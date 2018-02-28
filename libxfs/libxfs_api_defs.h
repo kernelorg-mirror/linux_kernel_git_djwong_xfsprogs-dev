@@ -151,6 +151,10 @@
 #define xfs_init_local_fork		libxfs_init_local_fork
 #define xfs_dir2_namecheck		libxfs_dir2_namecheck
 #define xfs_attr_namecheck		libxfs_attr_namecheck
+#define xfs_bmbt_calc_size		libxfs_bmbt_calc_size
+#define xfs_rmap_query_all		libxfs_rmap_query_all
+#define xfs_bmapi_remap			libxfs_bmapi_remap
+#define xfs_imap_to_bp			libxfs_imap_to_bp
 
 #define LIBXFS_ATTR_ROOT		ATTR_ROOT
 #define LIBXFS_ATTR_SECURE		ATTR_SECURE
