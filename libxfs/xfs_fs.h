@@ -597,9 +597,10 @@ struct xfs_scrub_metadata {
 #define XFS_SCRUB_TYPE_PQUOTA	23	/* project quotas */
 #define XFS_SCRUB_TYPE_HEALTHY	24	/* everything checked out ok */
 #define XFS_SCRUB_TYPE_FSCOUNTERS 25	/* fs summary counters */
+#define XFS_SCRUB_TYPE_RTRMAPBT	26	/* realtime reverse mapping btree */
 
 /* Number of scrub subcommands. */
-#define XFS_SCRUB_TYPE_NR	26
+#define XFS_SCRUB_TYPE_NR	27
 
 /* i: Repair this metadata. */
 #define XFS_SCRUB_IFLAG_REPAIR		(1 << 0)
