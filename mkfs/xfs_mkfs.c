@@ -2046,9 +2046,9 @@ _("reflink not supported with realtime devices\n"));
 		cli->sb_feat.reflink = false;
 	}
 
-	if (cli->sb_feat.rmapbt && cli->xi->rtname) {
+	if (cli->sb_feat.rmapbt && cli->xi->rtname && !cli->sb_feat.metadir) {
 		fprintf(stderr,
-_("rmapbt not supported with realtime devices\n"));
+_("rmapbt not supported on realtime device without metadir feature\n"));
 		usage();
 		cli->sb_feat.rmapbt = false;
 	}
@@ -3424,6 +3424,7 @@ initialise_ag_headers(
 	struct xfs_alloc_rec	*arec;
 	struct xfs_alloc_rec	*nrec;
 	int			bucket;
+	uint			max_rtrmap_height;
 	uint64_t		agsize = cfg->agsize;
 	xfs_agblock_t		agblocks;
 	bool			is_log_ag = false;
@@ -3431,6 +3432,19 @@ initialise_ag_headers(
 
 	if (cfg->loginternal && agno == cfg->logagno)
 		is_log_ag = true;
+
+	/* The realtime rmapbt mustn't grow taller than max btree height. */
+	if (xfs_sb_version_hasrtrmapbt(&mp->m_sb)) {
+		max_rtrmap_height = libxfs_btree_compute_maxlevels(
+				mp->m_rtrmap_mnr, mp->m_sb.sb_rblocks);
+		if (max_rtrmap_height > XFS_BTREE_MAXLEVELS) {
+			fprintf(stderr,
+_("%s: max realtime rmapbt height (%u) exceeds configured maximum (%u)\n"),
+					progname, max_rtrmap_height,
+					XFS_BTREE_MAXLEVELS);
+			exit(1);
+		}
+	}
 
 	/*
 	 * Superblock.
