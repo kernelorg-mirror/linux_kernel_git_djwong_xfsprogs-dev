@@ -90,6 +90,8 @@ static const struct scrub_descr scrubbers[XFS_SCRUB_TYPE_NR] = {
 		{"filesystem summary counters",		ST_SUMMARY},
 	[XFS_SCRUB_TYPE_HEALTHY] =
 		{"retained health records",		ST_HEALTH},
+	[XFS_SCRUB_TYPE_RTRMAPBT] =
+		{"realtime reverse mapping btree",	ST_FS},
 };
 
 /* Format a scrub description. */
