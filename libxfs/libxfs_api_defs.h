@@ -182,5 +182,6 @@
 #define xfs_imeta_mount			libxfs_imeta_mount
 
 #define xfs_rtrmapbt_maxrecs		libxfs_rtrmapbt_maxrecs
+#define xfs_rtrmapbt_init_cursor	libxfs_rtrmapbt_init_cursor
 
 #endif /* __LIBXFS_API_DEFS_H__ */
