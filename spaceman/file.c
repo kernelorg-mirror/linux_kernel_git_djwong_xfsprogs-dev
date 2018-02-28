@@ -55,12 +55,12 @@ print_f(
 
 int
 openfile(
-	char		*path,
-	xfs_fsop_geom_t	*geom,
-	struct fs_path	*fs_path)
+	char			*path,
+	struct xfs_fsop_geom	*geom,
+	struct fs_path		*fs_path)
 {
-	struct fs_path	*fsp;
-	int		fd;
+	struct fs_path		*fsp;
+	int			fd;
 
 	fd = open(path, 0);
 	if (fd < 0) {
