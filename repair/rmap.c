@@ -1539,3 +1539,68 @@ rmap_store_agflcount(
 
 	rmap_for_ag(agno)->ar_flcount = count;
 }
+
+/* Store the realtime reverse-mappings in the rtrmapbt. */
+int
+rmap_populate_realtime_rmapbt(
+	struct xfs_mount	*mp)
+{
+	struct xfs_trans	*tp;
+	struct xfs_inode	*ip;
+	struct xfs_inode	fakei;
+	struct xfs_slab_cursor	*rmap_cur;
+	struct xfs_rmap_irec	*rm_rec;
+	struct xfs_bmbt_irec	imap;
+	xfs_ino_t		ino;
+	int			error;
+
+	if (!xfs_sb_version_hasrtrmapbt(&mp->m_sb))
+		return 0;
+
+	error = rmap_init_cursor(NULLAGNUMBER, &rmap_cur);
+	if (error)
+		return ENOMEM;
+
+	error = -libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &ino);
+	if (error)
+		goto out;
+
+	error = -libxfs_imeta_iget(mp, ino, XFS_DIR3_FT_REG_FILE, &ip);
+	if (error)
+		goto out;
+
+	mp->m_rrmapip = ip;
+	fakei.i_d.di_flags = XFS_DIFLAG_REALTIME;
+	fakei.i_d.di_flags2 = 0;
+
+	while ((rm_rec = pop_slab_cursor(rmap_cur))) {
+		imap.br_startoff = rm_rec->rm_offset;
+		imap.br_startblock = rm_rec->rm_startblock;
+		imap.br_blockcount = rm_rec->rm_blockcount;
+		imap.br_state = ((rm_rec->rm_flags & XFS_RMAP_UNWRITTEN) ?
+				XFS_EXT_UNWRITTEN : XFS_EXT_NORM);
+		fakei.i_ino = rm_rec->rm_owner;
+
+		error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
+				0, 0, 0, &tp);
+		if (error)
+			break;
+
+		error = -libxfs_rmap_map_extent(tp, &fakei, XFS_DATA_FORK,
+				&imap);
+		if (error) {
+			libxfs_trans_cancel(tp);
+			break;
+		}
+
+		error = -libxfs_trans_commit(tp);
+		if (error)
+			break;
+	}
+
+	mp->m_rrmapip = NULL;
+	libxfs_imeta_irele(ip);
+out:
+	free_slab_cursor(&rmap_cur);
+	return error;
+}
