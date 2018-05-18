@@ -1,0 +1,12 @@
+#!/bin/bash -x
+
+libtoolize
+automake --add-missing
+aclocal -I m4
+autoconf
+make configure
+libtoolize
+automake --add-missing
+aclocal -I m4
+autoconf
+make configure
