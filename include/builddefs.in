@@ -53,7 +53,9 @@ PKG_DOC_DIR	= @datadir@/doc/@pkg_name@
 PKG_LOCALE_DIR	= @datadir@/locale
 
 CC		= @cc@
+CXX		= @cxx@
 BUILD_CC	= @BUILD_CC@
+BUILD_CXX	= @BUILD_CXX@
 AWK		= @awk@
 SED		= @sed@
 TAR		= @tar@
@@ -169,8 +171,11 @@ GCFLAGS += -DENABLE_GETTEXT
 endif
 
 BUILD_CFLAGS += $(GCFLAGS) $(PCFLAGS)
+BUILD_CXXFLAGS += $(GCFLAGS) $(PCFLAGS)
+
 # First, Sanitizer, Global, Platform, Local CFLAGS
 CFLAGS += $(FCFLAGS) $(SANITIZER_CFLAGS) $(OPTIMIZER) $(GCFLAGS) $(PCFLAGS) $(LCFLAGS)
+CXXFLAGS += $(FCFLAGS) $(SANITIZER_CFLAGS) $(OPTIMIZER) $(GCFLAGS) $(PCFLAGS) $(LCFLAGS)
 
 include $(TOPDIR)/include/buildmacros
 
