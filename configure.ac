@@ -27,6 +27,24 @@ if test "${BUILD_CFLAGS+set}" != "set"; then
   fi
 fi
 
+AC_PROG_CXX
+AC_ARG_VAR(BUILD_CXX, [C++ compiler for build tools])
+if test "${BUILD_CXX+set}" != "set"; then
+  if test $cross_compiling = no; then
+    BUILD_CXX="$CXX"
+  else
+    AC_CHECK_PROGS(BUILD_CXX, g++ c++)
+  fi
+fi
+AC_ARG_VAR(BUILD_CXXFLAGS, [C++ compiler flags for build tools])
+if test "${BUILD_CXXFLAGS+set}" != "set"; then
+  if test $cross_compiling = no; then
+    BUILD_CXXFLAGS="$CXXFLAGS"
+  else
+    BUILD_CXXFLAGS="-g -O2"
+  fi
+fi
+
 AC_ARG_ENABLE(shared,
 [ --enable-shared=[yes/no] Enable use of shared libraries [default=yes]],,
 	enable_shared=yes)
