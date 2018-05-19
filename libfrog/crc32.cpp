@@ -132,7 +132,9 @@ crc32_body(u32 crc, unsigned char const *buf, size_t len, const u32 (*tab)[256])
  * @p: pointer to buffer over which CRC is run
  * @len: length of buffer @p
  */
+#ifdef USE_FMV
 __attribute__ ((target ("default")))
+#endif
 static inline u32 __pure crc32_le_generic(u32 crc, unsigned char const *p,
 					  size_t len, const u32 (*tab)[256],
 					  u32 polynomial)
@@ -171,6 +173,21 @@ static inline u32 __pure crc32_le_generic(u32 crc, unsigned char const *p,
 #endif
 	return crc;
 }
+
+#ifdef USE_PCLMUL_FMV
+extern "C" {
+u32 crc_pcl(unsigned char const *buffer, size_t len, u32 crc_init);
+}
+
+__attribute__ ((target ("pclmul")))
+static inline u32 __pure crc32_le_generic(u32 crc, unsigned char const *p,
+					  size_t len, const u32 (*tab)[256],
+					  u32 polynomial)
+{
+	assert(polynomial == CRC32C_POLY_LE);
+	return crc_pcl(p, len, crc);
+}
+#endif /* USE_PCLMUL_FMV */
 
 extern "C" {
 #if CRC_LE_BITS == 1
