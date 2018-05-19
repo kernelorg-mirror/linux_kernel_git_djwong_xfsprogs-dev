@@ -34,6 +34,20 @@ crc32table.h
 
 LSRCFILES += gen_crc32table.c
 
+ifeq ($(USE_FMV),yes)
+CXXFLAGS += -DUSE_FMV
+BUILD_CXXFLAGS += -DUSE_FMV
+endif
+
+ifeq ($(USE_PCLMUL_FMV),yes)
+CRC32C_ASMFILES += crc32c-asm-intel-pcl.S
+CRC32C_OBJFILES += crc32c-asm-intel-pcl.o
+CXXFLAGS += -DUSE_PCLMUL_FMV
+BUILD_CXXFLAGS += -DUSE_PCLMUL_FMV
+endif
+
+ASMFILES += $(CRC32C_ASMFILES)
+
 ifeq ($(HAVE_GETMNTENT),yes)
 LCFLAGS += -DHAVE_GETMNTENT
 endif
@@ -41,6 +55,10 @@ endif
 LDIRT = gen_crc32table crc32table.h crc32selftest
 
 default: crc32selftest ltdepend $(LTLIBRARY)
+
+crc32.o: $(TOPDIR)/include/builddefs
+
+$(LTLIBRARY): $(TOPDIR)/include/builddefs
 
 crc32table.h: gen_crc32table.c crc32defs.h
 	@echo "    [CC]     gen_crc32table"
@@ -53,9 +71,9 @@ crc32table.h: gen_crc32table.c crc32defs.h
 # systems/architectures. Hence we make sure that xfsprogs will never use a
 # busted CRC calculation at build time and hence avoid putting bad CRCs down on
 # disk.
-crc32selftest: gen_crc32table.c crc32table.h crc32.cpp crc32defs.h
+crc32selftest: gen_crc32table.c crc32table.h crc32.cpp crc32defs.h $(CRC32C_ASMFILES)
 	@echo "    [TEST]    CRC32"
-	$(Q) $(BUILD_CXX) $(BUILD_CXXFLAGS) -D CRC32_SELFTEST=1 crc32.cpp -o $@
+	$(Q) $(BUILD_CXX) $(BUILD_CXXFLAGS) -D CRC32_SELFTEST=1 crc32.cpp $(CRC32C_ASMFILES) -o $@
 	$(Q) ./$@
 
 include $(BUILDRULES)
