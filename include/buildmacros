@@ -26,6 +26,7 @@ LIBDIRT = .libs
 DIRDIRT = $(LDIRDIRT) $(LIBDIRT)
 
 OBJECTS = $(ASFILES:.s=.o) \
+	  $(ASMFILES:.S=.o) \
 	  $(CFILES:.c=.o) \
 	  $(CXXFILES:.cpp=.o) \
 	  $(LFILES:.l=.o) \
