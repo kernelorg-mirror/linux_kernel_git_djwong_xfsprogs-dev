@@ -234,32 +234,32 @@ static inline void be64_add_cpu(__be64 *a, __s64 b)
 
 static inline uint16_t get_unaligned_be16(void *p)
 {
-	uint8_t *__p = p;
+	uint8_t *__p = (uint8_t *)p;
 	return __p[0] << 8 | __p[1];
 }
 
 static inline uint32_t get_unaligned_be32(void *p)
 {
-	uint8_t *__p = p;
+	uint8_t *__p = (uint8_t *)p;
         return (uint32_t)__p[0] << 24 | __p[1] << 16 | __p[2] << 8 | __p[3];
 }
 
 static inline uint64_t get_unaligned_be64(void *p)
 {
 	return (uint64_t)get_unaligned_be32(p) << 32 |
-			   get_unaligned_be32(p + 4);
+			   get_unaligned_be32((uint8_t *)p + 4);
 }
 
 static inline void put_unaligned_be16(uint16_t val, void *p)
 {
-	uint8_t *__p = p;
+	uint8_t *__p = (uint8_t *)p;
 	*__p++ = val >> 8;
 	*__p++ = val;
 }
 
 static inline void put_unaligned_be32(uint32_t val, void *p)
 {
-	uint8_t *__p = p;
+	uint8_t *__p = (uint8_t *)p;
 	put_unaligned_be16(val >> 16, __p);
 	put_unaligned_be16(val, __p + 2);
 }
@@ -267,7 +267,7 @@ static inline void put_unaligned_be32(uint32_t val, void *p)
 static inline void put_unaligned_be64(uint64_t val, void *p)
 {
 	put_unaligned_be32(val >> 32, p);
-	put_unaligned_be32(val, p + 4);
+	put_unaligned_be32(val, (uint8_t *)p + 4);
 }
 
 #endif	/* __XFS_ARCH_H__ */
