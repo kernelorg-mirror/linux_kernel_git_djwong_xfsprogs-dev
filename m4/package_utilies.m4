@@ -148,3 +148,26 @@ AC_DEFUN([AC_PACKAGE_UTILITIES],
     fi
     AC_SUBST(rpmbuild)
   ])
+
+# See if we can enable auto-switching pclmul crc32c function multiversioning.
+# We don't do this if there's a cross compiler because we have no way at all
+# of checking the results during build.
+AC_DEFUN([AC_COMPILER_SUPPORTS_PCLMUL_FMV],
+[   if test $cross_compiling = no; then
+	AC_MSG_CHECKING([whether g++ autodetects PCLMUL])
+	AC_LANG_PUSH([C++])
+	AC_COMPILE_IFELSE([
+		AC_LANG_PROGRAM([[
+__attribute__ ((target ("pclmul")))
+int moo(void) { return 1; }
+
+__attribute__ ((target ("default")))
+int moo(void) { return 0; }
+]], [[return moo();]])],
+		use_pclmul_fmv=yes
+		use_fmv=yes
+		AC_MSG_RESULT(yes), AC_MSG_RESULT(no))
+	AC_LANG_POP([C++])
+	AC_SUBST(use_pclmul_fmv)
+    fi
+])

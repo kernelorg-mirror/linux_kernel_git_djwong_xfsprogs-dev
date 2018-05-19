@@ -77,6 +77,9 @@ $(LTLIBRARY) : $(SUBDIRS) $(LTOBJECTS)
 %.lo: %.cpp
 	@echo "    [CXX]    $@"
 	$(Q)$(LTCXXOMPILE) -c $<
+%.lo: %.S
+	@echo "    [ASM]    $@"
+	$(Q)$(LTCOMPILE) -c $<
 else
 
 %.o: %.c
@@ -86,6 +89,10 @@ else
 %.o: %.cpp
 	@echo "    [CXX]    $@"
 	$(Q)$(CXX) $(CXXFLAGS) -c $<
+%.o: %.S
+	@echo "    [ASM]    $@"
+	$(Q)$(CC) $(CFLAGS) -c $<
+
 endif
 endif
 
