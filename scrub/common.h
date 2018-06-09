@@ -19,6 +19,7 @@ enum error_level {
 	S_ERROR	= 0,
 	S_WARN,
 	S_REPAIR,
+	S_TOOSLOW,
 	S_INFO,
 	S_PREEN,
 };
@@ -38,6 +39,8 @@ void __str_out(struct scrub_ctx *ctx, const char *descr, enum error_level level,
 	__str_out(ctx, str, S_REPAIR,	0,	__FILE__, __LINE__, __VA_ARGS__)
 #define record_preen(ctx, str, ...) \
 	__str_out(ctx, str, S_PREEN,	0,	__FILE__, __LINE__, __VA_ARGS__)
+#define skip_slow_op(ctx, str, ...) \
+	__str_out(ctx, str, S_TOOSLOW,	0,	__FILE__, __LINE__, __VA_ARGS__)
 
 #define dbg_printf(fmt, ...) \
 	do {if (debug > 1) {printf(fmt, __VA_ARGS__);}} while (0)
