@@ -50,7 +50,8 @@ static struct {
 	[S_WARN]   = { .string = "Warning",	.loglevel = LOG_WARNING },
 	[S_REPAIR] = { .string = "Repaired",	.loglevel = LOG_WARNING },
 	[S_INFO]   = { .string = "Info",	.loglevel = LOG_INFO },
-	[S_PREEN]  = { .string = "Optimized",	.loglevel = LOG_INFO }
+	[S_PREEN]  = { .string = "Optimized",	.loglevel = LOG_INFO },
+	[S_TOOSLOW]= { .string = "Skipped",	.loglevel = LOG_INFO },
 };
 
 /* If stream is a tty, clear to end of line to clean up progress bar. */
@@ -116,6 +117,8 @@ out_record:
 		ctx->repairs++;
 	else if (level == S_PREEN)
 		ctx->preens++;
+	else if (level == S_TOOSLOW)
+		ctx->slow_ops_skipped++;
 
 	pthread_mutex_unlock(&ctx->lock);
 }
