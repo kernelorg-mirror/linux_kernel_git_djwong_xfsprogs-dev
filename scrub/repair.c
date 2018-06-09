@@ -236,6 +236,7 @@ xfs_action_list_process(
 	list_for_each_entry_safe(aitem, n, &alist->list, list) {
 		fix = xfs_repair_metadata(ctx, fd, aitem, repair_flags);
 		switch (fix) {
+		case CHECK_TOOSLOW:
 		case CHECK_DONE:
 			if (!(repair_flags & ALP_NOPROGRESS))
 				progress_add(1);
