@@ -88,4 +88,6 @@ parse_defaults_file(
 	struct mkfs_default_params	*dft,
 	const char			*config_file);
 
+extern const struct sb_feat_args dft_features;
+
 #endif /* _XFS_MKFS_CONFIG_H */

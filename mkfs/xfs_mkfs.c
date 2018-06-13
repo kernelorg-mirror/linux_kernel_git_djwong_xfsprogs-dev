@@ -3725,24 +3725,7 @@ main(
 	struct mkfs_default_params	dft = {
 		.sectorsize = XFS_MIN_SECTORSIZE,
 		.blocksize = 1 << XFS_DFL_BLOCKSIZE_LOG,
-		.sb_feat = {
-			.log_version = 2,
-			.attr_version = 2,
-			.dir_version = 2,
-			.inode_align = true,
-			.nci = false,
-			.lazy_sb_counters = true,
-			.projid32bit = true,
-			.crcs_enabled = true,
-			.dirftype = true,
-			.finobt = true,
-			.spinodes = true,
-			.rmapbt = false,
-			.reflink = false,
-			.parent_pointers = false,
-			.nodalign = false,
-			.nortalign = false,
-		},
+		.sb_feat = dft_features,
 	};
 	char			*cli_config_file = NULL;
 	char			*config_file = NULL;
