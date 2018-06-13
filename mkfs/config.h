@@ -19,9 +19,6 @@
 #ifndef _XFS_MKFS_CONFIG_H
 #define _XFS_MKFS_CONFIG_H
 
-#define MKFS_XFS_CONF_DIR      	ROOT_SYSCONFDIR "/xfs/mkfs"
-#define MKFS_XFS_DEFAULT_CONFIG	"default"
-
 struct fsxattr;
 
 /*

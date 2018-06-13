@@ -65,6 +65,9 @@ PKG_MAN_DIR	= @mandir@
 PKG_ETC_DIR	= @sysconfdir@
 PKG_DOC_DIR	= @datadir@/doc/@pkg_name@
 PKG_LOCALE_DIR	= @datadir@/locale
+PKG_CFG_DIR	= $(PKG_ETC_DIR)/xfs
+PKG_MKFS_CFG_DIR = $(PKG_CFG_DIR)/mkfs
+PKG_MKFS_DEFAULT_CFGFILE = default
 
 CC		= @cc@
 BUILD_CC	= @BUILD_CC@
@@ -197,7 +200,6 @@ endif
 
 GCFLAGS = $(DEBUG) \
 	  -DVERSION=\"$(PKG_VERSION)\" -DLOCALEDIR=\"$(PKG_LOCALE_DIR)\"  \
-	  -DROOT_SYSCONFDIR=\"$(PKG_ETC_DIR)\"  \
 	  -DPACKAGE=\"$(PKG_NAME)\" -I$(TOPDIR)/include -I$(TOPDIR)/libxfs
 
 ifeq ($(ENABLE_GETTEXT),yes)
