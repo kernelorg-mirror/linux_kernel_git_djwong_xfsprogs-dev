@@ -88,6 +88,38 @@ parse_defaults_file(
 	struct mkfs_default_params	*dft,
 	const char			*config_file);
 
+enum cfg_data_subopts {
+	CFG_D_NOALIGN = 0,
+};
+
+enum cfg_inode_subopts {
+	CFG_I_ALIGN = 0,
+	CFG_I_PROJID32BIT,
+	CFG_I_SPINODES,
+};
+
+enum cfg_log_subopts {
+	CFG_L_LAZYSBCNTR = 0,
+};
+
+enum cfg_metadata_subopts {
+	CFG_M_CRC = 0,
+	CFG_M_FINOBT,
+	CFG_M_RMAPBT,
+	CFG_M_REFLINK,
+};
+
+enum cfg_naming_subopts {
+	CFG_N_FTYPE = 0,
+};
+
+enum cfg_rtdev_subopts {
+	CFG_R_NOALIGN = 0,
+};
+
+/* Just define the max options array size manually right now */
+#define CFG_MAX_SUBOPTS	5
+
 extern const struct sb_feat_args dft_features;
 
 #endif /* _XFS_MKFS_CONFIG_H */
