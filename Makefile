@@ -92,6 +92,7 @@ copy: libxlog
 mkfs: libxcmd
 spaceman: libxcmd
 scrub: libhandle libxcmd
+man: mkfs
 
 ifeq ($(HAVE_BUILDDEFS), yes)
 include $(BUILDRULES)

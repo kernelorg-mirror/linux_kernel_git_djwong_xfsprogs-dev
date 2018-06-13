@@ -13,13 +13,20 @@ LSRCFILES	= $(MAN_PAGES)
 
 default : $(MAN_PAGES)
 
-LDIRT		= mkfs.xfs.8
+LDIRT		= mkfs.xfs.8 cfg.8
 
 include $(BUILDRULES)
 
-mkfs.xfs.8: mkfs.xfs.8.in
+cfg.8: ../../mkfs/mkconfig
+	@echo "    [GENERATE] $@"
+	$(Q) ../../mkfs/mkconfig -m > $@
+
+mkfs.xfs.8: mkfs.xfs.8.in cfg.8
 	@echo "    [SED]    $@"
-	$(Q)$(SED) -e "s|@sysconfdir@|$(PKG_ETC_DIR)|g" < $< > $@
+	$(Q) $(SED) -e "s|@sysconfdir@|$(PKG_ETC_DIR)|g" \
+		   -e "/@default_mkfs_cfg@/r cfg.8" \
+		   -e "s/@default_mkfs_cfg@//g" \
+		   < $< > $@
 
 install : default
 	$(INSTALL) -m 755 -d $(MAN_DEST)

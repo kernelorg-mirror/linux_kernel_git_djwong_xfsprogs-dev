@@ -978,40 +978,7 @@ See below for a list of all supported configuration parameters and their
 current built-in default settings.
 .PP
 .B # Comments and blank lines  are allowed
-.br
-.B [data]
-.br
-.B noalign=0
-.PP
-.B [inode]
-.br
-.B align=1
-.br
-.B projid32bit=1
-.br
-.B sparse=1
-.PP
-.B [log]
-.br
-.B lazy-count=1
-.PP
-.B [metadata]
-.br
-.B crc=1
-.br
-.B finobt=1
-.br
-.B rmapbt=0
-.br
-.B reflink=0
-.PP
-.B [naming]
-.br
-.B ftype=1
-.PP
-.B [rtdev]
-.br
-.B noalign=0
+@default_mkfs_cfg@
 .PP
 .SH SEE ALSO
 .BR xfs (5),

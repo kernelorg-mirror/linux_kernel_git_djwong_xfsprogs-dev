@@ -112,6 +112,7 @@ struct confopts {
 			{NULL}
 		},
 	},
+	{NULL},
 };
 
 /* Spit out a config file template. */
@@ -123,10 +124,13 @@ main(
 	struct confopts		*opts = confopts_tab;
 	struct subopt_map	*submap;
 	int			c;
-	unsigned int		i, j;
+	bool			manpage = false;
 
-	while ((c = getopt(argc, argv, "")) != EOF) {
+	while ((c = getopt(argc, argv, "m")) != EOF) {
 		switch (c) {
+		case 'm':
+			manpage = true;
+			break;
 		case '?':
 			fprintf(stderr, "Unknown option %c.\n", optopt);
 			return 1;
@@ -137,19 +141,22 @@ main(
 		return 1;
 	}
 
-	printf("# mkfs.xfs configuration file to collect settings.\n");
-	printf("# See the mkfs.xfs(8) manpage for details.\n");
-	printf("# Copy this file to %s/%s to override the built-in defaults.\n",
-			MKFS_XFS_CONF_DIR, MKFS_XFS_DEFAULT_CONFIG);
+	if (!manpage) {
+		printf("# mkfs.xfs configuration file to collect settings.\n");
+		printf("# See the mkfs.xfs(8) manpage for details.\n");
+		printf("# Copy this file to %s/%s to override the built-in defaults.\n",
+				MKFS_XFS_CONF_DIR, MKFS_XFS_DEFAULT_CONFIG);
+	}
 
-	for (i = 0; i < ARRAY_SIZE(confopts_tab); i++, opts++) {
-		if (i > 0)
+	for (opts = confopts_tab; opts->name; opts++) {
+		if (manpage)
+			printf(".PP\n.B ");
+		else if (opts != confopts_tab)
 			printf("\n");
 		printf("[%s]\n", opts->name);
-		submap = opts->subopts;
-		for (j = 0;
-		     j < ARRAY_SIZE(opts->subopts) && submap->suboptname;
-		     j++, submap++) {
+		for (submap = opts->subopts; submap->suboptname; submap++) {
+			if (manpage)
+				printf(".br\n.B ");
 			printf("%s = ", submap->suboptname);
 			switch (submap->type) {
 			case FV_BOOL:
