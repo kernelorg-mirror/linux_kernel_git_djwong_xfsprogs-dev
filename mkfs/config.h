@@ -119,4 +119,22 @@ enum cfg_rtdev_subopts {
 
 extern const struct sb_feat_args dft_features;
 
+enum cfgfile_var_type {
+	FV_BOOL = 0
+};
+
+struct cfg_subopt_map {
+	const char		*suboptname;
+	const void		*ptr;
+	enum cfgfile_var_type	type;
+};
+
+/* Map config file options to the relevant parts of dft_features. */
+struct cfg_section_map {
+	const char		*name;
+	struct cfg_subopt_map	subopts[CFG_MAX_SUBOPTS];
+};
+
+extern const struct cfg_section_map cfgfile_map[];
+
 #endif /* _XFS_MKFS_CONFIG_H */

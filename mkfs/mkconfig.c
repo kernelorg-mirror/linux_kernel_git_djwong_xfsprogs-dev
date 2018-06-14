@@ -6,123 +6,14 @@
 #include "libxfs.h"
 #include "config.h"
 
-enum cfgfile_var_type {
-	FV_BOOL = 0
-};
-
-struct subopt_map {
-	const char		*suboptname;
-	const void		*ptr;
-	enum cfgfile_var_type	type;
-};
-
-/* Map all the config file options to their dft_features equivalents. */
-struct confopts {
-	const char		*name;
-	struct subopt_map	subopts[CFG_MAX_SUBOPTS];
-} confopts_tab[] = {
-	{
-		.name = "data",
-		.subopts = {
-			[CFG_D_NOALIGN] = {
-				.suboptname	= "noalign",
-				.ptr		= &dft_features.nodalign,
-				.type		= FV_BOOL,
-			},
-			{NULL}
-		},
-	},
-	{
-		.name = "inode",
-		.subopts = {
-			[CFG_I_ALIGN] = {
-				.suboptname	= "align",
-				.ptr		= &dft_features.inode_align,
-				.type		= FV_BOOL,
-			},
-			[CFG_I_PROJID32BIT] = {
-				.suboptname	= "projid32bit",
-				.ptr		= &dft_features.projid32bit,
-				.type		= FV_BOOL,
-			},
-			[CFG_I_SPINODES] = {
-				.suboptname	= "sparse",
-				.ptr		= &dft_features.spinodes,
-				.type		= FV_BOOL,
-			},
-			{NULL}
-		},
-	},
-	{
-		.name = "log",
-		.subopts = {
-			[CFG_L_LAZYSBCNTR] = {
-				.suboptname	= "lazy-count",
-				.ptr		= &dft_features.lazy_sb_counters,
-				.type		= FV_BOOL,
-			},
-			{NULL}
-		},
-	},
-	{
-		.name = "metadata",
-		.subopts = {
-			[CFG_M_CRC] = {
-				.suboptname	= "crc",
-				.ptr		= &dft_features.crcs_enabled,
-				.type		= FV_BOOL,
-			},
-			[CFG_M_FINOBT] = {
-				.suboptname	= "finobt",
-				.ptr		= &dft_features.finobt,
-				.type		= FV_BOOL,
-			},
-			[CFG_M_RMAPBT] = {
-				.suboptname	= "rmapbt",
-				.ptr		= &dft_features.rmapbt,
-				.type		= FV_BOOL,
-			},
-			[CFG_M_REFLINK] = {
-				.suboptname	= "reflink",
-				.ptr		= &dft_features.reflink,
-				.type		= FV_BOOL,
-			},
-			{NULL}
-		},
-	},
-	{
-		.name = "naming",
-		.subopts = {
-			[CFG_N_FTYPE] = {
-				.suboptname	= "ftype",
-				.ptr		= &dft_features.dirftype,
-				.type		= FV_BOOL,
-			},
-			{NULL}
-		},
-	},
-	{
-		.name = "rtdev",
-		.subopts = {
-			[CFG_R_NOALIGN] = {
-				.suboptname	= "noalign",
-				.ptr		= &dft_features.nortalign,
-				.type		= FV_BOOL,
-			},
-			{NULL}
-		},
-	},
-	{NULL},
-};
-
 /* Spit out a config file template. */
 int
 main(
 	int			argc,
 	char			*argv[])
 {
-	struct confopts		*opts = confopts_tab;
-	struct subopt_map	*submap;
+	const struct cfg_section_map	*opts = cfgfile_map;
+	const struct cfg_subopt_map	*submap;
 	int			c;
 	bool			manpage = false;
 
@@ -148,10 +39,10 @@ main(
 				MKFS_XFS_CONF_DIR, MKFS_XFS_DEFAULT_CONFIG);
 	}
 
-	for (opts = confopts_tab; opts->name; opts++) {
+	for (opts = cfgfile_map; opts->name; opts++) {
 		if (manpage)
 			printf(".PP\n.B ");
-		else if (opts != confopts_tab)
+		else if (opts != cfgfile_map)
 			printf("\n");
 		printf("[%s]\n", opts->name);
 		for (submap = opts->subopts; submap->suboptname; submap++) {

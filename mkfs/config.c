@@ -23,6 +23,102 @@
 #include "libxfs.h"
 #include "config.h"
 
+/* Map config file options to the relevant parts of dft_features. */
+const struct cfg_section_map cfgfile_map[] = {
+	{
+		.name = "data",
+		.subopts = {
+			[CFG_D_NOALIGN] = {
+				.suboptname	= "noalign",
+				.ptr		= &dft_features.nodalign,
+				.type		= FV_BOOL,
+			},
+			{NULL}
+		},
+	},
+	{
+		.name = "inode",
+		.subopts = {
+			[CFG_I_ALIGN] = {
+				.suboptname	= "align",
+				.ptr		= &dft_features.inode_align,
+				.type		= FV_BOOL,
+			},
+			[CFG_I_PROJID32BIT] = {
+				.suboptname	= "projid32bit",
+				.ptr		= &dft_features.projid32bit,
+				.type		= FV_BOOL,
+			},
+			[CFG_I_SPINODES] = {
+				.suboptname	= "sparse",
+				.ptr		= &dft_features.spinodes,
+				.type		= FV_BOOL,
+			},
+			{NULL}
+		},
+	},
+	{
+		.name = "log",
+		.subopts = {
+			[CFG_L_LAZYSBCNTR] = {
+				.suboptname	= "lazy-count",
+				.ptr		= &dft_features.lazy_sb_counters,
+				.type		= FV_BOOL,
+			},
+			{NULL}
+		},
+	},
+	{
+		.name = "metadata",
+		.subopts = {
+			[CFG_M_CRC] = {
+				.suboptname	= "crc",
+				.ptr		= &dft_features.crcs_enabled,
+				.type		= FV_BOOL,
+			},
+			[CFG_M_FINOBT] = {
+				.suboptname	= "finobt",
+				.ptr		= &dft_features.finobt,
+				.type		= FV_BOOL,
+			},
+			[CFG_M_RMAPBT] = {
+				.suboptname	= "rmapbt",
+				.ptr		= &dft_features.rmapbt,
+				.type		= FV_BOOL,
+			},
+			[CFG_M_REFLINK] = {
+				.suboptname	= "reflink",
+				.ptr		= &dft_features.reflink,
+				.type		= FV_BOOL,
+			},
+			{NULL}
+		},
+	},
+	{
+		.name = "naming",
+		.subopts = {
+			[CFG_N_FTYPE] = {
+				.suboptname	= "ftype",
+				.ptr		= &dft_features.dirftype,
+				.type		= FV_BOOL,
+			},
+			{NULL}
+		},
+	},
+	{
+		.name = "rtdev",
+		.subopts = {
+			[CFG_R_NOALIGN] = {
+				.suboptname	= "noalign",
+				.ptr		= &dft_features.nortalign,
+				.type		= FV_BOOL,
+			},
+			{NULL}
+		},
+	},
+	{NULL},
+};
+
 /*
  * Enums for each configuration option. All these currently match the CLI
  * parameters for now but this may change later, so we keep all this code

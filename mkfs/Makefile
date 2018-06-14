@@ -23,7 +23,7 @@ LDIRT = $(CFGFILE_TEMPLATE)
 
 default: depend $(CFGFILE_TEMPLATE) $(LTCOMMAND)
 
-mkconfig: mkconfig.c defaults.c
+mkconfig: mkconfig.c defaults.c config.c
 	@echo "    [CC]     mkconfig"
 	$(Q) $(BUILD_CC) $(BUILD_CFLAGS) $(CFGFILE_CFLAGS) -o $@ $^
 
