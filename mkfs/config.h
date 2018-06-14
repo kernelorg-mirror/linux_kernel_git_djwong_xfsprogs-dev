@@ -127,14 +127,16 @@ struct cfg_subopt_map {
 	const char		*suboptname;
 	const void		*ptr;
 	enum cfgfile_var_type	type;
+	bool			seen;
 };
 
 /* Map config file options to the relevant parts of dft_features. */
 struct cfg_section_map {
 	const char		*name;
 	struct cfg_subopt_map	subopts[CFG_MAX_SUBOPTS];
+	bool			seen;
 };
 
-extern const struct cfg_section_map cfgfile_map[];
+extern struct cfg_section_map cfgfile_map[];
 
 #endif /* _XFS_MKFS_CONFIG_H */

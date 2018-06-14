@@ -24,7 +24,7 @@
 #include "config.h"
 
 /* Map config file options to the relevant parts of dft_features. */
-const struct cfg_section_map cfgfile_map[] = {
+struct cfg_section_map cfgfile_map[] = {
 	{
 		.name = "data",
 		.subopts = {
@@ -119,454 +119,311 @@ const struct cfg_section_map cfgfile_map[] = {
 	{NULL},
 };
 
+/* Trim leading and trailing whitespace and comments. */
+static void
+trim_config_line(
+	char			*line)
+{
+	char			*start, *end;
+
+	/* Roll past leading whitespace. */
+	for (start = line; *start && isspace(*start); start++) { /* empty */; }
+
+	/* Run until we hit EOL or a comment. */
+	for (end = start; *end && *end != '#'; end++) { /* empty */; }
+
+	/* Trim any trailing whitespace. */
+	for (; end > start && isspace(*(end - 1)); end--) { /* empty */; }
+
+	/* Fix up the line. */
+	memmove(line, start, end - start);
+	line[end - start] = 0;
+}
+
+/* What did we do with this line? */
+enum line_control {
+	LINE_IGNORED,
+	LINE_HANDLED,
+	LINE_ERROR,
+};
+
 /*
- * Enums for each configuration option. All these currently match the CLI
- * parameters for now but this may change later, so we keep all this code
- * and definitions separate. The rules for configuration parameters may also
- * differ.
- *
- * We only provide definitions for what we currently support parsing.
+ * Look for a section tag and return it if we haven't seen this section
+ * already.
  */
-
-static int
-config_check_bool(
-	uint64_t	value)
+static enum line_control
+parse_section(
+	const char			*config_file,
+	unsigned int			line_number,
+	const char			*line,
+	struct cfg_section_map		**section)
 {
-	if (value > 1)
+	char				*tag;
+	char				*cp;
+	char				*junk;
+	struct cfg_section_map		*s;
+	int				n;
+	enum line_control		ret;
+
+	/*
+	 * Look for the section tag, the closing paren, and any junk after
+	 * that.
+	 */
+	tag = cp = junk = NULL;
+	n = sscanf(line, " [ %m[^] \f\n\r\t\v] %ms %m[^\n]", &tag, &cp, &junk);
+	if (n != 2 || strcmp(cp, "]")) {
+		ret = LINE_IGNORED;
 		goto out;
-
-	return 0;
-out:
-	errno = ERANGE;
-	return -1;
-}
-
-
-static int
-data_config_parser(
-	struct mkfs_default_params	*dft,
-	int				psubopt,
-	uint64_t			value)
-{
-	enum cfg_data_subopts		subopt = psubopt;
-
-	if (config_check_bool(value) != 0)
-		return -1;
-
-	switch (subopt) {
-	case CFG_D_NOALIGN:
-		dft->sb_feat.nodalign = value;
-		return 0;
-	}
-	return -1;
-}
-
-static int
-inode_config_parser(
-	struct mkfs_default_params	*dft,
-	int				psubopt,
-	uint64_t			value)
-{
-	enum cfg_inode_subopts		subopt = psubopt;
-
-	if (config_check_bool(value) != 0)
-		return -1;
-
-	switch (subopt) {
-	case CFG_I_ALIGN:
-		dft->sb_feat.inode_align = value;
-		return 0;
-	case CFG_I_PROJID32BIT:
-		dft->sb_feat.projid32bit = value;
-		return 0;
-	case CFG_I_SPINODES:
-		dft->sb_feat.spinodes = value;
-		return 0;
-	}
-	return -1;
-}
-
-static int
-log_config_parser(
-	struct mkfs_default_params	*dft,
-	int				psubopt,
-	uint64_t			value)
-{
-	enum cfg_log_subopts		subopt = psubopt;
-
-	if (config_check_bool(value) != 0)
-		return -1;
-
-	switch (subopt) {
-	case CFG_L_LAZYSBCNTR:
-		dft->sb_feat.lazy_sb_counters = value;
-		return 0;
-	}
-	return -1;
-}
-
-static int
-metadata_config_parser(
-	struct mkfs_default_params	*dft,
-	int				psubopt,
-	uint64_t			value)
-{
-	enum cfg_metadata_subopts	subopt = psubopt;
-
-	if (config_check_bool(value) != 0)
-		return -1;
-
-	switch (subopt) {
-	case CFG_M_CRC:
-		dft->sb_feat.crcs_enabled = value;
-		if (dft->sb_feat.crcs_enabled)
-			dft->sb_feat.dirftype = true;
-		return 0;
-	case CFG_M_FINOBT:
-		dft->sb_feat.finobt = value;
-		return 0;
-	case CFG_M_RMAPBT:
-		dft->sb_feat.rmapbt = value;
-		return 0;
-	case CFG_M_REFLINK:
-		dft->sb_feat.reflink = value;
-		return 0;
-	}
-	return -1;
-}
-
-static int
-naming_config_parser(
-	struct mkfs_default_params	*dft,
-	int				psubopt,
-	uint64_t			value)
-{
-	enum cfg_naming_subopts		subopt = psubopt;
-
-	if (config_check_bool(value) != 0)
-		return -1;
-
-	switch (subopt) {
-	case CFG_N_FTYPE:
-		dft->sb_feat.dirftype = value;
-		return 0;
-	}
-	return -1;
-}
-
-static int
-rtdev_config_parser(
-	struct mkfs_default_params	*dft,
-	int				psubopt,
-	uint64_t			value)
-{
-	enum cfg_rtdev_subopts		subopt = psubopt;
-
-	if (config_check_bool(value) != 0)
-		return -1;
-
-	switch (subopt) {
-	case CFG_R_NOALIGN:
-		dft->sb_feat.nortalign = value;
-		return 0;
-	}
-	return -1;
-}
-
-struct confopts {
-	const char	*name;
-	const char	*subopts[CFG_MAX_SUBOPTS];
-	int		(*parser)(struct mkfs_default_params *dft,
-				  int psubopt, uint64_t value);
-	bool		seen;
-} confopts_tab[] = {
-	{
-		.name = "data",
-		.subopts = {
-			[CFG_D_NOALIGN] = "noalign",
-			NULL
-		},
-		.parser = data_config_parser,
-	},
-	{
-		.name = "inode",
-		.subopts = {
-			[CFG_I_ALIGN] = "align",
-			[CFG_I_PROJID32BIT] = "projid32bit",
-			[CFG_I_SPINODES] = "sparse",
-			NULL
-		},
-		.parser = inode_config_parser,
-	},
-	{
-		.name = "log",
-		.subopts = {
-			[CFG_L_LAZYSBCNTR] = "lazy-count",
-			NULL
-		},
-		.parser = log_config_parser,
-	},
-	{
-		.name = "naming",
-		.subopts = {
-			[CFG_N_FTYPE] = "ftype",
-			NULL
-		},
-		.parser = naming_config_parser,
-	},
-	{
-		.name = "rtdev",
-		.subopts = {
-			[CFG_R_NOALIGN] = "noalign",
-			NULL
-		},
-		.parser = rtdev_config_parser,
-	},
-	{
-		.name = "metadata",
-		.subopts = {
-			[CFG_M_CRC] = "crc",
-			[CFG_M_FINOBT] = "finobt",
-			[CFG_M_RMAPBT] = "rmapbt",
-			[CFG_M_REFLINK] = "reflink",
-			NULL
-		},
-		.parser = metadata_config_parser,
-	},
-};
-
-static struct confopts *
-get_confopts(
-	const char	*section)
-{
-	unsigned int	i;
-	struct confopts	*opts;
-
-	for (i=0; i < ARRAY_SIZE(confopts_tab); i++) {
-		opts = &confopts_tab[i];
-		if (strcmp(opts->name, section) == 0)
-			return opts;
-	}
-	errno = EINVAL;
-	return NULL;
-}
-
-enum parse_line_type {
-	PARSE_COMMENT = 0,
-	PARSE_EMPTY,
-	PARSE_SECTION,
-	PARSE_TAG_VALUE,
-	PARSE_INVALID,
-	PARSE_EOF,
-};
-
-static bool
-isempty(
-	const char	*line,
-	ssize_t		linelen)
-{
-	ssize_t		i = 0;
-	char		p;
-
-	while (i < linelen) {
-		p = line[i++];
-
-		/* tab or space */
-		if (!isblank(p))
-			return false;
 	}
 
-	return true;
-}
-
-static bool
-iscomment(
-	const char	*line,
-	ssize_t		linelen)
-{
-	ssize_t		i = 0;
-	char		p;
-
-	while (i != linelen) {
-		p = line[i];
-		i++;
-
-		/* tab or space */
-		if (isblank(p))
+	/* Do we know about this section? */
+	for (s = cfgfile_map; s->name; s++) {
+		if (strcmp(s->name, tag))
 			continue;
+		if (s->seen) {
+			fprintf(stderr,
+_("%s:%d: section '%s' already seen.\n"),
+					config_file, line_number, s->name);
+			ret = LINE_ERROR;
+			goto out;
+		}
 
-		if (p == '#')
-			return true;
+		ASSERT(s->subopts[0].suboptname != NULL);
+		s->seen = true;
+		*section = s;
+		ret = LINE_HANDLED;
+		goto out;
+	}
 
+	fprintf(stderr,
+_("%s:%d: section '%s' not recognized.\n"),
+			config_file, line_number, tag);
+	ret = LINE_ERROR;
+out:
+	if (tag)
+		free(tag);
+	if (cp)
+		free(cp);
+	if (junk)
+		free(junk);
+	return ret;
+}
+
+/* Given a subopt, compute the appropriate offset in the mkfs params. */
+static void *
+section_to_dft(
+	struct cfg_subopt_map		*subopt,
+	struct mkfs_default_params	*dft)
+{
+	unsigned int			offset;
+
+	offset = (char *)subopt->ptr - (char *)&dft_features;
+	return (char *)&dft->sb_feat + offset;
+}
+
+/* Load a boolean into the parameters table. */
+static bool
+parse_subopt_bool(
+	const char			*config_file,
+	unsigned int			line_number,
+	struct cfg_section_map		*section,
+	struct cfg_subopt_map		*subopt,
+	const char			*val,
+	struct mkfs_default_params	*dft)
+{
+	bool				*v;
+	unsigned long long		raw;
+	char				*endp;
+
+	errno = 0;
+	raw = strtoull(val, &endp, 0);
+	if (endp == val || *endp != 0) {
+		fprintf(stderr,
+_("%s:%d: could not interpret value '%s'.\n"),
+			config_file, line_number, val);
+		return false;
+	}
+	if (raw != 0 && raw != 1) {
+		fprintf(stderr,
+_("%s:%d: %s.%s value '%s' must be 0 or 1.\n"),
+			config_file, line_number, section->name,
+			subopt->suboptname, val);
 		return false;
 	}
 
+	v = section_to_dft(subopt, dft);
+	*v = raw == 1;
+	return true;
+}
+
+/* Load a value into the defaults. */
+static bool
+parse_subopt_value(
+	const char			*config_file,
+	unsigned int			line_number,
+	struct cfg_section_map		*section,
+	struct cfg_subopt_map		*subopt,
+	const char			*val,
+	struct mkfs_default_params	*dft)
+{
+	switch (subopt->type) {
+	case FV_BOOL:
+		return parse_subopt_bool(config_file, line_number, section,
+				subopt, val, dft);
+	default:
+		ASSERT(0);
+		return false;
+	}
+}
+
+/*
+ * Look for a key and value and set them.
+ */
+static enum line_control
+parse_key_value(
+	const char			*config_file,
+	unsigned int			line_number,
+	const char			*line,
+	struct cfg_section_map		*section,
+	struct mkfs_default_params	*dft)
+{
+	char				*key;
+	char				*eq;
+	char				*val;
+	struct cfg_subopt_map		*s;
+	int				n;
+	enum line_control		ret;
+
+	/*
+	 * Look for the key, the equals sign, and the value.  The value is
+	 * anything that comes after the equals sign.
+	 */
+	key = eq = val = NULL;
+	n = sscanf(line, " %m[^][ \f\n\r\t\v=] %m[=] %m[^\n]", &key, &eq, &val);
+	if (n != 3 || strcmp(eq, "=")) {
+		ret = LINE_IGNORED;
+		goto out;
+	}
+
+	/* Must have a section. */
+	if (section == NULL) {
+		fprintf(stderr,
+_("%s:%d: key '%s' is not in a section.\n"),
+				config_file, line_number, key);
+		ret = LINE_ERROR;
+		goto out;
+	}
+
+	/* Do we know about this value? */
+	for (s = section->subopts; s->suboptname; s++) {
+		if (strcmp(s->suboptname, key))
+			continue;
+		if (s->seen) {
+			fprintf(stderr,
+_("%s:%d: section '%s' key '%s' already seen.\n"),
+					config_file, line_number, section->name,
+					s->suboptname);
+			ret = LINE_ERROR;
+			goto out;
+		}
+		if (parse_subopt_value(config_file, line_number, section, s,
+				val, dft)) {
+			s->seen = true;
+			ret = LINE_HANDLED;
+		} else {
+			ret = LINE_ERROR;
+		}
+		goto out;
+	}
+
+	fprintf(stderr,
+_("%s:%d: key '%s' is not a part of section '%s'.\n"),
+			config_file, line_number, key, section->name);
+	ret = LINE_ERROR;
+out:
+	if (key)
+		free(key);
+	if (eq)
+		free(eq);
+	if (val)
+		free(val);
+	return ret;
+}
+
+/* Deal with a single line of the config file. */
+static bool
+parse_config_line(
+	struct mkfs_default_params	*dft,
+	const char			*config_file,
+	unsigned int			line_number,
+	char				*line,
+	struct cfg_section_map		**section)
+{
+	enum line_control		ret;
+
+	/* Remove leading & trailing whitespace and comments. */
+	trim_config_line(line);
+
+	/* Ignore empty lines. */
+	if (line[0] == 0)
+		return true;
+
+	/* Is this a section header? */
+	ret = parse_section(config_file, line_number, line, section);
+	switch (ret) {
+	case LINE_HANDLED:
+		return true;
+	case LINE_ERROR:
+		return false;
+	case LINE_IGNORED:
+		break;
+	}
+
+	/* Is this a value? */
+	ret = parse_key_value(config_file, line_number, line, *section, dft);
+	switch (ret) {
+	case LINE_HANDLED:
+		return true;
+	case LINE_ERROR:
+		return false;
+	case LINE_IGNORED:
+		break;
+	}
+
+	fprintf(stderr,
+_("%s:%d: line not recognized as a section header or a key/value pair.\n"),
+			config_file, line_number);
 	return false;
 }
 
-static enum parse_line_type
-parse_get_line_type(
-	const char	*line,
-	ssize_t		linelen,
-	char		**tag,
-	uint64_t	*value)
-{
-	int		ret;
-	uint64_t	u64_value;
-
-	if (isempty(line, linelen))
-		return PARSE_EMPTY;
-
-	if (iscomment(line, linelen))
-		return PARSE_COMMENT;
-
-	/* check if we have a section header */
-	ret = sscanf(line, " [%m[^]]]", tag);
-	if (ret == 1)
-		return  PARSE_SECTION;
-
-	if (ret == EOF)
-		return PARSE_EOF;
-
-	/* should be a "tag = value" config option */
-	ret = sscanf(line, " %m[^ \t=] = %" PRIu64 " ", tag, &u64_value);
-	if (ret == 2) {
-		*value = u64_value;
-
-		return PARSE_TAG_VALUE;
-	}
-
-	if (ret == EOF)
-		return PARSE_EOF;
-
-	errno = EINVAL;
-	return PARSE_INVALID;
-}
-
+/* Interpret every line of a config file. */
+#define LINE_LEN	1025
 static int
 parse_config_stream(
 	struct mkfs_default_params	*dft,
-	const char 			*config_file,
+	const char			*config_file,
 	FILE				*fp)
 {
-	int				ret = 0;
-	char				*line = NULL;
-	ssize_t				linelen;
-	size_t				len = 0, lineno = 0;
-	uint64_t			value;
-	enum parse_line_type		parse_type;
-	struct confopts			*confopt = NULL;
-	int				subopt;
-	char				*tag = NULL;
+	char				line[LINE_LEN];
+	struct cfg_section_map		*section = NULL;
+	unsigned int			line_number = 1;
+	bool				ret;
 
-	while ((linelen = getline(&line, &len, fp)) != -1) {
-		char	*ignore_value;
-		char	*p;
-
-		lineno++;
-
-		/*
-		 * tag is allocated for us by scanf(), it must freed only on
-		 * any successful parse of a section or tag-value pair.
-		 */
-		parse_type = parse_get_line_type(line, linelen, &tag, &value);
-
-		switch (parse_type) {
-		case PARSE_EMPTY:
-		case PARSE_COMMENT:
-			/* Nothing tag to free for these */
-			continue;
-		case PARSE_EOF:
-			break;
-		case PARSE_INVALID:
-			ret = -1;
-			fprintf(stderr, _("Invalid line %s:%zu : %s\n"),
-					  config_file, lineno, line);
-			goto out;
-		case PARSE_SECTION:
-			confopt = get_confopts(tag);
-			if (!confopt) {
-				fprintf(stderr,
-_("Invalid section on line %s:%zu : %s\n"),
-					config_file, lineno, tag);
-				goto out_free_tag;
-			}
-			if (!confopt->subopts) {
-				fprintf(stderr,
-_("Section not yet supported on line %s:%zu : %s\n"),
-					config_file, lineno, tag);
-				goto out_free_tag;
-			}
-			if (confopt->seen) {
-				errno = EINVAL;
-				fprintf(stderr,
-_("Section '%s' respecified\n"),
-					tag);
-				goto out_free_tag;
-			}
-			confopt->seen = true;
-			free(tag);
-			break;
-		case PARSE_TAG_VALUE:
-			if (!confopt) {
-				fprintf(stderr,
-_("No section specified yet on line %s:%zu : %s\n"),
-					config_file, lineno, line);
-				goto out_free_tag;
-			}
-
-			/*
-			 * We re-use the line buffer allocated by getline(),
-			 * however line must be kept pointing to its original
-			 * value to free it later. A separate pointer is needed
-			 * as getsubopt() will otherwise muck with the value
-			 * passed.
-			 */
-			p = line;
-
-			/*
-			 * Trims white spaces. getsubopt() does not grok
-			 * white space, it would fail otherwise.
-			 */
-			snprintf(p, len, "%s=%lu", tag, value);
-
-			/* Not needed anymore */
-			free(tag);
-
-			/*
-			 * We only use getsubopt() to validate the possible
-			 * subopt, we already parsed the value and its already
-			 * in a more preferred data type.
-			 */
-			subopt = getsubopt(&p, (char **) confopt->subopts,
-					   &ignore_value);
-
-			ret = confopt->parser(dft, subopt, value);
-			if (ret) {
-				errno = EINVAL;
-				fprintf(stderr,
-_("Error parsing line %s:%zu : %s\n"),
-					config_file, lineno, line);
-				goto out;
-			}
-
-			break;
+	while (fgets(line, LINE_LEN, fp)) {
+		/* Lines should never hit the max length. */
+		if (strlen(line) >= LINE_LEN - 1) {
+			fprintf(stderr,
+_("%s:%d: line too long.\n"),
+					config_file, line_number);
+			return -1;
 		}
-		free(line);
-		line = NULL;
+		ret = parse_config_line(dft, config_file, line_number, line,
+				&section);
+		if (!ret)
+			return -1;
+		line_number++;
 	}
-
-out:
-	/* We must free even if getline() failed */
-	if (line)
-		free(line);
-	return ret;
-
-out_free_tag:
-	if (tag)
-		free(tag);
-	ret = -1;
-	goto out;
+	return 0;
 }
 
 static int
@@ -703,6 +560,7 @@ parse_defaults_file(
 
 	ret = parse_config_stream(dft, config_file, fp);
 	if (ret) {
+		errno = EINVAL;
 		fclose(fp);
 		return -1;
 	}
