@@ -519,7 +519,6 @@ mk_rbmino(xfs_mount_t *mp)
 	xfs_trans_t	*tp;
 	xfs_inode_t	*ip;
 	xfs_bmbt_irec_t	*ep;
-	xfs_fsblock_t	first;
 	int		i;
 	int		nmap;
 	int		error;
@@ -591,12 +590,12 @@ mk_rbmino(xfs_mount_t *mp)
 
 	libxfs_trans_ijoin(tp, ip, 0);
 	bno = 0;
-	libxfs_defer_init(tp, &dfops, &first);
+	libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 	while (bno < mp->m_sb.sb_rbmblocks) {
 		nmap = XFS_BMAP_MAX_NMAP;
 		error = -libxfs_bmapi_write(tp, ip, bno,
 			  (xfs_extlen_t)(mp->m_sb.sb_rbmblocks - bno),
-			  0, &first, mp->m_sb.sb_rbmblocks,
+			  0, &tp->t_firstblock, mp->m_sb.sb_rbmblocks,
 			  map, &nmap);
 		if (error) {
 			do_error(
@@ -629,12 +628,10 @@ fill_rbmino(xfs_mount_t *mp)
 	xfs_trans_t	*tp;
 	xfs_inode_t	*ip;
 	xfs_rtword_t	*bmp;
-	xfs_fsblock_t	first;
 	int		nmap;
 	int		error;
 	xfs_fileoff_t	bno;
 	xfs_bmbt_irec_t	map;
-	xfs_fsblock_t	firstfsb;
 
 	bmp = btmcompute;
 	bno = 0;
@@ -651,15 +648,14 @@ fill_rbmino(xfs_mount_t *mp)
 			error);
 	}
 
-	libxfs_defer_init(tp, &dfops, &firstfsb);
-	first = NULLFSBLOCK;
+	libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 	while (bno < mp->m_sb.sb_rbmblocks)  {
 		/*
 		 * fill the file one block at a time
 		 */
 		nmap = 1;
 		error = -libxfs_bmapi_write(tp, ip, bno, 1, 0,
-					&first, 1, &map, &nmap);
+					&tp->t_firstblock, 1, &map, &nmap);
 		if (error || nmap != 1) {
 			do_error(
 	_("couldn't map realtime bitmap block %" PRIu64 ", error = %d\n"),
@@ -703,13 +699,11 @@ fill_rsumino(xfs_mount_t *mp)
 	xfs_trans_t	*tp;
 	xfs_inode_t	*ip;
 	xfs_suminfo_t	*smp;
-	xfs_fsblock_t	first;
 	int		nmap;
 	int		error;
 	xfs_fileoff_t	bno;
 	xfs_fileoff_t	end_bno;
 	xfs_bmbt_irec_t	map;
-	xfs_fsblock_t	firstfsb;
 
 	smp = sumcompute;
 	bno = 0;
@@ -727,15 +721,14 @@ fill_rsumino(xfs_mount_t *mp)
 			error);
 	}
 
-	libxfs_defer_init(tp, &dfops, &firstfsb);
-	first = NULLFSBLOCK;
+	libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 	while (bno < end_bno)  {
 		/*
 		 * fill the file one block at a time
 		 */
 		nmap = 1;
 		error = -libxfs_bmapi_write(tp, ip, bno, 1, 0,
-					&first, 1, &map, &nmap);
+					&tp->t_firstblock, 1, &map, &nmap);
 		if (error || nmap != 1) {
 			do_error(
 	_("couldn't map realtime summary inode block %" PRIu64 ", error = %d\n"),
@@ -778,7 +771,6 @@ mk_rsumino(xfs_mount_t *mp)
 	xfs_trans_t	*tp;
 	xfs_inode_t	*ip;
 	xfs_bmbt_irec_t	*ep;
-	xfs_fsblock_t	first;
 	int		i;
 	int		nmap;
 	int		error;
@@ -850,14 +842,14 @@ mk_rsumino(xfs_mount_t *mp)
 	if (error)
 		res_failed(error);
 
-	libxfs_defer_init(tp, &dfops, &first);
+	libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 	libxfs_trans_ijoin(tp, ip, 0);
 	bno = 0;
 	while (bno < nsumblocks) {
 		nmap = XFS_BMAP_MAX_NMAP;
 		error = -libxfs_bmapi_write(tp, ip, bno,
 			  (xfs_extlen_t)(nsumblocks - bno),
-			  0, &first, nsumblocks, map, &nmap);
+			  0, &tp->t_firstblock, nsumblocks, map, &nmap);
 		if (error) {
 			do_error(
 		_("couldn't allocate realtime summary inode, error = %d\n"),
@@ -966,7 +958,6 @@ mk_orphanage(xfs_mount_t *mp)
 	xfs_trans_t	*tp;
 	xfs_inode_t	*ip;
 	xfs_inode_t	*pip;
-	xfs_fsblock_t	first;
 	ino_tree_node_t	*irec;
 	int		ino_offset = 0;
 	int		i;
@@ -1003,7 +994,7 @@ mk_orphanage(xfs_mount_t *mp)
 	if (i)
 		res_failed(i);
 
-	libxfs_defer_init(tp, &dfops, &first);
+	libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 
 	/*
 	 * use iget/ijoin instead of trans_iget because the ialloc
@@ -1061,8 +1052,7 @@ mk_orphanage(xfs_mount_t *mp)
 	/*
 	 * create the actual entry
 	 */
-	error = -libxfs_dir_createname(tp, pip, &xname, ip->i_ino, &first,
-			nres);
+	error = -libxfs_dir_createname(tp, pip, &xname, ip->i_ino, nres);
 	if (error)
 		do_error(
 		_("can't make %s, createname error %d\n"),
@@ -1112,7 +1102,6 @@ mv_orphanage(
 	xfs_ino_t		entry_ino_num;
 	xfs_inode_t		*ino_p;
 	xfs_trans_t		*tp;
-	xfs_fsblock_t		first;
 	struct xfs_defer_ops		dfops;
 	int			err;
 	unsigned char		fname[MAXPATHLEN + 1];
@@ -1169,9 +1158,9 @@ mv_orphanage(
 			libxfs_trans_ijoin(tp, orphanage_ip, 0);
 			libxfs_trans_ijoin(tp, ino_p, 0);
 
-			libxfs_defer_init(tp, &dfops, &first);
+			libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 			err = -libxfs_dir_createname(tp, orphanage_ip, &xname,
-					ino, &first, nres);
+					ino, nres);
 			if (err)
 				do_error(
 	_("name create failed in %s (%d), filesystem may be out of space\n"),
@@ -1184,7 +1173,7 @@ mv_orphanage(
 			libxfs_trans_log_inode(tp, orphanage_ip, XFS_ILOG_CORE);
 
 			err = -libxfs_dir_createname(tp, ino_p, &xfs_name_dotdot,
-					orphanage_ino, &first, nres);
+					orphanage_ino, nres);
 			if (err)
 				do_error(
 	_("creation of .. entry failed (%d), filesystem may be out of space\n"),
@@ -1212,9 +1201,9 @@ mv_orphanage(
 			libxfs_trans_ijoin(tp, orphanage_ip, 0);
 			libxfs_trans_ijoin(tp, ino_p, 0);
 
-			libxfs_defer_init(tp, &dfops, &first);
+			libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 			err = -libxfs_dir_createname(tp, orphanage_ip, &xname,
-					ino, &first, nres);
+					ino, nres);
 			if (err)
 				do_error(
 	_("name create failed in %s (%d), filesystem may be out of space\n"),
@@ -1233,7 +1222,7 @@ mv_orphanage(
 			if (entry_ino_num != orphanage_ino)  {
 				err = -libxfs_dir_replace(tp, ino_p,
 						&xfs_name_dotdot, orphanage_ino,
-						&first, nres);
+						nres);
 				if (err)
 					do_error(
 	_("name replace op failed (%d), filesystem may be out of space\n"),
@@ -1268,9 +1257,9 @@ mv_orphanage(
 		libxfs_trans_ijoin(tp, orphanage_ip, 0);
 		libxfs_trans_ijoin(tp, ino_p, 0);
 
-		libxfs_defer_init(tp, &dfops, &first);
+		libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 		err = -libxfs_dir_createname(tp, orphanage_ip, &xname, ino,
-				&first, nres);
+				nres);
 		if (err)
 			do_error(
 	_("name create failed in %s (%d), filesystem may be out of space\n"),
@@ -1371,7 +1360,6 @@ longform_dir2_rebuild(
 	int			nres;
 	xfs_trans_t		*tp;
 	xfs_fileoff_t		lastblock;
-	xfs_fsblock_t		firstblock;
 	struct xfs_defer_ops		dfops;
 	xfs_inode_t		pip;
 	dir_hash_ent_t		*p;
@@ -1400,7 +1388,7 @@ longform_dir2_rebuild(
 	if (error)
 		res_failed(error);
 	libxfs_trans_ijoin(tp, ip, 0);
-	libxfs_defer_init(tp, &dfops, &firstblock);
+	libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 
 	error = dir_binval(tp, ip, XFS_DATA_FORK);
 	if (error)
@@ -1412,7 +1400,7 @@ longform_dir2_rebuild(
 
 	/* free all data, leaf, node and freespace blocks */
 	error = -libxfs_bunmapi(tp, ip, 0, lastblock, XFS_BMAPI_METADATA, 0,
-				&firstblock, &done);
+				&tp->t_firstblock, &done);
 	if (error) {
 		do_warn(_("xfs_bunmapi failed -- error - %d\n"), error);
 		goto out_bmap_cancel;
@@ -1451,9 +1439,9 @@ longform_dir2_rebuild(
 
 		libxfs_trans_ijoin(tp, ip, 0);
 
-		libxfs_defer_init(tp, &dfops, &firstblock);
+		libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 		error = -libxfs_dir_createname(tp, ip, &p->name, p->inum,
-				&firstblock, nres);
+				nres);
 		if (error) {
 			do_warn(
 _("name create failed in ino %" PRIu64 " (%d), filesystem may be out of space\n"),
@@ -1495,7 +1483,6 @@ dir2_kill_block(
 {
 	xfs_da_args_t	args;
 	int		error;
-	xfs_fsblock_t	firstblock;
 	struct xfs_defer_ops	dfops;
 	int		nres;
 	xfs_trans_t	*tp;
@@ -1507,10 +1494,10 @@ dir2_kill_block(
 	libxfs_trans_ijoin(tp, ip, 0);
 	libxfs_trans_bjoin(tp, bp);
 	memset(&args, 0, sizeof(args));
-	libxfs_defer_init(tp, &dfops, &firstblock);
+	libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 	args.dp = ip;
 	args.trans = tp;
-	args.firstblock = &firstblock;
+	args.firstblock = &tp->t_firstblock;
 	args.whichfork = XFS_DATA_FORK;
 	args.geo = mp->m_dir_geo;
 	if (da_bno >= mp->m_dir_geo->leafblk && da_bno < mp->m_dir_geo->freeblk)
@@ -1555,7 +1542,6 @@ longform_dir2_entry_check_data(
 	struct xfs_dir2_data_free *bf;
 	char			*endptr;
 	int			error;
-	xfs_fsblock_t		firstblock;
 	struct xfs_defer_ops		dfops;
 	char			fname[MAXNAMELEN + 1];
 	freetab_t		*freetab;
@@ -1698,7 +1684,7 @@ longform_dir2_entry_check_data(
 	libxfs_trans_ijoin(tp, ip, 0);
 	libxfs_trans_bjoin(tp, bp);
 	libxfs_trans_bhold(tp, bp);
-	libxfs_defer_init(tp, &dfops, &firstblock);
+	libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 	if (be32_to_cpu(d->magic) != wantmagic) {
 		do_warn(
 	_("bad directory block magic # %#x for directory inode %" PRIu64 " block %d: "),
@@ -2917,7 +2903,6 @@ process_dir_inode(
 {
 	xfs_ino_t		ino;
 	struct xfs_defer_ops		dfops;
-	xfs_fsblock_t		first;
 	xfs_inode_t		*ip;
 	xfs_trans_t		*tp;
 	dir_hash_tab_t		*hashtab;
@@ -3055,9 +3040,9 @@ process_dir_inode(
 
 		libxfs_trans_ijoin(tp, ip, 0);
 
-		libxfs_defer_init(tp, &dfops, &first);
+		libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 		error = -libxfs_dir_createname(tp, ip, &xfs_name_dotdot,
-				ip->i_ino, &first, nres);
+				ip->i_ino, nres);
 		if (error)
 			do_error(
 	_("can't make \"..\" entry in root inode %" PRIu64 ", createname error %d\n"), ino, error);
@@ -3112,9 +3097,9 @@ process_dir_inode(
 
 			libxfs_trans_ijoin(tp, ip, 0);
 
-			libxfs_defer_init(tp, &dfops, &first);
+			libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 			error = -libxfs_dir_createname(tp, ip, &xfs_name_dot,
-					ip->i_ino, &first, nres);
+					ip->i_ino, nres);
 			if (error)
 				do_error(
 	_("can't make \".\" entry in dir ino %" PRIu64 ", createname error %d\n"),

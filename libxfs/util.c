@@ -543,7 +543,6 @@ libxfs_alloc_file_space(
 	xfs_filblks_t	datablocks;
 	xfs_filblks_t	allocated_fsb;
 	xfs_filblks_t	allocatesize_fsb;
-	xfs_fsblock_t	firstfsb;
 	struct xfs_defer_ops free_list;
 	xfs_bmbt_irec_t *imapp;
 	xfs_bmbt_irec_t imaps[1];
@@ -582,9 +581,9 @@ libxfs_alloc_file_space(
 		}
 		xfs_trans_ijoin(tp, ip, 0);
 
-		xfs_defer_init(tp, &free_list, &firstfsb);
+		xfs_defer_init(tp, &free_list, &tp->t_firstblock);
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb, allocatesize_fsb,
-				xfs_bmapi_flags, &firstfsb, 0, imapp,
+				xfs_bmapi_flags, &tp->t_firstblock, 0, imapp,
 				&reccount);
 
 		if (error)
