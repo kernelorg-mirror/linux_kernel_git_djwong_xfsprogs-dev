@@ -1394,13 +1394,13 @@ longform_dir2_rebuild(
 	    libxfs_dir_ino_validate(mp, pip.i_ino))
 		pip.i_ino = mp->m_sb.sb_rootino;
 
-	libxfs_defer_init(&dfops, &firstblock);
-
 	nres = XFS_REMOVE_SPACE_RES(mp);
 	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_remove, nres, 0, 0, &tp);
 	if (error)
 		res_failed(error);
 	libxfs_trans_ijoin(tp, ip, 0);
+	libxfs_defer_init(&dfops, &firstblock);
+	tp->t_dfops = &dfops;
 
 	error = dir_binval(tp, ip, XFS_DATA_FORK);
 	if (error)
@@ -1512,7 +1512,7 @@ dir2_kill_block(
 	args.dp = ip;
 	args.trans = tp;
 	args.firstblock = &firstblock;
-	args.dfops = &dfops;
+	tp->t_dfops = &dfops;
 	args.whichfork = XFS_DATA_FORK;
 	args.geo = mp->m_dir_geo;
 	if (da_bno >= mp->m_dir_geo->leafblk && da_bno < mp->m_dir_geo->freeblk)
@@ -1701,6 +1701,7 @@ longform_dir2_entry_check_data(
 	libxfs_trans_bjoin(tp, bp);
 	libxfs_trans_bhold(tp, bp);
 	libxfs_defer_init(&dfops, &firstblock);
+	tp->t_dfops = &dfops;
 	if (be32_to_cpu(d->magic) != wantmagic) {
 		do_warn(
 	_("bad directory block magic # %#x for directory inode %" PRIu64 " block %d: "),
