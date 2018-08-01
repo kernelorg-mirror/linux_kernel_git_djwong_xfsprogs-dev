@@ -583,8 +583,7 @@ libxfs_alloc_file_space(
 
 		xfs_defer_init(tp, &free_list, &tp->t_firstblock);
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb, allocatesize_fsb,
-				xfs_bmapi_flags, &tp->t_firstblock, 0, imapp,
-				&reccount);
+				xfs_bmapi_flags, 0, imapp, &reccount);
 
 		if (error)
 			goto error0;
