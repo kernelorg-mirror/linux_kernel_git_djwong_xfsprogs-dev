@@ -1497,7 +1497,6 @@ dir2_kill_block(
 	libxfs_defer_init(tp, &dfops, &tp->t_firstblock);
 	args.dp = ip;
 	args.trans = tp;
-	args.firstblock = &tp->t_firstblock;
 	args.whichfork = XFS_DATA_FORK;
 	args.geo = mp->m_dir_geo;
 	if (da_bno >= mp->m_dir_geo->leafblk && da_bno < mp->m_dir_geo->freeblk)
