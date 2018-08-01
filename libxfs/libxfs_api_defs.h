@@ -71,6 +71,7 @@
 #define xfs_defer_init			libxfs_defer_init
 #define xfs_defer_ijoin			libxfs_defer_ijoin
 #define xfs_defer_finish		libxfs_defer_finish
+#define __xfs_defer_cancel		__libxfs_defer_cancel
 #define xfs_defer_cancel		libxfs_defer_cancel
 
 #define xfs_da_brelse			libxfs_da_brelse
