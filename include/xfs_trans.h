@@ -163,7 +163,4 @@ void xfs_rmap_update_init_defer_op(void);
 void xfs_refcount_update_init_defer_op(void);
 void xfs_bmap_update_init_defer_op(void);
 
-/* cancel dfops associated with a transaction */
-void xfs_defer_cancel(struct xfs_trans *tp);
-
 #endif	/* __XFS_TRANS_H__ */

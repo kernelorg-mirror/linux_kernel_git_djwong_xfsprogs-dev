@@ -1016,10 +1016,3 @@ libxfs_trans_commit(
 {
 	return __xfs_trans_commit(tp, false);
 }
-
-void
-libxfs_defer_cancel(
-	struct xfs_trans	*tp)
-{
-	__libxfs_defer_cancel(tp->t_dfops);
-}
