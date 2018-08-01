@@ -71,6 +71,7 @@ typedef struct xfs_trans {
 	long		t_ifree_delta;		/* superblock ifree change */
 	long		t_fdblocks_delta;	/* superblock fdblocks chg */
 	long		t_frextents_delta;	/* superblock freextents chg */
+	xfs_fsblock_t		t_firstblock;	/* first allocated block */
 	struct list_head	t_items;	/* first log item desc chunk */
 	struct xfs_defer_ops	*t_dfops;	/* dfops reference */
 
