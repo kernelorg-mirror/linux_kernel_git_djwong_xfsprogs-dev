@@ -606,7 +606,6 @@ mk_rbmino(xfs_mount_t *mp)
 			bno += ep->br_blockcount;
 		}
 	}
-	libxfs_defer_ijoin(tp->t_dfops, ip);
 	error = -libxfs_trans_commit(tp);
 	if (error) {
 		do_error(
@@ -850,7 +849,6 @@ mk_rsumino(xfs_mount_t *mp)
 			bno += ep->br_blockcount;
 		}
 	}
-	libxfs_defer_ijoin(tp->t_dfops, ip);
 	error = -libxfs_trans_commit(tp);
 	if (error) {
 		do_error(
@@ -1057,7 +1055,6 @@ mk_orphanage(xfs_mount_t *mp)
 	libxfs_dir_init(tp, ip, pip);
 	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
-	libxfs_defer_ijoin(tp->t_dfops, ip);
 	error = -libxfs_trans_commit(tp);
 	if (error) {
 		do_error(_("%s directory creation failed -- bmapf error %d\n"),
@@ -1162,7 +1159,6 @@ mv_orphanage(
 			inc_nlink(VFS_I(ino_p));
 			libxfs_trans_log_inode(tp, ino_p, XFS_ILOG_CORE);
 
-			libxfs_defer_ijoin(tp->t_dfops, ino_p);
 			err = -libxfs_trans_commit(tp);
 			if (err)
 				do_error(
@@ -1206,7 +1202,6 @@ mv_orphanage(
 						err);
 			}
 
-			libxfs_defer_ijoin(tp->t_dfops, ino_p);
 			err = -libxfs_trans_commit(tp);
 			if (err)
 				do_error(
@@ -1243,7 +1238,6 @@ mv_orphanage(
 		set_nlink(VFS_I(ino_p), 1);
 		libxfs_trans_log_inode(tp, ino_p, XFS_ILOG_CORE);
 
-		libxfs_defer_ijoin(tp->t_dfops, ino_p);
 		err = -libxfs_trans_commit(tp);
 		if (err)
 			do_error(
@@ -1384,7 +1378,6 @@ longform_dir2_rebuild(
 		goto out_bmap_cancel;
 	}
 
-	libxfs_defer_ijoin(tp->t_dfops, ip);
 	error = -libxfs_trans_commit(tp);
 	if (error) {
 		do_warn(_("xfs_trans_commit failed -- error %d\n"), error);
@@ -1420,7 +1413,6 @@ _("name create failed in ino %" PRIu64 " (%d), filesystem may be out of space\n"
 			goto out_bmap_cancel;
 		}
 
-		libxfs_defer_ijoin(tp->t_dfops, ip);
 		error = -libxfs_trans_commit(tp);
 		if (error) {
 			do_warn(
@@ -1473,7 +1465,6 @@ dir2_kill_block(
 	if (error)
 		do_error(_("shrink_inode failed inode %" PRIu64 " block %u\n"),
 			ip->i_ino, da_bno);
-	libxfs_defer_ijoin(tp->t_dfops, ip);
 	error = -libxfs_trans_commit(tp);
 	if (error)
 		do_error(_("trans_commit failed inode %" PRIu64 " block %u\n"),
@@ -1950,7 +1941,6 @@ _("entry \"%s\" in dir inode %" PRIu64 " inconsistent with .. value (%" PRIu64 "
 				d, &i);
 	if (needlog)
 		libxfs_dir2_data_log_header(&da, bp);
-	libxfs_defer_ijoin(tp->t_dfops, ip);
 	error = -libxfs_trans_commit(tp);
 	if (error)
 		do_warn(_("%s commit failed, error %d\n"), __func__, error);
@@ -3013,7 +3003,6 @@ process_dir_inode(
 
 		libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
-		libxfs_defer_ijoin(tp->t_dfops, ip);
 		error = -libxfs_trans_commit(tp);
 		if (error)
 			do_warn(_("%s commit failed, error %d\n"), __func__,
@@ -3071,7 +3060,6 @@ process_dir_inode(
 
 			libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 
-			libxfs_defer_ijoin(tp->t_dfops, ip);
 			error = -libxfs_trans_commit(tp);
 			if (error)
 				do_error(_("%s commit failed, error %d\n"),

@@ -477,7 +477,6 @@ parseproto(
 		newdirent(mp, tp, pip, &xname, ip->i_ino);
 		libxfs_trans_log_inode(tp, ip, flags);
 
-		libxfs_defer_ijoin(tp->t_dfops, ip);
 		error = -libxfs_trans_commit(tp);
 		if (error)
 			fail(_("Pre-allocated file creation failed"), error);
@@ -558,7 +557,6 @@ parseproto(
 		}
 		newdirectory(mp, tp, ip, pip);
 		libxfs_trans_log_inode(tp, ip, flags);
-		libxfs_defer_ijoin(tp->t_dfops, ip);
 		error = -libxfs_trans_commit(tp);
 		if (error)
 			fail(_("Directory creation failed"), error);
@@ -584,7 +582,6 @@ parseproto(
 		fail(_("Unknown format"), EINVAL);
 	}
 	libxfs_trans_log_inode(tp, ip, flags);
-	libxfs_defer_ijoin(tp->t_dfops, ip);
 	error = -libxfs_trans_commit(tp);
 	if (error) {
 		fail(_("Error encountered creating file from prototype file"),
@@ -692,7 +689,6 @@ rtinit(
 		}
 	}
 
-	libxfs_defer_ijoin(tp->t_dfops, rbmip);
 	error = -libxfs_trans_commit(tp);
 	if (error) {
 		fail(_("Completion of the realtime bitmap failed"), error);
@@ -725,7 +721,6 @@ rtinit(
 			bno += ep->br_blockcount;
 		}
 	}
-	libxfs_defer_ijoin(tp->t_dfops, rsumip);
 	error = -libxfs_trans_commit(tp);
 	if (error) {
 		fail(_("Completion of the realtime summary failed"), error);
@@ -748,7 +743,6 @@ rtinit(
 			fail(_("Error initializing the realtime space"),
 				error);
 		}
-		libxfs_defer_ijoin(tp->t_dfops, rbmip);
 		error = -libxfs_trans_commit(tp);
 		if (error) {
 			fail(_("Error completing the realtime space"), error);
