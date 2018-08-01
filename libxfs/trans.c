@@ -155,7 +155,7 @@ xfs_trans_dup(
 	/* We gave our writer reference to the new transaction */
 	tp->t_flags |= XFS_TRANS_NO_WRITECOUNT;
 
-	ntp->t_agfl_dfops = tp->t_agfl_dfops;
+	ntp->t_dfops = tp->t_dfops;
 
 	return ntp;
 }
@@ -948,8 +948,8 @@ __xfs_trans_commit(
 	if (tp == NULL)
 		return 0;
 
-	ASSERT(!tp->t_agfl_dfops ||
-	       !xfs_defer_has_unfinished_work(tp->t_agfl_dfops) || regrant);
+	ASSERT(!tp->t_dfops ||
+	       !xfs_defer_has_unfinished_work(tp->t_dfops) || regrant);
 
 	if (!(tp->t_flags & XFS_TRANS_DIRTY)) {
 #ifdef XACT_DEBUG
