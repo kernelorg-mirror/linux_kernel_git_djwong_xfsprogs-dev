@@ -564,7 +564,7 @@ mk_rbmino(xfs_mount_t *mp)
 	 * now the ifork
 	 */
 	ip->i_df.if_flags = XFS_IFEXTENTS;
-	ip->i_df.if_bytes = ip->i_df.if_real_bytes = 0;
+	ip->i_df.if_bytes = 0;
 	ip->i_df.if_u1.if_root = NULL;
 
 	ip->i_d.di_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
@@ -806,7 +806,7 @@ mk_rsumino(xfs_mount_t *mp)
 	 * now the ifork
 	 */
 	ip->i_df.if_flags = XFS_IFEXTENTS;
-	ip->i_df.if_bytes = ip->i_df.if_real_bytes = 0;
+	ip->i_df.if_bytes = 0;
 	ip->i_df.if_u1.if_root = NULL;
 
 	ip->i_d.di_size = mp->m_rsumsize;
@@ -912,7 +912,7 @@ mk_root_dir(xfs_mount_t *mp)
 	 * now the ifork
 	 */
 	ip->i_df.if_flags = XFS_IFEXTENTS;
-	ip->i_df.if_bytes = ip->i_df.if_real_bytes = 0;
+	ip->i_df.if_bytes = 0;
 	ip->i_df.if_u1.if_root = NULL;
 
 
