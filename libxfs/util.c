@@ -582,8 +582,7 @@ libxfs_alloc_file_space(
 		}
 		xfs_trans_ijoin(tp, ip, 0);
 
-		xfs_defer_init(&free_list, &firstfsb);
-		tp->t_dfops = &free_list;
+		xfs_defer_init(tp, &free_list, &firstfsb);
 		error = xfs_bmapi_write(tp, ip, startoffset_fsb, allocatesize_fsb,
 				xfs_bmapi_flags, &firstfsb, 0, imapp,
 				&reccount);
