@@ -594,5 +594,12 @@ static inline int test_bit(int nr, const volatile unsigned long *addr)
 	return *p & mask;
 }
 
+/**
+ * swap - swap values of @a and @b
+ * @a: first value
+ * @b: second value
+ */
+#define swap(a, b) \
+	do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
 
 #endif	/* __LIBXFS_INTERNAL_XFS_H__ */
