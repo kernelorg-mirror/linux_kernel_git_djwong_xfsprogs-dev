@@ -528,12 +528,12 @@ mk_rbmino(xfs_mount_t *mp)
 	xfs_bmbt_irec_t	map[XFS_BMAP_MAX_NMAP];
 	int		vers;
 	int		times;
-	struct xfs_trans_res tres = {0};
 
 	/*
 	 * first set up inode
 	 */
-	i = -libxfs_trans_alloc(mp, &tres, 10, 0, 0, &tp);
+	i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
+			10, 0, 0, &tp);
 	if (i)
 		res_failed(i);
 
@@ -581,7 +581,7 @@ mk_rbmino(xfs_mount_t *mp)
 	 * then allocate blocks for file and fill with zeroes (stolen
 	 * from mkfs)
 	 */
-	error = -libxfs_trans_alloc(mp, &tres,
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
 		mp->m_sb.sb_rbmblocks + (XFS_BM_MAXLEVELS(mp,XFS_DATA_FORK) - 1),
 				   0, 0, &tp);
 	if (error)
@@ -631,12 +631,12 @@ fill_rbmino(xfs_mount_t *mp)
 	int		error;
 	xfs_fileoff_t	bno;
 	xfs_bmbt_irec_t	map;
-	struct xfs_trans_res tres = {0};
 
 	bmp = btmcompute;
 	bno = 0;
 
-	error = -libxfs_trans_alloc(mp, &tres, 10, 0, 0, &tp);
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
+			10, 0, 0, &tp);
 	if (error)
 		res_failed(error);
 
@@ -701,13 +701,13 @@ fill_rsumino(xfs_mount_t *mp)
 	xfs_fileoff_t	bno;
 	xfs_fileoff_t	end_bno;
 	xfs_bmbt_irec_t	map;
-	struct xfs_trans_res tres = {0};
 
 	smp = sumcompute;
 	bno = 0;
 	end_bno = mp->m_rsumsize >> mp->m_sb.sb_blocklog;
 
-	error = -libxfs_trans_alloc(mp, &tres, 10, 0, 0, &tp);
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
+			10, 0, 0, &tp);
 	if (error)
 		res_failed(error);
 
@@ -776,7 +776,6 @@ mk_rsumino(xfs_mount_t *mp)
 	xfs_bmbt_irec_t	map[XFS_BMAP_MAX_NMAP];
 	int		vers;
 	int		times;
-	struct xfs_trans_res tres = {0};
 
 	/*
 	 * first set up inode
@@ -832,10 +831,7 @@ mk_rsumino(xfs_mount_t *mp)
 	libxfs_defer_init(&dfops, &first);
 
 	nsumblocks = mp->m_rsumsize >> mp->m_sb.sb_blocklog;
-	tres.tr_logres = BBTOB(128);
-	tres.tr_logcount = XFS_DEFAULT_PERM_LOG_COUNT;
-	tres.tr_logflags = XFS_TRANS_PERM_LOG_RES;
-	error = -libxfs_trans_alloc(mp, &tres,
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
 		mp->m_sb.sb_rbmblocks + (XFS_BM_MAXLEVELS(mp,XFS_DATA_FORK) - 1),
 				    0, 0, &tp);
 	if (error)

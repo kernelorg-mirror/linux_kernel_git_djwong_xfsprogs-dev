@@ -123,9 +123,8 @@ getres(
 	uint		r;
 
 	for (i = 0, r = MKFS_BLOCKRES(blocks); r >= blocks; r--) {
-		struct xfs_trans_res    tres = {0};
-
-		i = -libxfs_trans_alloc(mp, &tres, r, 0, 0, &tp);
+		i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
+				r, 0, 0, &tp);
 		if (i == 0)
 			return tp;
 	}
@@ -180,7 +179,6 @@ rsvfile(
 {
 	int		error;
 	xfs_trans_t	*tp;
-	struct xfs_trans_res tres = {0};
 
 	error = -libxfs_alloc_file_space(ip, 0, llen, 1, 0);
 
@@ -192,7 +190,7 @@ rsvfile(
 	/*
 	 * update the inode timestamp, mode, and prealloc flag bits
 	 */
-	error = -libxfs_trans_alloc(mp, &tres, 0, 0, 0, &tp);
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate, 0, 0, 0, &tp);
 	if (error)
 		fail(_("allocating transaction for a file"), error);
 	libxfs_trans_ijoin(tp, ip, 0);
@@ -636,12 +634,12 @@ rtinit(
 	xfs_trans_t	*tp;
 	struct cred	creds;
 	struct fsxattr	fsxattrs;
-	struct xfs_trans_res tres = {0};
 
 	/*
 	 * First, allocate the inodes.
 	 */
-	i = -libxfs_trans_alloc(mp, &tres, MKFS_BLOCKRES_INODE, 0, 0, &tp);
+	i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
+			MKFS_BLOCKRES_INODE, 0, 0, &tp);
 	if (i)
 		res_failed(i);
 
@@ -678,7 +676,7 @@ rtinit(
 	/*
 	 * Next, give the bitmap file some zero-filled blocks.
 	 */
-	i = -libxfs_trans_alloc(mp, &tres,
+	i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
 		mp->m_sb.sb_rbmblocks + (XFS_BM_MAXLEVELS(mp,XFS_DATA_FORK) - 1),
 				0, 0, &tp);
 	if (i)
@@ -716,7 +714,7 @@ rtinit(
 	 * Give the summary file some zero-filled blocks.
 	 */
 	nsumblocks = mp->m_rsumsize >> mp->m_sb.sb_blocklog;
-	i = -libxfs_trans_alloc(mp, &tres,
+	i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
 			nsumblocks + (XFS_BM_MAXLEVELS(mp,XFS_DATA_FORK) - 1),
 				0, 0, &tp);
 	if (i)
@@ -753,7 +751,8 @@ rtinit(
 	 * Do one transaction per bitmap block.
 	 */
 	for (bno = 0; bno < mp->m_sb.sb_rextents; bno = ebno) {
-		i = -libxfs_trans_alloc(mp, &tres, 0, 0, 0, &tp);
+		i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
+				0, 0, 0, &tp);
 		if (i)
 			res_failed(i);
 		libxfs_trans_ijoin(tp, rbmip, 0);
