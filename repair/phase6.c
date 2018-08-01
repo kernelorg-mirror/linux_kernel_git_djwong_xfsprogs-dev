@@ -592,12 +592,13 @@ mk_rbmino(xfs_mount_t *mp)
 	libxfs_trans_ijoin(tp, ip, 0);
 	bno = 0;
 	libxfs_defer_init(&dfops, &first);
+	tp->t_dfops = &dfops;
 	while (bno < mp->m_sb.sb_rbmblocks) {
 		nmap = XFS_BMAP_MAX_NMAP;
 		error = -libxfs_bmapi_write(tp, ip, bno,
 			  (xfs_extlen_t)(mp->m_sb.sb_rbmblocks - bno),
 			  0, &first, mp->m_sb.sb_rbmblocks,
-			  map, &nmap, &dfops);
+			  map, &nmap);
 		if (error) {
 			do_error(
 			_("couldn't allocate realtime bitmap, error = %d\n"),
@@ -624,6 +625,7 @@ mk_rbmino(xfs_mount_t *mp)
 static int
 fill_rbmino(xfs_mount_t *mp)
 {
+	struct xfs_defer_ops	dfops;
 	xfs_buf_t	*bp;
 	xfs_trans_t	*tp;
 	xfs_inode_t	*ip;
@@ -633,6 +635,7 @@ fill_rbmino(xfs_mount_t *mp)
 	int		error;
 	xfs_fileoff_t	bno;
 	xfs_bmbt_irec_t	map;
+	xfs_fsblock_t	firstfsb;
 
 	bmp = btmcompute;
 	bno = 0;
@@ -649,6 +652,8 @@ fill_rbmino(xfs_mount_t *mp)
 			error);
 	}
 
+	libxfs_defer_init(&dfops, &firstfsb);
+	tp->t_dfops = &dfops;
 	first = NULLFSBLOCK;
 	while (bno < mp->m_sb.sb_rbmblocks)  {
 		/*
@@ -656,7 +661,7 @@ fill_rbmino(xfs_mount_t *mp)
 		 */
 		nmap = 1;
 		error = -libxfs_bmapi_write(tp, ip, bno, 1, 0,
-					&first, 1, &map, &nmap, NULL);
+					&first, 1, &map, &nmap);
 		if (error || nmap != 1) {
 			do_error(
 	_("couldn't map realtime bitmap block %" PRIu64 ", error = %d\n"),
@@ -695,6 +700,7 @@ _("can't access block %" PRIu64 " (fsbno %" PRIu64 ") of realtime bitmap inode %
 static int
 fill_rsumino(xfs_mount_t *mp)
 {
+	struct xfs_defer_ops	dfops;
 	xfs_buf_t	*bp;
 	xfs_trans_t	*tp;
 	xfs_inode_t	*ip;
@@ -705,6 +711,7 @@ fill_rsumino(xfs_mount_t *mp)
 	xfs_fileoff_t	bno;
 	xfs_fileoff_t	end_bno;
 	xfs_bmbt_irec_t	map;
+	xfs_fsblock_t	firstfsb;
 
 	smp = sumcompute;
 	bno = 0;
@@ -722,6 +729,8 @@ fill_rsumino(xfs_mount_t *mp)
 			error);
 	}
 
+	libxfs_defer_init(&dfops, &firstfsb);
+	tp->t_dfops = &dfops;
 	first = NULLFSBLOCK;
 	while (bno < end_bno)  {
 		/*
@@ -729,7 +738,7 @@ fill_rsumino(xfs_mount_t *mp)
 		 */
 		nmap = 1;
 		error = -libxfs_bmapi_write(tp, ip, bno, 1, 0,
-					&first, 1, &map, &nmap, NULL);
+					&first, 1, &map, &nmap);
 		if (error || nmap != 1) {
 			do_error(
 	_("couldn't map realtime summary inode block %" PRIu64 ", error = %d\n"),
@@ -836,7 +845,6 @@ mk_rsumino(xfs_mount_t *mp)
 	 * then allocate blocks for file and fill with zeroes (stolen
 	 * from mkfs)
 	 */
-	libxfs_defer_init(&dfops, &first);
 
 	nsumblocks = mp->m_rsumsize >> mp->m_sb.sb_blocklog;
 	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
@@ -845,14 +853,15 @@ mk_rsumino(xfs_mount_t *mp)
 	if (error)
 		res_failed(error);
 
+	libxfs_defer_init(&dfops, &first);
+	tp->t_dfops = &dfops;
 	libxfs_trans_ijoin(tp, ip, 0);
 	bno = 0;
-	libxfs_defer_init(&dfops, &first);
 	while (bno < nsumblocks) {
 		nmap = XFS_BMAP_MAX_NMAP;
 		error = -libxfs_bmapi_write(tp, ip, bno,
 			  (xfs_extlen_t)(nsumblocks - bno),
-			  0, &first, nsumblocks, map, &nmap, &dfops);
+			  0, &first, nsumblocks, map, &nmap);
 		if (error) {
 			do_error(
 		_("couldn't allocate realtime summary inode, error = %d\n"),
