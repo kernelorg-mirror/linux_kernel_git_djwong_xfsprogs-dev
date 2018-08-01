@@ -602,4 +602,6 @@ static inline int test_bit(int nr, const volatile unsigned long *addr)
 #define swap(a, b) \
 	do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
 
+#define xfs_log_in_recovery(mp)	(false)
+
 #endif	/* __LIBXFS_INTERNAL_XFS_H__ */
