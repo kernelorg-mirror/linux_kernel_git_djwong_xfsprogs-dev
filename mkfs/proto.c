@@ -445,8 +445,7 @@ parseproto(
 	case IF_REGULAR:
 		buf = newregfile(pp, &len);
 		tp = getres(mp, XFS_B_TO_FSB(mp, len));
-		libxfs_defer_init(&dfops, &first);
-		tp->t_dfops = &dfops;
+		libxfs_defer_init(tp, &dfops, &first);
 		error = -libxfs_inode_alloc(&tp, pip, mode|S_IFREG, 1, 0,
 					   &creds, fsxp, &ip);
 		if (error)
@@ -470,8 +469,7 @@ parseproto(
 			exit(1);
 		}
 		tp = getres(mp, XFS_B_TO_FSB(mp, llen));
-		libxfs_defer_init(&dfops, &first);
-		tp->t_dfops = &dfops;
+		libxfs_defer_init(tp, &dfops, &first);
 
 		error = -libxfs_inode_alloc(&tp, pip, mode|S_IFREG, 1, 0,
 					  &creds, fsxp, &ip);
@@ -495,8 +493,7 @@ parseproto(
 
 	case IF_BLOCK:
 		tp = getres(mp, 0);
-		libxfs_defer_init(&dfops, &first);
-		tp->t_dfops = &dfops;
+		libxfs_defer_init(tp, &dfops, &first);
 		majdev = getnum(getstr(pp), 0, 0, false);
 		mindev = getnum(getstr(pp), 0, 0, false);
 		error = -libxfs_inode_alloc(&tp, pip, mode|S_IFBLK, 1,
@@ -512,8 +509,7 @@ parseproto(
 
 	case IF_CHAR:
 		tp = getres(mp, 0);
-		libxfs_defer_init(&dfops, &first);
-		tp->t_dfops = &dfops;
+		libxfs_defer_init(tp, &dfops, &first);
 		majdev = getnum(getstr(pp), 0, 0, false);
 		mindev = getnum(getstr(pp), 0, 0, false);
 		error = -libxfs_inode_alloc(&tp, pip, mode|S_IFCHR, 1,
@@ -528,8 +524,7 @@ parseproto(
 
 	case IF_FIFO:
 		tp = getres(mp, 0);
-		libxfs_defer_init(&dfops, &first);
-		tp->t_dfops = &dfops;
+		libxfs_defer_init(tp, &dfops, &first);
 		error = -libxfs_inode_alloc(&tp, pip, mode|S_IFIFO, 1, 0,
 				&creds, fsxp, &ip);
 		if (error)
@@ -542,8 +537,7 @@ parseproto(
 		buf = getstr(pp);
 		len = (int)strlen(buf);
 		tp = getres(mp, XFS_B_TO_FSB(mp, len));
-		libxfs_defer_init(&dfops, &first);
-		tp->t_dfops = &dfops;
+		libxfs_defer_init(tp, &dfops, &first);
 		error = -libxfs_inode_alloc(&tp, pip, mode|S_IFLNK, 1, 0,
 				&creds, fsxp, &ip);
 		if (error)
@@ -555,8 +549,7 @@ parseproto(
 		break;
 	case IF_DIRECTORY:
 		tp = getres(mp, 0);
-		libxfs_defer_init(&dfops, &first);
-		tp->t_dfops = &dfops;
+		libxfs_defer_init(tp, &dfops, &first);
 		error = -libxfs_inode_alloc(&tp, pip, mode|S_IFDIR, 1, 0,
 				&creds, fsxp, &ip);
 		if (error)
@@ -694,8 +687,7 @@ rtinit(
 
 	libxfs_trans_ijoin(tp, rbmip, 0);
 	bno = 0;
-	libxfs_defer_init(&dfops, &first);
-	tp->t_dfops = &dfops;
+	libxfs_defer_init(tp, &dfops, &first);
 	while (bno < mp->m_sb.sb_rbmblocks) {
 		nmap = XFS_BMAP_MAX_NMAP;
 		error = -libxfs_bmapi_write(tp, rbmip, bno,
@@ -731,8 +723,7 @@ rtinit(
 		res_failed(i);
 	libxfs_trans_ijoin(tp, rsumip, 0);
 	bno = 0;
-	libxfs_defer_init(&dfops, &first);
-	tp->t_dfops = &dfops;
+	libxfs_defer_init(tp, &dfops, &first);
 	while (bno < nsumblocks) {
 		nmap = XFS_BMAP_MAX_NMAP;
 		error = -libxfs_bmapi_write(tp, rsumip, bno,
@@ -765,8 +756,7 @@ rtinit(
 		if (i)
 			res_failed(i);
 		libxfs_trans_ijoin(tp, rbmip, 0);
-		libxfs_defer_init(&dfops, &first);
-		tp->t_dfops = &dfops;
+		libxfs_defer_init(tp, &dfops, &first);
 		ebno = XFS_RTMIN(mp->m_sb.sb_rextents,
 			bno + NBBY * mp->m_sb.sb_blocksize);
 		error = -libxfs_rtfree_extent(tp, bno, (xfs_extlen_t)(ebno-bno));
