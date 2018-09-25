@@ -17,6 +17,7 @@
 #include "xfs_inode.h"
 #include "xfs_trans.h"
 #include "xfs_sb.h"
+#include "xfs_defer.h"
 
 static void xfs_trans_free_items(struct xfs_trans *tp);
 
@@ -121,6 +122,14 @@ libxfs_trans_roll(
 
 	return 0;
 }
+
+void
+xfs_defer_cancel(
+	struct xfs_trans	*tp)
+{
+	__xfs_defer_cancel(tp->t_dfops);
+}
+
 
 /*
  * Free the transaction structure.  If there is more clean up
