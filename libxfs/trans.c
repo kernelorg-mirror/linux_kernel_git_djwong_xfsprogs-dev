@@ -79,6 +79,7 @@ libxfs_trans_roll(
 	struct xfs_trans	*trans = *tpp;
 	struct xfs_trans_res	tres;
 	unsigned int		old_blk_res;
+	xfs_fsblock_t		old_firstblock;
 	int			error;
 
 	/*
@@ -88,6 +89,7 @@ libxfs_trans_roll(
 	tres.tr_logres = trans->t_log_res;
 	tres.tr_logcount = trans->t_log_count;
 	old_blk_res = trans->t_blk_res;
+	old_firstblock = trans->t_firstblock;
 
 	/*
 	 * Commit the current transaction.
@@ -112,6 +114,7 @@ libxfs_trans_roll(
 	error = libxfs_trans_alloc(mp, &tres, 0, 0, 0, tpp);
 	trans = *tpp;
 	trans->t_blk_res = old_blk_res;
+	trans->t_firstblock = old_firstblock;
 
 	return 0;
 }
@@ -155,6 +158,7 @@ libxfs_trans_alloc(
 	ptr->t_mountp = mp;
 	ptr->t_blk_res = blocks;
 	INIT_LIST_HEAD(&ptr->t_items);
+	ptr->t_firstblock = NULLFSBLOCK;
 #ifdef XACT_DEBUG
 	fprintf(stderr, "allocated new transaction %p\n", ptr);
 #endif
