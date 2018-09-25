@@ -80,6 +80,7 @@ libxfs_trans_roll(
 	struct xfs_trans_res	tres;
 	unsigned int		old_blk_res;
 	xfs_fsblock_t		old_firstblock;
+	struct xfs_defer_ops	*old_dfops;
 	int			error;
 
 	/*
@@ -90,6 +91,7 @@ libxfs_trans_roll(
 	tres.tr_logcount = trans->t_log_count;
 	old_blk_res = trans->t_blk_res;
 	old_firstblock = trans->t_firstblock;
+	old_dfops = trans->t_dfops;
 
 	/*
 	 * Commit the current transaction.
@@ -115,6 +117,7 @@ libxfs_trans_roll(
 	trans = *tpp;
 	trans->t_blk_res = old_blk_res;
 	trans->t_firstblock = old_firstblock;
+	trans->t_dfops = old_dfops;
 
 	return 0;
 }
