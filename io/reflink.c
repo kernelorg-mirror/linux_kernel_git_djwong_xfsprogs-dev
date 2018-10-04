@@ -70,7 +70,8 @@ dedupe_ioctl(
 					_(strerror(-info->status)));
 			goto done;
 		}
-		if (info->status == XFS_EXTENT_DATA_DIFFERS) {
+		if (deduped == 0 &&
+		    info->status == XFS_EXTENT_DATA_DIFFERS) {
 			fprintf(stderr, "XFS_IOC_FILE_EXTENT_SAME: %s\n",
 					_("Extents did not match."));
 			goto done;
