@@ -652,15 +652,15 @@ set_cur_inode(
 	}
 	cur_agno = agno;
 
-	if (mp->m_inode_cluster_size > mp->m_sb.sb_blocksize &&
-	    mp->m_inoalign_mask) {
+	if (mp->m_ino_geo.ig_min_cluster_size > mp->m_sb.sb_blocksize &&
+	    mp->m_ino_geo.ig_inoalign_mask) {
 		xfs_agblock_t	chunk_agbno;
 		xfs_agblock_t	offset_agbno;
 		int		blks_per_cluster;
 
-		blks_per_cluster = mp->m_inode_cluster_size >>
+		blks_per_cluster = mp->m_ino_geo.ig_min_cluster_size >>
 							mp->m_sb.sb_blocklog;
-		offset_agbno = agbno & mp->m_inoalign_mask;
+		offset_agbno = agbno & mp->m_ino_geo.ig_inoalign_mask;
 		chunk_agbno = agbno - offset_agbno;
 		cluster_agbno = chunk_agbno +
 			((offset_agbno / blks_per_cluster) * blks_per_cluster);
