@@ -508,7 +508,7 @@ libxfs_initialize_perag(
 		 * Calculate how much should be reserved for inodes to meet
 		 * the max inode percentage.
 		 */
-		if (mp->m_maxicount) {
+		if (mp->m_ino_geo.ig_maxicount) {
 			uint64_t	icount;
 
 			icount = sbp->sb_dblocks * sbp->sb_imax_pct;
@@ -661,25 +661,25 @@ libxfs_mount(
 		/* Make sure the maximum inode count is a multiple of the
 		 * units we allocate inodes in.
 		 */
-		mp->m_maxicount = (sbp->sb_dblocks * sbp->sb_imax_pct) / 100;
-		mp->m_maxicount = XFS_FSB_TO_INO(mp,
-				(mp->m_maxicount / mp->m_ialloc_blks) *
-				 mp->m_ialloc_blks);
+		mp->m_ino_geo.ig_maxicount = (sbp->sb_dblocks * sbp->sb_imax_pct) / 100;
+		mp->m_ino_geo.ig_maxicount = XFS_FSB_TO_INO(mp,
+				(mp->m_ino_geo.ig_maxicount / mp->m_ino_geo.ig_ialloc_blks) *
+				 mp->m_ino_geo.ig_ialloc_blks);
 	} else
-		mp->m_maxicount = 0;
+		mp->m_ino_geo.ig_maxicount = 0;
 
-	mp->m_inode_cluster_size = XFS_INODE_BIG_CLUSTER_SIZE;
+	mp->m_ino_geo.ig_min_cluster_size = XFS_INODE_BIG_CLUSTER_SIZE;
 	if (xfs_sb_version_hascrc(&mp->m_sb)) {
-		int	new_size = mp->m_inode_cluster_size;
+		int	new_size = mp->m_ino_geo.ig_min_cluster_size;
 
 		new_size *= mp->m_sb.sb_inodesize / XFS_DINODE_MIN_SIZE;
 		if (mp->m_sb.sb_inoalignmt >= XFS_B_TO_FSBT(mp, new_size))
-			mp->m_inode_cluster_size = new_size;
+			mp->m_ino_geo.ig_min_cluster_size = new_size;
 	}
-	mp->m_blocks_per_cluster = xfs_icluster_size_fsb(mp);
-	mp->m_inodes_per_cluster = XFS_FSB_TO_INO(mp, mp->m_blocks_per_cluster);
-	mp->m_cluster_align = xfs_ialloc_cluster_alignment(mp);
-	mp->m_cluster_align_inodes = XFS_FSB_TO_INO(mp, mp->m_cluster_align);
+	mp->m_ino_geo.ig_blocks_per_cluster = xfs_icluster_size_fsb(mp);
+	mp->m_ino_geo.ig_inodes_per_cluster = XFS_FSB_TO_INO(mp, mp->m_ino_geo.ig_blocks_per_cluster);
+	mp->m_ino_geo.ig_cluster_align = xfs_ialloc_cluster_alignment(mp);
+	mp->m_ino_geo.ig_cluster_align_inodes = XFS_FSB_TO_INO(mp, mp->m_ino_geo.ig_cluster_align);
 
 	/*
 	 * Set whether we're using stripe alignment.
@@ -694,19 +694,19 @@ libxfs_mount(
 	 */
 	if (xfs_sb_version_hasalign(&mp->m_sb) &&
 	    mp->m_sb.sb_inoalignmt >=
-	    XFS_B_TO_FSBT(mp, mp->m_inode_cluster_size))
-		mp->m_inoalign_mask = mp->m_sb.sb_inoalignmt - 1;
+	    XFS_B_TO_FSBT(mp, mp->m_ino_geo.ig_min_cluster_size))
+		mp->m_ino_geo.ig_inoalign_mask = mp->m_sb.sb_inoalignmt - 1;
 	else
-		mp->m_inoalign_mask = 0;
+		mp->m_ino_geo.ig_inoalign_mask = 0;
 	/*
 	 * If we are using stripe alignment, check whether
 	 * the stripe unit is a multiple of the inode alignment
 	 */
-	if (mp->m_dalign && mp->m_inoalign_mask &&
-					!(mp->m_dalign & mp->m_inoalign_mask))
-		mp->m_sinoalign = mp->m_dalign;
+	if (mp->m_dalign && mp->m_ino_geo.ig_inoalign_mask &&
+					!(mp->m_dalign & mp->m_ino_geo.ig_inoalign_mask))
+		mp->m_ino_geo.ig_sinoalign = mp->m_dalign;
 	else
-		mp->m_sinoalign = 0;
+		mp->m_ino_geo.ig_sinoalign = 0;
 
 	/*
 	 * Check that the data (and log if separate) are an ok size.
