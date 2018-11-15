@@ -629,6 +629,23 @@ libxfs_buftarg_init(
 	mp->m_rtdev_targp = libxfs_buftarg_alloc(mp, rtdev);
 }
 
+STATIC void
+libxfs_mountfs_imeta(
+	struct xfs_mount	*mp)
+{
+	int			error;
+
+	/* Ignore filesystems that are under construction. */
+	if (mp->m_sb.sb_inprogress != 0)
+		return;
+
+	error = -xfs_imeta_mount(mp);
+	if (error)
+		fprintf(stderr,
+_("%s: metadata inode mounting failed, error %d\n"),
+			progname, error);
+}
+
 /*
  * Mount structure initialization, provides a filled-in xfs_mount_t
  * such that the numerous XFS_* macros can be used.  If dev is zero,
@@ -756,6 +773,8 @@ libxfs_mount(
 	}
 
 	xfs_da_mount(mp);
+
+	libxfs_mountfs_imeta(mp);
 
 	if (xfs_sb_version_hasattr2(&mp->m_sb))
 		mp->m_flags |= LIBXFS_MOUNT_ATTR2;
