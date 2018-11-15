@@ -167,4 +167,12 @@
 #define xfs_set_projid			libxfs_set_projid
 #define xfs_inode_init			libxfs_inode_init
 
+#define xfs_imeta_lookup		libxfs_imeta_lookup
+#define xfs_imeta_create		libxfs_imeta_create
+#define xfs_imeta_unlink		libxfs_imeta_unlink
+#define xfs_imeta_zap			libxfs_imeta_zap
+#define xfs_imeta_end_update		libxfs_imeta_end_update
+#define xfs_is_meta_ino			libxfs_is_meta_ino
+#define xfs_imeta_mount			libxfs_imeta_mount
+
 #endif /* __LIBXFS_API_DEFS_H__ */
