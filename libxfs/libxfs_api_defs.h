@@ -179,5 +179,6 @@
 #define xfs_imeta_iget			libxfs_imeta_iget
 #define xfs_imeta_irele			libxfs_imeta_irele
 #define xfs_imeta_ensure_dirpath	libxfs_imeta_ensure_dirpath
+#define xfs_imeta_mount			libxfs_imeta_mount
 
 #endif /* __LIBXFS_API_DEFS_H__ */
