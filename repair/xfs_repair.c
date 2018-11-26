@@ -412,6 +412,56 @@ _("would reset superblock %s inode pointer to %"PRIu64"\n"),
 	*ino = expected_ino;
 }
 
+/* check metadata directory inode pointer in superblock */
+STATIC void
+check_metadir_inode(
+	struct xfs_mount	*mp)
+{
+	int			error;
+
+	ensure_fixed_ino(&mp->m_sb.sb_metadirino, first_prealloc_ino + 1,
+			_("metadata inode directory"));
+
+	/* If we changed the metadir inode, try reloading it. */
+	if (!mp->m_metadirip ||
+	    mp->m_metadirip->i_ino != mp->m_sb.sb_metadirino) {
+		if (mp->m_metadirip)
+			libxfs_irele(mp->m_metadirip);
+
+		error = -libxfs_imeta_iget(mp, mp->m_sb.sb_metadirino,
+				XFS_DIR3_FT_DIR, &mp->m_metadirip);
+		if (error) {
+			need_metadir_inode = 1;
+			goto done;
+		}
+
+		error = -libxfs_imeta_mount(mp);
+		if (error)
+			need_metadir_inode = 1;
+	}
+
+done:
+	if (need_metadir_inode) {
+		if (!no_modify)
+			do_warn(_("will reset metadata directory\n"));
+		else
+			do_warn(_("would reset metadata directory\n"));
+		if (mp->m_metadirip)
+			libxfs_irele(mp->m_metadirip);
+		mp->m_metadirip = NULL;
+	}
+
+	/*
+	 * Since these two realtime inodes are no longer fixed, we must
+	 * remember to regenerate them if we still haven't gotten a pointer to
+	 * a valid realtime inode.
+	 */
+	if (!libxfs_verify_ino(mp, mp->m_sb.sb_rbmino))
+		need_rbmino = 1;
+	if (!libxfs_verify_ino(mp, mp->m_sb.sb_rsumino))
+		need_rsumino = 1;
+}
+
 static void
 calc_mkfs(xfs_mount_t *mp)
 {
@@ -489,10 +539,18 @@ calc_mkfs(xfs_mount_t *mp)
 	 */
 	ensure_fixed_ino(&mp->m_sb.sb_rootino, first_prealloc_ino,
 			_("root"));
-	ensure_fixed_ino(&mp->m_sb.sb_rbmino, first_prealloc_ino + 1,
-			_("realtime bitmap"));
-	ensure_fixed_ino(&mp->m_sb.sb_rsumino, first_prealloc_ino + 2,
-			_("realtime summary"));
+	if (xfs_sb_version_hasmetadir(&mp->m_sb)) {
+		check_metadir_inode(mp);
+	} else {
+		/*
+		 * The realtime bitmap and summary inodes are no longer at
+		 * fixed when the metadir feature is enabled.
+		 */
+		ensure_fixed_ino(&mp->m_sb.sb_rbmino, first_prealloc_ino + 1,
+				_("realtime bitmap"));
+		ensure_fixed_ino(&mp->m_sb.sb_rsumino, first_prealloc_ino + 2,
+				_("realtime summary"));
+	}
 }
 
 /*
