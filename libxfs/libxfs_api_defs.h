@@ -177,5 +177,7 @@
 #define xfs_imeta_mount			libxfs_imeta_mount
 #define xfs_imeta_create_space_res	libxfs_imeta_create_space_res
 #define xfs_imeta_unlink_space_res	libxfs_imeta_unlink_space_res
+#define xfs_imeta_iget			libxfs_imeta_iget
+#define xfs_imeta_irele			libxfs_imeta_irele
 
 #endif /* __LIBXFS_API_DEFS_H__ */
