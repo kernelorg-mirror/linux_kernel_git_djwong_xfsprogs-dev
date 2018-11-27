@@ -2655,6 +2655,35 @@ process_exinode(
 	process_bmbt_reclist(rp, *nex, type, id, totd, blkmapp);
 }
 
+static bool
+is_meta_ino(
+	struct xfs_mount	*mp,
+	struct inodata		*id,
+	struct xfs_inode	*xino,
+	dbm_t			*typep,
+	struct blkmap		**blkmap)
+{
+	dbm_t			type = DBM_UNKNOWN;
+
+	if (id->ino == mp->m_sb.sb_rbmino)
+		type = DBM_RTBITMAP;
+	else if (id->ino == mp->m_sb.sb_rsumino)
+		type = DBM_RTSUM;
+	else if (id->ino == mp->m_sb.sb_uquotino ||
+		 id->ino == mp->m_sb.sb_gquotino ||
+		 id->ino == mp->m_sb.sb_pquotino)
+		type = DBM_QUOTA;
+
+	if (type != DBM_UNKNOWN) {
+		addlink_inode(id);
+		*typep = type;
+		*blkmap = blkmap_alloc(xino->i_d.di_nextents);
+		return true;
+	}
+
+	return false;
+}
+
 static void
 process_inode(
 	xfs_agf_t		*agf,
@@ -2809,27 +2838,16 @@ process_inode(
 		type = DBM_DIR;
 		if (xino.i_d.di_format == XFS_DINODE_FMT_LOCAL)
 			break;
-		blkmap = blkmap_alloc(xino.i_d.di_nextents);
+		if (is_meta_ino(mp, id, &xino, &type, &blkmap))
+			; /* empty */
+		else
+			blkmap = blkmap_alloc(xino.i_d.di_nextents);
 		break;
 	case S_IFREG:
 		if (xino.i_d.di_flags & XFS_DIFLAG_REALTIME)
 			type = DBM_RTDATA;
-		else if (id->ino == mp->m_sb.sb_rbmino) {
-			type = DBM_RTBITMAP;
-			blkmap = blkmap_alloc(xino.i_d.di_nextents);
-			addlink_inode(id);
-		} else if (id->ino == mp->m_sb.sb_rsumino) {
-			type = DBM_RTSUM;
-			blkmap = blkmap_alloc(xino.i_d.di_nextents);
-			addlink_inode(id);
-		}
-		else if (id->ino == mp->m_sb.sb_uquotino ||
-			 id->ino == mp->m_sb.sb_gquotino ||
-			 id->ino == mp->m_sb.sb_pquotino) {
-			type = DBM_QUOTA;
-			blkmap = blkmap_alloc(xino.i_d.di_nextents);
-			addlink_inode(id);
-		}
+		else if (is_meta_ino(mp, id, &xino, &type, &blkmap))
+			; /* empty */
 		else
 			type = DBM_DATA;
 		if (mode & (S_ISUID | S_ISGID))
