@@ -157,4 +157,6 @@ extern int	libxfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 				struct xfs_ifork_ops *);
 extern void	libxfs_irele(struct xfs_inode *ip);
 
+#define XFS_DEFAULT_COWEXTSZ_HINT 32
+
 #endif /* __XFS_INODE_H__ */
