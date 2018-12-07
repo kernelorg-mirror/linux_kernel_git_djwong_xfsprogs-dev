@@ -2899,7 +2899,7 @@ process_inode(
 			break;
 		}
 		if (ic) {
-			dqprid = xfs_get_projid(&xino);	/* dquot ID is u32 */
+			dqprid = libxfs_get_projid(&xino); /* dquot ID is u32 */
 			quota_add(&dqprid, &xino.i_d.di_gid, &xino.i_d.di_uid,
 				  0, bc, ic, rc);
 		}
