@@ -436,6 +436,9 @@ roundup_64(uint64_t x, uint32_t y)
 	__mode = __mode; /* no set-but-unused warning */	\
 })
 
+#define mutex_lock(l)					((void) 0)
+#define mutex_unlock(l)					((void) 0)
+
 /* space allocation */
 #define XFS_EXTENT_BUSY_DISCARDED	0x01	/* undergoing a discard op. */
 #define XFS_EXTENT_BUSY_SKIP_DISCARD	0x02	/* do not discard */
@@ -461,6 +464,8 @@ roundup_64(uint64_t x, uint32_t y)
 
 #define xfs_log_force(mp,flags)			((void) 0)
 #define XFS_LOG_SYNC				1
+
+#define xfs_trans_inode_buf(tp, bp)		((void) 0)
 
 /* quota bits */
 #define xfs_trans_mod_dquot_byino(t,i,f,d)		((void) 0)
