@@ -161,4 +161,7 @@
 #define LIBXFS_ATTR_CREATE		ATTR_CREATE
 #define LIBXFS_ATTR_REPLACE		ATTR_REPLACE
 
+#define xfs_get_projid			libxfs_get_projid
+#define xfs_set_projid			libxfs_set_projid
+
 #endif /* __LIBXFS_API_DEFS_H__ */
