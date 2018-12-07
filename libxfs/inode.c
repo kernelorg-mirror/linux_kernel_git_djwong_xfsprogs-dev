@@ -111,6 +111,40 @@ xfs_dir_ialloc_roll(
 }
 
 /*
+ * Wrapper around call to libxfs_dir_ialloc. Takes care of committing and
+ * allocating a new transaction as needed.
+ */
+int
+libxfs_inode_alloc(
+	struct xfs_trans	**tpp,
+	struct xfs_inode	*pip,
+	mode_t			mode,
+	nlink_t			nlink,
+	xfs_dev_t		rdev,
+	struct cred		*cr,
+	struct fsxattr		*fsx,
+	struct xfs_inode	**ipp)
+{
+	struct xfs_ialloc_args	args = {
+		.pip		= pip,
+		.uid		= cr->cr_uid,
+		.gid		= cr->cr_gid,
+		.prid		= pip ? 0 : fsx->fsx_projid,
+		.nlink		= nlink,
+		.rdev		= rdev,
+		.mode		= mode,
+	};
+	int			error;
+
+	error = xfs_dir_ialloc(tpp, &args, ipp);
+	if (error)
+		return error;
+	if (!pip)
+		xfs_ialloc_fsx_init(tpp, *ipp, fsx);
+	return 0;
+}
+
+/*
  * Writes a modified inode's changes out to the inode's on disk home.
  * Originally based on xfs_iflush_int() from xfs_inode.c in the kernel.
  */
@@ -168,75 +202,6 @@ libxfs_iflush_int(xfs_inode_t *ip, xfs_buf_t *bp)
 	xfs_dinode_calc_crc(mp, dip);
 
 	return 0;
-}
-
-/* Temporary: Fix this up until we migrate libxfs_inode_alloc */
-#define libxfs_ialloc xfs_ialloc
-
-/*
- * Wrapper around call to libxfs_ialloc. Takes care of committing and
- * allocating a new transaction as needed.
- *
- * Originally there were two copies of this code - one in mkfs, the
- * other in repair - now there is just the one.
- */
-int
-libxfs_inode_alloc(
-	xfs_trans_t	**tp,
-	xfs_inode_t	*pip,
-	mode_t		mode,
-	nlink_t		nlink,
-	xfs_dev_t	rdev,
-	struct cred	*cr,
-	struct fsxattr	*fsx,
-	xfs_inode_t	**ipp)
-{
-	struct xfs_ialloc_args	args = {
-		.pip		= pip,
-		.uid		= cr->cr_uid,
-		.gid		= cr->cr_gid,
-		.prid		= pip ? 0 : fsx->fsx_projid,
-		.nlink		= nlink,
-		.rdev		= rdev,
-		.mode		= mode,
-	};
-	xfs_buf_t	*ialloc_context;
-	xfs_inode_t	*ip;
-	int		error;
-
-	ialloc_context = (xfs_buf_t *)0;
-	error = libxfs_ialloc(*tp, &args, &ialloc_context, &ip);
-	if (error) {
-		*ipp = NULL;
-		return error;
-	}
-	if (!ialloc_context && !ip) {
-		*ipp = NULL;
-		return -ENOSPC;
-	}
-
-	if (ialloc_context) {
-
-		xfs_trans_bhold(*tp, ialloc_context);
-
-		error = xfs_dir_ialloc_roll(tp);
-		if (error) {
-			fprintf(stderr, _("%s: cannot duplicate transaction: %s\n"),
-				progname, strerror(error));
-			exit(1);
-		}
-		xfs_trans_bjoin(*tp, ialloc_context);
-		error = libxfs_ialloc(*tp, &args, &ialloc_context, &ip);
-		if (!ip)
-			error = -ENOSPC;
-		if (error)
-			return error;
-	}
-
-	*ipp = ip;
-	if (!pip)
-		xfs_ialloc_fsx_init(tp, ip, fsx);
-	return error;
 }
 
 /*
