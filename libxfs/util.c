@@ -213,7 +213,7 @@ libxfs_ialloc(
 	set_nlink(VFS_I(ip), nlink);
 	ip->i_d.di_uid = cr->cr_uid;
 	ip->i_d.di_gid = cr->cr_gid;
-	xfs_set_projid(ip, pip ? 0 : fsx->fsx_projid);
+	libxfs_set_projid(ip, pip ? 0 : fsx->fsx_projid);
 	xfs_trans_ichgtime(tp, ip, XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD);
 
 	/*
