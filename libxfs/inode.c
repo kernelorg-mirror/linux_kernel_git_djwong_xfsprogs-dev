@@ -101,6 +101,14 @@ xfs_ialloc_iget(
 			&xfs_default_ifork_ops);
 }
 
+/* Roll transaction after allocating inode chunk. */
+int
+xfs_dir_ialloc_roll(
+	struct xfs_trans	**tpp)
+{
+	return xfs_trans_roll(tpp);
+}
+
 /*
  * Writes a modified inode's changes out to the inode's on disk home.
  * Originally based on xfs_iflush_int() from xfs_inode.c in the kernel.
@@ -210,7 +218,7 @@ libxfs_inode_alloc(
 
 		xfs_trans_bhold(*tp, ialloc_context);
 
-		error = xfs_trans_roll(tp);
+		error = xfs_dir_ialloc_roll(tp);
 		if (error) {
 			fprintf(stderr, _("%s: cannot duplicate transaction: %s\n"),
 				progname, strerror(error));
