@@ -155,6 +155,7 @@
 #define xfs_rmap_query_all		libxfs_rmap_query_all
 #define xfs_bmapi_remap			libxfs_bmapi_remap
 #define xfs_imap_to_bp			libxfs_imap_to_bp
+#define xfs_fixed_inode_reset		libxfs_fixed_inode_reset
 
 #define LIBXFS_ATTR_ROOT		ATTR_ROOT
 #define LIBXFS_ATTR_SECURE		ATTR_SECURE
@@ -163,5 +164,6 @@
 
 #define xfs_get_projid			libxfs_get_projid
 #define xfs_set_projid			libxfs_set_projid
+#define xfs_inode_init			libxfs_inode_init
 
 #endif /* __LIBXFS_API_DEFS_H__ */
