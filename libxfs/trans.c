@@ -352,10 +352,10 @@ libxfs_trans_iget(
 	xfs_inode_log_item_t	*iip;
 
 	if (tp == NULL)
-		return libxfs_iget(mp, tp, ino, lock_flags, ipp,
+		return libxfs_iget(mp, tp, ino, flags, ipp,
 				&xfs_default_ifork_ops);
 
-	error = libxfs_iget(mp, tp, ino, lock_flags, &ip,
+	error = libxfs_iget(mp, tp, ino, flags, &ip,
 			&xfs_default_ifork_ops);
 	if (error)
 		return error;
