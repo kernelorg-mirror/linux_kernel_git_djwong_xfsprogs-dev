@@ -436,6 +436,22 @@ out:
 }
 
 /*
+ * Estimate the amount of parallelization possible for scanning file data on
+ * the data and realtime devices.
+ */
+static unsigned int
+phase6_threads(
+	struct scrub_ctx	*ctx)
+{
+	unsigned int		nr = disk_heads(ctx->datadev);
+
+	if (ctx->rtdev)
+		nr += disk_heads(ctx->rtdev);
+
+	return nr > nproc ? nproc : nr;
+}
+
+/*
  * Read verify all the file data blocks in a filesystem.  Since XFS doesn't
  * do data checksums, we trust that the underlying storage will pass back
  * an IO error if it can't retrieve whatever we previously stored there.
@@ -469,7 +485,7 @@ xfs_scan_blocks(
 	}
 
 	ve.readverify = read_verify_pool_init(ctx, ctx->geo.blocksize,
-			xfs_check_rmap_ioerr, disk_heads(ctx->datadev));
+			xfs_check_rmap_ioerr, phase6_threads(ctx));
 	if (!ve.readverify) {
 		moveon = false;
 		str_info(ctx, ctx->mntpoint,
@@ -525,7 +541,7 @@ xfs_estimate_verify_work(
 		return moveon;
 
 	*items = ((d_blocks - d_bfree) + (r_blocks - r_bfree)) << ctx->blocklog;
-	*nr_threads = disk_heads(ctx->datadev);
+	*nr_threads = phase6_threads(ctx);
 	*rshift = 20;
 	return moveon;
 }
