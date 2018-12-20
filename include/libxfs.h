@@ -156,6 +156,8 @@ extern int	libxfs_log_header(char *, uuid_t *, int, int, int, xfs_lsn_t,
 
 extern int	libxfs_alloc_file_space(struct xfs_inode *ip, xfs_off_t offset,
 					xfs_off_t len, int alloc_type);
+extern int	libxfs_file_write(struct xfs_trans *tp, struct xfs_inode *ip,
+				  void *buf, size_t len, bool logit);
 
 extern void	libxfs_fs_repair_cmn_err(int, struct xfs_mount *, char *, ...);
 extern void	libxfs_fs_cmn_err(int, struct xfs_mount *, char *, ...);
