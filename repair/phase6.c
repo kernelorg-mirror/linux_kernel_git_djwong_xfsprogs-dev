@@ -665,19 +665,12 @@ mk_rbmino(
 }
 
 static int
-fill_rbmino(xfs_mount_t *mp)
+fill_rbmino(
+	struct xfs_mount	*mp)
 {
-	xfs_buf_t	*bp;
-	xfs_trans_t	*tp;
-	xfs_inode_t	*ip;
-	xfs_rtword_t	*bmp;
-	int		nmap;
-	int		error;
-	xfs_fileoff_t	bno;
-	xfs_bmbt_irec_t	map;
-
-	bmp = btmcompute;
-	bno = 0;
+	struct xfs_trans	*tp;
+	struct xfs_inode	*ip;
+	int			error;
 
 	error = -libxfs_trans_alloc_rollable(mp, 10, &tp);
 	if (error)
@@ -690,63 +683,26 @@ fill_rbmino(xfs_mount_t *mp)
 			error);
 	}
 
-	while (bno < mp->m_sb.sb_rbmblocks)  {
-		/*
-		 * fill the file one block at a time
-		 */
-		nmap = 1;
-		error = -libxfs_bmapi_write(tp, ip, bno, 1, 0, 1, &map, &nmap);
-		if (error || nmap != 1) {
-			do_error(
-	_("couldn't map realtime bitmap block %" PRIu64 ", error = %d\n"),
-				bno, error);
-		}
-
-		ASSERT(map.br_startblock != HOLESTARTBLOCK);
-
-		error = -libxfs_trans_read_buf(
-				mp, tp, mp->m_dev,
-				XFS_FSB_TO_DADDR(mp, map.br_startblock),
-				XFS_FSB_TO_BB(mp, 1), 1, &bp, NULL);
-
-		if (error) {
-			do_warn(
-_("can't access block %" PRIu64 " (fsbno %" PRIu64 ") of realtime bitmap inode %" PRIu64 "\n"),
-				bno, map.br_startblock, mp->m_sb.sb_rbmino);
-			return(1);
-		}
-
-		memmove(bp->b_addr, bmp, mp->m_sb.sb_blocksize);
-
-		libxfs_trans_log_buf(tp, bp, 0, mp->m_sb.sb_blocksize - 1);
-
-		bmp = (xfs_rtword_t *)((intptr_t) bmp + mp->m_sb.sb_blocksize);
-		bno++;
-	}
+	error = -libxfs_file_write(tp, ip, btmcompute,
+			XFS_FSB_TO_B(mp, mp->m_sb.sb_rbmblocks), true);
+	if (error)
+		do_error(_("%s: write failed, error %d\n"), __func__, error);
 
 	error = -libxfs_trans_commit(tp);
 	if (error)
 		do_error(_("%s: commit failed, error %d\n"), __func__, error);
 	libxfs_irele(ip);
-	return(0);
+
+	return 0;
 }
 
 static int
-fill_rsumino(xfs_mount_t *mp)
+fill_rsumino(
+	struct xfs_mount	*mp)
 {
-	xfs_buf_t	*bp;
-	xfs_trans_t	*tp;
-	xfs_inode_t	*ip;
-	xfs_suminfo_t	*smp;
-	int		nmap;
-	int		error;
-	xfs_fileoff_t	bno;
-	xfs_fileoff_t	end_bno;
-	xfs_bmbt_irec_t	map;
-
-	smp = sumcompute;
-	bno = 0;
-	end_bno = mp->m_rsumsize >> mp->m_sb.sb_blocklog;
+	struct xfs_trans	*tp;
+	struct xfs_inode	*ip;
+	int			error;
 
 	error = -libxfs_trans_alloc_rollable(mp, 10, &tp);
 	if (error)
@@ -759,46 +715,16 @@ fill_rsumino(xfs_mount_t *mp)
 			error);
 	}
 
-	while (bno < end_bno)  {
-		/*
-		 * fill the file one block at a time
-		 */
-		nmap = 1;
-		error = -libxfs_bmapi_write(tp, ip, bno, 1, 0, 1, &map, &nmap);
-		if (error || nmap != 1) {
-			do_error(
-	_("couldn't map realtime summary inode block %" PRIu64 ", error = %d\n"),
-				bno, error);
-		}
-
-		ASSERT(map.br_startblock != HOLESTARTBLOCK);
-
-		error = -libxfs_trans_read_buf(
-				mp, tp, mp->m_dev,
-				XFS_FSB_TO_DADDR(mp, map.br_startblock),
-				XFS_FSB_TO_BB(mp, 1), 1, &bp, NULL);
-
-		if (error) {
-			do_warn(
-_("can't access block %" PRIu64 " (fsbno %" PRIu64 ") of realtime summary inode %" PRIu64 "\n"),
-				bno, map.br_startblock, mp->m_sb.sb_rsumino);
-			libxfs_irele(ip);
-			return(1);
-		}
-
-		memmove(bp->b_addr, smp, mp->m_sb.sb_blocksize);
-
-		libxfs_trans_log_buf(tp, bp, 0, mp->m_sb.sb_blocksize - 1);
-
-		smp = (xfs_suminfo_t *)((intptr_t)smp + mp->m_sb.sb_blocksize);
-		bno++;
-	}
+	error = -libxfs_file_write(tp, ip, sumcompute, mp->m_rsumsize, true);
+	if (error)
+		do_error(_("%s: write failed, error %d\n"), __func__, error);
 
 	error = -libxfs_trans_commit(tp);
 	if (error)
 		do_error(_("%s: commit failed, error %d\n"), __func__, error);
 	libxfs_irele(ip);
-	return(0);
+
+	return 0;
 }
 
 static void
