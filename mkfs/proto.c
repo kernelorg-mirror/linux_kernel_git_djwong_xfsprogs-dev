@@ -219,21 +219,19 @@ rsvfile(
 
 static int
 newfile(
-	xfs_trans_t	*tp,
-	xfs_inode_t	*ip,
-	int		symlink,
-	int		logit,
-	char		*buf,
-	int		len)
+	struct xfs_trans	*tp,
+	struct xfs_inode	*ip,
+	int			symlink,
+	int			logit,
+	char			*buf,
+	int			len)
 {
-	xfs_buf_t	*bp;
-	xfs_daddr_t	d;
-	int		error;
-	int		flags;
-	xfs_bmbt_irec_t	map;
-	xfs_mount_t	*mp;
-	xfs_extlen_t	nb;
-	int		nmap;
+	struct xfs_bmbt_irec	map;
+	struct xfs_mount	*mp;
+	int			error;
+	int			flags;
+	xfs_extlen_t		nb;
+	int			nmap;
 
 	flags = 0;
 	mp = ip->i_mount;
@@ -245,25 +243,18 @@ newfile(
 		nb = XFS_B_TO_FSB(mp, len);
 		nmap = 1;
 		error = -libxfs_bmapi_write(tp, ip, 0, nb, 0, nb, &map, &nmap);
-		if (error) {
+		if (error)
 			fail(_("error allocating space for a file"), error);
-		}
 		if (nmap != 1) {
 			fprintf(stderr,
 				_("%s: cannot allocate space for file\n"),
 				progname);
 			exit(1);
 		}
-		d = XFS_FSB_TO_DADDR(mp, map.br_startblock);
-		bp = libxfs_trans_get_buf(logit ? tp : NULL, mp->m_dev, d,
-			nb << mp->m_blkbb_log, 0);
-		memmove(bp->b_addr, buf, len);
-		if (len < bp->b_bcount)
-			memset((char *)bp->b_addr + len, 0, bp->b_bcount - len);
-		if (logit)
-			libxfs_trans_log_buf(tp, bp, 0, bp->b_bcount - 1);
-		else
-			libxfs_writebuf(bp, LIBXFS_EXIT_ON_FAILURE);
+
+		error = -libxfs_file_write(tp, ip, buf, len, logit);
+		if (error)
+			fail(_("error writing file"), error);
 	}
 	ip->i_d.di_size = len;
 	return flags;
