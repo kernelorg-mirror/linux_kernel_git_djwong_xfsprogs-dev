@@ -13,20 +13,25 @@
 #include "da_util.h"
 
 /*
- * takes a name and length (name need not be null-terminated)
- * and returns 1 if the name contains a '/' or a \0, returns 0
- * otherwise
+ * takes a name and length (name need not be null-terminated) and whether
+ * we are checking a dir (vs an attr), and returns 1 if the direntry contains
+ * a '/', or anything contains a \0, returns 0 otherwise
  */
 int
-namecheck(char *name, int length)
+namecheck(
+	char	*name,
+	int	length,
+	bool	isadir)
 {
-	char *c;
-	int i;
+	char	*c;
+	int	i;
 
 	ASSERT(length < MAXNAMELEN);
 
 	for (c = name, i = 0; i < length; i++, c++) {
-		if (*c == '/' || *c == '\0')
+		if (isadir && *c == '/')
+			return 1;
+		if (*c == '\0')
 			return 1;
 	}
 
