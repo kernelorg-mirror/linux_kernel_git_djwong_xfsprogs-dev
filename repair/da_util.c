@@ -13,32 +13,6 @@
 #include "da_util.h"
 
 /*
- * takes a name and length (name need not be null-terminated) and whether
- * we are checking a dir (vs an attr), and returns 1 if the direntry contains
- * a '/', or anything contains a \0, returns 0 otherwise
- */
-int
-namecheck(
-	char	*name,
-	int	length,
-	bool	isadir)
-{
-	char	*c;
-	int	i;
-
-	ASSERT(length < MAXNAMELEN);
-
-	for (c = name, i = 0; i < length; i++, c++) {
-		if (isadir && *c == '/')
-			return 1;
-		if (*c == '\0')
-			return 1;
-	}
-
-	return 0;
-}
-
-/*
  * the cursor gets passed up and down the da btree processing
  * routines.  The interior block processing routines use the
  * cursor to determine if the pointers to and from the preceding
