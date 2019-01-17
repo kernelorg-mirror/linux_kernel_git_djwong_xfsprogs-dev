@@ -119,16 +119,19 @@ static inline void inc_nlink(struct inode *inode)
  * xfs_inode...
  */
 static inline prid_t
-xfs_get_projid(struct xfs_icdinode *id)
+xfs_get_projid(
+	struct xfs_inode	*ip)
 {
-	return (prid_t)id->di_projid_hi << 16 | id->di_projid_lo;
+	return (prid_t)ip->i_d.di_projid_hi << 16 | ip->i_d.di_projid_lo;
 }
 
 static inline void
-xfs_set_projid(struct xfs_icdinode *id, prid_t projid)
+xfs_set_projid(
+	struct xfs_inode	*ip,
+	prid_t			projid)
 {
-	id->di_projid_hi = (uint16_t) (projid >> 16);
-	id->di_projid_lo = (uint16_t) (projid & 0xffff);
+	ip->i_d.di_projid_hi = (uint16_t) (projid >> 16);
+	ip->i_d.di_projid_lo = (uint16_t) (projid & 0xffff);
 }
 
 static inline bool xfs_is_reflink_inode(struct xfs_inode *ip)
