@@ -96,6 +96,7 @@ libxfs_ialloc(
 	struct xfs_inode		*pip = args->pip;
 	xfs_ino_t			ino;
 	uint				flags;
+	int				times;
 	int				error;
 
 	/*
@@ -123,7 +124,7 @@ libxfs_ialloc(
 	ip->i_d.di_uid = args->uid;
 	ip->i_d.di_gid = args->gid;
 	libxfs_set_projid(ip, args->prid);
-	xfs_trans_ichgtime(tp, ip, XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD);
+	times = XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD;
 
 	/*
 	 * We only support filesystems that understand v2 format inodes. So if
@@ -158,10 +159,11 @@ libxfs_ialloc(
 		ASSERT(uuid_equal(&ip->i_d.di_uuid, &mp->m_sb.sb_meta_uuid));
 		VFS_I(ip)->i_version = 1;
 		ip->i_d.di_flags2 = 0;
-		ip->i_d.di_crtime.t_sec = (int32_t)VFS_I(ip)->i_mtime.tv_sec;
-		ip->i_d.di_crtime.t_nsec = (int32_t)VFS_I(ip)->i_mtime.tv_nsec;
 		ip->i_d.di_cowextsize = 0;
+		times |= XFS_ICHGTIME_CREATE;
 	}
+
+	xfs_trans_ichgtime(tp, ip, times);
 
 	flags = XFS_ILOG_CORE;
 	switch (args->mode & S_IFMT) {
