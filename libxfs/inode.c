@@ -88,6 +88,20 @@ xfs_setup_inode(
 }
 
 /*
+ * Create in-core inode for a newly allocated on-disk inode.  Get the in-core
+ * inode with the lock held exclusively because we're setting fields here and
+ * need to prevent others from looking at the inode until we're done.
+ */
+static int
+xfs_ialloc_iget(
+	struct xfs_trans	*tp,
+	xfs_ino_t		ino,
+	struct xfs_inode	**ipp)
+{
+	return xfs_trans_iget(tp->t_mountp, tp, ino, 0, 0, ipp);
+}
+
+/*
  * Allocate an inode on disk and return a copy of its in-core version.
  * Set mode, nlink, and rdev appropriately within the inode.
  * The uid and gid for the inode are set according to the contents of
@@ -125,7 +139,7 @@ libxfs_ialloc(
 	}
 	ASSERT(*ialloc_context == NULL);
 
-	error = xfs_trans_iget(tp->t_mountp, tp, ino, 0, 0, &ip);
+	error = xfs_ialloc_iget(tp, ino, &ip);
 	if (error != 0)
 		return error;
 	ASSERT(ip != NULL);
