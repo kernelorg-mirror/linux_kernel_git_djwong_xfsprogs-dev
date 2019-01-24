@@ -51,6 +51,8 @@ libxfs_trans_ichgtime(
 		VFS_I(ip)->i_mtime = tv;
 	if (flags & XFS_ICHGTIME_CHG)
 		VFS_I(ip)->i_ctime = tv;
+	if (flags & XFS_ICHGTIME_ACCESS)
+		VFS_I(ip)->i_atime = tv;
 	if (flags & XFS_ICHGTIME_CREATE) {
 		ip->i_d.di_crtime.t_sec = (int32_t)tv.tv_sec;
 		ip->i_d.di_crtime.t_nsec = (int32_t)tv.tv_nsec;
