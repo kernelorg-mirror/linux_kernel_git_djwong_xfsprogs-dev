@@ -124,7 +124,7 @@ libxfs_ialloc(
 	ip->i_d.di_uid = args->uid;
 	ip->i_d.di_gid = args->gid;
 	libxfs_set_projid(ip, args->prid);
-	times = XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD;
+	times = XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD | XFS_ICHGTIME_ACCESS;
 
 	/*
 	 * We only support filesystems that understand v2 format inodes. So if
