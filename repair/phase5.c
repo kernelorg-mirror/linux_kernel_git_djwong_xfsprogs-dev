@@ -1133,6 +1133,10 @@ build_agi(xfs_mount_t *mp, xfs_agnumber_t agno, bt_status_t *btree_curs,
 		agi->agi_free_level = cpu_to_be32(finobt_curs->num_levels);
 	}
 
+	if (xfs_sb_version_hasfinobtblocks(&mp->m_sb))
+		agi->agi_fino_blocks = cpu_to_be32(finobt_curs->num_tot_blocks -
+				finobt_curs->num_free_blocks);
+
 	libxfs_writebuf(agi_buf, 0);
 }
 
