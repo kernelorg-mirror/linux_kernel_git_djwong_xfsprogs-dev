@@ -3520,6 +3520,8 @@ initialise_ag_headers(
 		platform_uuid_copy(&agi->agi_uuid, &sbp->sb_uuid);
 	for (c = 0; c < XFS_AGI_UNLINKED_BUCKETS; c++)
 		agi->agi_unlinked[c] = cpu_to_be32(NULLAGINO);
+	if (xfs_sb_version_hasfinobtblocks(sbp))
+		agi->agi_fino_blocks = cpu_to_be32(1);
 	libxfs_writebuf(buf, LIBXFS_EXIT_ON_FAILURE);
 
 	/*
