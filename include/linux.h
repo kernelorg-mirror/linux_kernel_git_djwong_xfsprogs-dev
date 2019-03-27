@@ -323,4 +323,9 @@ fsmap_advance(
 #include <asm-generic/mman-common.h>
 #endif /* HAVE_MAP_SYNC */
 
+/* ioctl wrappers */
+
+struct xfs_fsop_geom;
+int xfs_fsgeometry(int fd, struct xfs_fsop_geom *fsgeo);
+
 #endif	/* __XFS_LINUX_H__ */

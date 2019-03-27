@@ -118,7 +118,7 @@ openfile(
 	if (flags & IO_PATH) {
 		/* Can't call ioctl() on O_PATH fds */
 		memset(geom, 0, sizeof(*geom));
-	} else if (xfsctl(path, fd, XFS_IOC_FSGEOMETRY, geom) < 0) {
+	} else if (xfs_fsgeometry(fd, geom)) {
 		perror("XFS_IOC_FSGEOMETRY");
 		close(fd);
 		return -1;

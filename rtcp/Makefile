@@ -9,6 +9,9 @@ LTCOMMAND = xfs_rtcp
 CFILES = xfs_rtcp.c
 LLDFLAGS = -static
 
+LLDLIBS = $(LIBHANDLE)
+LTDEPENDENCIES = $(LIBHANDLE)
+
 default: depend $(LTCOMMAND)
 
 include $(BUILDRULES)
