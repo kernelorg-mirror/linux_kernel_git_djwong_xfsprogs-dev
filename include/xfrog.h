@@ -28,4 +28,6 @@ struct xfs_inogrp;
 int xfrog_inumbers(int fd, uint64_t *lastino, uint32_t icount,
 		struct xfs_inogrp *ubuffer, uint32_t *ocount);
 
+int xfrog_ag_geometry(int fd, unsigned int agno, struct xfs_ag_geometry *ageo);
+
 #endif	/* __XFROG_H__ */
