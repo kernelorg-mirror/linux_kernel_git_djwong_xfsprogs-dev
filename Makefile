@@ -99,14 +99,15 @@ $(LIB_SUBDIRS) $(TOOL_SUBDIRS): include libfrog
 $(DLIB_SUBDIRS) $(TOOL_SUBDIRS): libxfs
 db logprint: libxlog
 fsr: libhandle
-growfs: libxcmd
+growfs: libxcmd libhandle
 io: libxcmd libhandle
-quota: libxcmd
-repair: libxlog libxcmd
+quota: libxcmd libhandle
+repair: libxlog libxcmd libhandle
 copy: libxlog
 mkfs: libxcmd
-spaceman: libxcmd
+spaceman: libxcmd libhandle
 scrub: libhandle libxcmd
+rtcp: libhandle
 
 ifeq ($(HAVE_BUILDDEFS), yes)
 include $(BUILDRULES)

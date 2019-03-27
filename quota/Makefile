@@ -10,8 +10,8 @@ HFILES = init.h quota.h
 CFILES = init.c util.c \
 	edit.c free.c linux.c path.c project.c quot.c quota.c report.c state.c
 
-LLDLIBS = $(LIBXCMD) $(LIBFROG)
-LTDEPENDENCIES = $(LIBXCMD) $(LIBFROG)
+LLDLIBS = $(LIBHANDLE) $(LIBXCMD) $(LIBFROG)
+LTDEPENDENCIES = $(LIBHANDLE) $(LIBXCMD) $(LIBFROG)
 LLDFLAGS = -static
 
 ifeq ($(ENABLE_READLINE),yes)
