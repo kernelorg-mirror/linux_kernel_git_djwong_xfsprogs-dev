@@ -159,6 +159,12 @@ corruption.
 .TP
 .B XFS_SCRUB_TYPE_PQUOTA
 Examine all user, group, or project quota records for corruption.
+
+.TP
+.B XFS_SCRUB_TYPE_HEALTHY
+Mark everything healthy after a clean scrub run.
+This clears out all the indirect health problem markers that might remain
+in the system.
 .RE
 
 .PD 1
