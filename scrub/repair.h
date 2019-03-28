@@ -16,6 +16,7 @@ bool xfs_action_lists_alloc(size_t nr, struct xfs_action_list **listsp);
 void xfs_action_lists_free(struct xfs_action_list **listsp);
 
 void xfs_action_list_init(struct xfs_action_list *alist);
+void xfs_action_list_discard(struct xfs_action_list *alist);
 size_t xfs_action_list_length(struct xfs_action_list *alist);
 void xfs_action_list_add(struct xfs_action_list *dest,
 		struct action_item *item);

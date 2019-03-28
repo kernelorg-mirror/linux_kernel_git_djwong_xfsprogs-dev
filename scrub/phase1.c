@@ -27,6 +27,7 @@
 #include "scrub.h"
 #include "repair.h"
 #include "fsgeom.h"
+#include "scrub.h"
 
 /* Phase 1: Find filesystem geometry (and clean up after) */
 
@@ -43,12 +44,43 @@ xfs_shutdown_fs(
 		str_errno(ctx, ctx->mntpoint);
 }
 
+/*
+ * If we haven't found /any/ problems at all, tell the kernel that we're giving
+ * the filesystem a clean bill of health.
+ */
+static bool
+xfs_report_to_kernel(
+	struct scrub_ctx	*ctx)
+{
+	struct xfs_action_list	alist;
+	unsigned long long	total_errors;
+
+	total_errors = ctx->errors_found + ctx->runtime_errors;
+	if (!ctx->scrub_setup_succeeded || total_errors > 0)
+		return true;
+
+	xfs_action_list_init(&alist);
+	if (!xfs_scrub_clean_health(ctx, &alist))
+		return false;
+
+	if (xfs_action_list_length(&alist) > 0) {
+		/* That's odd, we shouldn't fail the clean bill of health. */
+		str_info(ctx, "Couldn't upload clean bill of health.", NULL);
+		xfs_action_list_discard(&alist);
+	}
+
+	return true;
+}
+
 /* Clean up the XFS-specific state data. */
 bool
 xfs_cleanup_fs(
 	struct scrub_ctx	*ctx)
 {
 	int			error;
+
+	if (!xfs_report_to_kernel(ctx))
+		return false;
 
 	xfs_action_lists_free(&ctx->action_lists);
 	if (ctx->fshandle)

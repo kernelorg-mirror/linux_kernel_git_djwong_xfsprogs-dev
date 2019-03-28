@@ -163,6 +163,21 @@ xfs_action_lists_alloc(
 	return true;
 }
 
+/* Discard repair list contents. */
+void
+xfs_action_list_discard(
+	struct xfs_action_list		*alist)
+{
+	struct action_item		*aitem;
+	struct action_item		*n;
+
+	list_for_each_entry_safe(aitem, n, &alist->list, list) {
+		alist->nr--;
+		list_del(&aitem->list);
+		free(aitem);
+	}
+}
+
 /* Free the repair lists. */
 void
 xfs_action_lists_free(
