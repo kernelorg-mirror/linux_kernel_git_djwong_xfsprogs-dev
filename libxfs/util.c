@@ -28,6 +28,7 @@
 #include "xfs_da_format.h"
 #include "xfs_da_btree.h"
 #include "xfs_dir2_priv.h"
+#include "xfs_health.h"
 
 /*
  * Calculate the worst case log unit reservation for a given superblock
@@ -778,3 +779,14 @@ hweight64(__u64 w)
 }
 
 void xfs_fs_mark_healthy(struct xfs_mount *mp, unsigned int mask) { }
+
+/* Nothing is ever sick in userspace! */
+void
+xfs_ag_measure_sickness(
+	struct xfs_perag	*pag,
+	unsigned int		*sick,
+	unsigned int		*checked)
+{
+	*sick = 0;
+	*checked = 0;
+}
