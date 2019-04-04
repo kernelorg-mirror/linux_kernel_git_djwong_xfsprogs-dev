@@ -790,3 +790,12 @@ xfs_ag_measure_sickness(
 	*sick = 0;
 	*checked = 0;
 }
+
+void
+xfs_health_update_agf(
+	struct xfs_trans	*tp,
+	struct xfs_perag	*pag,
+	long			len)
+{
+	/* empty */
+}
