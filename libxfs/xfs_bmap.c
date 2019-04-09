@@ -3343,8 +3343,10 @@ xfs_bmap_btalloc_accounting(
 		 * already have quota reservation and there's nothing to do
 		 * yet.
 		 */
-		if (ap->wasdel)
+		if (ap->wasdel) {
+			xfs_mod_delayed(ap->ip->i_mount, -(int64_t)args->len);
 			return;
+		}
 
 		/*
 		 * Otherwise, we've allocated blocks in a hole. The transaction
@@ -3363,8 +3365,10 @@ xfs_bmap_btalloc_accounting(
 	/* data/attr fork only */
 	ap->ip->i_d.di_nblocks += args->len;
 	xfs_trans_log_inode(ap->tp, ap->ip, XFS_ILOG_CORE);
-	if (ap->wasdel)
+	if (ap->wasdel) {
 		ap->ip->i_delayed_blks -= args->len;
+		xfs_mod_delayed(ap->ip->i_mount, -(int64_t)args->len);
+	}
 	xfs_trans_mod_dquot_byino(ap->tp, ap->ip,
 		ap->wasdel ? XFS_TRANS_DQ_DELBCOUNT : XFS_TRANS_DQ_BCOUNT,
 		args->len);
@@ -3960,6 +3964,7 @@ xfs_bmapi_reserve_delalloc(
 
 
 	ip->i_delayed_blks += alen;
+	xfs_mod_delayed(ip->i_mount, alen);
 
 	got->br_startoff = aoff;
 	got->br_startblock = nullstartblock(indlen);
@@ -4764,6 +4769,7 @@ xfs_bmap_del_extent_delay(
 	if (error)
 		return error;
 	ip->i_delayed_blks -= del->br_blockcount;
+	xfs_mod_delayed(ip->i_mount, -(int64_t)del->br_blockcount);
 
 	if (got->br_startoff == del->br_startoff)
 		state |= BMAP_LEFT_FILLING;
