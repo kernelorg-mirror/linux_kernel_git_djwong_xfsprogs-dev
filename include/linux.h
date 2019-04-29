@@ -328,4 +328,9 @@ fsmap_advance(
 struct xfs_fsop_geom;
 int xfs_fsgeometry(int fd, struct xfs_fsop_geom *fsgeo);
 
+struct xfs_bstat;
+int xfs_bulkstat_single(int fd, uint64_t ino, struct xfs_bstat *ubuffer);
+int xfs_bulkstat(int fd, uint64_t *lastino, uint32_t icount,
+		struct xfs_bstat *ubuffer, uint32_t *ocount);
+
 #endif	/* __XFS_LINUX_H__ */
