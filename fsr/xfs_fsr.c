@@ -103,31 +103,6 @@ static int	nfrags = 0;	/* Debug option: Coerse into specific number
 static int	openopts = O_CREAT|O_EXCL|O_RDWR|O_DIRECT;
 
 static int
-xfs_bulkstat_single(int fd, xfs_ino_t *lastip, xfs_bstat_t *ubuffer)
-{
-    xfs_fsop_bulkreq_t  bulkreq;
-
-    bulkreq.lastip = (__u64 *)lastip;
-    bulkreq.icount = 1;
-    bulkreq.ubuffer = ubuffer;
-    bulkreq.ocount = NULL;
-    return ioctl(fd, XFS_IOC_FSBULKSTAT_SINGLE, &bulkreq);
-}
-
-static int
-xfs_bulkstat(int fd, xfs_ino_t *lastip, int icount,
-                    xfs_bstat_t *ubuffer, __s32 *ocount)
-{
-    xfs_fsop_bulkreq_t  bulkreq;
-
-    bulkreq.lastip = (__u64 *)lastip;
-    bulkreq.icount = icount;
-    bulkreq.ubuffer = ubuffer;
-    bulkreq.ocount = ocount;
-    return ioctl(fd, XFS_IOC_FSBULKSTAT, &bulkreq);
-}
-
-static int
 xfs_swapext(int fd, xfs_swapext_t *sx)
 {
     return ioctl(fd, XFS_IOC_SWAPEXT, sx);
@@ -600,7 +575,7 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 	int	fsfd, fd;
 	int	count = 0;
 	int	ret;
-	__s32	buflenout;
+	uint32_t buflenout;
 	xfs_bstat_t buf[GRABSZ];
 	char	fname[64];
 	char	*tname;
@@ -634,7 +609,7 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 
 	tmp_init(mntdir);
 
-	while ((ret = xfs_bulkstat(fsfd,
+	while ((ret = xfrog_bulkstat(fsfd,
 				&lastino, GRABSZ, &buf[0], &buflenout)) == 0) {
 		xfs_bstat_t *p;
 		xfs_bstat_t *endp;
@@ -690,7 +665,7 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 		}
 	}
 	if (ret < 0)
-		fsrprintf(_("%s: xfs_bulkstat: %s\n"), progname, strerror(errno));
+		fsrprintf(_("%s: xfrog_bulkstat: %s\n"), progname, strerror(errno));
 out0:
 	tmp_close(mntdir);
 	close(fsfd);
@@ -752,7 +727,7 @@ fsrfile(char *fname, xfs_ino_t ino)
 		goto out;
 	}
 
-	if ((xfs_bulkstat_single(fsfd, &ino, &statbuf)) < 0) {
+	if ((xfrog_bulkstat_single(fsfd, ino, &statbuf)) < 0) {
 		fsrprintf(_("unable to get bstat on %s: %s\n"),
 			fname, strerror(errno));
 		goto out;
@@ -981,7 +956,6 @@ fsr_setup_attr_fork(
 	i = 0;
 	do {
 		xfs_bstat_t	tbstat;
-		xfs_ino_t	ino;
 		char		name[64];
 
 		/*
@@ -989,8 +963,7 @@ fsr_setup_attr_fork(
 		 * this to compare against the target and determine what we
 		 * need to do.
 		 */
-		ino = tstatbuf.st_ino;
-		if ((xfs_bulkstat_single(tfd, &ino, &tbstat)) < 0) {
+		if ((xfrog_bulkstat_single(tfd, tstatbuf.st_ino, &tbstat)) < 0) {
 			fsrprintf(_("unable to get bstat on temp file: %s\n"),
 						strerror(errno));
 			return -1;

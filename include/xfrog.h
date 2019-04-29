@@ -19,4 +19,9 @@
 struct xfs_fsop_geom;
 int xfrog_geometry(int fd, struct xfs_fsop_geom *fsgeo);
 
+struct xfs_bstat;
+int xfrog_bulkstat_single(int fd, uint64_t ino, struct xfs_bstat *ubuffer);
+int xfrog_bulkstat(int fd, uint64_t *lastino, uint32_t icount,
+		struct xfs_bstat *ubuffer, uint32_t *ocount);
+
 #endif	/* __XFROG_H__ */
