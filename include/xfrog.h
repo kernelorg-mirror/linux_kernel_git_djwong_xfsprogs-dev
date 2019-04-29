@@ -100,4 +100,11 @@ xfrog_b_to_fsbt(
 	return bytes >> frog->blocklog;
 }
 
+/* Bulkstat wrappers */
+struct xfs_bstat;
+int xfrog_bulkstat_single(struct xfrog *froggie, uint64_t ino,
+		struct xfs_bstat *ubuffer);
+int xfrog_bulkstat(struct xfrog *froggie, uint64_t *lastino, uint32_t icount,
+		struct xfs_bstat *ubuffer, uint32_t *ocount);
+
 #endif	/* __XFROG_H__ */
