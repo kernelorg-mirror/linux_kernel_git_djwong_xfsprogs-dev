@@ -62,3 +62,21 @@ xfs_bulkstat(
 	return ioctl(fd, XFS_IOC_FSBULKSTAT, &bulkreq);
 }
 
+/* Query inode allocation bitmask information. */
+int
+xfs_inumbers(
+	int			fd,
+	uint64_t		*lastino,
+	uint32_t		icount,
+	struct xfs_inogrp	*ubuffer,
+	uint32_t		*ocount)
+{
+	struct xfs_fsop_bulkreq	bulkreq = {
+		.lastip		= (__u64 *)lastino,
+		.icount		= icount,
+		.ubuffer	= ubuffer,
+		.ocount		= (__s32 *)ocount,
+	};
+
+	return ioctl(fd, XFS_IOC_FSINUMBERS, &bulkreq);
+}
