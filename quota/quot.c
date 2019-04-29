@@ -11,6 +11,7 @@
 #include <grp.h>
 #include "init.h"
 #include "quota.h"
+#include "xfrog.h"
 
 typedef struct du {
 	struct du	*next;
@@ -124,12 +125,11 @@ quot_bulkstat_add(
 static void
 quot_bulkstat_mount(
 	char			*fsdir,
-	uint			flags)
+	unsigned int		flags)
 {
-	xfs_fsop_bulkreq_t	bulkreq;
-	xfs_bstat_t		*buf;
-	__u64			last = 0;
-	__s32			count;
+	struct xfs_bstat	*buf;
+	uint64_t		last = 0;
+	uint32_t		count;
 	int			i, sts, fsfd;
 	du_t			**dp;
 
@@ -158,12 +158,7 @@ quot_bulkstat_mount(
 		return;
 	}
 
-	bulkreq.lastip = &last;
-	bulkreq.icount = NBSTAT;
-	bulkreq.ubuffer = buf;
-	bulkreq.ocount = &count;
-
-	while ((sts = xfsctl(fsdir, fsfd, XFS_IOC_FSBULKSTAT, &bulkreq)) == 0) {
+	while ((sts = xfrog_bulkstat(fsfd, &last, NBSTAT, buf, &count)) == 0) {
 		if (count == 0)
 			break;
 		for (i = 0; i < count; i++)
