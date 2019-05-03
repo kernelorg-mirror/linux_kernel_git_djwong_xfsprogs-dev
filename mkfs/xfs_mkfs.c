@@ -2015,7 +2015,7 @@ _("rmapbt not supported without CRC support\n"));
 		}
 		cli->sb_feat.rmapbt = false;
 
-		if (cli->sb_feat.reflink) {
+		if (cli->sb_feat.reflink && cli_opt_set(&mopts, M_REFLINK)) {
 			fprintf(stderr,
 _("reflink not supported without CRC support\n"));
 			usage();
@@ -3900,7 +3900,7 @@ main(
 			.finobt = true,
 			.spinodes = true,
 			.rmapbt = false,
-			.reflink = false,
+			.reflink = true,
 			.parent_pointers = false,
 			.nodalign = false,
 			.nortalign = false,
