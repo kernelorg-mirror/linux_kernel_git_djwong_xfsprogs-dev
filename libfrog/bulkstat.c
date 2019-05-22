@@ -318,21 +318,91 @@ xfrog_bulkstat_alloc_req(
 	return breq;
 }
 
+/* Convert an inumbers (v5) struct to a inogrp (v1) struct. */
+void
+xfrog_inumbers_to_inogrp(
+	struct xfs_inogrp		*ig1,
+	const struct xfs_inumbers	*ig)
+{
+	ig1->xi_startino = ig->xi_startino;
+	ig1->xi_alloccount = ig->xi_alloccount;
+	ig1->xi_allocmask = ig->xi_allocmask;
+}
+
+/* Convert an inogrp (v1) struct to a inumbers (v5) struct. */
+void
+xfrog_inogrp_to_inumbers(
+	struct xfs_inumbers		*ig,
+	const struct xfs_inogrp		*ig1)
+{
+	memset(ig, 0, sizeof(*ig));
+	ig->xi_version = XFS_INUMBERS_VERSION_V1;
+
+	ig->xi_startino = ig1->xi_startino;
+	ig->xi_alloccount = ig1->xi_alloccount;
+	ig->xi_allocmask = ig1->xi_allocmask;
+}
+
+static uint64_t xfrog_inum_ino(void *v1_rec)
+{
+	return ((struct xfs_inogrp *)v1_rec)->xi_startino;
+}
+
+static void xfrog_inum_cvt(struct xfs_fsop_geom *fsgeom, void *v5, void *v1)
+{
+	xfrog_inogrp_to_inumbers(v5, v1);
+}
+
 /* Query inode allocation bitmask information. */
 int
 xfrog_inumbers(
 	int			fd,
-	uint64_t		*lastino,
-	uint32_t		icount,
-	struct xfs_inogrp	*ubuffer,
-	uint32_t		*ocount)
+	struct xfs_fsop_geom	*fsgeom,
+	struct xfs_inumbers_req	*req)
 {
-	struct xfs_fsop_bulkreq	bulkreq = {
-		.lastip		= (__u64 *)lastino,
-		.icount		= icount,
-		.ubuffer	= ubuffer,
-		.ocount		= (__s32 *)ocount,
-	};
+	struct xfs_fsop_geom	geo;
+	struct xfs_fsop_bulkreq	bulkreq;
+	int			error;
 
-	return ioctl(fd, XFS_IOC_FSINUMBERS, &bulkreq);
+	error = ioctl(fd, XFS_IOC_INUMBERS, req);
+	if (!error)
+		return 0;
+
+	/* Emulate the v5 call as best we can with v1. */
+	if (!fsgeom) {
+		if (xfrog_geometry(fd, &geo))
+			return -1;
+		fsgeom = &geo;
+	}
+
+	error = xfrog_bulk_req_setup(fsgeom, &req->hdr, &bulkreq,
+			sizeof(struct xfs_inogrp));
+	if (error < 0)
+		return error;
+
+	if (!error)
+		error = ioctl(fd, XFS_IOC_FSINUMBERS, &bulkreq);
+
+	return xfrog_bulk_req_teardown(fsgeom, &req->hdr, &bulkreq,
+			sizeof(struct xfs_inogrp), xfrog_inum_ino,
+			&req->inumbers, sizeof(struct xfs_inumbers),
+			xfrog_inum_cvt, 64, error);
+}
+
+/* Allocate a inumbers request. */
+struct xfs_inumbers_req *
+xfrog_inumbers_alloc_req(
+	uint32_t		nr,
+	uint64_t		startino)
+{
+	struct xfs_inumbers_req	*ireq;
+
+	ireq = calloc(1, XFS_INUMBERS_REQ_SIZE(nr));
+	if (!ireq)
+		return NULL;
+
+	ireq->hdr.icount = nr;
+	ireq->hdr.ino = startino;
+
+	return ireq;
 }
