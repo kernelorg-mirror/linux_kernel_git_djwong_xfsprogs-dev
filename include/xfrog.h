@@ -177,8 +177,8 @@ xfrog_daddr_to_agbno(
 
 /* Bulkstat wrappers */
 struct xfs_bstat;
-int xfrog_bulkstat_single(struct xfrog *froggie, uint64_t ino,
-		struct xfs_bstat *ubuffer);
+int xfrog_bulkstat_single(struct xfrog *froggie,
+		struct xfs_bulkstat_single_req *req);
 int xfrog_bulkstat(struct xfrog *froggie, struct xfs_bulkstat_req *req);
 
 struct xfs_bulkstat_req *xfrog_bulkstat_alloc_req(uint32_t nr,

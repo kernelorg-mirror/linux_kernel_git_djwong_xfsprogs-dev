@@ -51,13 +51,12 @@ xfs_iterate_inodes_range_check(
 	struct xfs_inogrp	*inogrp,
 	struct xfs_bulkstat	*bstat)
 {
+	struct xfs_bulkstat_single_req	req = { 0 };
 	struct xfs_bulkstat	*bs;
 	int			i;
 	int			error;
 
 	for (i = 0, bs = bstat; i < XFS_INODES_PER_CHUNK; i++) {
-		struct xfs_bstat bs1;
-
 		if (!(inogrp->xi_allocmask & (1ULL << i)))
 			continue;
 		if (bs->bs_ino == inogrp->xi_startino + i) {
@@ -66,14 +65,14 @@ xfs_iterate_inodes_range_check(
 		}
 
 		/* Load the one inode. */
-		error = xfrog_bulkstat_single(&ctx->mnt,
-				inogrp->xi_startino + i, &bs1);
-		if (error || bs1.bs_ino != inogrp->xi_startino + i) {
+		req.hdr.ino = inogrp->xi_startino + i;
+		error = xfrog_bulkstat_single(&ctx->mnt, &req);
+		if (error || req.bulkstat.bs_ino != inogrp->xi_startino + i) {
 			memset(bs, 0, sizeof(struct xfs_bulkstat));
 			bs->bs_ino = inogrp->xi_startino + i;
 			bs->bs_blksize = ctx->mnt_sv.f_frsize;
 		} else {
-			xfrog_bstat_to_bulkstat(&ctx->mnt, bs, &bs1);
+			memcpy(bs, &req.bulkstat, sizeof(*bs));
 		}
 		bs++;
 	}

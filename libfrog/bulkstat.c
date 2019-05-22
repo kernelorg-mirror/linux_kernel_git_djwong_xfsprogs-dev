@@ -20,22 +20,71 @@ xfrog_bulkstat_prep_v1_emulation(
 	return 0;
 }
 
-/* Bulkstat a single inode. */
+/* Bulkstat a single inode using v5 ioctl. */
+static int
+xfrog_bulkstat_single5(
+	struct xfrog			*froggie,
+	struct xfs_bulkstat_single_req	*req)
+{
+	return ioctl(froggie->fd, XFS_IOC_BULKSTAT_SINGLE, req);
+}
+
+/* Bulkstat a single inode using v1 ioctl. */
+static int
+xfrog_bulkstat_single1(
+	struct xfrog			*froggie,
+	struct xfs_bulkstat_single_req	*req)
+{
+	struct xfs_bstat		bstat;
+	struct xfs_fsop_bulkreq		bulkreq = { 0 };
+	int				error;
+
+	/* Old bulkstat_single doesn't do special inodes. */
+	if (req->hdr.flags) {
+		errno = EOPNOTSUPP;
+		return -1;
+	}
+
+	error = xfrog_bulkstat_prep_v1_emulation(froggie);
+	if (error)
+		return error;
+
+	bulkreq.lastip = (__u64 *)&req->hdr.ino,
+	bulkreq.icount = 1;
+	bulkreq.ubuffer = &bstat;
+	error = ioctl(froggie->fd, XFS_IOC_FSBULKSTAT_SINGLE, &bulkreq);
+	if (error)
+		return error;
+
+	xfrog_bstat_to_bulkstat(froggie, &req->bulkstat, &bstat);
+	return 0;
+}
+
+/* Bulkstat a single inode using v1 ioctl. */
 int
 xfrog_bulkstat_single(
-	struct xfrog		*froggie,
-	uint64_t		ino,
-	struct xfs_bstat	*ubuffer)
+	struct xfrog			*froggie,
+	struct xfs_bulkstat_single_req	*req)
 {
-	__u64			i = ino;
-	struct xfs_fsop_bulkreq	bulkreq = {
-		.lastip		= &i,
-		.icount		= 1,
-		.ubuffer	= ubuffer,
-		.ocount		= NULL,
-	};
+	int				error;
 
-	return ioctl(froggie->fd, XFS_IOC_FSBULKSTAT_SINGLE, &bulkreq);
+	if (froggie->flags & XFROG_FLAG_BULKSTAT_FORCE_V1)
+		goto try_v1;
+
+	error = xfrog_bulkstat_single5(froggie, req);
+	if (error == 0 || (froggie->flags & XFROG_FLAG_BULKSTAT_FORCE_V5))
+		return 0;
+
+	/* If the v5 ioctl wasn't found, we punt to v1. */
+	switch (errno) {
+	case EOPNOTSUPP:
+	case ENOTTY:
+		froggie->flags |= XFROG_FLAG_BULKSTAT_FORCE_V1;
+		break;
+	}
+
+try_v1:
+	return xfrog_bulkstat_single1(froggie, req);
 }
 
 /*
