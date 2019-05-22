@@ -65,9 +65,9 @@ static int	pagesize;
 void usage(int ret);
 static int  fsrfile(char *fname, xfs_ino_t ino);
 static int  fsrfile_common( char *fname, char *tname, char *mnt,
-                            int fd, xfs_bstat_t *statp);
+                            int fd, struct xfs_bstat *statp);
 static int  packfile(char *fname, char *tname, int fd,
-                     xfs_bstat_t *statp, struct fsxattr *fsxp);
+                     struct xfs_bstat *statp, struct fsxattr *fsxp);
 static void fsrdir(char *dirname);
 static int  fsrfs(char *mntdir, xfs_ino_t ino, int targetrange);
 static void initallfs(char *mtab);
@@ -79,7 +79,7 @@ int xfs_getrt(int fd, struct statvfs *sfbp);
 char * gettmpname(char *fname);
 char * getparent(char *fname);
 int fsrprintf(const char *fmt, ...);
-int read_fd_bmap(int, xfs_bstat_t *, int *);
+int read_fd_bmap(int, struct xfs_bstat *, int *);
 int cmp(const void *, const void *);
 static void tmp_init(char *mnt);
 static char * tmp_next(char *mnt);
@@ -576,7 +576,7 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 	int	count = 0;
 	int	ret;
 	uint32_t buflenout;
-	xfs_bstat_t buf[GRABSZ];
+	struct xfs_bstat buf[GRABSZ];
 	char	fname[64];
 	char	*tname;
 	jdm_fshandle_t	*fshandlep;
@@ -611,8 +611,8 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 
 	while ((ret = xfrog_bulkstat(fsfd,
 				&lastino, GRABSZ, &buf[0], &buflenout)) == 0) {
-		xfs_bstat_t *p;
-		xfs_bstat_t *endp;
+		struct xfs_bstat *p;
+		struct xfs_bstat *endp;
 
 		if (buflenout == 0)
 			goto out0;
@@ -679,8 +679,8 @@ out0:
 int
 cmp(const void *s1, const void *s2)
 {
-	return( ((xfs_bstat_t *)s2)->bs_extents -
-	        ((xfs_bstat_t *)s1)->bs_extents);
+	return( ((struct xfs_bstat *)s2)->bs_extents -
+	        ((struct xfs_bstat *)s1)->bs_extents);
 
 }
 
@@ -703,7 +703,7 @@ fsrdir(char *dirname)
 static int
 fsrfile(char *fname, xfs_ino_t ino)
 {
-	xfs_bstat_t	statbuf;
+	struct xfs_bstat	statbuf;
 	jdm_fshandle_t	*fshandlep;
 	int	fd = -1, fsfd = -1;
 	int	error = -1;
@@ -782,7 +782,7 @@ fsrfile_common(
 	char		*tname,
 	char		*fsname,
 	int		fd,
-	xfs_bstat_t	*statp)
+	struct xfs_bstat	*statp)
 {
 	int		error;
 	struct statvfs  vfss;
@@ -917,7 +917,7 @@ static int
 fsr_setup_attr_fork(
 	int		fd,
 	int		tfd,
-	xfs_bstat_t	*bstatp)
+	struct xfs_bstat	*bstatp)
 {
 #ifdef HAVE_FSETXATTR
 	struct stat	tstatbuf;
@@ -955,7 +955,7 @@ fsr_setup_attr_fork(
 
 	i = 0;
 	do {
-		xfs_bstat_t	tbstat;
+		struct xfs_bstat	tbstat;
 		char		name[64];
 
 		/*
@@ -1098,7 +1098,7 @@ out:
  */
 static int
 packfile(char *fname, char *tname, int fd,
-	 xfs_bstat_t *statp, struct fsxattr *fsxp)
+	 struct xfs_bstat *statp, struct fsxattr *fsxp)
 {
 	int 		tfd = -1;
 	int		srval;
@@ -1465,7 +1465,7 @@ getparent(char *fname)
 #define MAPSIZE	128
 #define	OUTMAP_SIZE_INCREMENT	MAPSIZE
 
-int	read_fd_bmap(int fd, xfs_bstat_t *sin, int *cur_nextents)
+int	read_fd_bmap(int fd, struct xfs_bstat *sin, int *cur_nextents)
 {
 	int		i, cnt;
 	struct getbmap	map[MAPSIZE];
