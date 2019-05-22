@@ -26,6 +26,8 @@ swapext_f(
 	int			argc,
 	char			**argv)
 {
+	struct xfs_bulkstat_single_req	req = { 0 };
+	struct xfs_fsop_geom	fsgeom;
 	int			fd;
 	int			error;
 	struct xfs_swapext	sx;
@@ -46,11 +48,18 @@ swapext_f(
 		goto out;
 	}
 
-	error = xfrog_bulkstat_single(file->fd, stat.st_ino, &sx.sx_stat);
+	if (xfrog_geometry(file->fd, &fsgeom)) {
+		perror("geometry");
+		goto out;
+	}
+
+	req.hdr.ino = stat.st_ino;
+	error = xfrog_bulkstat_single(file->fd, &fsgeom, &req);
 	if (error) {
 		perror("bulkstat");
 		goto out;
 	}
+	xfrog_bulkstat_to_bstat(&fsgeom, &sx.sx_stat, &req.bulkstat);
 	sx.sx_version = XFS_SX_VERSION;
 	sx.sx_fdtarget = file->fd;
 	sx.sx_fdtmp = fd;
