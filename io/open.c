@@ -674,35 +674,42 @@ static __u64
 get_last_inode(void)
 {
 	struct xfrog		frog = XFROG_INIT(file->fd);
-	uint64_t		lastip = 0;
+	struct xfs_inumbers_req	*ireq;
 	uint32_t		lastgrp = 0;
-	uint32_t		ocount = 0;
 	__u64			last_ino;
-	struct xfs_inogrp	igroup[IGROUP_NR];
+
+	ireq = xfrog_inumbers_alloc_req(IGROUP_NR, 0);
+	if (!ireq) {
+		perror("alloc req");
+		return 0;
+	}
 
 	for (;;) {
-		if (xfrog_inumbers(&frog, &lastip, IGROUP_NR, igroup,
-					&ocount)) {
+		if (xfrog_inumbers(&frog, ireq)) {
 			perror("XFS_IOC_FSINUMBERS");
+			free(ireq);
 			return 0;
 		}
 
 		/* Did we reach the last inode? */
-		if (ocount == 0)
+		if (ireq->hdr.ocount == 0)
 			break;
 
 		/* last inode in igroup table */
-		lastgrp = ocount;
+		lastgrp = ireq->hdr.ocount;
 	}
 
-	if (lastgrp == 0)
+	if (lastgrp == 0) {
+		free(ireq);
 		return 0;
+	}
 
 	lastgrp--;
 
 	/* The last inode number in use */
-	last_ino = igroup[lastgrp].xi_startino +
-		  libxfs_highbit64(igroup[lastgrp].xi_allocmask);
+	last_ino = ireq->inumbers[lastgrp].xi_startino +
+		  libxfs_highbit64(ireq->inumbers[lastgrp].xi_allocmask);
+	free(ireq);
 
 	return last_ino;
 }
