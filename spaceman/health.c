@@ -263,11 +263,10 @@ static int
 report_bulkstat_health(
 	xfs_agnumber_t		agno)
 {
-	struct xfs_bstat	bstat[128];
+	struct xfs_bulkstat_req	*breq;
 	char			descr[256];
 	uint64_t		startino = 0;
 	uint64_t		lastino = -1ULL;
-	uint32_t		ocount;
 	uint32_t		i;
 	int			error;
 
@@ -276,18 +275,27 @@ report_bulkstat_health(
 		lastino = xfrog_agino_to_ino(&file->frog, agno + 1, 0) - 1;
 	}
 
-	while ((error = xfrog_bulkstat(&file->frog, &startino, 128, bstat,
-			&ocount) == 0) && ocount > 0) {
-		for (i = 0; i < ocount; i++) {
-			if (bstat[i].bs_ino > lastino)
+	breq = xfrog_bulkstat_alloc_req(128, startino);
+	if (!breq) {
+		perror("bulk alloc req");
+		exitcode = 1;
+		return 1;
+	}
+
+	while ((error = xfrog_bulkstat(&file->frog, breq) == 0) &&
+			breq->hdr.ocount > 0) {
+		for (i = 0; i < breq->hdr.ocount; i++) {
+			if (breq->bulkstat[i].bs_ino > lastino)
 				goto out;
-			snprintf(descr, sizeof(descr) - 1, _("inode %llu"),
-					bstat[i].bs_ino);
-			report_sick(descr, inode_flags, bstat[i].bs_sick,
-					bstat[i].bs_checked);
+			snprintf(descr, sizeof(descr) - 1, _("inode %"PRIu64),
+					breq->bulkstat[i].bs_ino);
+			report_sick(descr, inode_flags,
+					breq->bulkstat[i].bs_sick,
+					breq->bulkstat[i].bs_checked);
 		}
 	}
 out:
+	free(breq);
 	return error;
 }
 
