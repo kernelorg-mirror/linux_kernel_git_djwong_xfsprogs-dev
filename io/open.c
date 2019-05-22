@@ -712,7 +712,6 @@ inode_f(
 	char			**argv)
 {
 	struct xfs_bstat	bstat;
-	uint32_t		count = 0;
 	uint64_t		result_ino = 0;
 	uint64_t		userino = NULLFSINO;
 	char			*p;
@@ -762,19 +761,30 @@ inode_f(
 			return 0;
 		}
 	} else if (ret_next) {
+		struct xfs_bulkstat_req	*breq;
+
+		breq = xfrog_bulkstat_alloc_req(1, userino + 1);
+		if (!breq) {
+			perror("alloc bulkstat");
+			exitcode = 1;
+			return 0;
+		}
+
 		/* get next inode */
-		ret = xfrog_bulkstat(file->fd, &userino, 1, &bstat, &count);
+		ret = xfrog_bulkstat(file->fd, NULL, breq);
 		if (ret) {
 			perror("xfsctl");
+			free(breq);
 			exitcode = 1;
 			return 0;
 		}
 
 		/* The next inode in use, or 0 if none */
-		if (count)
-			result_ino = bstat.bs_ino;
+		if (breq->hdr.ocount)
+			result_ino = breq->bulkstat[0].bs_ino;
 		else
 			result_ino = 0;
+		free(breq);
 	} else {
 		/* get this inode */
 		ret = xfrog_bulkstat_single(file->fd, userino, &bstat);

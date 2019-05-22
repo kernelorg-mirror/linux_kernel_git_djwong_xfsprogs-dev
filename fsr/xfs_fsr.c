@@ -465,6 +465,17 @@ fsrallfs(char *mtab, int howlong, char *leftofffile)
 				ptr = strchr(ptr, ' ');
 				if (ptr) {
 					startino = strtoull(++ptr, NULL, 10);
+					/*
+					 * NOTE: The inode number read in from
+					 * the leftoff file is the last inode
+					 * to have been fsr'd.  Since the new
+					 * xfrog_bulkstat function wants to be
+					 * passed the first inode that we want
+					 * to examine, increment the value that
+					 * we read in.  The debug message below
+					 * prints the lastoff value.
+					 */
+					startino++;
 				}
 			}
 			if (startpass < 0)
@@ -483,7 +494,7 @@ fsrallfs(char *mtab, int howlong, char *leftofffile)
 
 	if (vflag) {
 		fsrprintf(_("START: pass=%d ino=%llu %s %s\n"),
-			  fs->npass, (unsigned long long)startino,
+			  fs->npass, (unsigned long long)startino - 1,
 			  fs->dev, fs->mnt);
 	}
 
@@ -575,12 +586,10 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 	int	fsfd, fd;
 	int	count = 0;
 	int	ret;
-	uint32_t buflenout;
-	struct xfs_bstat buf[GRABSZ];
 	char	fname[64];
 	char	*tname;
 	jdm_fshandle_t	*fshandlep;
-	xfs_ino_t	lastino = startino;
+	struct xfs_bulkstat_req	*breq;
 
 	fsrprintf(_("%s start inode=%llu\n"), mntdir,
 		(unsigned long long)startino);
@@ -609,10 +618,21 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 
 	tmp_init(mntdir);
 
-	while ((ret = xfrog_bulkstat(fsfd,
-				&lastino, GRABSZ, &buf[0], &buflenout)) == 0) {
-		struct xfs_bstat *p;
-		struct xfs_bstat *endp;
+	breq = xfrog_bulkstat_alloc_req(GRABSZ, startino);
+	if (!breq) {
+		fsrprintf(_("Skipping %s: not enough memory\n"),
+			  mntdir);
+		close(fsfd);
+		free(fshandlep);
+		return -1;
+	}
+
+	while ((ret = xfrog_bulkstat(fsfd, &fsgeom, breq) == 0)) {
+		struct xfs_bstat	bs1;
+		struct xfs_bulkstat	*buf = breq->bulkstat;
+		struct xfs_bulkstat	*p;
+		struct xfs_bulkstat	*endp;
+		uint32_t		buflenout = breq->hdr.ocount;
 
 		if (buflenout == 0)
 			goto out0;
@@ -620,7 +640,7 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 		/* Each loop through, defrag targetrange percent of the files */
 		count = (buflenout * targetrange) / 100;
 
-		qsort((char *)buf, buflenout, sizeof(struct xfs_bstat), cmp);
+		qsort((char *)buf, buflenout, sizeof(struct xfs_bulkstat), cmp);
 
 		for (p = buf, endp = (buf + buflenout); p < endp ; p++) {
 			/* Do some obvious checks now */
@@ -628,7 +648,8 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 			     (p->bs_extents < 2))
 				continue;
 
-			fd = jdm_open(fshandlep, p, O_RDWR|O_DIRECT);
+			xfrog_bulkstat_to_bstat(&fsgeom, &bs1, p);
+			fd = jdm_open(fshandlep, &bs1, O_RDWR | O_DIRECT);
 			if (fd < 0) {
 				/* This probably means the file was
 				 * removed while in progress of handling
@@ -646,7 +667,7 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 			/* Get a tmp file name */
 			tname = tmp_next(mntdir);
 
-			ret = fsrfile_common(fname, tname, mntdir, fd, p);
+			ret = fsrfile_common(fname, tname, mntdir, fd, &bs1);
 
 			leftoffino = p->bs_ino;
 
@@ -658,6 +679,7 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 			}
 		}
 		if (endtime && endtime < time(NULL)) {
+			free(breq);
 			tmp_close(mntdir);
 			close(fsfd);
 			fsrall_cleanup(1);
@@ -667,6 +689,7 @@ fsrfs(char *mntdir, xfs_ino_t startino, int targetrange)
 	if (ret < 0)
 		fsrprintf(_("%s: xfrog_bulkstat: %s\n"), progname, strerror(errno));
 out0:
+	free(breq);
 	tmp_close(mntdir);
 	close(fsfd);
 	free(fshandlep);
