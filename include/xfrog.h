@@ -20,7 +20,8 @@ struct xfs_fsop_geom;
 int xfrog_geometry(int fd, struct xfs_fsop_geom *fsgeo);
 
 struct xfs_bstat;
-int xfrog_bulkstat_single(int fd, uint64_t ino, struct xfs_bstat *ubuffer);
+int xfrog_bulkstat_single(int fd, struct xfs_fsop_geom *geom,
+		struct xfs_bulkstat_single_req *req);
 int xfrog_bulkstat(int fd, struct xfs_fsop_geom *geom,
 		struct xfs_bulkstat_req *req);
 struct xfs_bulkstat_req *xfrog_bulkstat_alloc_req(uint32_t nr,

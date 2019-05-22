@@ -13,19 +13,42 @@
 /* Bulkstat a single inode. */
 int
 xfrog_bulkstat_single(
-	int			fd,
-	uint64_t		ino,
-	struct xfs_bstat	*ubuffer)
+	int				fd,
+	struct xfs_fsop_geom		*fsgeom,
+	struct xfs_bulkstat_single_req	*req)
 {
-	__u64			i = ino;
-	struct xfs_fsop_bulkreq	bulkreq = {
-		.lastip		= &i,
-		.icount		= 1,
-		.ubuffer	= ubuffer,
-		.ocount		= NULL,
-	};
+	struct xfs_fsop_geom		geom;
+	struct xfs_bstat		bstat;
+	struct xfs_fsop_bulkreq		bulkreq = { 0 };
+	int				error;
 
-	return ioctl(fd, XFS_IOC_FSBULKSTAT_SINGLE, &bulkreq);
+	error = ioctl(fd, XFS_IOC_BULKSTAT_SINGLE, req);
+	if (!error)
+		return 0;
+
+	/* Emulate the v5 call as best we can with v1. */
+
+	/* Old bulkstat_single doesn't do special inodes. */
+	if (req->hdr.flags) {
+		errno = EOPNOTSUPP;
+		return -1;
+	}
+
+	if (!fsgeom) {
+		if (xfrog_geometry(fd, &geom))
+			return -1;
+		fsgeom = &geom;
+	}
+
+	bulkreq.lastip = (__u64 *)&req->hdr.ino,
+	bulkreq.icount = 1;
+	bulkreq.ubuffer = &bstat;
+	error = ioctl(fd, XFS_IOC_FSBULKSTAT_SINGLE, &bulkreq);
+	if (error)
+		return error;
+
+	xfrog_bstat_to_bulkstat(fsgeom, &req->bulkstat, &bstat);
+	return 0;
 }
 
 static inline int
