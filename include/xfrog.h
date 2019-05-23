@@ -188,11 +188,14 @@ void xfrog_bulkstat_to_bstat(struct xfrog *froggie, struct xfs_bstat *bs1,
 void xfrog_bstat_to_bulkstat(struct xfrog *froggie, struct xfs_bulkstat *bstat,
 		const struct xfs_bstat *bs1);
 
+void xfrog_bulkstat_set_ag(struct xfs_bulkstat_req *req, uint32_t agno);
+
 struct xfs_inogrp;
 int xfrog_inumbers(struct xfrog *froggie, struct xfs_inumbers_req *req);
 
 struct xfs_inumbers_req *xfrog_inumbers_alloc_req(uint32_t nr,
 		uint64_t startino);
+void xfrog_inumbers_set_ag(struct xfs_inumbers_req *req, uint32_t agno);
 void xfrog_inumbers_to_inogrp(struct xfs_inogrp *ig1,
 		const struct xfs_inumbers *ig);
 void xfrog_inogrp_to_inumbers(struct xfs_inumbers *ig,
