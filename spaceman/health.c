@@ -258,35 +258,6 @@ report_file_health(
 	return report_inode_health(statb.st_ino, path);
 }
 
-static inline int
-ino_agino_bits(
-	struct xfs_fsop_geom	*geom)
-{
-	int agblklog = log2_roundup(geom->agblocks);
-	int blocklog = highbit32(geom->blocksize);
-	int inodelog = highbit32(geom->inodesize);
-	int inopblog = blocklog - inodelog;
-
-	return agblklog + inopblog;
-}
-
-static inline uint64_t
-agino_to_ino(
-	struct xfs_fsop_geom	*geom,
-	uint32_t		agno,
-	uint32_t		agino)
-{
-	return ((uint64_t)agno << ino_agino_bits(geom)) + agino;
-}
-
-static inline uint32_t
-ino_to_agno(
-	struct xfs_fsop_geom	*geom,
-	uint64_t		ino)
-{
-	return ino >> ino_agino_bits(geom);
-}
-
 /* Report on all files' health. */
 static int
 report_bulkstat_health(
@@ -294,28 +265,22 @@ report_bulkstat_health(
 {
 	struct xfs_bulkstat_req	*breq;
 	char			descr[256];
-	uint64_t		startino = 0;
-	uint64_t		lastino = -1ULL;
 	uint32_t		i;
 	int			error;
 
-	if (agno >= 0) {
-		startino = agino_to_ino(&fsgeo, agno, 0);
-		lastino = agino_to_ino(&fsgeo, agno + 1, 0) - 1;
-	}
-
-	breq = xfrog_bulkstat_alloc_req(128, startino);
+	breq = xfrog_bulkstat_alloc_req(128, 0);
 	if (!breq) {
 		perror("bulk alloc req");
 		exitcode = 1;
 		return 1;
 	}
 
+	if (agno >= 0)
+		xfrog_bulkstat_set_ag(breq, agno);
+
 	while ((error = xfrog_bulkstat(file->fd, &fsgeo, breq) == 0) &&
 			breq->hdr.ocount > 0) {
 		for (i = 0; i < breq->hdr.ocount; i++) {
-			if (breq->bulkstat[i].bs_ino > lastino)
-				goto out;
 			snprintf(descr, sizeof(descr) - 1, _("inode %"PRIu64),
 					breq->bulkstat[i].bs_ino);
 			report_sick(descr, inode_flags,
@@ -323,7 +288,7 @@ report_bulkstat_health(
 					breq->bulkstat[i].bs_checked);
 		}
 	}
-out:
+
 	free(breq);
 	return error;
 }
