@@ -83,12 +83,11 @@ xfs_iterate_inodes_range_check(
  * but we also can detect iget failures.
  */
 static bool
-xfs_iterate_inodes_range(
+xfs_iterate_inodes_ag(
 	struct scrub_ctx	*ctx,
 	const char		*descr,
 	void			*fshandle,
-	uint64_t		first_ino,
-	uint64_t		last_ino,
+	uint32_t		agno,
 	xfs_inode_iter_fn	fn,
 	void			*arg)
 {
@@ -114,12 +113,13 @@ xfs_iterate_inodes_range(
 		return false;
 	}
 
-	ireq = xfrog_inumbers_alloc_req(1, first_ino);
+	ireq = xfrog_inumbers_alloc_req(1, 0);
 	if (!ireq) {
 		str_info(ctx, descr, _("Insufficient memory; giving up."));
 		free(breq);
 		return false;
 	}
+	xfrog_inumbers_set_ag(ireq, agno);
 
 	/* Find the inode chunk & alloc mask */
 	while ((error = xfrog_inumbers(ctx->mnt_fd, &ctx->geo, ireq)) == 0 &&
@@ -144,9 +144,6 @@ xfs_iterate_inodes_range(
 		for (i = 0, bs = breq->bulkstat;
 		     i < breq->hdr.icount;
 		     i++, bs++) {
-			if (bs->bs_ino > last_ino)
-				goto out;
-
 			handle.ha_fid.fid_ino = bs->bs_ino;
 			handle.ha_fid.fid_gen = bs->bs_gen;
 			error = fn(ctx, &handle, bs, arg);
@@ -210,8 +207,6 @@ xfs_scan_ag_inodes(
 	struct xfs_scan_inodes	*si = arg;
 	struct scrub_ctx	*ctx = (struct scrub_ctx *)wq->wq_ctx;
 	char			descr[DESCR_BUFSZ];
-	uint64_t		ag_ino;
-	uint64_t		next_ag_ino;
 	bool			moveon;
 
 	snprintf(descr, DESCR_BUFSZ, _("dev %d:%d AG %u inodes"),
@@ -219,11 +214,8 @@ xfs_scan_ag_inodes(
 				minor(ctx->fsinfo.fs_datadev),
 				agno);
 
-	ag_ino = (__u64)agno << (ctx->inopblog + ctx->agblklog);
-	next_ag_ino = (__u64)(agno + 1) << (ctx->inopblog + ctx->agblklog);
-
-	moveon = xfs_iterate_inodes_range(ctx, descr, ctx->fshandle, ag_ino,
-			next_ag_ino - 1, si->fn, si->arg);
+	moveon = xfs_iterate_inodes_ag(ctx, descr, ctx->fshandle, agno,
+			si->fn, si->arg);
 	if (!moveon)
 		si->moveon = false;
 }
