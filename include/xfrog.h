@@ -26,6 +26,7 @@ int xfrog_bulkstat(int fd, struct xfs_fsop_geom *geom,
 		struct xfs_bulkstat_req *req);
 struct xfs_bulkstat_req *xfrog_bulkstat_alloc_req(uint32_t nr,
 		uint64_t startino);
+void xfrog_bulkstat_set_ag(struct xfs_bulkstat_req *req, uint32_t agno);
 void xfrog_bulkstat_to_bstat(const struct xfs_fsop_geom *geo,
 		struct xfs_bstat *bs1, const struct xfs_bulkstat *bstat);
 void xfrog_bstat_to_bulkstat(const struct xfs_fsop_geom *geo,
@@ -40,6 +41,7 @@ void xfrog_inogrp_to_inumbers(struct xfs_inumbers *ig,
 		const struct xfs_inogrp *ig1);
 struct xfs_inumbers_req *xfrog_inumbers_alloc_req(uint32_t nr,
 		uint64_t startino);
+void xfrog_inumbers_set_ag(struct xfs_inumbers_req *req, uint32_t agno);
 void xfrog_inumbers_to_inogrp(struct xfs_inogrp *ig1,
 		const struct xfs_inumbers *ig);
 void xfrog_inogrp_to_inumbers(struct xfs_inumbers *ig,
