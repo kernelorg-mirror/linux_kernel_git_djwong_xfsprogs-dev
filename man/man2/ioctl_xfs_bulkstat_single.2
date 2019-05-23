@@ -1,0 +1,93 @@
+.\" Copyright (c) 2019, Oracle.  All rights reserved.
+.\"
+.\" %%%LICENSE_START(GPLv2+_DOC_FULL)
+.\" SPDX-License-Identifier: GPL-2.0+
+.\" %%%LICENSE_END
+.TH IOCTL-XFS-BULKSTAT_SINGLE 2 2019-05-23 "XFS"
+.SH NAME
+ioctl_xfs_bulkstat_single \- query information for a single XFS inode
+.SH SYNOPSIS
+.br
+.B #include <xfs/xfs_fs.h>
+.PP
+.BI "int ioctl(int " fd ", XFS_IOC_BULKSTAT_SINGLE, struct xfs_bulkstat_single_req *" arg );
+.SH DESCRIPTION
+Query stat information for a single XFS inode.
+This ioctl uses
+.B struct xfs_bulkstat_single_req
+to set up a transfer with the kernel:
+.PP
+.in +4n
+.nf
+struct xfs_bulkstat_single_req {
+	struct xfs_ireq         hdr;
+	struct xfs_bulkstat     bulkstat;
+};
+
+struct xfs_ireq {
+	uint64_t                ino;
+	uint32_t                flags;
+	uint32_t                reserved32;
+	uint64_t                reserved[2];
+};
+.fi
+.in
+.PP
+.I hdr.ino
+should be set to the number of the first inode for which the caller wants
+information, or a special flag value:
+.RS 0.4i
+.TP
+.B XFS_IREQ_SPECIAL_ROOT
+Return stat information for the root directory inode.
+.RE
+.PP
+.I hdr.flags
+is a bit set of operational flags:
+.RS 0.4i
+.TP
+.B XFS_IREQ_SPECIAL
+If this is set, the
+.B hdr.ino
+field will be interpreted instead of treated as a plain inode number.
+.RE
+.PP
+.IR hdr.reserved32 " and " hdr.reserved
+must be set to zero.
+.PP
+.I bulkstat
+is described in the
+.BR ioctl_xfs_bulkstat (2)
+manpage and will not be discussed further here.
+.SH RETURN VALUE
+On error, \-1 is returned, and
+.I errno
+is set to indicate the error.
+.PP
+.SH ERRORS
+Error codes can be one of, but are not limited to, the following:
+.TP
+.B EFAULT
+The kernel was not able to copy into the userspace buffer.
+.TP
+.B EFSBADCRC
+Metadata checksum validation failed while performing the query.
+.TP
+.B EFSCORRUPTED
+Metadata corruption was encountered while performing the query.
+.TP
+.B EINVAL
+One of the arguments was not valid, or the inode is an internal inode.
+.TP
+.B ENOENT
+The inode is not allocated.
+.TP
+.B EIO
+An I/O error was encountered while performing the query.
+.TP
+.B ENOMEM
+There was insufficient memory to perform the query.
+.SH CONFORMING TO
+This API is specific to XFS filesystem on the Linux kernel.
+.SH SEE ALSO
+.BR ioctl (2)
