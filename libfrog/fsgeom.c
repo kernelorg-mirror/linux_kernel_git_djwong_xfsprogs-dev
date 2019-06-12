@@ -5,6 +5,7 @@
 #include "libxfs.h"
 #include "fsgeom.h"
 #include "xfrog.h"
+#include "libfrog.h"
 
 void
 xfs_report_geom(
@@ -94,7 +95,17 @@ int
 xfrog_prepare_geometry(
 	struct xfrog		*froggie)
 {
-	return xfrog_geometry(froggie->fd, &froggie->fsgeom);
+	int			ret;
+
+	ret = xfrog_geometry(froggie->fd, &froggie->fsgeom);
+	if (ret)
+		return ret;
+
+	froggie->agblklog = log2_roundup(froggie->fsgeom.agblocks);
+	froggie->blocklog = highbit32(froggie->fsgeom.blocksize);
+	froggie->inodelog = highbit32(froggie->fsgeom.inodesize);
+	froggie->inopblog = froggie->blocklog - froggie->inodelog;
+	return 0;
 }
 
 /* Release any resources associated with this xfrog structure. */
