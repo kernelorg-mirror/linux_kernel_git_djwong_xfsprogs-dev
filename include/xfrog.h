@@ -19,4 +19,24 @@
 struct xfs_fsop_geom;
 int xfrog_geometry(int fd, struct xfs_fsop_geom *fsgeo);
 
+/*
+ * Structure for recording whatever observations we want about the level of
+ * xfs runtime support for this fd.  Right now we only store the fd and fs
+ * geometry.
+ */
+struct xfrog {
+	/* ioctl file descriptor */
+	int			fd;
+
+	/* filesystem geometry */
+	struct xfs_fsop_geom	fsgeom;
+};
+
+/* Static initializers */
+#define XFROG_INIT(_fd)		{ .fd = (_fd), }
+#define XFROG_INIT_EMPTY	XFROG_INIT(-1)
+
+int xfrog_prepare_geometry(struct xfrog *froggie);
+int xfrog_close(struct xfrog *froggie);
+
 #endif	/* __XFROG_H__ */
