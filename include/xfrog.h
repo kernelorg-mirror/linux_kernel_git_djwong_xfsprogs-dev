@@ -42,6 +42,9 @@ struct xfrog {
 
 	/* log2 of sb_inopblock */
 	unsigned int		inopblog;
+
+	/* bits for agino in inum */
+	unsigned int		aginolog;
 };
 
 /* Static initializers */
@@ -50,5 +53,51 @@ struct xfrog {
 
 int xfrog_prepare_geometry(struct xfrog *froggie);
 int xfrog_close(struct xfrog *froggie);
+
+/* Convert AG number and AG inode number into fs inode number. */
+static inline uint64_t
+xfrog_agino_to_ino(
+	struct xfrog		*frog,
+	uint32_t		agno,
+	uint32_t		agino)
+{
+	return ((uint64_t)agno << frog->aginolog) + agino;
+}
+
+/* Convert fs inode number into AG number. */
+static inline uint32_t
+xfrog_ino_to_agno(
+	struct xfrog		*frog,
+	uint64_t		ino)
+{
+	return ino >> frog->aginolog;
+}
+
+/* Convert fs inode number into AG inode number. */
+static inline uint32_t
+xfrog_ino_to_agino(
+	struct xfrog		*frog,
+	uint64_t		ino)
+{
+	return ino & ((1ULL << frog->aginolog) - 1);
+}
+
+/* Convert fs block number into bytes */
+static inline uint64_t
+xfrog_fsb_to_b(
+	struct xfrog		*frog,
+	uint64_t		fsb)
+{
+	return fsb << frog->blocklog;
+}
+
+/* Convert bytes into (rounded down) fs block number */
+static inline uint64_t
+xfrog_b_to_fsbt(
+	struct xfrog		*frog,
+	uint64_t		bytes)
+{
+	return bytes >> frog->blocklog;
+}
 
 #endif	/* __XFROG_H__ */
