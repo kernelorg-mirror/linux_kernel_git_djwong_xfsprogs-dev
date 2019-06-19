@@ -30,3 +30,4 @@ extern void		init_commands(void);
 
 extern void		btdump_init(void);
 extern void		info_init(void);
+extern void		btheight_init(void);
