@@ -45,26 +45,27 @@ print_f(
 int
 openfile(
 	char		*path,
-	struct xfs_fsop_geom *geom,
+	struct xfrog	*froggie,
 	struct fs_path	*fs_path)
 {
 	struct fs_path	*fsp;
-	int		fd;
+	int		ret;
 
-	fd = open(path, 0);
-	if (fd < 0) {
+	froggie->fd = open(path, 0);
+	if (froggie->fd < 0) {
 		perror(path);
 		return -1;
 	}
 
-	if (xfrog_geometry(fd, geom)) {
+	ret = xfrog_prepare_geometry(froggie);
+	if (ret) {
 		if (errno == ENOTTY)
 			fprintf(stderr,
 _("%s: Not on a mounted XFS filesystem.\n"),
 					path);
 		else
 			perror("XFS_IOC_FSGEOMETRY");
-		close(fd);
+		xfrog_close(froggie);
 		return -1;
 	}
 
@@ -73,19 +74,18 @@ _("%s: Not on a mounted XFS filesystem.\n"),
 		if (!fsp) {
 			fprintf(stderr, _("%s: cannot find mount point."),
 				path);
-			close(fd);
+			xfrog_close(froggie);
 			return -1;
 		}
 		memcpy(fs_path, fsp, sizeof(struct fs_path));
 	}
-	return fd;
+	return froggie->fd;
 }
 
 int
 addfile(
 	char		*name,
-	int		fd,
-	struct xfs_fsop_geom *geometry,
+	struct xfrog	*froggie,
 	struct fs_path	*fs_path)
 {
 	char		*filename;
@@ -93,7 +93,7 @@ addfile(
 	filename = strdup(name);
 	if (!filename) {
 		perror("strdup");
-		close(fd);
+		xfrog_close(froggie);
 		return -1;
 	}
 
@@ -104,15 +104,14 @@ addfile(
 		perror("realloc");
 		filecount = 0;
 		free(filename);
-		close(fd);
+		xfrog_close(froggie);
 		return -1;
 	}
 
 	/* Finally, make this the new active open file */
 	file = &filetable[filecount - 1];
-	file->fd = fd;
 	file->name = filename;
-	file->geom = *geometry;
+	memcpy(&file->frog, froggie, sizeof(struct xfrog));
 	memcpy(&file->fs_path, fs_path, sizeof(file->fs_path));
 	return 0;
 }
