@@ -110,6 +110,7 @@ xfrog_prepare_geometry(
 	froggie->inodelog = highbit32(froggie->fsgeom.inodesize);
 	froggie->inopblog = froggie->blocklog - froggie->inodelog;
 	froggie->aginolog = froggie->agblklog + froggie->inopblog;
+	froggie->blkbb_log = froggie->blocklog - BBSHIFT;
 	return 0;
 }
 
