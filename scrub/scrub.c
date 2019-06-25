@@ -30,6 +30,7 @@ enum scrub_type {
 	ST_FS,		/* per-FS metadata */
 	ST_INODE,	/* per-inode metadata */
 	ST_SUMMARY,	/* summary counters (phase 7) */
+	ST_HEALTH,	/* health tracking update (phase 7) */
 };
 struct scrub_descr {
 	const char	*name;
@@ -88,6 +89,8 @@ static const struct scrub_descr scrubbers[XFS_SCRUB_TYPE_NR] = {
 		{"project quotas",			ST_FS},
 	[XFS_SCRUB_TYPE_FSCOUNTERS] =
 		{"filesystem summary counters",		ST_SUMMARY},
+	[XFS_SCRUB_TYPE_HEALTHY] =
+		{"retained health records",		ST_HEALTH},
 };
 
 /* Format a scrub description. */
@@ -113,6 +116,7 @@ format_scrub_descr(
 		break;
 	case ST_FS:
 	case ST_SUMMARY:
+	case ST_HEALTH:
 		return snprintf(buf, buflen, _("%s"), _(sd->name));
 		break;
 	case ST_NONE:
@@ -465,6 +469,15 @@ xfs_scrub_fs_summary(
 	struct xfs_action_list		*alist)
 {
 	return xfs_scrub_metadata(ctx, ST_SUMMARY, 0, alist);
+}
+
+/* Update incore health records if we were clean. */
+bool
+xfs_scrub_clean_health(
+	struct scrub_ctx		*ctx,
+	struct xfs_action_list		*alist)
+{
+	return xfs_scrub_metadata(ctx, ST_HEALTH, 0, alist);
 }
 
 /* How many items do we have to check? */
