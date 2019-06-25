@@ -181,4 +181,6 @@
 #define xfs_imeta_ensure_dirpath	libxfs_imeta_ensure_dirpath
 #define xfs_imeta_mount			libxfs_imeta_mount
 
+#define xfs_rtrmapbt_maxrecs		libxfs_rtrmapbt_maxrecs
+
 #endif /* __LIBXFS_API_DEFS_H__ */
