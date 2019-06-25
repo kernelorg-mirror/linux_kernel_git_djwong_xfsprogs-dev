@@ -30,7 +30,7 @@ xfs_scrub_fd(
 	struct scrub_ctx	*ctx,
 	bool			(*fn)(struct scrub_ctx *, uint64_t,
 				      uint32_t, int, struct xfs_action_list *),
-	struct xfs_bstat	*bs,
+	struct xfs_bulkstat	*bs,
 	struct xfs_action_list	*alist)
 {
 	return fn(ctx, bs->bs_ino, bs->bs_gen, ctx->mnt.fd, alist);
@@ -45,7 +45,7 @@ struct scrub_inode_ctx {
 static void
 xfs_scrub_inode_vfs_error(
 	struct scrub_ctx	*ctx,
-	struct xfs_bstat	*bstat)
+	struct xfs_bulkstat	*bstat)
 {
 	char			descr[DESCR_BUFSZ];
 	int			old_errno = errno;
@@ -61,7 +61,7 @@ static int
 xfs_scrub_inode(
 	struct scrub_ctx	*ctx,
 	struct xfs_handle	*handle,
-	struct xfs_bstat	*bstat,
+	struct xfs_bulkstat	*bstat,
 	void			*arg)
 {
 	struct xfs_action_list	alist;
