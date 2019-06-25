@@ -208,7 +208,7 @@ report_inode_health(
 	unsigned long long	ino,
 	const char		*descr)
 {
-	struct xfs_bstat	bs;
+	struct xfs_bulkstat_single_req	req = { 0 };
 	char			d[256];
 	int			ret;
 
@@ -217,13 +217,15 @@ report_inode_health(
 		descr = d;
 	}
 
-	ret = xfrog_bulkstat_single(&file->xfd, ino, &bs);
+	req.hdr.ino = ino;
+	ret = xfrog_bulkstat_single(&file->xfd, &req);
 	if (ret) {
 		perror(descr);
 		return 1;
 	}
 
-	report_sick(descr, inode_flags, bs.bs_sick, bs.bs_checked);
+	report_sick(descr, inode_flags, req.bulkstat.bs_sick,
+			req.bulkstat.bs_checked);
 	return 0;
 }
 
