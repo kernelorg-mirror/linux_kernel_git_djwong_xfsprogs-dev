@@ -68,6 +68,9 @@ SHELL		= @SHELL@
 LIBTOOL		= @LIBTOOL@
 MAKEDEPEND	= @makedepend@
 
+USE_FMV		= @use_fmv@
+USE_PCLMUL_FMV	= @use_pclmul_fmv@
+
 MSGFMT		= @msgfmt@
 MSGMERGE	= @msgmerge@
 XGETTEXT	= @xgettext@
