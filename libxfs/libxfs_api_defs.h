@@ -160,5 +160,7 @@
 
 #define xfs_ag_init_headers		libxfs_ag_init_headers
 #define xfs_buf_delwri_submit		libxfs_buf_delwri_submit
+#define xfs_get_projid			libxfs_get_projid
+#define xfs_set_projid			libxfs_set_projid
 
 #endif /* __LIBXFS_API_DEFS_H__ */
