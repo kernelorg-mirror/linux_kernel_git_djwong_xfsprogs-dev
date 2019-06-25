@@ -48,7 +48,16 @@ struct xfs_fd {
 
 	/* log2 of sb_blocksize / sb_sectsize */
 	unsigned int		blkbb_log;
+
+	/* XFROG_FLAG_* state flags */
+	unsigned int		flags;
 };
+
+/* Only use v1 bulkstat/inumbers ioctls. */
+#define XFROG_FLAG_BULKSTAT_FORCE_V1	(1 << 0)
+
+/* Only use v5 bulkstat/inumbers ioctls. */
+#define XFROG_FLAG_BULKSTAT_FORCE_V5	(1 << 1)
 
 /* Static initializers */
 #define XFS_FD_INIT(_fd)	{ .fd = (_fd), }
@@ -170,8 +179,14 @@ xfrog_daddr_to_agbno(
 struct xfs_bstat;
 int xfrog_bulkstat_single(struct xfs_fd *xfd, uint64_t ino,
 		struct xfs_bstat *ubuffer);
-int xfrog_bulkstat(struct xfs_fd *xfd, uint64_t *lastino, uint32_t icount,
-		struct xfs_bstat *ubuffer, uint32_t *ocount);
+int xfrog_bulkstat(struct xfs_fd *xfd, struct xfs_bulkstat_req *req);
+
+struct xfs_bulkstat_req *xfrog_bulkstat_alloc_req(uint32_t nr,
+		uint64_t startino);
+void xfrog_bulkstat_to_bstat(struct xfs_fd *xfd, struct xfs_bstat *bs1,
+		const struct xfs_bulkstat *bstat);
+void xfrog_bstat_to_bulkstat(struct xfs_fd *xfd, struct xfs_bulkstat *bstat,
+		const struct xfs_bstat *bs1);
 
 struct xfs_inogrp;
 int xfrog_inumbers(struct xfs_fd *xfd, uint64_t *lastino, uint32_t icount,
