@@ -20,22 +20,102 @@ xfrog_bulkstat_prep_v1_emulation(
 	return 0;
 }
 
-/* Bulkstat a single inode. */
+/* Bulkstat a single inode using v5 ioctl. */
+static int
+xfrog_bulkstat_single5(
+	struct xfs_fd			*xfd,
+	uint64_t			ino,
+	unsigned int			flags,
+	struct xfs_bulkstat		*bulkstat)
+{
+	struct xfs_bulkstat_req		*req;
+	int				ret;
+
+	if (flags & ~(XFS_BULK_IREQ_SPECIAL)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	req = xfrog_bulkstat_alloc_req(1, ino);
+	if (!req)
+		return -1;
+
+	req->hdr.flags = flags;
+	ret = ioctl(xfd->fd, XFS_IOC_BULKSTAT, req);
+	if (ret)
+		goto free;
+
+	if (req->hdr.ocount == 0) {
+		errno = ENOENT;
+		ret = -1;
+		goto free;
+	}
+
+	memcpy(bulkstat, req->bulkstat, sizeof(struct xfs_bulkstat));
+free:
+	free(req);
+	return ret;
+}
+
+/* Bulkstat a single inode using v1 ioctl. */
+static int
+xfrog_bulkstat_single1(
+	struct xfs_fd			*xfd,
+	uint64_t			ino,
+	unsigned int			flags,
+	struct xfs_bulkstat		*bulkstat)
+{
+	struct xfs_bstat		bstat;
+	struct xfs_fsop_bulkreq		bulkreq = { 0 };
+	int				error;
+
+	if (flags) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	error = xfrog_bulkstat_prep_v1_emulation(xfd);
+	if (error)
+		return error;
+
+	bulkreq.lastip = (__u64 *)&ino;
+	bulkreq.icount = 1;
+	bulkreq.ubuffer = &bstat;
+	error = ioctl(xfd->fd, XFS_IOC_FSBULKSTAT_SINGLE, &bulkreq);
+	if (error)
+		return error;
+
+	xfrog_bstat_to_bulkstat(xfd, bulkstat, &bstat);
+	return 0;
+}
+
+/* Bulkstat a single inode using v1 ioctl. */
 int
 xfrog_bulkstat_single(
-	struct xfs_fd		*xfd,
-	uint64_t		ino,
-	struct xfs_bstat	*ubuffer)
+	struct xfs_fd			*xfd,
+	uint64_t			ino,
+	unsigned int			flags,
+	struct xfs_bulkstat		*bulkstat)
 {
-	__u64			i = ino;
-	struct xfs_fsop_bulkreq	bulkreq = {
-		.lastip		= &i,
-		.icount		= 1,
-		.ubuffer	= ubuffer,
-		.ocount		= NULL,
-	};
+	int				error;
 
-	return ioctl(xfd->fd, XFS_IOC_FSBULKSTAT_SINGLE, &bulkreq);
+	if (xfd->flags & XFROG_FLAG_BULKSTAT_FORCE_V1)
+		goto try_v1;
+
+	error = xfrog_bulkstat_single5(xfd, ino, flags, bulkstat);
+	if (error == 0 || (xfd->flags & XFROG_FLAG_BULKSTAT_FORCE_V5))
+		return 0;
+
+	/* If the v5 ioctl wasn't found, we punt to v1. */
+	switch (errno) {
+	case EOPNOTSUPP:
+	case ENOTTY:
+		xfd->flags |= XFROG_FLAG_BULKSTAT_FORCE_V1;
+		break;
+	}
+
+try_v1:
+	return xfrog_bulkstat_single1(xfd, ino, flags, bulkstat);
 }
 
 /*
