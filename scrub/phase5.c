@@ -81,7 +81,7 @@ xfs_scrub_scan_dirents(
 	struct scrub_ctx	*ctx,
 	struct descr		*dsc,
 	int			*fd,
-	struct xfs_bstat	*bstat)
+	struct xfs_bulkstat	*bstat)
 {
 	struct unicrash		*uc = NULL;
 	DIR			*dir;
@@ -141,7 +141,7 @@ xfs_scrub_scan_fhandle_namespace_xattrs(
 	struct scrub_ctx		*ctx,
 	struct descr			*dsc,
 	struct xfs_handle		*handle,
-	struct xfs_bstat		*bstat,
+	struct xfs_bulkstat		*bstat,
 	const struct attrns_decode	*attr_ns)
 {
 	struct attrlist_cursor		cur;
@@ -201,7 +201,7 @@ xfs_scrub_scan_fhandle_xattrs(
 	struct scrub_ctx		*ctx,
 	struct descr			*dsc,
 	struct xfs_handle		*handle,
-	struct xfs_bstat		*bstat)
+	struct xfs_bulkstat		*bstat)
 {
 	const struct attrns_decode	*ns;
 	bool				moveon = true;
@@ -242,7 +242,7 @@ static int
 xfs_scrub_connections(
 	struct scrub_ctx	*ctx,
 	struct xfs_handle	*handle,
-	struct xfs_bstat	*bstat,
+	struct xfs_bulkstat	*bstat,
 	void			*arg)
 {
 	bool			*pmoveon = arg;
