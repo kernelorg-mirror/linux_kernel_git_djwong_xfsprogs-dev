@@ -213,6 +213,16 @@ retry:
 	if (error) {
 		code = errno;
 		switch (code) {
+		case EUSERS:
+			/* Operation skipped because we cannot freeze. */
+			if (!(meta->sm_flags & XFS_SCRUB_IFLAG_FREEZE_OK) &&
+			    ctx->freeze_ok) {
+				meta->sm_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
+				goto retry;
+			}
+			skip_slow_op(ctx, descr_render(&dsc),
+_("Check skipped because we can't freeze the fs."));
+			return CHECK_TOOSLOW;
 		case ENOENT:
 			/* Metadata not present, just skip it. */
 			return CHECK_DONE;
@@ -388,6 +398,7 @@ xfs_scrub_metadata(
 			if (!xfs_scrub_save_repair(ctx, alist, &meta))
 				return false;
 			/* fall through */
+		case CHECK_TOOSLOW:
 		case CHECK_DONE:
 			continue;
 		case CHECK_RETRY:
@@ -423,6 +434,7 @@ xfs_scrub_primary_super(
 		if (!xfs_scrub_save_repair(ctx, alist, &meta))
 			return false;
 		/* fall through */
+	case CHECK_TOOSLOW:
 	case CHECK_DONE:
 		return true;
 	case CHECK_RETRY:
@@ -778,9 +790,20 @@ xfs_repair_metadata(
 		str_info(ctx, descr_render(&dsc),
 				_("Attempting optimization."));
 
+retry:
 	error = ioctl(fd, XFS_IOC_SCRUB_METADATA, &meta);
 	if (error) {
 		switch (errno) {
+		case EUSERS:
+			/* Operation skipped because we cannot freeze. */
+			if (!(meta.sm_flags & XFS_SCRUB_IFLAG_FREEZE_OK) &&
+			    ctx->freeze_ok) {
+				meta.sm_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
+				goto retry;
+			}
+			skip_slow_op(ctx, descr_render(&dsc),
+_("Repair skipped because we can't freeze the fs."));
+			return CHECK_TOOSLOW;
 		case EDEADLOCK:
 		case EBUSY:
 			/* Filesystem is busy, try again later. */
