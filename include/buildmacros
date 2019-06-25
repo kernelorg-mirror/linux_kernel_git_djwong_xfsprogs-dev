@@ -27,6 +27,7 @@ DIRDIRT = $(LDIRDIRT) $(LIBDIRT)
 
 OBJECTS = $(ASFILES:.s=.o) \
 	  $(CFILES:.c=.o) \
+	  $(CXXFILES:.cpp=.o) \
 	  $(LFILES:.l=.o) \
 	  $(YFILES:%.y=%.tab.o)
 
@@ -37,7 +38,7 @@ DIST_DIR = $(TOPDIR)/dist
 
 CCF	= $(CC) $(CFLAGS) $(CPPFLAGS)
 MAKEF	= $(MAKE) $(MAKEOPTS)
-CXXF	= $(CXX) $(CXXFLAGS)
+CXXF	= $(CXX) $(CXXFLAGS) $(CPPFLAGS)
 
 # For libtool.
 LIBNAME = $(basename $(LTLIBRARY))
@@ -48,6 +49,7 @@ LTLINK = $(LIBTOOL) --quiet --tag=CC --mode=link $(CC)
 LTEXEC = $(LIBTOOL) --quiet --mode=execute
 LTINSTALL = $(LIBTOOL) --quiet --mode=install $(INSTALL)
 LTCOMPILE = $(LIBTOOL) --quiet --tag=CC --mode=compile $(CCF)
+LTCXXOMPILE = $(LIBTOOL) --quiet --tag=CXX --mode=compile $(CXXF)
 
 ifeq ($(ENABLE_SHARED),yes)
 LTLDFLAGS += -rpath $(PKG_ROOT_LIB_DIR)
