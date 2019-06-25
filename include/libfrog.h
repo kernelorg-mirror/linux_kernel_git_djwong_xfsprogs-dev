@@ -8,4 +8,6 @@
 
 unsigned int	log2_roundup(unsigned int i);
 
+#define XFROG_ITER_ABORT	(1)
+
 #endif /* __LIBFROG_UTIL_H_ */
