@@ -584,8 +584,7 @@ libxfs_trans_get_buf_map(
 xfs_buf_t *
 libxfs_trans_getsb(
 	xfs_trans_t		*tp,
-	xfs_mount_t		*mp,
-	int			flags)
+	xfs_mount_t		*mp)
 {
 	xfs_buf_t		*bp;
 	xfs_buf_log_item_t	*bip;
@@ -593,7 +592,7 @@ libxfs_trans_getsb(
 	DEFINE_SINGLE_BUF_MAP(map, XFS_SB_DADDR, len);
 
 	if (tp == NULL)
-		return libxfs_getsb(mp, flags);
+		return libxfs_getsb(mp);
 
 	bp = xfs_trans_buf_item_match(tp, mp->m_dev, &map, 1);
 	if (bp != NULL) {
@@ -605,7 +604,7 @@ libxfs_trans_getsb(
 		return bp;
 	}
 
-	bp = libxfs_getsb(mp, flags);
+	bp = libxfs_getsb(mp);
 
 	_libxfs_trans_bjoin(tp, bp, 1);
 	trace_xfs_trans_getsb(bp->b_log_item);
