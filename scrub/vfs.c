@@ -79,8 +79,7 @@ queue_subdir(
 	if (error) {
 		sft->nr_dirs--;
 		pthread_mutex_unlock(&sft->lock);
-		str_info(ctx, ctx->mntpoint,
-_("Could not queue subdirectory scan work."));
+		str_liberror(ctx, error, _("queueing directory scan work"));
 		return false;
 	}
 	pthread_mutex_unlock(&sft->lock);
