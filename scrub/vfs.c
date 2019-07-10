@@ -46,7 +46,7 @@ struct scan_fs_tree_dir {
 static void scan_fs_dir(struct workqueue *wq, xfs_agnumber_t agno, void *arg);
 
 /* Queue a directory for scanning. */
-static bool
+static int
 queue_subdir(
 	struct scrub_ctx	*ctx,
 	struct scan_fs_tree	*sft,
@@ -55,35 +55,40 @@ queue_subdir(
 	bool			is_rootdir)
 {
 	struct scan_fs_tree_dir	*new_sftd;
-	int			error;
+	int			ret;
 
 	new_sftd = malloc(sizeof(struct scan_fs_tree_dir));
-	if (!new_sftd) {
-		str_errno(ctx, _("creating directory scan context"));
-		return false;
-	}
+	if (!new_sftd)
+		return errno;
 
 	new_sftd->path = strdup(path);
 	if (!new_sftd->path) {
-		str_errno(ctx, _("creating directory scan path"));
-		free(new_sftd);
-		return false;
+		ret = errno;
+		goto out_dir;
 	}
 
 	new_sftd->sft = sft;
 	new_sftd->rootdir = is_rootdir;
 
-	pthread_mutex_lock(&sft->lock);
+	ret = pthread_mutex_lock(&sft->lock);
+	if (ret)
+		goto out_path;
+
 	sft->nr_dirs++;
-	error = workqueue_add(wq, scan_fs_dir, 0, new_sftd);
-	if (error) {
+	ret = workqueue_add(wq, scan_fs_dir, 0, new_sftd);
+	if (ret) {
 		sft->nr_dirs--;
 		pthread_mutex_unlock(&sft->lock);
-		str_liberror(ctx, error, _("queueing directory scan work"));
-		return false;
+		goto out_path;
 	}
+
 	pthread_mutex_unlock(&sft->lock);
-	return true;
+	return 0;
+out_path:
+	free(new_sftd->path);
+out_dir:
+	free(new_sftd);
+	return ret;
 }
 
 /* Scan a directory sub tree. */
@@ -159,10 +164,13 @@ scan_fs_dir(
 		/* If directory, call ourselves recursively. */
 		if (S_ISDIR(sb.st_mode) && strcmp(".", dirent->d_name) &&
 		    strcmp("..", dirent->d_name)) {
-			sft->moveon = queue_subdir(ctx, sft, wq, newpath,
-					false);
-			if (!sft->moveon)
+			error = queue_subdir(ctx, sft, wq, newpath, false);
+			if (error) {
+				str_liberror(ctx, error,
+_("queueing subdirectory scan"));
+				sft->moveon = false;
 				break;
+			}
 		}
 	}
 
@@ -210,9 +218,11 @@ scan_fs_tree(
 		return false;
 	}
 
-	sft.moveon = queue_subdir(ctx, &sft, &wq, ctx->mntpoint, true);
-	if (!sft.moveon)
+	ret = queue_subdir(ctx, &sft, &wq, ctx->mntpoint, true);
+	if (ret) {
+		str_liberror(ctx, ret, _("queueing directory scan"));
 		goto out_wq;
+	}
 
 	pthread_mutex_lock(&sft.lock);
 	pthread_cond_wait(&sft.wakeup, &sft.lock);
