@@ -304,5 +304,7 @@
 
 #define trace_xfs_btree_commit_afakeroot(...)	((void) 0)
 #define trace_xfs_btree_commit_ifakeroot(...)	((void) 0)
+#define trace_xfs_btree_bload_level_geometry(...)	((void) 0)
+#define trace_xfs_btree_bload_block(...)	((void) 0)
 
 #endif /* __TRACE_H__ */
