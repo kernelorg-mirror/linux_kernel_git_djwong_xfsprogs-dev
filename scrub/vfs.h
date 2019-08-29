@@ -6,12 +6,12 @@
 #ifndef XFS_SCRUB_VFS_H_
 #define XFS_SCRUB_VFS_H_
 
-typedef bool (*scan_fs_tree_dir_fn)(struct scrub_ctx *, const char *,
+typedef int (*scan_fs_tree_dir_fn)(struct scrub_ctx *, const char *,
 		int, void *);
-typedef bool (*scan_fs_tree_dirent_fn)(struct scrub_ctx *, const char *,
+typedef int (*scan_fs_tree_dirent_fn)(struct scrub_ctx *, const char *,
 		int, struct dirent *, struct stat *, void *);
 
-bool scan_fs_tree(struct scrub_ctx *ctx, scan_fs_tree_dir_fn dir_fn,
+int scan_fs_tree(struct scrub_ctx *ctx, scan_fs_tree_dir_fn dir_fn,
 		scan_fs_tree_dirent_fn dirent_fn, void *arg);
 
 void fstrim(struct scrub_ctx *ctx);
