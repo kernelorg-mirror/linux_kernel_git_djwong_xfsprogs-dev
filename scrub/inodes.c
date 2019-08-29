@@ -49,13 +49,15 @@ static void
 xfs_iterate_inodes_range_check(
 	struct scrub_ctx	*ctx,
 	struct xfs_inogrp	*inogrp,
-	struct xfs_bstat	*bstat)
+	struct xfs_bulkstat	*bstat)
 {
-	struct xfs_bstat	*bs;
+	struct xfs_bulkstat	*bs;
 	int			i;
 	int			error;
 
 	for (i = 0, bs = bstat; i < XFS_INODES_PER_CHUNK; i++) {
+		struct xfs_bstat bs1;
+
 		if (!(inogrp->xi_allocmask & (1ULL << i)))
 			continue;
 		if (bs->bs_ino == inogrp->xi_startino + i) {
@@ -65,11 +67,13 @@ xfs_iterate_inodes_range_check(
 
 		/* Load the one inode. */
 		error = xfrog_bulkstat_single(&ctx->mnt,
-				inogrp->xi_startino + i, bs);
-		if (error || bs->bs_ino != inogrp->xi_startino + i) {
-			memset(bs, 0, sizeof(struct xfs_bstat));
+				inogrp->xi_startino + i, &bs1);
+		if (error || bs1.bs_ino != inogrp->xi_startino + i) {
+			memset(bs, 0, sizeof(struct xfs_bulkstat));
 			bs->bs_ino = inogrp->xi_startino + i;
 			bs->bs_blksize = ctx->mnt_sv.f_frsize;
+		} else {
+			xfrog_bstat_to_bulkstat(&ctx->mnt, bs, &bs1);
 		}
 		bs++;
 	}
@@ -92,48 +96,50 @@ xfs_iterate_inodes_range(
 {
 	struct xfs_handle	handle;
 	struct xfs_inogrp	inogrp;
-	struct xfs_bstat	bstat[XFS_INODES_PER_CHUNK];
+	struct xfs_bulkstat_req	*breq;
 	char			idescr[DESCR_BUFSZ];
-	struct xfs_bstat	*bs;
+	struct xfs_bulkstat	*bs;
 	uint64_t		igrp_ino;
-	uint64_t		ino;
-	uint32_t		bulklen = 0;
 	uint32_t		igrplen = 0;
 	bool			moveon = true;
 	int			i;
 	int			error;
 	int			stale_count = 0;
 
-
-	memset(bstat, 0, XFS_INODES_PER_CHUNK * sizeof(struct xfs_bstat));
-
 	memcpy(&handle.ha_fsid, fshandle, sizeof(handle.ha_fsid));
 	handle.ha_fid.fid_len = sizeof(xfs_fid_t) -
 			sizeof(handle.ha_fid.fid_len);
 	handle.ha_fid.fid_pad = 0;
 
+	breq = xfrog_bulkstat_alloc_req(XFS_INODES_PER_CHUNK, 0);
+	if (!breq) {
+		str_info(ctx, descr, _("Insufficient memory; giving up."));
+		return false;
+	}
+
 	/* Find the inode chunk & alloc mask */
 	igrp_ino = first_ino;
 	error = xfrog_inumbers(&ctx->mnt, &igrp_ino, 1, &inogrp, &igrplen);
 	while (!error && igrplen) {
-		/* Load the inodes. */
-		ino = inogrp.xi_startino - 1;
-
 		/*
 		 * We can have totally empty inode chunks on filesystems where
 		 * there are more than 64 inodes per block.  Skip these.
 		 */
 		if (inogrp.xi_alloccount == 0)
 			goto igrp_retry;
-		error = xfrog_bulkstat(&ctx->mnt, &ino, inogrp.xi_alloccount,
-				bstat, &bulklen);
+
+		breq->hdr.ino = inogrp.xi_startino;
+		breq->hdr.icount = inogrp.xi_alloccount;
+		error = xfrog_bulkstat(&ctx->mnt, breq);
 		if (error)
 			str_liberror(ctx, error, descr);
 
-		xfs_iterate_inodes_range_check(ctx, &inogrp, bstat);
+		xfs_iterate_inodes_range_check(ctx, &inogrp, breq->bulkstat);
 
 		/* Iterate all the inodes. */
-		for (i = 0, bs = bstat; i < inogrp.xi_alloccount; i++, bs++) {
+		for (i = 0, bs = breq->bulkstat;
+		     i < inogrp.xi_alloccount;
+		     i++, bs++) {
 			if (bs->bs_ino > last_ino)
 				goto out;
 
@@ -179,6 +185,7 @@ err:
 		str_liberror(ctx, error, descr);
 		moveon = false;
 	}
+	free(breq);
 out:
 	return moveon;
 }
