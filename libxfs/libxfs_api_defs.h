@@ -159,4 +159,8 @@
 #define xfs_ag_init_headers		libxfs_ag_init_headers
 #define xfs_buf_delwri_submit		libxfs_buf_delwri_submit
 
+#define xfs_btree_bload_compute_geometry libxfs_btree_bload_compute_geometry
+#define xfs_btree_bload			libxfs_btree_bload
+#define xfs_allocbt_stage_cursor	libxfs_allocbt_stage_cursor
+
 #endif /* __LIBXFS_API_DEFS_H__ */
