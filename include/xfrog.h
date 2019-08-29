@@ -205,8 +205,8 @@ cvt_b_to_agbno(
 
 /* Bulkstat wrappers */
 struct xfs_bstat;
-int xfrog_bulkstat_single(struct xfs_fd *xfd, uint64_t ino,
-		struct xfs_bstat *ubuffer);
+int xfrog_bulkstat_single(struct xfs_fd *xfd, uint64_t ino, unsigned int flags,
+		struct xfs_bulkstat *bulkstat);
 int xfrog_bulkstat(struct xfs_fd *xfd, struct xfs_bulkstat_req *req);
 
 struct xfs_bulkstat_req *xfrog_bulkstat_alloc_req(uint32_t nr,

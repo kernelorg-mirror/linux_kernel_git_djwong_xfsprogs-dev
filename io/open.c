@@ -722,7 +722,7 @@ inode_f(
 	int			argc,
 	char			**argv)
 {
-	struct xfs_bstat	bstat;
+	struct xfs_bulkstat	bulkstat;
 	uint64_t		result_ino = 0;
 	uint64_t		userino = NULLFSINO;
 	char			*p;
@@ -802,7 +802,7 @@ inode_f(
 		struct xfs_fd	xfd = XFS_FD_INIT(file->fd);
 
 		/* get this inode */
-		ret = xfrog_bulkstat_single(&xfd, userino, &bstat);
+		ret = xfrog_bulkstat_single(&xfd, userino, 0, &bulkstat);
 		if (ret == EINVAL) {
 			/* Not in use */
 			result_ino = 0;
@@ -812,7 +812,7 @@ inode_f(
 			exitcode = 1;
 			return 0;
 		} else {
-			result_ino = bstat.bs_ino;
+			result_ino = bulkstat.bs_ino;
 		}
 	}
 
