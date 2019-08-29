@@ -9,6 +9,7 @@ AC_DEFUN([AC_PACKAGE_GLOBALS],
     AC_SUBST(pkg_name)
 
     AC_PROG_CC
+    AC_PROG_CXX
 
     . ./VERSION
     pkg_version=${PKG_MAJOR}.${PKG_MINOR}.${PKG_REVISION}
