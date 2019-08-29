@@ -1009,7 +1009,6 @@ _("%s rmap btree block claimed (state %d), agno %d, bno %d, suspect %d\n"),
 			owner = be64_to_cpu(rp[i].rm_owner);
 			offset = be64_to_cpu(rp[i].rm_offset);
 
-			key.rm_flags = 0;
 			key.rm_startblock = b;
 			key.rm_blockcount = len;
 			key.rm_owner = owner;
@@ -1150,7 +1149,6 @@ advance:
 	for (i = 0; !isroot && i < numrecs; i++) {
 		kp = XFS_RMAP_HIGH_KEY_ADDR(block, i + 1);
 
-		key.rm_flags = 0;
 		key.rm_startblock = be32_to_cpu(kp->rm_startblock);
 		key.rm_owner = be64_to_cpu(kp->rm_owner);
 		if (libxfs_rmap_irec_offset_unpack(be64_to_cpu(kp->rm_offset),
@@ -1180,7 +1178,6 @@ advance:
 		 * as possible.
 		 */
 		kp = XFS_RMAP_HIGH_KEY_ADDR(block, i + 1);
-		rmap_priv->high_key.rm_flags = 0;
 		rmap_priv->high_key.rm_startblock =
 				be32_to_cpu(kp->rm_startblock);
 		rmap_priv->high_key.rm_owner =
