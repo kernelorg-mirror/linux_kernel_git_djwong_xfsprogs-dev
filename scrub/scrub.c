@@ -320,7 +320,7 @@ _("Optimizations of %s are possible."), scrubbers[i].name);
 static int
 xfs_scrub_save_repair(
 	struct scrub_ctx		*ctx,
-	struct xfs_action_list		*alist,
+	struct action_list		*alist,
 	struct xfs_scrub_metadata	*meta)
 {
 	struct action_item		*aitem;
@@ -348,7 +348,7 @@ xfs_scrub_save_repair(
 		break;
 	}
 
-	xfs_action_list_add(alist, aitem);
+	action_list_add(alist, aitem);
 	return 0;
 }
 
@@ -361,7 +361,7 @@ xfs_scrub_metadata(
 	struct scrub_ctx		*ctx,
 	enum scrub_type			scrub_type,
 	xfs_agnumber_t			agno,
-	struct xfs_action_list		*alist)
+	struct action_list		*alist)
 {
 	struct xfs_scrub_metadata	meta = {0};
 	const struct scrub_descr	*sc;
@@ -410,7 +410,7 @@ xfs_scrub_metadata(
 int
 xfs_scrub_primary_super(
 	struct scrub_ctx		*ctx,
-	struct xfs_action_list		*alist)
+	struct action_list		*alist)
 {
 	struct xfs_scrub_metadata	meta = {
 		.sm_type = XFS_SCRUB_TYPE_SB,
@@ -443,7 +443,7 @@ int
 xfs_scrub_ag_headers(
 	struct scrub_ctx		*ctx,
 	xfs_agnumber_t			agno,
-	struct xfs_action_list		*alist)
+	struct action_list		*alist)
 {
 	return xfs_scrub_metadata(ctx, ST_AGHEADER, agno, alist);
 }
@@ -453,7 +453,7 @@ int
 xfs_scrub_ag_metadata(
 	struct scrub_ctx		*ctx,
 	xfs_agnumber_t			agno,
-	struct xfs_action_list		*alist)
+	struct action_list		*alist)
 {
 	return xfs_scrub_metadata(ctx, ST_PERAG, agno, alist);
 }
@@ -462,7 +462,7 @@ xfs_scrub_ag_metadata(
 int
 xfs_scrub_fs_metadata(
 	struct scrub_ctx		*ctx,
-	struct xfs_action_list		*alist)
+	struct action_list		*alist)
 {
 	return xfs_scrub_metadata(ctx, ST_FS, 0, alist);
 }
@@ -471,7 +471,7 @@ xfs_scrub_fs_metadata(
 int
 xfs_scrub_fs_summary(
 	struct scrub_ctx		*ctx,
-	struct xfs_action_list		*alist)
+	struct action_list		*alist)
 {
 	return xfs_scrub_metadata(ctx, ST_SUMMARY, 0, alist);
 }
@@ -513,7 +513,7 @@ __xfs_scrub_file(
 	uint32_t			gen,
 	int				fd,
 	unsigned int			type,
-	struct xfs_action_list		*alist)
+	struct action_list		*alist)
 {
 	struct xfs_scrub_metadata	meta = {0};
 	enum check_outcome		fix;
@@ -541,7 +541,7 @@ xfs_scrub_inode_fields(
 	uint64_t		ino,
 	uint32_t		gen,
 	int			fd,
-	struct xfs_action_list	*alist)
+	struct action_list	*alist)
 {
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_INODE, alist);
 }
@@ -552,7 +552,7 @@ xfs_scrub_data_fork(
 	uint64_t		ino,
 	uint32_t		gen,
 	int			fd,
-	struct xfs_action_list	*alist)
+	struct action_list	*alist)
 {
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_BMBTD, alist);
 }
@@ -563,7 +563,7 @@ xfs_scrub_attr_fork(
 	uint64_t		ino,
 	uint32_t		gen,
 	int			fd,
-	struct xfs_action_list	*alist)
+	struct action_list	*alist)
 {
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_BMBTA, alist);
 }
@@ -574,7 +574,7 @@ xfs_scrub_cow_fork(
 	uint64_t		ino,
 	uint32_t		gen,
 	int			fd,
-	struct xfs_action_list	*alist)
+	struct action_list	*alist)
 {
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_BMBTC, alist);
 }
@@ -585,7 +585,7 @@ xfs_scrub_dir(
 	uint64_t		ino,
 	uint32_t		gen,
 	int			fd,
-	struct xfs_action_list	*alist)
+	struct action_list	*alist)
 {
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_DIR, alist);
 }
@@ -596,7 +596,7 @@ xfs_scrub_attr(
 	uint64_t		ino,
 	uint32_t		gen,
 	int			fd,
-	struct xfs_action_list	*alist)
+	struct action_list	*alist)
 {
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_XATTR, alist);
 }
@@ -607,7 +607,7 @@ xfs_scrub_symlink(
 	uint64_t		ino,
 	uint32_t		gen,
 	int			fd,
-	struct xfs_action_list	*alist)
+	struct action_list	*alist)
 {
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_SYMLINK, alist);
 }
@@ -618,7 +618,7 @@ xfs_scrub_parent(
 	uint64_t		ino,
 	uint32_t		gen,
 	int			fd,
-	struct xfs_action_list	*alist)
+	struct action_list	*alist)
 {
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_PARENT, alist);
 }
