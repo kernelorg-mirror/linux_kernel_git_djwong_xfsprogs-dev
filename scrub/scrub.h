@@ -24,6 +24,7 @@ int xfs_scrub_ag_metadata(struct scrub_ctx *ctx, xfs_agnumber_t agno,
 		struct action_list *alist);
 int xfs_scrub_fs_metadata(struct scrub_ctx *ctx, struct action_list *alist);
 int xfs_scrub_fs_summary(struct scrub_ctx *ctx, struct action_list *alist);
+int xfs_scrub_clean_health(struct scrub_ctx *ctx, struct action_list *alist);
 
 bool xfs_can_scrub_fs_metadata(struct scrub_ctx *ctx);
 bool xfs_can_scrub_inode(struct scrub_ctx *ctx);
