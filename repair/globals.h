@@ -107,6 +107,7 @@ extern int		need_metadir_dotdot;
 
 extern int		need_rbmino;
 extern int		need_rsumino;
+extern bool		need_rrmapino;
 
 extern int		lost_quotas;
 extern int		have_uquotino;
