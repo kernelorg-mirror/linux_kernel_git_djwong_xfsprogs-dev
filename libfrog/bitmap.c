@@ -314,7 +314,6 @@ bitmap_clear(
 }
 #endif
 
-#ifdef DEBUG
 /* Iterate the set regions of this bitmap. */
 int
 bitmap_iterate(
@@ -324,20 +323,19 @@ bitmap_iterate(
 {
 	struct avl64node	*node;
 	struct bitmap_node	*ext;
-	int			error = 0;
+	int			ret;
 
 	pthread_mutex_lock(&bmap->bt_lock);
 	avl_for_each(bmap->bt_tree, node) {
 		ext = container_of(node, struct bitmap_node, btn_node);
-		error = fn(ext->btn_start, ext->btn_length, arg);
-		if (error)
+		ret = fn(ext->btn_start, ext->btn_length, arg);
+		if (ret)
 			break;
 	}
 	pthread_mutex_unlock(&bmap->bt_lock);
 
-	return error;
+	return ret;
 }
-#endif
 
 /* Iterate the set regions of part of this bitmap. */
 int
