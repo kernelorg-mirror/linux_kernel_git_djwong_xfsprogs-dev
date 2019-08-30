@@ -2579,7 +2579,9 @@ process_dir(
 		if (!sflag || id->ilist || CHECK_BLIST(bno))
 			dbprintf(_("no .. entry for directory %lld\n"), id->ino);
 		error++;
-	} else if (parent == id->ino && id->ino != mp->m_sb.sb_rootino) {
+	} else if (parent == id->ino &&
+		   id->ino != mp->m_sb.sb_rootino &&
+		   id->ino != mp->m_sb.sb_metadirino) {
 		if (!sflag || id->ilist || CHECK_BLIST(bno))
 			dbprintf(_(". and .. same for non-root directory %lld\n"),
 				id->ino);
@@ -2588,6 +2590,11 @@ process_dir(
 		if (!sflag || id->ilist || CHECK_BLIST(bno))
 			dbprintf(_("root directory %lld has .. %lld\n"), id->ino,
 				parent);
+		error++;
+	} else if (id->ino == mp->m_sb.sb_metadirino && id->ino != parent) {
+		if (!sflag || id->ilist || CHECK_BLIST(bno))
+			dbprintf(_("metadata directory %lld has .. %lld\n"),
+				id->ino, parent);
 		error++;
 	} else if (parent != NULLFSINO && id->ino != parent)
 		addparent_inode(id, parent);
@@ -2673,9 +2680,13 @@ is_meta_ino(
 		 id->ino == mp->m_sb.sb_gquotino ||
 		 id->ino == mp->m_sb.sb_pquotino)
 		type = DBM_QUOTA;
+	else if (id->ino == mp->m_sb.sb_metadirino)
+		type = DBM_DIR;
 
 	if (type != DBM_UNKNOWN) {
-		addlink_inode(id);
+		if (!xfs_sb_version_hasmetadir(&mp->m_sb) ||
+		    id->ino == mp->m_sb.sb_metadirino)
+			addlink_inode(id);
 		*typep = type;
 		*blkmap = blkmap_alloc(xino->i_d.di_nextents);
 		return true;
