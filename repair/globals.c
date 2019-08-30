@@ -66,6 +66,7 @@ int	need_metadir_dotdot;
 
 int	need_rbmino;
 int	need_rsumino;
+bool	need_rrmapino;
 
 int	lost_quotas;
 int	have_uquotino;
