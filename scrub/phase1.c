@@ -56,7 +56,8 @@ report_to_kernel(
 	int			ret;
 
 	total_errors = ctx->errors_found + ctx->runtime_errors;
-	if (!ctx->scrub_setup_succeeded || total_errors > 0)
+	if (!ctx->scrub_setup_succeeded || total_errors > 0 ||
+	    ctx->slow_ops_skipped > 0)
 		return 0;
 
 	action_list_init(&alist);
