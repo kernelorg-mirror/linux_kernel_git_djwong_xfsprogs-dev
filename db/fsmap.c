@@ -22,8 +22,8 @@ fsmap_fn(
 {
 	struct fsmap_info	*info = priv;
 
-	dbprintf(_("%llu: %u/%u len %u owner %lld offset %llu bmbt %d attrfork %d extflag %d\n"),
-		info->nr, info->agno, rec->rm_startblock,
+	dbprintf(_("%llu: %d/%llu len %llu owner %lld offset %llu bmbt %d attrfork %d extflag %d\n"),
+		info->nr, (signed)info->agno, rec->rm_startblock,
 		rec->rm_blockcount, rec->rm_owner, rec->rm_offset,
 		!!(rec->rm_flags & XFS_RMAP_BMBT_BLOCK),
 		!!(rec->rm_flags & XFS_RMAP_ATTR_FORK),
@@ -99,6 +99,69 @@ fsmap(
 	}
 }
 
+static void
+fsmap_rt(
+	xfs_fsblock_t		start_fsb,
+	xfs_fsblock_t		end_fsb)
+{
+	struct fsmap_info	info;
+	xfs_daddr_t		eofs;
+	struct xfs_rmap_irec	low;
+	struct xfs_rmap_irec	high;
+	struct xfs_btree_cur	*bt_cur;
+	struct xfs_inode	*ip;
+	xfs_ino_t		ino;
+	int			error;
+
+	if (mp->m_sb.sb_rblocks == 0)
+		return;
+
+	eofs = XFS_FSB_TO_BB(mp, mp->m_sb.sb_rblocks);
+	if (XFS_FSB_TO_DADDR(mp, end_fsb) >= eofs)
+		end_fsb = XFS_DADDR_TO_FSB(mp, eofs - 1);
+
+	low.rm_startblock = start_fsb;
+	low.rm_owner = 0;
+	low.rm_offset = 0;
+	low.rm_flags = 0;
+	high.rm_startblock = end_fsb;
+	high.rm_owner = ULLONG_MAX;
+	high.rm_offset = ULLONG_MAX;
+	high.rm_flags = XFS_RMAP_ATTR_FORK | XFS_RMAP_BMBT_BLOCK |
+			XFS_RMAP_UNWRITTEN;
+
+	info.nr = 0;
+
+	error = -libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &ino);
+	if (error) {
+		dbprintf(_("%d - couldn't look up rtrmap inode.\n"),
+			 error);
+		return;
+	}
+
+	error = -libxfs_imeta_iget(mp, ino, XFS_DIR3_FT_REG_FILE, &ip);
+	if (error) {
+		dbprintf(_("%d - couldn't iget rtrmap inode.\n"),
+			 error);
+		return;
+	}
+
+	bt_cur = libxfs_rtrmapbt_init_cursor(mp, NULL, ip);
+	if (!bt_cur)
+		goto out_ino;
+
+	info.agno = NULLAGNUMBER;
+	error = -libxfs_rmap_query_range(bt_cur, &low, &high,
+			fsmap_fn, &info);
+	if (error)
+		dbprintf(_("Error %d while querying fsmap btree.\n"),
+			error);
+
+	libxfs_btree_del_cursor(bt_cur, XFS_BTREE_NOERROR);
+out_ino:
+	libxfs_imeta_irele(ip);
+}
+
 static int
 fsmap_f(
 	int			argc,
@@ -108,14 +171,18 @@ fsmap_f(
 	int			c;
 	xfs_fsblock_t		start_fsb = 0;
 	xfs_fsblock_t		end_fsb = NULLFSBLOCK;
+	bool			is_rt = false;
 
 	if (!xfs_sb_version_hasrmapbt(&mp->m_sb)) {
 		dbprintf(_("Filesystem does not support reverse mapping btree.\n"));
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "")) != EOF) {
+	while ((c = getopt(argc, argv, "r")) != EOF) {
 		switch (c) {
+		case 'r':
+			is_rt = true;
+			break;
 		default:
 			dbprintf(_("Bad option for fsmap command.\n"));
 			return 0;
@@ -138,7 +205,10 @@ fsmap_f(
 		}
 	}
 
-	fsmap(start_fsb, end_fsb);
+	if (is_rt)
+		fsmap_rt(start_fsb, end_fsb);
+	else
+		fsmap(start_fsb, end_fsb);
 
 	return 0;
 }
