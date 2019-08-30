@@ -27,6 +27,7 @@ swapext_f(
 	char			**argv)
 {
 	struct xfs_fd		fxfd = XFS_FD_INIT(file->fd);
+	struct xfs_bulkstat	bulkstat;
 	int			fd;
 	int			error;
 	struct xfs_swapext	sx;
@@ -47,12 +48,13 @@ swapext_f(
 		goto out;
 	}
 
-	error = xfrog_bulkstat_single(&fxfd, stat.st_ino, &sx.sx_stat);
+	error = xfrog_bulkstat_single(&fxfd, stat.st_ino, 0, &bulkstat);
 	if (error) {
 		errno = error;
 		perror("bulkstat");
 		goto out;
 	}
+	xfrog_bulkstat_to_bstat(&fxfd, &sx.sx_stat, &bulkstat);
 	sx.sx_version = XFS_SX_VERSION;
 	sx.sx_fdtarget = file->fd;
 	sx.sx_fdtmp = fd;

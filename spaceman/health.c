@@ -209,7 +209,7 @@ report_inode_health(
 	unsigned long long	ino,
 	const char		*descr)
 {
-	struct xfs_bstat	bs;
+	struct xfs_bulkstat	bs;
 	char			d[256];
 	int			ret;
 
@@ -218,7 +218,7 @@ report_inode_health(
 		descr = d;
 	}
 
-	ret = xfrog_bulkstat_single(&file->xfd, ino, &bs);
+	ret = xfrog_bulkstat_single(&file->xfd, ino, 0, &bs);
 	if (ret) {
 		errno = ret;
 		perror(descr);
