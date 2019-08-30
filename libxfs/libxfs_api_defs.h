@@ -161,5 +161,8 @@
 #define xfs_ialloc_calc_rootino		libxfs_ialloc_calc_rootino
 
 #define xfs_sb_read_secondary		libxfs_sb_read_secondary
+#define xfs_btree_bload_compute_geometry libxfs_btree_bload_compute_geometry
+#define xfs_btree_bload			libxfs_btree_bload
+#define xfs_allocbt_stage_cursor	libxfs_allocbt_stage_cursor
 
 #endif /* __LIBXFS_API_DEFS_H__ */
