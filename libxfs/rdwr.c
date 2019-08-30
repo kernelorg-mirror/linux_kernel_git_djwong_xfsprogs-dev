@@ -1498,3 +1498,23 @@ xfs_buf_delwri_submit(
 
 	return error;
 }
+
+/*
+ * Cancel a delayed write list.
+ *
+ * Remove each buffer from the list, clear the delwri queue flag and drop the
+ * associated buffer reference.
+ */
+void
+xfs_buf_delwri_cancel(
+	struct list_head	*list)
+{
+	struct xfs_buf		*bp;
+
+	while (!list_empty(list)) {
+		bp = list_first_entry(list, struct xfs_buf, b_list);
+		list_del_init(&bp->b_list);
+		bp->b_flags &= ~LIBXFS_B_DIRTY;
+		libxfs_putbuf(bp);
+	}
+}
