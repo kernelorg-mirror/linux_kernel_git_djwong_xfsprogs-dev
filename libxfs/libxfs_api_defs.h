@@ -186,5 +186,6 @@
 #define xfs_btree_bload			libxfs_btree_bload
 #define xfs_allocbt_stage_cursor	libxfs_allocbt_stage_cursor
 #define xfs_inobt_stage_cursor		libxfs_inobt_stage_cursor
+#define xfs_rmapbt_stage_cursor		libxfs_rmapbt_stage_cursor
 
 #endif /* __LIBXFS_API_DEFS_H__ */
