@@ -117,6 +117,28 @@ xfd_prepare_geometry(
 	return 0;
 }
 
+/* Open a file on an XFS filesystem.  Returns zero or a positive error code. */
+int
+xfd_open(
+	struct xfs_fd		*xfd,
+	const char		*pathname,
+	int			flags)
+{
+	int			ret;
+
+	xfd->fd = open(pathname, O_RDONLY);
+	if (xfd->fd < 0)
+		return errno;
+
+	ret = xfd_prepare_geometry(xfd);
+	if (ret) {
+		xfd_close(xfd);
+		return ret;
+	}
+
+	return 0;
+}
+
 /*
  * Release any resources associated with this xfs_fd structure.  Returns zero
  * or a positive error code.
