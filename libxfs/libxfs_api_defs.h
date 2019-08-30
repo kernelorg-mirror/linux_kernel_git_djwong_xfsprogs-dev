@@ -162,6 +162,8 @@
 
 #define xfs_ag_init_headers		libxfs_ag_init_headers
 #define xfs_buf_delwri_submit		libxfs_buf_delwri_submit
+#define xfs_get_projid			libxfs_get_projid
+#define xfs_set_projid			libxfs_set_projid
 
 #define xfs_btree_bload_compute_geometry libxfs_btree_bload_compute_geometry
 #define xfs_btree_bload			libxfs_btree_bload
