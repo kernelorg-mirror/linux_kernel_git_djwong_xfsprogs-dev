@@ -833,6 +833,11 @@ build_agi(
 		agi->agi_free_level = cpu_to_be32(fino_bt->newbt.afake.af_levels);
 	}
 
+	if (xfs_sb_version_hasinobtcounts(&mp->m_sb)) {
+		agi->agi_iblocks = cpu_to_be32(ino_bt->newbt.afake.af_blocks);
+		agi->agi_fblocks = cpu_to_be32(fino_bt->newbt.afake.af_blocks);
+	}
+
 	libxfs_writebuf(agi_buf, 0);
 }
 
