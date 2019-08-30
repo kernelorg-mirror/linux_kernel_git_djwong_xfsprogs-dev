@@ -156,6 +156,8 @@
 #define xfs_bmapi_remap			libxfs_bmapi_remap
 #define xfs_imap_to_bp			libxfs_imap_to_bp
 #define xfs_fixed_inode_reset		libxfs_fixed_inode_reset
+#define xfs_dir_create_new_child	libxfs_dir_create_new_child
+#define xfs_dir_ialloc			libxfs_dir_ialloc
 
 #define LIBXFS_ATTR_ROOT		ATTR_ROOT
 #define LIBXFS_ATTR_SECURE		ATTR_SECURE
