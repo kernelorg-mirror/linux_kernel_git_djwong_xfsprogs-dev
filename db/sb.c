@@ -687,6 +687,8 @@ version_string(
 		strcat(s, ",RMAPBT");
 	if (xfs_sb_version_hasreflink(sbp))
 		strcat(s, ",REFLINK");
+	if (xfs_sb_version_hasmetadir(sbp))
+		strcat(s, ",METADIR");
 	return s;
 }
 
