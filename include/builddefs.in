@@ -70,6 +70,7 @@ MAKEDEPEND	= @makedepend@
 
 USE_FMV		= @use_fmv@
 USE_PCLMUL_FMV	= @use_pclmul_fmv@
+USE_SSE42_FMV	= @use_sse42_fmv@
 
 MSGFMT		= @msgfmt@
 MSGMERGE	= @msgmerge@
