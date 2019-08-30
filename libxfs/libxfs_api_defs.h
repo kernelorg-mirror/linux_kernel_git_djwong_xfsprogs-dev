@@ -194,6 +194,7 @@
 #define xfs_allocbt_stage_cursor	libxfs_allocbt_stage_cursor
 #define xfs_inobt_stage_cursor		libxfs_inobt_stage_cursor
 #define xfs_rmapbt_stage_cursor		libxfs_rmapbt_stage_cursor
+#define xfs_rtrmapbt_stage_cursor	libxfs_rtrmapbt_stage_cursor
 #define xfs_refcountbt_stage_cursor	libxfs_refcountbt_stage_cursor
 
 #define xfs_bmbt_disk_set_all		libxfs_bmbt_disk_set_all
@@ -206,6 +207,7 @@
 #define xfs_btree_bload			libxfs_btree_bload
 #define xfs_rmap_ino_bmbt_owner		libxfs_rmap_ino_bmbt_owner
 #define xfs_bmbt_commit_staged_btree	libxfs_bmbt_commit_staged_btree
+#define xfs_rtrmapbt_commit_staged_btree	libxfs_rtrmapbt_commit_staged_btree
 
 #define xfs_inode_to_disk_timestamp	libxfs_inode_to_disk_timestamp
 #define xfs_inode_from_disk_timestamp	libxfs_inode_from_disk_timestamp
@@ -227,5 +229,7 @@
 
 #define xfs_rtrmapbt_maxrecs		libxfs_rtrmapbt_maxrecs
 #define xfs_rtrmapbt_init_cursor	libxfs_rtrmapbt_init_cursor
+#define xfs_rtrmapbt_create		libxfs_rtrmapbt_create
+#define xfs_rmap_map_extent		libxfs_rmap_map_extent
 
 #endif /* __LIBXFS_API_DEFS_H__ */
