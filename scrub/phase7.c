@@ -278,10 +278,3 @@ out_free:
 	ptvar_free(ptvar);
 	return error;
 }
-
-bool
-xfs_scan_summary(
-	struct scrub_ctx	*ctx)
-{
-	return phase7_func(ctx) == 0;
-}
