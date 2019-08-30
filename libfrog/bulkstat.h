@@ -10,8 +10,14 @@
 struct xfs_bstat;
 int xfrog_bulkstat_single(struct xfs_fd *xfd, uint64_t ino,
 		struct xfs_bstat *ubuffer);
-int xfrog_bulkstat(struct xfs_fd *xfd, uint64_t *lastino, uint32_t icount,
-		struct xfs_bstat *ubuffer, uint32_t *ocount);
+int xfrog_bulkstat(struct xfs_fd *xfd, struct xfs_bulkstat_req *req);
+
+struct xfs_bulkstat_req *xfrog_bulkstat_alloc_req(uint32_t nr,
+		uint64_t startino);
+void xfrog_bulkstat_to_bstat(struct xfs_fd *xfd, struct xfs_bstat *bs1,
+		const struct xfs_bulkstat *bstat);
+void xfrog_bstat_to_bulkstat(struct xfs_fd *xfd, struct xfs_bulkstat *bstat,
+		const struct xfs_bstat *bs1);
 
 struct xfs_inogrp;
 int xfrog_inumbers(struct xfs_fd *xfd, uint64_t *lastino, uint32_t icount,
