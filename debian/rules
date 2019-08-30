@@ -1,11 +1,16 @@
 #!/usr/bin/make -f
 
+.PHONY: dpkg_config
+
 export DH_VERBOSE=1
 
 ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
     NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
     PMAKEFLAGS += -j$(NUMJOBS)
 endif
+
+DH_VERSION := $(shell dpkg-query -W -f '$${Version}' debhelper)
+USE_DH9 ?= $(shell if dpkg --compare-versions $(DH_VERSION) lt 11 ; then echo yes ; fi)
 
 package = xfsprogs
 develop = xfslibs-dev
@@ -33,10 +38,17 @@ checkdir = test -f debian/rules
 build: build-arch build-indep
 build-arch: built
 build-indep: built
-built: dibuild config
+built: dpkg_config dibuild config
 	@echo "== dpkg-buildpackage: build" 1>&2
 	$(MAKE) $(PMAKEFLAGS) default
 	touch built
+
+dpkg_config:
+ifeq ($(USE_DH9),yes)
+	mv debian/compat debian/compat.save
+	echo 9 > debian/compat
+endif
+	@true
 
 config: .census
 .census:
@@ -93,7 +105,9 @@ binary-arch: checkroot built
 	dh_compress
 	dh_fixperms
 	dh_makeshlibs
+ifneq ($(USE_DH9),yes)
 	dh_installsystemd -p xfsprogs --no-enable --no-start --no-restart-after-upgrade --no-stop-on-upgrade
+endif
 	dh_installdeb
 	dh_shlibdeps
 	dh_gencontrol
