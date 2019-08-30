@@ -180,6 +180,8 @@
 #define xfs_dir2_data_get_ftype		libxfs_dir2_data_get_ftype
 #define xfs_dir2_data_put_ftype		libxfs_dir2_data_put_ftype
 #define xfs_ialloc_calc_rootino		libxfs_ialloc_calc_rootino
+#define xfs_get_projid			libxfs_get_projid
+#define xfs_set_projid			libxfs_set_projid
 
 #define xfs_sb_read_secondary		libxfs_sb_read_secondary
 #define xfs_btree_bload_compute_geometry libxfs_btree_bload_compute_geometry
