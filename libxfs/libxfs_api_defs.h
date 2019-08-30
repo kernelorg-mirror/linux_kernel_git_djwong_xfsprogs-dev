@@ -151,6 +151,10 @@
 #define xfs_init_local_fork		libxfs_init_local_fork
 #define xfs_dir2_namecheck		libxfs_dir2_namecheck
 #define xfs_attr_namecheck		libxfs_attr_namecheck
+#define xfs_bmbt_calc_size		libxfs_bmbt_calc_size
+#define xfs_rmap_query_all		libxfs_rmap_query_all
+#define xfs_bmapi_remap			libxfs_bmapi_remap
+#define xfs_imap_to_bp			libxfs_imap_to_bp
 
 #define LIBXFS_ATTR_ROOT		ATTR_ROOT
 #define LIBXFS_ATTR_SECURE		ATTR_SECURE
@@ -184,5 +188,16 @@
 #define xfs_inobt_stage_cursor		libxfs_inobt_stage_cursor
 #define xfs_rmapbt_stage_cursor		libxfs_rmapbt_stage_cursor
 #define xfs_refcountbt_stage_cursor	libxfs_refcountbt_stage_cursor
+
+#define xfs_bmbt_disk_set_all		libxfs_bmbt_disk_set_all
+#define xfs_bmbt_disk_get_startoff	libxfs_bmbt_disk_get_startoff
+#define xfs_iext_first			libxfs_iext_first
+#define xfs_iext_insert_raw		libxfs_iext_insert_raw
+#define xfs_iext_next			libxfs_iext_next
+#define xfs_btree_bload_compute_geometry	libxfs_btree_bload_compute_geometry
+#define xfs_bmbt_stage_cursor		libxfs_bmbt_stage_cursor
+#define xfs_btree_bload			libxfs_btree_bload
+#define xfs_rmap_ino_bmbt_owner		libxfs_rmap_ino_bmbt_owner
+#define xfs_bmbt_commit_staged_btree	libxfs_bmbt_commit_staged_btree
 
 #endif /* __LIBXFS_API_DEFS_H__ */
