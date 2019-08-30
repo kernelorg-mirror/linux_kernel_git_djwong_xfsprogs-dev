@@ -166,5 +166,6 @@
 #define xfs_allocbt_stage_cursor	libxfs_allocbt_stage_cursor
 #define xfs_inobt_stage_cursor		libxfs_inobt_stage_cursor
 #define xfs_rmapbt_stage_cursor		libxfs_rmapbt_stage_cursor
+#define xfs_refcountbt_stage_cursor	libxfs_refcountbt_stage_cursor
 
 #endif /* __LIBXFS_API_DEFS_H__ */
