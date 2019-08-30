@@ -323,4 +323,6 @@ fsmap_advance(
 #include <asm-generic/mman-common.h>
 #endif /* HAVE_MAP_SYNC */
 
+#define howmany_64(x, y) howmany((x), (y))
+
 #endif	/* __XFS_LINUX_H__ */
