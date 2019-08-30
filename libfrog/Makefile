@@ -15,7 +15,6 @@ avl64.c \
 bitmap.c \
 bulkstat.c \
 convert.c \
-crc32.c \
 fsgeom.c \
 list_sort.c \
 linux.c \
@@ -28,6 +27,9 @@ scrub.c \
 topology.c \
 util.c \
 workqueue.c
+
+CXXFILES = \
+crc32.cpp
 
 HFILES = \
 avl64.h \
@@ -69,9 +71,9 @@ crc32table.h: gen_crc32table.c crc32defs.h
 # systems/architectures. Hence we make sure that xfsprogs will never use a
 # busted CRC calculation at build time and hence avoid putting bad CRCs down on
 # disk.
-crc32selftest: gen_crc32table.c crc32table.h crc32.c crc32defs.h
+crc32selftest: gen_crc32table.c crc32table.h crc32.cpp crc32defs.h
 	@echo "    [TEST]    CRC32"
-	$(Q) $(BUILD_CC) $(BUILD_CFLAGS) -D CRC32_SELFTEST=1 crc32.c -o $@
+	$(Q) $(BUILD_CXX) $(BUILD_CXXFLAGS) -D CRC32_SELFTEST=1 crc32.cpp -o $@
 	$(Q) ./$@
 
 include $(BUILDRULES)

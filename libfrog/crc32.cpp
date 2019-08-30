@@ -36,7 +36,9 @@
 /* For endian conversion routines */
 #include "xfs_arch.h"
 #include "crc32defs.h"
+extern "C" {
 #include "crc32c.h"
+}
 
 /* types specifc to this file */
 typedef __u8	u8;
@@ -130,6 +132,7 @@ crc32_body(u32 crc, unsigned char const *buf, size_t len, const u32 (*tab)[256])
  * @p: pointer to buffer over which CRC is run
  * @len: length of buffer @p
  */
+__attribute__ ((target ("default")))
 static inline u32 __pure crc32_le_generic(u32 crc, unsigned char const *p,
 					  size_t len, const u32 (*tab)[256],
 					  u32 polynomial)
@@ -169,6 +172,7 @@ static inline u32 __pure crc32_le_generic(u32 crc, unsigned char const *p,
 	return crc;
 }
 
+extern "C" {
 #if CRC_LE_BITS == 1
 u32 __pure crc32c_le(u32 crc, unsigned char const *p, size_t len)
 {
@@ -181,6 +185,7 @@ u32 __pure crc32c_le(u32 crc, unsigned char const *p, size_t len)
 			(const u32 (*)[256])crc32ctable_le, CRC32C_POLY_LE);
 }
 #endif
+}
 
 
 #ifdef CRC32_SELFTEST
