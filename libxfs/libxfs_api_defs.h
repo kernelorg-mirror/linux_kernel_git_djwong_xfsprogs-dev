@@ -182,5 +182,8 @@
 #define xfs_rmapbt_calc_reserves	libxfs_rmapbt_calc_reserves
 #define xfs_read_agf			libxfs_read_agf
 #define xfs_sb_read_secondary		libxfs_sb_read_secondary
+#define xfs_btree_bload_compute_geometry libxfs_btree_bload_compute_geometry
+#define xfs_btree_bload			libxfs_btree_bload
+#define xfs_allocbt_stage_cursor	libxfs_allocbt_stage_cursor
 
 #endif /* __LIBXFS_API_DEFS_H__ */
