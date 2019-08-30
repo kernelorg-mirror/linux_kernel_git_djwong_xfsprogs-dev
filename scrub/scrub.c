@@ -317,7 +317,7 @@ _("Optimizations of %s are possible."), scrubbers[i].name);
 }
 
 /* Save a scrub context for later repairs. */
-static bool
+static int
 xfs_scrub_save_repair(
 	struct scrub_ctx		*ctx,
 	struct xfs_action_list		*alist,
@@ -328,9 +328,10 @@ xfs_scrub_save_repair(
 	/* Schedule this item for later repairs. */
 	aitem = malloc(sizeof(struct action_item));
 	if (!aitem) {
-		str_errno(ctx, _("repair list"));
-		return false;
+		str_errno(ctx, _("adding item to repair list"));
+		return errno;
 	}
+
 	memset(aitem, 0, sizeof(*aitem));
 	aitem->type = meta->sm_type;
 	aitem->flags = meta->sm_flags;
@@ -348,11 +349,14 @@ xfs_scrub_save_repair(
 	}
 
 	xfs_action_list_add(alist, aitem);
-	return true;
+	return 0;
 }
 
-/* Scrub metadata, saving corruption reports for later. */
-static bool
+/*
+ * Scrub metadata, saving corruption reports for later.  Returns zero or
+ * a positive error value.  Errors will be logged by this function.
+ */
+static int
 xfs_scrub_metadata(
 	struct scrub_ctx		*ctx,
 	enum scrub_type			scrub_type,
@@ -363,6 +367,7 @@ xfs_scrub_metadata(
 	const struct scrub_descr	*sc;
 	enum check_outcome		fix;
 	int				type;
+	int				ret;
 
 	sc = scrubbers;
 	for (type = 0; type < XFS_SCRUB_TYPE_NR; type++, sc++) {
@@ -379,10 +384,11 @@ xfs_scrub_metadata(
 		progress_add(1);
 		switch (fix) {
 		case CHECK_ABORT:
-			return false;
+			return ECANCELED;
 		case CHECK_REPAIR:
-			if (!xfs_scrub_save_repair(ctx, alist, &meta))
-				return false;
+			ret = xfs_scrub_save_repair(ctx, alist, &meta);
+			if (ret)
+				return ret;
 			/* fall through */
 		case CHECK_DONE:
 			continue;
@@ -392,15 +398,16 @@ xfs_scrub_metadata(
 		}
 	}
 
-	return true;
+	return 0;
 }
 
 /*
  * Scrub primary superblock.  This will be useful if we ever need to hook
  * a filesystem-wide pre-scrub activity off of the sb 0 scrubber (which
- * currently does nothing).
+ * currently does nothing).  If errors occur, this function will log them and
+ * return nonzero.
  */
-bool
+int
 xfs_scrub_primary_super(
 	struct scrub_ctx		*ctx,
 	struct xfs_action_list		*alist)
@@ -409,28 +416,30 @@ xfs_scrub_primary_super(
 		.sm_type = XFS_SCRUB_TYPE_SB,
 	};
 	enum check_outcome		fix;
+	int				ret;
 
 	/* Check the item. */
 	fix = xfs_check_metadata(ctx, ctx->mnt.fd, &meta, false);
 	switch (fix) {
 	case CHECK_ABORT:
-		return false;
+		return ECANCELED;
 	case CHECK_REPAIR:
-		if (!xfs_scrub_save_repair(ctx, alist, &meta))
-			return false;
+		ret = xfs_scrub_save_repair(ctx, alist, &meta);
+		if (ret)
+			return ret;
 		/* fall through */
 	case CHECK_DONE:
-		return true;
+		return 0;
 	case CHECK_RETRY:
 		abort();
 		break;
 	}
 
-	return true;
+	return 0;
 }
 
 /* Scrub each AG's header blocks. */
-bool
+int
 xfs_scrub_ag_headers(
 	struct scrub_ctx		*ctx,
 	xfs_agnumber_t			agno,
@@ -440,7 +449,7 @@ xfs_scrub_ag_headers(
 }
 
 /* Scrub each AG's metadata btrees. */
-bool
+int
 xfs_scrub_ag_metadata(
 	struct scrub_ctx		*ctx,
 	xfs_agnumber_t			agno,
@@ -450,7 +459,7 @@ xfs_scrub_ag_metadata(
 }
 
 /* Scrub whole-FS metadata btrees. */
-bool
+int
 xfs_scrub_fs_metadata(
 	struct scrub_ctx		*ctx,
 	struct xfs_action_list		*alist)
@@ -459,7 +468,7 @@ xfs_scrub_fs_metadata(
 }
 
 /* Scrub FS summary metadata. */
-bool
+int
 xfs_scrub_fs_summary(
 	struct scrub_ctx		*ctx,
 	struct xfs_action_list		*alist)
@@ -469,7 +478,7 @@ xfs_scrub_fs_summary(
 
 /* How many items do we have to check? */
 unsigned int
-xfs_scrub_estimate_ag_work(
+scrub_estimate_ag_work(
 	struct scrub_ctx		*ctx)
 {
 	const struct scrub_descr	*sc;
@@ -493,8 +502,11 @@ xfs_scrub_estimate_ag_work(
 	return estimate;
 }
 
-/* Scrub inode metadata. */
-static bool
+/*
+ * Scrub inode metadata.  If errors occur, this function will log them and
+ * return nonzero.
+ */
+static int
 __xfs_scrub_file(
 	struct scrub_ctx		*ctx,
 	uint64_t			ino,
@@ -516,14 +528,14 @@ __xfs_scrub_file(
 	/* Scrub the piece of metadata. */
 	fix = xfs_check_metadata(ctx, fd, &meta, true);
 	if (fix == CHECK_ABORT)
-		return false;
+		return ECANCELED;
 	if (fix == CHECK_DONE)
-		return true;
+		return 0;
 
 	return xfs_scrub_save_repair(ctx, alist, &meta);
 }
 
-bool
+int
 xfs_scrub_inode_fields(
 	struct scrub_ctx	*ctx,
 	uint64_t		ino,
@@ -534,7 +546,7 @@ xfs_scrub_inode_fields(
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_INODE, alist);
 }
 
-bool
+int
 xfs_scrub_data_fork(
 	struct scrub_ctx	*ctx,
 	uint64_t		ino,
@@ -545,7 +557,7 @@ xfs_scrub_data_fork(
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_BMBTD, alist);
 }
 
-bool
+int
 xfs_scrub_attr_fork(
 	struct scrub_ctx	*ctx,
 	uint64_t		ino,
@@ -556,7 +568,7 @@ xfs_scrub_attr_fork(
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_BMBTA, alist);
 }
 
-bool
+int
 xfs_scrub_cow_fork(
 	struct scrub_ctx	*ctx,
 	uint64_t		ino,
@@ -567,7 +579,7 @@ xfs_scrub_cow_fork(
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_BMBTC, alist);
 }
 
-bool
+int
 xfs_scrub_dir(
 	struct scrub_ctx	*ctx,
 	uint64_t		ino,
@@ -578,7 +590,7 @@ xfs_scrub_dir(
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_DIR, alist);
 }
 
-bool
+int
 xfs_scrub_attr(
 	struct scrub_ctx	*ctx,
 	uint64_t		ino,
@@ -589,7 +601,7 @@ xfs_scrub_attr(
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_XATTR, alist);
 }
 
-bool
+int
 xfs_scrub_symlink(
 	struct scrub_ctx	*ctx,
 	uint64_t		ino,
@@ -600,7 +612,7 @@ xfs_scrub_symlink(
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_SYMLINK, alist);
 }
 
-bool
+int
 xfs_scrub_parent(
 	struct scrub_ctx	*ctx,
 	uint64_t		ino,
@@ -611,7 +623,11 @@ xfs_scrub_parent(
 	return __xfs_scrub_file(ctx, ino, gen, fd, XFS_SCRUB_TYPE_PARENT, alist);
 }
 
-/* Test the availability of a kernel scrub command. */
+/*
+ * Test the availability of a kernel scrub command.  If errors occur (or the
+ * scrub ioctl is rejected) the errors will be logged and this function will
+ * return false.
+ */
 static bool
 __xfs_scrub_test(
 	struct scrub_ctx		*ctx,
