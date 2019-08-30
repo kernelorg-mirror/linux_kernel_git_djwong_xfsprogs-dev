@@ -19,7 +19,7 @@ CFILES = agheader.c attr_repair.c avl.c bload.c bmap.c btree.c \
 	incore_bmc.c init.c incore_ext.c incore_ino.c phase1.c \
 	phase2.c phase3.c phase4.c phase5.c phase6.c phase7.c \
 	progress.c prefetch.c rmap.c rt.c sb.c scan.c slab.c threads.c \
-	versions.c bmap_repair.c xfs_repair.c
+	versions.c bmap_repair.c rtrmap_repair.c xfs_repair.c
 
 LLDLIBS = $(LIBXFS) $(LIBXLOG) $(LIBXCMD) $(LIBFROG) $(LIBUUID) $(LIBRT) \
 	$(LIBPTHREAD) $(LIBBLKID)
