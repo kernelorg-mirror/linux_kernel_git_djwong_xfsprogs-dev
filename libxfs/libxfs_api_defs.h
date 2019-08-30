@@ -246,5 +246,6 @@ struct timespec64 {
 #define xfs_rtrmapbt_init_cursor	libxfs_rtrmapbt_init_cursor
 #define xfs_rtrmapbt_create		libxfs_rtrmapbt_create
 #define xfs_rmap_map_extent		libxfs_rmap_map_extent
+#define xfs_btree_compute_maxlevels	libxfs_btree_compute_maxlevels
 
 #endif /* __LIBXFS_API_DEFS_H__ */
