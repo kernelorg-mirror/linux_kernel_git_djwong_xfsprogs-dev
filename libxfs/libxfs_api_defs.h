@@ -51,6 +51,8 @@
 #define xfs_attr_remove			libxfs_attr_remove
 #define xfs_attr_leaf_newentsize	libxfs_attr_leaf_newentsize
 
+#define xfs_alloc_vextent		libxfs_alloc_vextent
+#define __xfs_bmap_add_free		__libxfs_bmap_add_free
 #define xfs_agfl_walk			libxfs_agfl_walk
 #define xfs_alloc_fix_freelist		libxfs_alloc_fix_freelist
 #define xfs_alloc_min_freelist		libxfs_alloc_min_freelist
