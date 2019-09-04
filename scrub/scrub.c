@@ -276,47 +276,64 @@ xfs_scrub_save_repair(
 	return true;
 }
 
+/* Scrub non-inode metadata, saving corruption reports for later. */
+static int
+xfs_scrub_meta(
+	struct scrub_ctx		*ctx,
+	unsigned int			type,
+	xfs_agnumber_t			agno,
+	struct xfs_action_list		*alist)
+{
+	struct xfs_scrub_metadata	meta = {
+		.sm_type		= type,
+		.sm_agno		= agno,
+	};
+	enum check_outcome		fix;
+
+	background_sleep();
+
+	/* Check the item. */
+	fix = xfs_check_metadata(ctx, &meta, false);
+	progress_add(1);
+
+	switch (fix) {
+	case CHECK_ABORT:
+		return ECANCELED;
+	case CHECK_REPAIR:
+		if (!xfs_scrub_save_repair(ctx, alist, &meta))
+			return ENOMEM;
+		/* fall through */
+	case CHECK_DONE:
+		return 0;
+	default:
+		/* CHECK_RETRY should never happen. */
+		abort();
+	}
+}
+
 /* Scrub metadata, saving corruption reports for later. */
 static bool
-xfs_scrub_metadata(
+xfs_scrub_meta_type(
 	struct scrub_ctx		*ctx,
 	enum xfrog_scrub_type		scrub_type,
 	xfs_agnumber_t			agno,
 	struct xfs_action_list		*alist)
 {
-	struct xfs_scrub_metadata	meta = {0};
 	const struct xfrog_scrub_descr	*sc;
-	enum check_outcome		fix;
-	int				type;
+	unsigned int			type;
 
 	sc = xfrog_scrubbers;
 	for (type = 0; type < XFS_SCRUB_TYPE_NR; type++, sc++) {
+		int			ret;
+
 		if (sc->type != scrub_type)
 			continue;
 		if (sc->flags & XFROG_SCRUB_DESCR_SUMMARY)
 			continue;
 
-		meta.sm_type = type;
-		meta.sm_flags = 0;
-		meta.sm_agno = agno;
-		background_sleep();
-
-		/* Check the item. */
-		fix = xfs_check_metadata(ctx, &meta, false);
-		progress_add(1);
-		switch (fix) {
-		case CHECK_ABORT:
+		ret = xfs_scrub_meta(ctx, type, agno, alist);
+		if (ret)
 			return false;
-		case CHECK_REPAIR:
-			if (!xfs_scrub_save_repair(ctx, alist, &meta))
-				return false;
-			/* fall through */
-		case CHECK_DONE:
-			continue;
-		case CHECK_RETRY:
-			abort();
-			break;
-		}
 	}
 
 	return true;
@@ -332,28 +349,10 @@ xfs_scrub_primary_super(
 	struct scrub_ctx		*ctx,
 	struct xfs_action_list		*alist)
 {
-	struct xfs_scrub_metadata	meta = {
-		.sm_type = XFS_SCRUB_TYPE_SB,
-	};
-	enum check_outcome		fix;
+	int				ret;
 
-	/* Check the item. */
-	fix = xfs_check_metadata(ctx, &meta, false);
-	switch (fix) {
-	case CHECK_ABORT:
-		return false;
-	case CHECK_REPAIR:
-		if (!xfs_scrub_save_repair(ctx, alist, &meta))
-			return false;
-		/* fall through */
-	case CHECK_DONE:
-		return true;
-	case CHECK_RETRY:
-		abort();
-		break;
-	}
-
-	return true;
+	ret = xfs_scrub_meta(ctx, XFS_SCRUB_TYPE_SB, 0, alist);
+	return ret == 0;
 }
 
 /* Scrub each AG's header blocks. */
@@ -363,7 +362,7 @@ xfs_scrub_ag_headers(
 	xfs_agnumber_t			agno,
 	struct xfs_action_list		*alist)
 {
-	return xfs_scrub_metadata(ctx, XFROG_SCRUB_TYPE_AGHEADER, agno, alist);
+	return xfs_scrub_meta_type(ctx, XFROG_SCRUB_TYPE_AGHEADER, agno, alist);
 }
 
 /* Scrub each AG's metadata btrees. */
@@ -373,7 +372,7 @@ xfs_scrub_ag_metadata(
 	xfs_agnumber_t			agno,
 	struct xfs_action_list		*alist)
 {
-	return xfs_scrub_metadata(ctx, XFROG_SCRUB_TYPE_PERAG, agno, alist);
+	return xfs_scrub_meta_type(ctx, XFROG_SCRUB_TYPE_PERAG, agno, alist);
 }
 
 /* Scrub whole-FS metadata btrees. */
@@ -382,7 +381,7 @@ xfs_scrub_fs_metadata(
 	struct scrub_ctx		*ctx,
 	struct xfs_action_list		*alist)
 {
-	return xfs_scrub_metadata(ctx, XFROG_SCRUB_TYPE_FS, 0, alist);
+	return xfs_scrub_meta_type(ctx, XFROG_SCRUB_TYPE_FS, 0, alist);
 }
 
 /* How many items do we have to check? */
