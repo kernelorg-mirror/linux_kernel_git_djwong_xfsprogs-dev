@@ -195,7 +195,7 @@ report_data_loss(
 	else
 		bmp = vs->d_bad;
 
-	return bitmap_iterate_range(bmp, bmap->bm_physical, bmap->bm_length,
+	return -bitmap_iterate_range(bmp, bmap->bm_physical, bmap->bm_length,
 			report_badfile, br);
 }
 
@@ -446,7 +446,7 @@ report_ioerr(
 	(keys + 1)->fmr_owner = ULLONG_MAX;
 	(keys + 1)->fmr_offset = ULLONG_MAX;
 	(keys + 1)->fmr_flags = UINT_MAX;
-	return scrub_iterate_fsmap(dioerr->ctx, keys, report_ioerr_fsmap,
+	return -scrub_iterate_fsmap(dioerr->ctx, keys, report_ioerr_fsmap,
 			&start);
 }
 
@@ -468,7 +468,7 @@ report_disk_ioerrs(
 	tree = bitmap_for_disk(ctx, disk, vs);
 	if (!tree)
 		return 0;
-	return bitmap_iterate(tree, report_ioerr, &dioerr);
+	return -bitmap_iterate(tree, report_ioerr, &dioerr);
 }
 
 /* Given bad extent lists for the data & rtdev, find bad files. */
@@ -598,7 +598,7 @@ remember_ioerr(
 		return;
 	}
 
-	ret = bitmap_set(tree, start, length);
+	ret = -bitmap_set(tree, start, length);
 	if (ret)
 		str_liberror(ctx, ret, _("setting bad block bitmap"));
 }
@@ -661,13 +661,13 @@ phase6_func(
 	struct media_verify_state	vs = { NULL };
 	int				ret, ret2, ret3;
 
-	ret = bitmap_alloc(&vs.d_bad);
+	ret = -bitmap_alloc(&vs.d_bad);
 	if (ret) {
 		str_liberror(ctx, ret, _("creating datadev badblock bitmap"));
 		return ret;
 	}
 
-	ret = bitmap_alloc(&vs.r_bad);
+	ret = -bitmap_alloc(&vs.r_bad);
 	if (ret) {
 		str_liberror(ctx, ret, _("creating realtime badblock bitmap"));
 		goto out_dbad;
