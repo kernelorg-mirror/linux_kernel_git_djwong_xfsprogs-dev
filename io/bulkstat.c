@@ -164,7 +164,7 @@ bulkstat_f(
 		return 0;
 	}
 
-	ret = xfd_prepare_geometry(&xfd);
+	ret = -xfd_prepare_geometry(&xfd);
 	if (ret) {
 		xfrog_perror(ret, "xfd_prepare_geometry");
 		exitcode = 1;
@@ -266,7 +266,7 @@ bulkstat_single_f(
 		}
 	}
 
-	ret = xfd_prepare_geometry(&xfd);
+	ret = -xfd_prepare_geometry(&xfd);
 	if (ret) {
 		xfrog_perror(ret, "xfd_prepare_geometry");
 		exitcode = 1;
@@ -422,7 +422,7 @@ inumbers_f(
 		return 0;
 	}
 
-	ret = xfd_prepare_geometry(&xfd);
+	ret = -xfd_prepare_geometry(&xfd);
 	if (ret) {
 		xfrog_perror(ret, "xfd_prepare_geometry");
 		exitcode = 1;
