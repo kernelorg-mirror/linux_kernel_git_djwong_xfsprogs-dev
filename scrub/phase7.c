@@ -39,8 +39,8 @@ count_block_summary(
 
 	counts = ptvar_get((struct ptvar *)arg, &ret);
 	if (ret) {
-		str_liberror(ctx, ret, _("retrieving summary counts"));
-		return ret;
+		str_liberror(ctx, -ret, _("retrieving summary counts"));
+		return -ret;
 	}
 	if (fsmap->fmr_device == ctx->fsinfo.fs_logdev)
 		return 0;
@@ -135,7 +135,7 @@ phase7_func(
 		return error;
 	}
 
-	error = ptvar_alloc(scrub_nproc(ctx), sizeof(struct summary_counts),
+	error = -ptvar_alloc(scrub_nproc(ctx), sizeof(struct summary_counts),
 			&ptvar);
 	if (error) {
 		str_liberror(ctx, error, _("setting up block counter"));
@@ -146,7 +146,7 @@ phase7_func(
 	error = scrub_scan_all_spacemaps(ctx, count_block_summary, ptvar);
 	if (error)
 		goto out_free;
-	error = ptvar_foreach(ptvar, add_summaries, &totalcount);
+	error = -ptvar_foreach(ptvar, add_summaries, &totalcount);
 	if (error) {
 		str_liberror(ctx, error, _("counting blocks"));
 		goto out_free;

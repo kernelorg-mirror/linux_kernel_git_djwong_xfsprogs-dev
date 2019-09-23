@@ -115,7 +115,7 @@ read_verify_pool_alloc(
 	rvp->disk = disk;
 	rvp->ioerr_fn = ioerr_fn;
 	rvp->errors_seen = 0;
-	ret = ptvar_alloc(submitter_threads, sizeof(struct read_verify),
+	ret = -ptvar_alloc(submitter_threads, sizeof(struct read_verify),
 			&rvp->rvstate);
 	if (ret)
 		goto out_counter;
@@ -334,7 +334,7 @@ read_verify_schedule_io(
 
 	rv = ptvar_get(rvp->rvstate, &ret);
 	if (ret)
-		return ret;
+		return -ret;
 	req_end = start + length;
 	rv_end = rv->io_start + rv->io_length;
 
@@ -382,7 +382,7 @@ force_one_io(
 	if (rv->io_length == 0)
 		return 0;
 
-	return read_verify_queue(rvp, rv);
+	return -read_verify_queue(rvp, rv);
 }
 
 /* Force any stashed IOs into the verifier. */
@@ -392,7 +392,7 @@ read_verify_force_io(
 {
 	assert(rvp->readbuf);
 
-	return ptvar_foreach(rvp->rvstate, force_one_io, rvp);
+	return -ptvar_foreach(rvp->rvstate, force_one_io, rvp);
 }
 
 /* How many bytes has this process verified? */
