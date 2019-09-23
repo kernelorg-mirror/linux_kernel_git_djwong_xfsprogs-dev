@@ -65,7 +65,7 @@ fill_in_bulkstat_holes(
 		}
 
 		/* Load the one inode. */
-		error = xfrog_bulkstat_single(&ctx->mnt,
+		error = -xfrog_bulkstat_single(&ctx->mnt,
 				inumbers->xi_startino + i, 0, bs);
 		if (error || bs->bs_ino != inumbers->xi_startino + i) {
 			memset(bs, 0, sizeof(struct xfs_bulkstat));
@@ -116,16 +116,16 @@ scan_ag_inodes(
 			sizeof(handle.ha_fid.fid_len);
 	handle.ha_fid.fid_pad = 0;
 
-	breq = xfrog_bulkstat_alloc_req(XFS_INODES_PER_CHUNK, 0);
-	if (!breq) {
-		str_errno(ctx, descr);
+	error = -xfrog_bulkstat_alloc_req(XFS_INODES_PER_CHUNK, 0, &breq);
+	if (error) {
+		str_liberror(ctx, error, descr);
 		si->aborted = true;
 		return;
 	}
 
-	ireq = xfrog_inumbers_alloc_req(1, 0);
-	if (!ireq) {
-		str_errno(ctx, descr);
+	error = -xfrog_inumbers_alloc_req(1, 0, &ireq);
+	if (error) {
+		str_liberror(ctx, error, descr);
 		free(breq);
 		si->aborted = true;
 		return;
@@ -134,7 +134,7 @@ scan_ag_inodes(
 	xfrog_inumbers_set_ag(ireq, agno);
 
 	/* Find the inode chunk & alloc mask */
-	error = xfrog_inumbers(&ctx->mnt, ireq);
+	error = -xfrog_inumbers(&ctx->mnt, ireq);
 	while (!error && !si->aborted && ireq->hdr.ocount > 0) {
 		/*
 		 * We can have totally empty inode chunks on filesystems where
@@ -145,7 +145,7 @@ scan_ag_inodes(
 
 		breq->hdr.ino = inumbers->xi_startino;
 		breq->hdr.icount = inumbers->xi_alloccount;
-		error = xfrog_bulkstat(&ctx->mnt, breq);
+		error = -xfrog_bulkstat(&ctx->mnt, breq);
 		if (error) {
 			char	errbuf[DESCR_BUFSZ];
 
@@ -193,7 +193,7 @@ _("Changed too many times during scan; giving up."));
 
 		stale_count = 0;
 igrp_retry:
-		error = xfrog_inumbers(&ctx->mnt, ireq);
+		error = -xfrog_inumbers(&ctx->mnt, ireq);
 	}
 
 err:
