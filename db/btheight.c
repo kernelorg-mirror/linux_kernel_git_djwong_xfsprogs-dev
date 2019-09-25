@@ -22,18 +22,37 @@ static int rmap_maxrecs(struct xfs_mount *mp, int blocklen, int leaf)
 	return libxfs_rmapbt_maxrecs(blocklen, leaf);
 }
 
+static int iext_maxrecs(struct xfs_mount *mp, int blocklen, int leaf)
+{
+	blocklen -= 2 * sizeof(void *);
+
+	return blocklen / sizeof(struct xfs_bmbt_rec);
+}
+
+static int fs_blocksize(struct xfs_mount *mp)
+{
+	return mp->m_sb.sb_blocksize;
+}
+
+static int iext_blocksize(struct xfs_mount *mp)
+{
+	return 256;
+}
+
 struct btmap {
 	const char	*tag;
 	int		(*maxrecs)(struct xfs_mount *mp, int blocklen,
 				   int leaf);
+	int		(*default_blocksize)(struct xfs_mount *mp);
 } maps[] = {
-	{"bnobt", libxfs_allocbt_maxrecs},
-	{"cntbt", libxfs_allocbt_maxrecs},
-	{"inobt", libxfs_inobt_maxrecs},
-	{"finobt", libxfs_inobt_maxrecs},
-	{"bmapbt", libxfs_bmbt_maxrecs},
-	{"refcountbt", refc_maxrecs},
-	{"rmapbt", rmap_maxrecs},
+	{"bnobt", libxfs_allocbt_maxrecs, fs_blocksize},
+	{"cntbt", libxfs_allocbt_maxrecs, fs_blocksize},
+	{"inobt", libxfs_inobt_maxrecs, fs_blocksize},
+	{"finobt", libxfs_inobt_maxrecs, fs_blocksize},
+	{"bmapbt", libxfs_bmbt_maxrecs, fs_blocksize},
+	{"refcountbt", refc_maxrecs, fs_blocksize},
+	{"rmapbt", rmap_maxrecs, fs_blocksize},
+	{"iext", iext_maxrecs, iext_blocksize},
 };
 
 static void
@@ -108,7 +127,7 @@ calc_height(
 static int
 construct_records_per_block(
 	char		*tag,
-	int		blocksize,
+	int		*blocksize,
 	unsigned int	*records_per_block)
 {
 	char		*toktag;
@@ -119,8 +138,10 @@ construct_records_per_block(
 
 	for (i = 0, m = maps; i < ARRAY_SIZE(maps); i++, m++) {
 		if (!strcmp(m->tag, tag)) {
-			records_per_block[0] = m->maxrecs(mp, blocksize, 1);
-			records_per_block[1] = m->maxrecs(mp, blocksize, 0);
+			if (*blocksize < 0)
+				*blocksize = m->default_blocksize(mp);
+			records_per_block[0] = m->maxrecs(mp, *blocksize, 1);
+			records_per_block[1] = m->maxrecs(mp, *blocksize, 0);
 			return 0;
 		}
 	}
@@ -178,38 +199,50 @@ construct_records_per_block(
 		fprintf(stderr, _("%s: header type not found.\n"), tag);
 		goto out;
 	}
-	if (!strcmp(p, "short"))
+	if (!strcmp(p, "short")) {
+		if (*blocksize < 0)
+			*blocksize = mp->m_sb.sb_blocksize;
 		blocksize -= XFS_BTREE_SBLOCK_LEN;
-	else if (!strcmp(p, "shortcrc"))
+	} else if (!strcmp(p, "shortcrc")) {
+		if (*blocksize < 0)
+			*blocksize = mp->m_sb.sb_blocksize;
 		blocksize -= XFS_BTREE_SBLOCK_CRC_LEN;
-	else if (!strcmp(p, "long"))
+	} else if (!strcmp(p, "long")) {
+		if (*blocksize < 0)
+			*blocksize = mp->m_sb.sb_blocksize;
 		blocksize -= XFS_BTREE_LBLOCK_LEN;
-	else if (!strcmp(p, "longcrc"))
+	} else if (!strcmp(p, "longcrc")) {
+		if (*blocksize < 0)
+			*blocksize = mp->m_sb.sb_blocksize;
 		blocksize -= XFS_BTREE_LBLOCK_CRC_LEN;
-	else {
+	} else if (!strcmp(p, "iext")) {
+		if (*blocksize < 0)
+			*blocksize = 256;
+		blocksize -= 2 * sizeof(void *);
+	} else {
 		fprintf(stderr, _("%s: unrecognized btree header type."),
 				p);
 		goto out;
 	}
 
-	if (record_size > blocksize) {
+	if (record_size > *blocksize) {
 		fprintf(stderr,
 _("%s: record size must be less than selected block size (%u bytes).\n"),
-			tag, blocksize);
+			tag, *blocksize);
 		goto out;
 	}
 
-	if (key_size > blocksize) {
+	if (key_size > *blocksize) {
 		fprintf(stderr,
 _("%s: key size must be less than selected block size (%u bytes).\n"),
-			tag, blocksize);
+			tag, *blocksize);
 		goto out;
 	}
 
-	if (ptr_size > blocksize) {
+	if (ptr_size > *blocksize) {
 		fprintf(stderr,
 _("%s: pointer size must be less than selected block size (%u bytes).\n"),
-			tag, blocksize);
+			tag, *blocksize);
 		goto out;
 	}
 
@@ -221,8 +254,8 @@ _("%s: pointer size must be less than selected block size (%u bytes).\n"),
 		goto out;
 	}
 
-	records_per_block[0] = blocksize / record_size;
-	records_per_block[1] = blocksize / (key_size + ptr_size);
+	records_per_block[0] = *blocksize / record_size;
+	records_per_block[1] = *blocksize / (key_size + ptr_size);
 	ret = 0;
 out:
 	free(toktag);
@@ -238,12 +271,12 @@ report(
 	char			*tag,
 	unsigned int		report_what,
 	unsigned long long	nr_records,
-	unsigned int		blocksize)
+	int			blocksize)
 {
 	unsigned int		records_per_block[2];
 	int			ret;
 
-	ret = construct_records_per_block(tag, blocksize, records_per_block);
+	ret = construct_records_per_block(tag, &blocksize, records_per_block);
 	if (ret)
 		return;
 
@@ -302,7 +335,7 @@ btheight_f(
 	int		argc,
 	char		**argv)
 {
-	long long	blocksize = mp->m_sb.sb_blocksize;
+	long long	blocksize = -1;
 	uint64_t	nr_records = 0;
 	int		report_what = REPORT_DEFAULT;
 	int		i, c;
@@ -355,7 +388,7 @@ _("The largest block size this command will consider is %u bytes.\n"),
 		return 0;
 	}
 
-	if (blocksize < 128) {
+	if (blocksize >= 0 && blocksize < 128) {
 		fprintf(stderr,
 _("The smallest block size this command will consider is 128 bytes.\n"));
 		return 0;
