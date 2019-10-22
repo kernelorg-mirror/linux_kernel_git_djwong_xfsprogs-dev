@@ -83,4 +83,6 @@ extern int	platform_nproc(void);
 #define S32_MAX		((int32_t)(U32_MAX >> 1))
 #define S32_MIN		((int32_t)(-S32_MAX - 1))
 
+#define timespec64	timespec
+
 #endif	/* __XFS_PLATFORM_DEFS_H__ */
