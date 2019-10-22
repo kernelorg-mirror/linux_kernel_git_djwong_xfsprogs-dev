@@ -197,7 +197,8 @@ xfs_flags2diflags2(
 	unsigned int		xflags)
 {
 	uint64_t		di_flags2 =
-		(ip->i_d.di_flags2 & XFS_DIFLAG2_REFLINK);
+		(ip->i_d.di_flags2 & (XFS_DIFLAG2_REFLINK |
+				      XFS_DIFLAG2_BIGTIME));
 
 	if (xflags & FS_XFLAG_DAX)
 		di_flags2 |= XFS_DIFLAG2_DAX;
@@ -294,6 +295,8 @@ libxfs_ialloc(
 		VFS_I(ip)->i_version = 1;
 		ip->i_d.di_flags2 = pip ? 0 : xfs_flags2diflags2(ip,
 				fsx->fsx_xflags);
+		if (xfs_sb_version_hasbigtime(&ip->i_mount->m_sb))
+			ip->i_d.di_flags2 |= XFS_DIFLAG2_BIGTIME;
 		ip->i_d.di_crtime = VFS_I(ip)->i_mtime;
 		ip->i_d.di_cowextsize = pip ? 0 : fsx->fsx_cowextsize;
 	}
@@ -399,6 +402,8 @@ libxfs_iflush_int(xfs_inode_t *ip, xfs_buf_t *bp)
 	}
 	ASSERT(ip->i_d.di_nextents+ip->i_d.di_anextents <= ip->i_d.di_nblocks);
 	ASSERT(ip->i_d.di_forkoff <= mp->m_sb.sb_inodesize);
+	ASSERT(!(ip->i_d.di_flags2 & XFS_DIFLAG2_BIGTIME) &&
+	       xfs_sb_version_hasbigtime(&mp->m_sb));
 
 	/* bump the change count on v3 inodes */
 	if (ip->i_d.di_version == 3)
