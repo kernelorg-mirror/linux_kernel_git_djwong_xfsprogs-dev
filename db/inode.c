@@ -172,14 +172,38 @@ const field_t	inode_v3_flds[] = {
 	{ "cowextsz", FLDT_UINT1,
 	  OI(COFF(flags2) + bitsz(uint64_t) - XFS_DIFLAG2_COWEXTSIZE_BIT-1), C1,
 	  0, TYP_NONE },
+	{ "bigtime", FLDT_UINT1,
+	  OI(COFF(flags2) + bitsz(uint64_t) - XFS_DIFLAG2_BIGTIME_BIT-1), C1,
+	  0, TYP_NONE },
 	{ NULL }
 };
 
+static int
+inode_timestamp_count(
+	void		*obj,
+	int		startoff)
+{
+	return xfs_sb_version_hasbigtime(&mp->m_sb) ? 0 : 1;
+}
+
+static int
+inode_bigtimestamp_count(
+	void		*obj,
+	int		startoff)
+{
+	return xfs_sb_version_hasbigtime(&mp->m_sb) ? 1 : 0;
+}
 
 #define	TOFF(f)	bitize(offsetof(union xfs_timestamp, t_ ## f))
 const field_t	timestamp_flds[] = {
-	{ "sec", FLDT_TIME, OI(TOFF(sec)), C1, 0, TYP_NONE },
-	{ "nsec", FLDT_NSEC, OI(TOFF(nsec)), C1, 0, TYP_NONE },
+	{ "sec", FLDT_TIME, OI(TOFF(sec)), inode_timestamp_count, FLD_COUNT,
+		TYP_NONE },
+	{ "nsec", FLDT_NSEC, OI(TOFF(nsec)), inode_timestamp_count, FLD_COUNT,
+		TYP_NONE },
+	{ "sec", FLDT_BTSEC, OI(TOFF(bigtime)), inode_bigtimestamp_count,
+		FLD_COUNT, TYP_NONE },
+	{ "nsec", FLDT_BTNSEC, OI(TOFF(bigtime)), inode_bigtimestamp_count,
+		FLD_COUNT, TYP_NONE },
 	{ NULL }
 };
 
