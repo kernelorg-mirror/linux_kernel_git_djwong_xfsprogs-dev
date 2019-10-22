@@ -200,4 +200,8 @@
 #define xfs_rmap_ino_bmbt_owner		libxfs_rmap_ino_bmbt_owner
 #define xfs_bmbt_commit_staged_btree	libxfs_bmbt_commit_staged_btree
 
+#define xfs_inode_to_disk_timestamp	libxfs_inode_to_disk_timestamp
+#define xfs_inode_from_disk_timestamp	libxfs_inode_from_disk_timestamp
+#define xfs_dquot_from_disk_timestamp	libxfs_dquot_from_disk_timestamp
+
 #endif /* __LIBXFS_API_DEFS_H__ */
