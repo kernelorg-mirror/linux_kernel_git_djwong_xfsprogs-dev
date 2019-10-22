@@ -146,25 +146,13 @@ enum ce { CE_DEBUG, CE_CONT, CE_NOTE, CE_WARN, CE_ALERT, CE_PANIC };
 #define XFS_STATS_DEC(mp, count, x)	do { (mp) = (mp); } while (0)
 #define XFS_STATS_ADD(mp, count, x)	do { (mp) = (mp); } while (0)
 #define XFS_TEST_ERROR(expr,a,b)	( expr )
-#define XFS_WANT_CORRUPTED_GOTO(mp, expr, l)				\
-{									\
-	if (!(expr)) {							\
-		if ((mp)->m_flags & LIBXFS_MOUNT_WANT_CORRUPTED)	\
-			printf("WANT_CORRUPTED_GOTO at %s:%d\n",	\
-				__func__, __LINE__);			\
-		error = -EFSCORRUPTED;					\
-		goto l;							\
-	}								\
-}
-#define XFS_WANT_CORRUPTED_RETURN(mp, expr)				\
-{									\
-	if (!(expr)) {							\
-		if ((mp)->m_flags & LIBXFS_MOUNT_WANT_CORRUPTED)	\
-			printf("WANT_CORRUPTED_RETURN at %s:%d\n",	\
-				__func__, __LINE__);			\
-		return -EFSCORRUPTED;					\
-	}								\
-}
+
+#define XFS_CORRUPT_ON(mp, expr)	\
+	(unlikely(expr) ? \
+	 (((mp)->m_flags & LIBXFS_MOUNT_WANT_CORRUPTED) ?	\
+	  printf("XFS_CORRUPT_ON %s at %s:%d\n", #expr, __func__, __LINE__) : \
+	  0),		\
+	 true : false)
 
 #ifdef __GNUC__
 #define __return_address	__builtin_return_address(0)
