@@ -2157,7 +2157,7 @@ static void
 check_nsec(
 	const char		*name,
 	xfs_ino_t		lino,
-	struct xfs_timestamp	*t,
+	union xfs_timestamp	*t,
 	int			*dirty)
 {
 	if (be32_to_cpu(t->t_nsec) < 1000000000)
