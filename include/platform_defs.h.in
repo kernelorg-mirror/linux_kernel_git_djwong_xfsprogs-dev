@@ -79,4 +79,8 @@ typedef unsigned short umode_t;
 
 extern int	platform_nproc(void);
 
+#define U32_MAX		((uint32_t)~0U)
+#define S32_MAX		((int32_t)(U32_MAX >> 1))
+#define S32_MIN		((int32_t)(-S32_MAX - 1))
+
 #endif	/* __XFS_PLATFORM_DEFS_H__ */
