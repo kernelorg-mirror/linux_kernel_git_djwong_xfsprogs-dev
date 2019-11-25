@@ -173,5 +173,6 @@
 #define xfs_dir2_data_bestfree_p	libxfs_dir2_data_bestfree_p
 #define xfs_dir2_data_get_ftype		libxfs_dir2_data_get_ftype
 #define xfs_dir2_data_put_ftype		libxfs_dir2_data_put_ftype
+#define xfs_ialloc_calc_rootino		libxfs_ialloc_calc_rootino
 
 #endif /* __LIBXFS_API_DEFS_H__ */
