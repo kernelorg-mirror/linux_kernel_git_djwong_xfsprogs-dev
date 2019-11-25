@@ -172,6 +172,7 @@
 
 #define xfs_ag_init_headers		libxfs_ag_init_headers
 #define xfs_buf_delwri_submit		libxfs_buf_delwri_submit
+#define xfs_ialloc_calc_rootino		libxfs_ialloc_calc_rootino
 
 #define xfs_refcountbt_calc_reserves	libxfs_refcountbt_calc_reserves
 #define xfs_finobt_calc_reserves	libxfs_finobt_calc_reserves
