@@ -458,6 +458,52 @@ out:
 }
 
 /*
+ * If any of the secondary SBs contain a *correct* value for sunit, write that
+ * back to the primary superblock.
+ */
+static void
+guess_correct_sunit(
+	struct xfs_mount	*mp)
+{
+	struct xfs_sb		sb;
+	struct xfs_buf		*bp;
+	xfs_ino_t		calc_rootino;
+	xfs_agnumber_t		agno;
+	int			error;
+
+	/* Try reading secondary supers to see if we find a good sb_unit. */
+	for (agno = 1; agno < mp->m_sb.sb_agcount; agno++) {
+		error = -libxfs_sb_read_secondary(mp, NULL, agno, &bp);
+		if (error)
+			continue;
+		libxfs_sb_from_disk(&sb, XFS_BUF_TO_SBP(bp));
+		libxfs_putbuf(bp);
+
+		calc_rootino = libxfs_ialloc_calc_rootino(mp, sb.sb_unit);
+		if (calc_rootino == mp->m_sb.sb_rootino)
+			break;
+	}
+	if (agno == mp->m_sb.sb_agcount)
+		return;
+
+	/* Inform the caller of what we found and the fix. */
+	do_warn(_("AG %u superblock contains plausible sb_unit value\n"),
+			agno);
+
+	if (!no_modify)
+		do_warn(_("resetting sb_unit to %u\n"), sb.sb_unit);
+	else
+		do_warn(_("would reset sb_unit to %u\n"),
+				sb.sb_unit);
+
+	/*
+	 * Just set the value -- safe since the superblock doesn't get flushed
+	 * out if no_modify is set.
+	 */
+	mp->m_sb.sb_unit = sb.sb_unit;
+}
+
+/*
  * Make sure that the first 3 inodes in the filesystem are the root directory,
  * the realtime bitmap, and the realtime summary, in that order.
  */
@@ -478,6 +524,7 @@ calc_mkfs(
 		do_warn(
 _("sb root inode value %" PRIu64 " inconsistent with alignment (expected %"PRIu64")\n"),
 			mp->m_sb.sb_rootino, rootino);
+		guess_correct_sunit(mp);
 		rootino = mp->m_sb.sb_rootino;
 	}
 

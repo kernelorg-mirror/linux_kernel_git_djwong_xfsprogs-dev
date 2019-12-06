@@ -158,4 +158,6 @@
 #define xfs_buf_delwri_submit		libxfs_buf_delwri_submit
 #define xfs_ialloc_calc_rootino		libxfs_ialloc_calc_rootino
 
+#define xfs_sb_read_secondary		libxfs_sb_read_secondary
+
 #endif /* __LIBXFS_API_DEFS_H__ */
