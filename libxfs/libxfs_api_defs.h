@@ -175,4 +175,6 @@
 #define xfs_dir2_data_put_ftype		libxfs_dir2_data_put_ftype
 #define xfs_ialloc_calc_rootino		libxfs_ialloc_calc_rootino
 
+#define xfs_sb_read_secondary		libxfs_sb_read_secondary
+
 #endif /* __LIBXFS_API_DEFS_H__ */
