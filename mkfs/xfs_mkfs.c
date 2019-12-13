@@ -1251,6 +1251,14 @@ discard_blocks(dev_t dev, uint64_t nsectors, int quiet)
 	fd = libxfs_device_to_fd(dev);
 	if (fd <= 0)
 		return;
+
+	/*
+	 * Try discarding the first 64k; if that fails, don't bother printing
+	 * any messages at all.
+	 */
+	if (platform_discard_blocks(fd, offset, 65536))
+		return;
+
 	if (!quiet) {
 		printf("Discarding blocks...");
 		fflush(stdout);
@@ -1267,8 +1275,10 @@ discard_blocks(dev_t dev, uint64_t nsectors, int quiet)
 		 * not necessary for the mkfs functionality but just an
 		 * optimization. However we should stop on error.
 		 */
-		if (platform_discard_blocks(fd, offset, tmp_step))
+		if (platform_discard_blocks(fd, offset, tmp_step)) {
+			printf("\n");
 			return;
+		}
 
 		offset += tmp_step;
 	}
