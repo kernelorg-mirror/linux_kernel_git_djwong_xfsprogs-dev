@@ -1285,7 +1285,7 @@ dir_binval(
 	for_each_xfs_iext(ifp, &icur, &rec) {
 		for_each_xfs_bmap_dabno(geo, &rec, dabno) {
 			bp = NULL;
-			error = -libxfs_da_get_buf(tp, ip, dabno, -2, &bp,
+			error = -libxfs_da_get_buf(tp, ip, dabno, &bp,
 					whichfork);
 			if (error)
 				return error;
