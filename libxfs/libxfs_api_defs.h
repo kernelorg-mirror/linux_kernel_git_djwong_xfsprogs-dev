@@ -204,4 +204,11 @@
 #define xfs_rmap_ino_bmbt_owner		libxfs_rmap_ino_bmbt_owner
 #define xfs_bmbt_commit_staged_btree	libxfs_bmbt_commit_staged_btree
 
+typedef long long int time64_t;
+
+struct timespec64 {
+	time64_t	tv_sec;			/* seconds */
+	long		tv_nsec;		/* nanoseconds */
+};
+
 #endif /* __LIBXFS_API_DEFS_H__ */
