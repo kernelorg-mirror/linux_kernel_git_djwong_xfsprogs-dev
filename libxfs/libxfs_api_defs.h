@@ -173,4 +173,9 @@
 #define xfs_ag_init_headers		libxfs_ag_init_headers
 #define xfs_buf_delwri_submit		libxfs_buf_delwri_submit
 
+#define xfs_refcountbt_calc_reserves	libxfs_refcountbt_calc_reserves
+#define xfs_finobt_calc_reserves	libxfs_finobt_calc_reserves
+#define xfs_rmapbt_calc_reserves	libxfs_rmapbt_calc_reserves
+#define xfs_read_agf			libxfs_read_agf
+
 #endif /* __LIBXFS_API_DEFS_H__ */
