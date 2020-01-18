@@ -39,6 +39,7 @@
 #define xfs_trans_log_inode		libxfs_trans_log_inode
 #define xfs_trans_roll_inode		libxfs_trans_roll_inode
 #define xfs_trans_mod_sb		libxfs_trans_mod_sb
+#define xfs_buf_read			libxfs_buf_read
 #define xfs_trans_read_buf		libxfs_trans_read_buf
 #define xfs_trans_read_buf_map		libxfs_trans_read_buf_map
 #define xfs_trans_roll			libxfs_trans_roll
