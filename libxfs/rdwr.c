@@ -52,6 +52,10 @@
  * propagation of stale errors into future buffer operations.
  */
 
+static struct xfs_buf *libxfs_getbufr(struct xfs_buftarg *btp,
+		xfs_daddr_t daddr, int len);
+static void libxfs_putbufr(struct xfs_buf *bp);
+
 #define BDSTRAT_SIZE	(256 * 1024)
 
 #define IO_BCOMPARE_CHECK
@@ -666,7 +670,7 @@ __libxfs_getbufr(int blen)
 	return bp;
 }
 
-xfs_buf_t *
+static xfs_buf_t *
 libxfs_getbufr(struct xfs_buftarg *btp, xfs_daddr_t blkno, int bblen)
 {
 	xfs_buf_t	*bp;
@@ -1360,7 +1364,7 @@ libxfs_bflush(
 	return bp->b_error;
 }
 
-void
+static void
 libxfs_putbufr(xfs_buf_t *bp)
 {
 	if (bp->b_flags & LIBXFS_B_DIRTY)
