@@ -1091,9 +1091,10 @@ __write_buf(int fd, void *buf, int len, off64_t offset, int flags)
 }
 
 int
-libxfs_writebufr(xfs_buf_t *bp)
+libxfs_bwrite(
+	struct xfs_buf	*bp)
 {
-	int	fd = libxfs_device_to_fd(bp->b_target->dev);
+	int		fd = libxfs_device_to_fd(bp->b_target->dev);
 
 	/*
 	 * we never write buffers that are marked stale. This indicates they
@@ -1303,7 +1304,7 @@ libxfs_bflush(
 	struct xfs_buf		*bp = (struct xfs_buf *)node;
 
 	if (!bp->b_error && bp->b_flags & LIBXFS_B_DIRTY)
-		return libxfs_writebufr(bp);
+		return libxfs_bwrite(bp);
 	return bp->b_error;
 }
 
@@ -1311,7 +1312,7 @@ void
 libxfs_putbufr(xfs_buf_t *bp)
 {
 	if (bp->b_flags & LIBXFS_B_DIRTY)
-		libxfs_writebufr(bp);
+		libxfs_bwrite(bp);
 	libxfs_brelse((struct cache_node *)bp);
 }
 
@@ -1524,7 +1525,7 @@ xfs_buf_delwri_submit(
 
 	list_for_each_entry_safe(bp, n, buffer_list, b_list) {
 		list_del_init(&bp->b_list);
-		error2 = libxfs_writebufr(bp);
+		error2 = libxfs_bwrite(bp);
 		if (!error)
 			error = error2;
 		libxfs_buf_relse(bp);
