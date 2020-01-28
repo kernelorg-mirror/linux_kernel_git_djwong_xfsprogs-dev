@@ -438,7 +438,7 @@ rtmount_init(
 			(unsigned long long) mp->m_sb.sb_rblocks);
 		return -1;
 	}
-	bp = libxfs_readbuf(mp->m_rtdev,
+	bp = libxfs_buf_read(mp->m_rtdev,
 			d - XFS_FSB_TO_BB(mp, 1), XFS_FSB_TO_BB(mp, 1), 0, NULL);
 	if (bp == NULL) {
 		fprintf(stderr, _("%s: realtime size check failed\n"),
@@ -721,7 +721,7 @@ libxfs_mount(
 	if (!(flags & LIBXFS_MOUNT_DEBUGGER))
 		readflags |= LIBXFS_READBUF_FAIL_EXIT;
 
-	bp = libxfs_readbuf(mp->m_dev,
+	bp = libxfs_buf_read(mp->m_dev,
 			d - XFS_FSS_TO_BB(mp, 1), XFS_FSS_TO_BB(mp, 1),
 			readflags, NULL);
 	if (!bp) {
@@ -735,7 +735,7 @@ libxfs_mount(
 	    mp->m_logdev_targp->dev != mp->m_ddev_targp->dev) {
 		d = (xfs_daddr_t) XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
 		if ( (XFS_BB_TO_FSB(mp, d) != mp->m_sb.sb_logblocks) ||
-		     (!(bp = libxfs_readbuf(mp->m_logdev_targp,
+		     (!(bp = libxfs_buf_read(mp->m_logdev_targp,
 					d - XFS_FSB_TO_BB(mp, 1),
 					XFS_FSB_TO_BB(mp, 1),
 					readflags, NULL))) ) {
@@ -763,7 +763,7 @@ libxfs_mount(
 	 * read the first one and let the user know to check the geometry.
 	 */
 	if (sbp->sb_agcount > 1000000) {
-		bp = libxfs_readbuf(mp->m_dev,
+		bp = libxfs_buf_read(mp->m_dev,
 				XFS_AG_DADDR(mp, sbp->sb_agcount - 1, 0), 1,
 				readflags, NULL);
 		if (bp->b_error) {
