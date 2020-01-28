@@ -1263,7 +1263,7 @@ bad:
 		if (writebuf && !no_modify)
 			libxfs_writebuf(bp, 0);
 		else
-			libxfs_putbuf(bp);
+			libxfs_buf_relse(bp);
 	}
 	return 0;
 }
@@ -1325,7 +1325,7 @@ _("cannot read inode %" PRIu64 ", file block %d, disk block %" PRIu64 "\n"),
 			do_warn(
 _("Corrupt symlink remote block %" PRIu64 ", inode %" PRIu64 ".\n"),
 				fsbno, lino);
-			libxfs_putbuf(bp);
+			libxfs_buf_relse(bp);
 			return 1;
 		}
 		if (bp->b_error == -EFSBADCRC) {
@@ -1345,7 +1345,7 @@ _("Bad symlink buffer CRC, block %" PRIu64 ", inode %" PRIu64 ".\n"
 				do_warn(
 _("bad symlink header ino %" PRIu64 ", file block %d, disk block %" PRIu64 "\n"),
 					lino, i, fsbno);
-				libxfs_putbuf(bp);
+				libxfs_buf_relse(bp);
 				return 1;
 			}
 			src += sizeof(struct xfs_dsymlink_hdr);
@@ -1360,7 +1360,7 @@ _("bad symlink header ino %" PRIu64 ", file block %d, disk block %" PRIu64 "\n")
 		if (badcrc && !no_modify)
 			libxfs_writebuf(bp, 0);
 		else
-			libxfs_putbuf(bp);
+			libxfs_buf_relse(bp);
 	}
 	return 0;
 }

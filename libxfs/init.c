@@ -445,7 +445,7 @@ rtmount_init(
 			progname);
 		return -1;
 	}
-	libxfs_putbuf(bp);
+	libxfs_buf_relse(bp);
 	return 0;
 }
 
@@ -729,7 +729,7 @@ libxfs_mount(
 		if (!(flags & LIBXFS_MOUNT_DEBUGGER))
 			return NULL;
 	} else
-		libxfs_putbuf(bp);
+		libxfs_buf_relse(bp);
 
 	if (mp->m_logdev_targp->dev &&
 	    mp->m_logdev_targp->dev != mp->m_ddev_targp->dev) {
@@ -745,7 +745,7 @@ libxfs_mount(
 				return NULL;
 		}
 		if (bp)
-			libxfs_putbuf(bp);
+			libxfs_buf_relse(bp);
 	}
 
 	/* Initialize realtime fields in the mount structure */
@@ -775,7 +775,7 @@ libxfs_mount(
 								progname);
 			sbp->sb_agcount = 1;
 		}
-		libxfs_putbuf(bp);
+		libxfs_buf_relse(bp);
 	}
 
 	error = libxfs_initialize_perag(mp, sbp->sb_agcount, &mp->m_maxagi);

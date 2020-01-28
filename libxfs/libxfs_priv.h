@@ -381,7 +381,6 @@ xfs_buf_incore(
 }
 
 #define xfs_buf_ioerror_alert(bp, a)	((void) 0)
-#define xfs_buf_relse(bp)		libxfs_putbuf(bp)
 #define xfs_buf_get(devp,blkno,len)	(libxfs_getbuf((devp), (blkno), (len)))
 #define xfs_buf_read			libxfs_readbuf
 #define xfs_bwrite(bp)			libxfs_writebuf((bp), 0)
