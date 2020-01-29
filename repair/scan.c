@@ -66,11 +66,13 @@ scan_sbtree(
 	void		*priv,
 	const struct xfs_buf_ops *ops)
 {
-	xfs_buf_t	*bp;
+	struct xfs_buf	*bp;
+	int		error;
 
-	bp = libxfs_buf_read(mp->m_dev, XFS_AGB_TO_DADDR(mp, agno, root),
-			XFS_FSB_TO_BB(mp, 1), 0, ops);
-	if (!bp) {
+	error = -libxfs_buf_read(mp->m_dev, XFS_AGB_TO_DADDR(mp, agno, root),
+			XFS_FSB_TO_BB(mp, 1), LIBXFS_READBUF_SALVAGE, &bp,
+			ops);
+	if (error) {
 		do_error(_("can't read btree block %d/%d\n"), agno, root);
 		return;
 	}
@@ -123,9 +125,10 @@ scan_lbtree(
 	int		dirty = 0;
 	bool		badcrc = false;
 
-	bp = libxfs_buf_read(mp->m_dev, XFS_FSB_TO_DADDR(mp, root),
-		      XFS_FSB_TO_BB(mp, 1), 0, ops);
-	if (!bp)  {
+	err = -libxfs_buf_read(mp->m_dev, XFS_FSB_TO_DADDR(mp, root),
+			XFS_FSB_TO_BB(mp, 1), LIBXFS_READBUF_SALVAGE, &bp,
+			ops);
+	if (err) {
 		do_error(_("can't read btree block %d/%d\n"),
 			XFS_FSB_TO_AGNO(mp, root),
 			XFS_FSB_TO_AGBNO(mp, root));
@@ -2102,6 +2105,7 @@ scan_freelist(
 	xfs_buf_t		*agflbuf;
 	xfs_agnumber_t		agno;
 	struct agfl_state	state;
+	int			error;
 
 	agno = be32_to_cpu(agf->agf_seqno);
 
@@ -2113,10 +2117,11 @@ scan_freelist(
 	if (be32_to_cpu(agf->agf_flcount) == 0)
 		return;
 
-	agflbuf = libxfs_buf_read(mp->m_dev,
-				 XFS_AG_DADDR(mp, agno, XFS_AGFL_DADDR(mp)),
-				 XFS_FSS_TO_BB(mp, 1), 0, &xfs_agfl_buf_ops);
-	if (!agflbuf)  {
+	error = -libxfs_buf_read(mp->m_dev,
+			XFS_AG_DADDR(mp, agno, XFS_AGFL_DADDR(mp)),
+			XFS_FSS_TO_BB(mp, 1), LIBXFS_READBUF_SALVAGE, &agflbuf,
+			&xfs_agfl_buf_ops);
+	if (error) {
 		do_abort(_("can't read agfl block for ag %d\n"), agno);
 		return;
 	}
@@ -2330,6 +2335,7 @@ scan_ag(
 	int		sb_dirty = 0;
 	int		status;
 	char		*objname = NULL;
+	int		error;
 
 	sb = (struct xfs_sb *)calloc(BBTOB(XFS_FSS_TO_BB(mp, 1)), 1);
 	if (!sb) {
@@ -2337,27 +2343,31 @@ scan_ag(
 		return;
 	}
 
-	sbbuf = libxfs_buf_read(mp->m_dev, XFS_AG_DADDR(mp, agno, XFS_SB_DADDR),
-				XFS_FSS_TO_BB(mp, 1), 0, &xfs_sb_buf_ops);
-	if (!sbbuf)  {
+	error = -libxfs_buf_read(mp->m_dev,
+			XFS_AG_DADDR(mp, agno, XFS_SB_DADDR),
+			XFS_FSS_TO_BB(mp, 1), LIBXFS_READBUF_SALVAGE, &sbbuf,
+			&xfs_sb_buf_ops);
+	if (error) {
 		objname = _("root superblock");
 		goto out_free_sb;
 	}
 	libxfs_sb_from_disk(sb, XFS_BUF_TO_SBP(sbbuf));
 
-	agfbuf = libxfs_buf_read(mp->m_dev,
+	error = -libxfs_buf_read(mp->m_dev,
 			XFS_AG_DADDR(mp, agno, XFS_AGF_DADDR(mp)),
-			XFS_FSS_TO_BB(mp, 1), 0, &xfs_agf_buf_ops);
-	if (!agfbuf)  {
+			XFS_FSS_TO_BB(mp, 1), LIBXFS_READBUF_SALVAGE, &agfbuf,
+			&xfs_agf_buf_ops);
+	if (error) {
 		objname = _("agf block");
 		goto out_free_sbbuf;
 	}
 	agf = XFS_BUF_TO_AGF(agfbuf);
 
-	agibuf = libxfs_buf_read(mp->m_dev,
+	error = -libxfs_buf_read(mp->m_dev,
 			XFS_AG_DADDR(mp, agno, XFS_AGI_DADDR(mp)),
-			XFS_FSS_TO_BB(mp, 1), 0, &xfs_agi_buf_ops);
-	if (!agibuf)  {
+			XFS_FSS_TO_BB(mp, 1), LIBXFS_READBUF_SALVAGE, &agibuf,
+			&xfs_agi_buf_ops);
+	if (error) {
 		objname = _("agi block");
 		goto out_free_agfbuf;
 	}
