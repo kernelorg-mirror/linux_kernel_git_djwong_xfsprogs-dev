@@ -184,6 +184,7 @@ main(
 	char	*input;
 	char	**v;
 	int	start_iocur_sp;
+	int	d, l, r;
 
 	init(argc, argv);
 	start_iocur_sp = iocur_sp;
@@ -216,6 +217,19 @@ close_devices:
 	 */
 	while (iocur_sp > start_iocur_sp)
 		pop_cur();
+
+	libxfs_flush_devices(mp, &d, &l, &r);
+	if (d)
+		fprintf(stderr, _("%s: cannot flush data device (%d).\n"),
+				progname, d);
+	if (l)
+		fprintf(stderr, _("%s: cannot flush log device (%d).\n"),
+				progname, l);
+	if (r)
+		fprintf(stderr, _("%s: cannot flush realtime device (%d).\n"),
+				progname, r);
+
+
 	libxfs_umount(mp);
 	if (x.ddev)
 		libxfs_device_close(x.ddev);

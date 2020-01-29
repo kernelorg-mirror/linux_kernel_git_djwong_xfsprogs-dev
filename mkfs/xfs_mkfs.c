@@ -3644,6 +3644,7 @@ main(
 	char			*protofile = NULL;
 	char			*protostring = NULL;
 	int			worst_freelist = 0;
+	int			d, l, r;
 
 	struct libxfs_xinit	xi = {
 		.isdirect = LIBXFS_DIRECT,
@@ -3939,6 +3940,20 @@ main(
 		exit(1);
 	(XFS_BUF_TO_SBP(buf))->sb_inprogress = 0;
 	libxfs_writebuf(buf, LIBXFS_EXIT_ON_FAILURE);
+
+	/* Make sure our new fs made it to stable storage. */
+	libxfs_flush_devices(mp, &d, &l, &r);
+	if (d)
+		fprintf(stderr, _("%s: cannot flush data device (%d).\n"),
+				progname, d);
+	if (l)
+		fprintf(stderr, _("%s: cannot flush log device (%d).\n"),
+				progname, l);
+	if (r)
+		fprintf(stderr, _("%s: cannot flush realtime device (%d).\n"),
+				progname, r);
+	if (d || l || r)
+		return 1;
 
 	libxfs_umount(mp);
 	if (xi.rtdev)

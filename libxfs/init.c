@@ -569,6 +569,8 @@ libxfs_buftarg_alloc(
 	}
 	btp->bt_mount = mp;
 	btp->dev = dev;
+	btp->lost_writes = false;
+
 	return btp;
 }
 
@@ -789,6 +791,47 @@ libxfs_rtmount_destroy(xfs_mount_t *mp)
 	if (mp->m_rbmip)
 		libxfs_irele(mp->m_rbmip);
 	mp->m_rsumip = mp->m_rbmip = NULL;
+}
+
+static inline int
+libxfs_flush_buftarg(
+	struct xfs_buftarg	*btp)
+{
+	if (btp->lost_writes)
+		return -ENOTRECOVERABLE;
+
+	return libxfs_blkdev_issue_flush(btp);
+}
+
+/*
+ * Purge the buffer cache to write all dirty buffers to disk and free all
+ * incore buffers.  Buffers that cannot be written will cause the lost_writes
+ * flag to be set in the buftarg.  If there were no lost writes, flush the
+ * device to make sure the writes made it to stable storage.
+ *
+ * For each device, the return code will be set to -ENOTRECOVERABLE if we
+ * couldn't write something to disk; or the results of the block device flush
+ * operation.
+ */
+void
+libxfs_flush_devices(
+	struct xfs_mount	*mp,
+	int			*datadev,
+	int			*logdev,
+	int			*rtdev)
+{
+	*datadev = *logdev = *rtdev = 0;
+
+	libxfs_bcache_purge();
+
+	if (mp->m_ddev_targp)
+		*datadev = libxfs_flush_buftarg(mp->m_ddev_targp);
+
+	if (mp->m_logdev_targp && mp->m_logdev_targp != mp->m_ddev_targp)
+		*logdev = libxfs_flush_buftarg(mp->m_logdev_targp);
+
+	if (mp->m_rtdev_targp)
+		*rtdev = libxfs_flush_buftarg(mp->m_rtdev_targp);
 }
 
 /*
