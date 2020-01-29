@@ -690,6 +690,36 @@ check_fs_vs_host_sectsize(
 	}
 }
 
+/* Flush the devices and complain if anything bad happened. */
+static bool
+check_write_failed(
+	struct xfs_mount	*mp)
+{
+	int			d, l, r;
+
+	libxfs_flush_devices(mp, &d, &l, &r);
+
+	if (d == -ENOTRECOVERABLE)
+		do_warn(_("Lost writes to data device, please re-run.\n"));
+	else if (d)
+		do_warn(_("Error %d flushing data device, please re-run.\n"),
+				-d);
+
+	if (l == -ENOTRECOVERABLE)
+		do_warn(_("Lost writes to log device, please re-run.\n"));
+	else if (l)
+		do_warn(_("Error %d flushing log device, please re-run.\n"),
+				-l);
+
+	if (r == -ENOTRECOVERABLE)
+		do_warn(_("Lost writes to realtime device, please re-run.\n"));
+	else if (r)
+		do_warn(_("Error %d flushing realtime device, please re-run.\n"),
+				-r);
+
+	return d || l || r;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -703,6 +733,7 @@ main(int argc, char **argv)
 	struct xfs_sb	psb;
 	int		rval;
 	struct xfs_ino_geometry	*igeo;
+	bool		writes_failed;
 
 	progname = basename(argv[0]);
 	setlocale(LC_ALL, "");
@@ -1106,6 +1137,8 @@ _("Note - stripe unit (%d) and width (%d) were copied from a backup superblock.\
 	format_log_max_lsn(mp);
 	libxfs_umount(mp);
 
+	writes_failed = check_write_failed(mp);
+
 	if (x.rtdev)
 		libxfs_device_close(x.rtdev);
 	if (x.logdev && x.logdev != x.ddev)
@@ -1125,6 +1158,8 @@ _("Repair of readonly mount complete.  Immediate reboot encouraged.\n"));
 
 	free(msgbuf);
 
+	if (writes_failed)
+		return 1;
 	if (fs_is_dirty && report_corrected)
 		return (4);
 	return (0);

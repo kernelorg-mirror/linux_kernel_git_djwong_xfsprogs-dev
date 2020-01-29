@@ -17,6 +17,7 @@
 #include "xfs_inode_fork.h"
 #include "xfs_inode.h"
 #include "xfs_trans.h"
+#include "libfrog/platform.h"
 
 #include "libxfs.h"		/* for LIBXFS_EXIT_ON_FAILURE */
 
@@ -1227,9 +1228,11 @@ libxfs_brelse(
 
 	if (!bp)
 		return;
-	if (bp->b_flags & LIBXFS_B_DIRTY)
+	if (bp->b_flags & LIBXFS_B_DIRTY) {
 		fprintf(stderr,
 			"releasing dirty buffer to free list!\n");
+		bp->b_target->lost_writes = true;
+	}
 
 	pthread_mutex_lock(&xfs_buf_freelist.cm_mutex);
 	list_add(&bp->b_node.cn_mru, &xfs_buf_freelist.cm_list);
@@ -1248,9 +1251,11 @@ libxfs_bulkrelse(
 		return 0 ;
 
 	list_for_each_entry(bp, list, b_node.cn_mru) {
-		if (bp->b_flags & LIBXFS_B_DIRTY)
+		if (bp->b_flags & LIBXFS_B_DIRTY) {
 			fprintf(stderr,
 				"releasing dirty buffer (bulk) to free list!\n");
+			bp->b_target->lost_writes = true;
+		}
 		count++;
 	}
 
@@ -1477,6 +1482,24 @@ libxfs_irele(
 	ASSERT(ip->i_itemp == NULL);
 	libxfs_idestroy(ip);
 	kmem_cache_free(xfs_inode_zone, ip);
+}
+
+/*
+ * Flush everything dirty in the kernel and disk write caches to stable media.
+ * Returns 0 for success or a negative error code.
+ */
+int
+libxfs_blkdev_issue_flush(
+	struct xfs_buftarg	*btp)
+{
+	int			fd, ret;
+
+	if (btp->dev == 0)
+		return 0;
+
+	fd = libxfs_device_to_fd(btp->dev);
+	ret = platform_flush_device(fd, btp->dev);
+	return ret ? -errno : 0;
 }
 
 /*
