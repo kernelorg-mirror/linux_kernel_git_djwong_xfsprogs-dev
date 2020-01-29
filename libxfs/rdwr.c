@@ -387,14 +387,14 @@ libxfs_log_header(
 
 #undef libxfs_buf_read_map
 #undef libxfs_writebuf
-#undef libxfs_getbuf_map
+#undef libxfs_buf_get_map
 
 xfs_buf_t	*libxfs_buf_read_map(struct xfs_buftarg *, struct xfs_buf_map *,
 				int, int, const struct xfs_buf_ops *);
 int		libxfs_writebuf(xfs_buf_t *, int);
 struct xfs_buf *libxfs_buf_get(struct xfs_buftarg *btp, xfs_daddr_t daddr,
 				size_t len);
-xfs_buf_t	*libxfs_getbuf_map(struct xfs_buftarg *, struct xfs_buf_map *,
+xfs_buf_t	*libxfs_buf_get_map(struct xfs_buftarg *, struct xfs_buf_map *,
 				int, int);
 void		libxfs_buf_relse(struct xfs_buf *);
 
@@ -450,7 +450,7 @@ libxfs_trace_getbuf(
 	struct xfs_buf		*bp;
 	DEFINE_SINGLE_BUF_MAP(map, blkno, numblks);
 
-	bp = libxfs_getbuf_map(target, &map, 1, 0);
+	bp = libxfs_buf_get_map(target, &map, 1, 0);
 	__add_trace(bp, func, file, line);
 	return bp;
 }
@@ -460,7 +460,7 @@ libxfs_trace_getbuf_map(const char *func, const char *file, int line,
 		struct xfs_buftarg *btp, struct xfs_buf_map *map, int nmaps,
 		int flags)
 {
-	xfs_buf_t	*bp = libxfs_getbuf_map(btp, map, nmaps, flags);
+	xfs_buf_t	*bp = libxfs_buf_get_map(btp, map, nmaps, flags);
 	__add_trace(bp, func, file, line);
 	return bp;
 }
@@ -805,7 +805,7 @@ reset_buf_state(
 }
 
 static struct xfs_buf *
-__libxfs_getbuf_map(struct xfs_buftarg *btp, struct xfs_buf_map *map,
+__libxfs_buf_get_map(struct xfs_buftarg *btp, struct xfs_buf_map *map,
 		    int nmaps, int flags)
 {
 	struct xfs_bufkey key = {NULL};
@@ -827,12 +827,12 @@ __libxfs_getbuf_map(struct xfs_buftarg *btp, struct xfs_buf_map *map,
 }
 
 struct xfs_buf *
-libxfs_getbuf_map(struct xfs_buftarg *btp, struct xfs_buf_map *map,
+libxfs_buf_get_map(struct xfs_buftarg *btp, struct xfs_buf_map *map,
 		  int nmaps, int flags)
 {
 	struct xfs_buf	*bp;
 
-	bp = __libxfs_getbuf_map(btp, map, nmaps, flags);
+	bp = __libxfs_buf_get_map(btp, map, nmaps, flags);
 	reset_buf_state(bp);
 	return bp;
 }
@@ -1036,7 +1036,7 @@ libxfs_buf_read_map(struct xfs_buftarg *btp, struct xfs_buf_map *map, int nmaps,
 		return libxfs_readbuf(btp, map[0].bm_bn, map[0].bm_len,
 					flags, ops);
 
-	bp = __libxfs_getbuf_map(btp, map, nmaps, 0);
+	bp = __libxfs_buf_get_map(btp, map, nmaps, 0);
 	if (!bp)
 		return NULL;
 
