@@ -124,6 +124,9 @@ extern struct cache_operations	libxfs_bcache_operations;
 
 #define LIBXFS_GETBUF_TRYLOCK	(1 << 0)
 
+/* Exit on buffer read error */
+#define LIBXFS_READBUF_FAIL_EXIT	(1 << 0)
+
 #ifdef XFS_BUF_TRACING
 
 #define libxfs_readbuf(dev, daddr, len, flags, ops) \
