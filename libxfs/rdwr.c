@@ -911,13 +911,13 @@ __read_buf(int fd, void *buf, int len, off64_t offset, int flags)
 		int error = errno;
 		fprintf(stderr, _("%s: read failed: %s\n"),
 			progname, strerror(error));
-		if (flags & LIBXFS_EXIT_ON_FAILURE)
+		if (flags & LIBXFS_READBUF_FAIL_EXIT)
 			exit(1);
 		return -error;
 	} else if (sts != len) {
 		fprintf(stderr, _("%s: error - read only %d of %d bytes\n"),
 			progname, sts, len);
-		if (flags & LIBXFS_EXIT_ON_FAILURE)
+		if (flags & LIBXFS_READBUF_FAIL_EXIT)
 			exit(1);
 		return -EIO;
 	}
