@@ -425,11 +425,16 @@ libxfs_trace_readbuf(
 	return bp;
 }
 
-int
-libxfs_trace_writebuf(const char *func, const char *file, int line, xfs_buf_t *bp, int flags)
+void
+libxfs_trace_dirtybuf(
+	const char		*func,
+	const char		*file,
+	int			line,
+	struct xfs_buf		*bp,
+	int			flags)
 {
 	__add_trace(bp, func, file, line);
-	return libxfs_writebuf(bp, flags);
+	libxfs_buf_dirty(bp, flags);
 }
 
 struct xfs_buf *
@@ -1233,8 +1238,12 @@ libxfs_writebuf_int(xfs_buf_t *bp, int flags)
 	return 0;
 }
 
-int
-libxfs_writebuf(
+/*
+ * Mark a buffer dirty.  The dirty data will be written out when the cache
+ * is flushed (or at release time if the buffer is uncached).
+ */
+void
+libxfs_buf_dirty(
 	struct xfs_buf	*bp,
 	int		flags)
 {
@@ -1256,8 +1265,6 @@ libxfs_writebuf(
 	bp->b_error = 0;
 	bp->b_flags &= ~LIBXFS_B_STALE;
 	bp->b_flags |= bflags;
-	libxfs_buf_relse(bp);
-	return 0;
 }
 
 void

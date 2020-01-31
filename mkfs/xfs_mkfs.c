@@ -3462,7 +3462,8 @@ prepare_devices(
 	buf = get_write_buf(mp->m_ddev_targp, (xi->dsize - whack_blks),
 			whack_blks);
 	memset(buf->b_addr, 0, WHACK_SIZE);
-	libxfs_writebuf(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_dirty(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_relse(buf);
 
 	/*
 	 * Now zero out the beginning of the device, to obliterate any old
@@ -3472,7 +3473,8 @@ prepare_devices(
 	 */
 	buf = get_write_buf(mp->m_ddev_targp, 0, whack_blks);
 	memset(buf->b_addr, 0, WHACK_SIZE);
-	libxfs_writebuf(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_dirty(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_relse(buf);
 
 	/* OK, now write the superblock... */
 	buf = get_write_buf(mp->m_ddev_targp, XFS_SB_DADDR,
@@ -3480,7 +3482,8 @@ prepare_devices(
 	buf->b_ops = &xfs_sb_buf_ops;
 	memset(buf->b_addr, 0, cfg->sectorsize);
 	libxfs_sb_to_disk(buf->b_addr, sbp);
-	libxfs_writebuf(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_dirty(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_relse(buf);
 
 	/* ...and zero the log.... */
 	lsunit = sbp->sb_logsunit;
@@ -3499,7 +3502,8 @@ prepare_devices(
 				XFS_FSB_TO_BB(mp, cfg->rtblocks - 1LL),
 				BTOBB(cfg->blocksize));
 		memset(buf->b_addr, 0, cfg->blocksize);
-		libxfs_writebuf(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+		libxfs_buf_dirty(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+		libxfs_buf_relse(buf);
 	}
 
 }
@@ -3591,7 +3595,8 @@ rewrite_secondary_superblocks(
 			XFS_FSS_TO_BB(mp, 1),
 			LIBXFS_READBUF_FAIL_EXIT, &xfs_sb_buf_ops);
 	XFS_BUF_TO_SBP(buf)->sb_rootino = cpu_to_be64(mp->m_sb.sb_rootino);
-	libxfs_writebuf(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_dirty(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_relse(buf);
 
 	/* and one in the middle for luck if there's enough AGs for that */
 	if (mp->m_sb.sb_agcount <= 2)
@@ -3603,7 +3608,8 @@ rewrite_secondary_superblocks(
 			XFS_FSS_TO_BB(mp, 1),
 			LIBXFS_READBUF_FAIL_EXIT, &xfs_sb_buf_ops);
 	XFS_BUF_TO_SBP(buf)->sb_rootino = cpu_to_be64(mp->m_sb.sb_rootino);
-	libxfs_writebuf(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_dirty(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_relse(buf);
 }
 
 static void
@@ -3951,7 +3957,8 @@ main(
 	if (!buf || buf->b_error)
 		exit(1);
 	(XFS_BUF_TO_SBP(buf))->sb_inprogress = 0;
-	libxfs_writebuf(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_dirty(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
+	libxfs_buf_relse(buf);
 
 	/* Make sure our new fs made it to stable storage. */
 	libxfs_flush_devices(mp, &d, &l, &r);

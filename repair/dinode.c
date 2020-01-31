@@ -1260,8 +1260,10 @@ bad:
 			}
 		}
 
-		if (writebuf && !no_modify)
-			libxfs_writebuf(bp, 0);
+		if (writebuf && !no_modify) {
+			libxfs_buf_dirty(bp, 0);
+			libxfs_buf_relse(bp);
+		}
 		else
 			libxfs_buf_relse(bp);
 	}
@@ -1357,8 +1359,10 @@ _("bad symlink header ino %" PRIu64 ", file block %d, disk block %" PRIu64 "\n")
 		offset += byte_cnt;
 		i++;
 
-		if (badcrc && !no_modify)
-			libxfs_writebuf(bp, 0);
+		if (badcrc && !no_modify) {
+			libxfs_buf_dirty(bp, 0);
+			libxfs_buf_relse(bp);
+		}
 		else
 			libxfs_buf_relse(bp);
 	}
