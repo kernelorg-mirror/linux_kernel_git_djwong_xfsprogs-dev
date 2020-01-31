@@ -1177,21 +1177,28 @@ libxfs_writebuf_int(xfs_buf_t *bp, int flags)
 }
 
 int
-libxfs_writebuf(xfs_buf_t *bp, int flags)
+libxfs_writebuf(
+	struct xfs_buf	*bp,
+	int		flags)
 {
+	int		bflags = LIBXFS_B_DIRTY;
+
 #ifdef IO_DEBUG
 	printf("%lx: %s: dirty blkno=%llu(%llu)\n",
 			pthread_self(), __FUNCTION__,
 			(long long)LIBXFS_BBTOOFF64(bp->b_bn),
 			(long long)bp->b_bn);
 #endif
+	if (flags & LIBXFS_WRITEBUF_FAIL_EXIT)
+		bflags |= LIBXFS_B_EXIT;
+
 	/*
 	 * Clear any error hanging over from reading the buffer. This prevents
 	 * subsequent reads after this write from seeing stale errors.
 	 */
 	bp->b_error = 0;
 	bp->b_flags &= ~LIBXFS_B_STALE;
-	bp->b_flags |= (LIBXFS_B_DIRTY | flags);
+	bp->b_flags |= bflags;
 	libxfs_putbuf(bp);
 	return 0;
 }
