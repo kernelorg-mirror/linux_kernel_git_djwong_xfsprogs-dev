@@ -3595,11 +3595,11 @@ rewrite_secondary_superblocks(
 	struct xfs_buf		*buf;
 
 	/* rewrite the last superblock */
-	buf = libxfs_buf_read(mp->m_dev,
+	libxfs_buf_read(mp->m_dev,
 			XFS_AGB_TO_DADDR(mp, mp->m_sb.sb_agcount - 1,
 				XFS_SB_DADDR),
 			XFS_FSS_TO_BB(mp, 1),
-			LIBXFS_READBUF_FAIL_EXIT, &xfs_sb_buf_ops);
+			LIBXFS_READBUF_FAIL_EXIT, &buf, &xfs_sb_buf_ops);
 	XFS_BUF_TO_SBP(buf)->sb_rootino = cpu_to_be64(mp->m_sb.sb_rootino);
 	libxfs_buf_dirty(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
 	libxfs_buf_relse(buf);
@@ -3608,11 +3608,11 @@ rewrite_secondary_superblocks(
 	if (mp->m_sb.sb_agcount <= 2)
 		return;
 
-	buf = libxfs_buf_read(mp->m_dev,
+	libxfs_buf_read(mp->m_dev,
 			XFS_AGB_TO_DADDR(mp, (mp->m_sb.sb_agcount - 1) / 2,
 				XFS_SB_DADDR),
 			XFS_FSS_TO_BB(mp, 1),
-			LIBXFS_READBUF_FAIL_EXIT, &xfs_sb_buf_ops);
+			LIBXFS_READBUF_FAIL_EXIT, &buf, &xfs_sb_buf_ops);
 	XFS_BUF_TO_SBP(buf)->sb_rootino = cpu_to_be64(mp->m_sb.sb_rootino);
 	libxfs_buf_dirty(buf, LIBXFS_WRITEBUF_FAIL_EXIT);
 	libxfs_buf_relse(buf);
