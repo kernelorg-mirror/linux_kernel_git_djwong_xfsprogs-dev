@@ -640,6 +640,7 @@ libxfs_mount(
 	xfs_buf_t	*bp;
 	xfs_sb_t	*sbp;
 	int		error;
+	int		readflags = 0;
 
 	libxfs_buftarg_init(mp, dev, logdev, rtdev);
 
@@ -716,9 +717,13 @@ libxfs_mount(
 	if (dev == 0)	/* maxtrres, we have no device so leave now */
 		return mp;
 
+	/* device size checks must pass unless we're a debugger. */
+	if (!(flags & LIBXFS_MOUNT_DEBUGGER))
+		readflags |= LIBXFS_READBUF_FAIL_EXIT;
+
 	bp = libxfs_readbuf(mp->m_dev,
 			d - XFS_FSS_TO_BB(mp, 1), XFS_FSS_TO_BB(mp, 1),
-			!(flags & LIBXFS_MOUNT_DEBUGGER), NULL);
+			readflags, NULL);
 	if (!bp) {
 		fprintf(stderr, _("%s: data size check failed\n"), progname);
 		if (!(flags & LIBXFS_MOUNT_DEBUGGER))
@@ -733,7 +738,7 @@ libxfs_mount(
 		     (!(bp = libxfs_readbuf(mp->m_logdev_targp,
 					d - XFS_FSB_TO_BB(mp, 1),
 					XFS_FSB_TO_BB(mp, 1),
-					!(flags & LIBXFS_MOUNT_DEBUGGER), NULL))) ) {
+					readflags, NULL))) ) {
 			fprintf(stderr, _("%s: log size checks failed\n"),
 					progname);
 			if (!(flags & LIBXFS_MOUNT_DEBUGGER))
@@ -760,7 +765,7 @@ libxfs_mount(
 	if (sbp->sb_agcount > 1000000) {
 		bp = libxfs_readbuf(mp->m_dev,
 				XFS_AG_DADDR(mp, sbp->sb_agcount - 1, 0), 1,
-				!(flags & LIBXFS_MOUNT_DEBUGGER), NULL);
+				readflags, NULL);
 		if (bp->b_error) {
 			fprintf(stderr, _("%s: read of AG %u failed\n"),
 						progname, sbp->sb_agcount);

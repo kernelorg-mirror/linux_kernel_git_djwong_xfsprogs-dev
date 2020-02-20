@@ -3577,7 +3577,7 @@ rewrite_secondary_superblocks(
 			XFS_AGB_TO_DADDR(mp, mp->m_sb.sb_agcount - 1,
 				XFS_SB_DADDR),
 			XFS_FSS_TO_BB(mp, 1),
-			LIBXFS_EXIT_ON_FAILURE, &xfs_sb_buf_ops);
+			LIBXFS_READBUF_FAIL_EXIT, &xfs_sb_buf_ops);
 	XFS_BUF_TO_SBP(buf)->sb_rootino = cpu_to_be64(mp->m_sb.sb_rootino);
 	libxfs_writebuf(buf, LIBXFS_EXIT_ON_FAILURE);
 
@@ -3589,7 +3589,7 @@ rewrite_secondary_superblocks(
 			XFS_AGB_TO_DADDR(mp, (mp->m_sb.sb_agcount - 1) / 2,
 				XFS_SB_DADDR),
 			XFS_FSS_TO_BB(mp, 1),
-			LIBXFS_EXIT_ON_FAILURE, &xfs_sb_buf_ops);
+			LIBXFS_READBUF_FAIL_EXIT, &xfs_sb_buf_ops);
 	XFS_BUF_TO_SBP(buf)->sb_rootino = cpu_to_be64(mp->m_sb.sb_rootino);
 	libxfs_writebuf(buf, LIBXFS_EXIT_ON_FAILURE);
 }
