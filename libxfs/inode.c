@@ -29,6 +29,23 @@
 #include "xfs_da_btree.h"
 #include "xfs_dir2_priv.h"
 
+/* Propagate extended inode properties into the new child. */
+static void
+xfs_ialloc_fsx_init(
+	struct xfs_trans		**tpp,
+	struct xfs_inode		*ip,
+	const struct fsxattr		*fsx)
+{
+	ip->i_d.di_extsize = fsx->fsx_extsize;
+	ip->i_d.di_flags = xfs_flags2diflags(ip, fsx->fsx_xflags);
+
+	if (xfs_sb_version_has_v3inode(&ip->i_mount->m_sb)) {
+		ip->i_d.di_flags2 = xfs_flags2diflags2(ip, fsx->fsx_xflags);
+		ip->i_d.di_cowextsize = fsx->fsx_cowextsize;
+	}
+	xfs_trans_log_inode(*tpp, ip, XFS_ILOG_CORE);
+}
+
 /*
  * Allocate an inode on disk and return a copy of its in-core version.
  * Set mode, nlink, and rdev appropriately within the inode.
@@ -40,26 +57,22 @@
  */
 int
 libxfs_ialloc(
-	struct xfs_trans	*tp,
-	struct xfs_inode	*pip,
-	mode_t			mode,
-	nlink_t			nlink,
-	xfs_dev_t		rdev,
-	struct cred		*cr,
-	struct fsxattr		*fsx,
-	struct xfs_buf		**ialloc_context,
-	struct xfs_inode	**ipp)
+	struct xfs_trans		*tp,
+	const struct xfs_ialloc_args	*args,
+	struct xfs_buf			**ialloc_context,
+	struct xfs_inode		**ipp)
 {
-	struct xfs_inode	*ip;
-	xfs_ino_t		ino;
-	uint			flags;
-	int			error;
+	struct xfs_inode		*ip;
+	struct xfs_inode		*pip = args->pip;
+	xfs_ino_t			ino;
+	uint				flags;
+	int				error;
 
 	/*
 	 * Call the space management code to pick
 	 * the on-disk inode to be allocated.
 	 */
-	error = xfs_dialloc(tp, pip ? pip->i_ino : 0, mode,
+	error = xfs_dialloc(tp, pip ? pip->i_ino : 0, args->mode,
 			    ialloc_context, &ino);
 	if (error != 0)
 		return error;
@@ -75,58 +88,54 @@ libxfs_ialloc(
 		return error;
 	ASSERT(ip != NULL);
 
-	VFS_I(ip)->i_mode = mode;
-	set_nlink(VFS_I(ip), nlink);
-	i_uid_write(VFS_I(ip), cr->cr_uid);
-	i_gid_write(VFS_I(ip), cr->cr_gid);
-	ip->i_d.di_projid = pip ? 0 : fsx->fsx_projid;
+	VFS_I(ip)->i_mode = args->mode;
+	set_nlink(VFS_I(ip), args->nlink);
+	VFS_I(ip)->i_uid = args->uid;
+	ip->i_d.di_projid = args->prid;
 	xfs_trans_ichgtime(tp, ip, XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD);
 
 	if (pip && (VFS_I(pip)->i_mode & S_ISGID)) {
 		VFS_I(ip)->i_gid = VFS_I(pip)->i_gid;
-		if ((VFS_I(pip)->i_mode & S_ISGID) && (mode & S_IFMT) == S_IFDIR)
+		if ((VFS_I(pip)->i_mode & S_ISGID) && S_ISDIR(args->mode))
 			VFS_I(ip)->i_mode |= S_ISGID;
-	}
+	} else
+		VFS_I(ip)->i_gid = args->gid;
 
 	ip->i_d.di_size = 0;
 	ip->i_d.di_nextents = 0;
 	ASSERT(ip->i_d.di_nblocks == 0);
-	ip->i_d.di_extsize = pip ? 0 : fsx->fsx_extsize;
+	ip->i_d.di_extsize = 0;
 	ip->i_d.di_dmevmask = 0;
 	ip->i_d.di_dmstate = 0;
-	ip->i_d.di_flags = pip ? 0 : xfs_flags2diflags(ip, fsx->fsx_xflags);
+	ip->i_d.di_flags = 0;
 
 	if (xfs_sb_version_has_v3inode(&ip->i_mount->m_sb)) {
 		ASSERT(ip->i_d.di_ino == ino);
 		ASSERT(uuid_equal(&ip->i_d.di_uuid, &mp->m_sb.sb_meta_uuid));
 		VFS_I(ip)->i_version = 1;
-		ip->i_d.di_flags2 = pip ? 0 : xfs_flags2diflags2(ip,
-				fsx->fsx_xflags);
+		ip->i_d.di_flags2 = 0;
 		if (xfs_sb_version_hasbigtime(&ip->i_mount->m_sb))
 			ip->i_d.di_flags2 |= XFS_DIFLAG2_BIGTIME;
 		ip->i_d.di_crtime = VFS_I(ip)->i_mtime;
-		ip->i_d.di_cowextsize = pip ? 0 : fsx->fsx_cowextsize;
+		ip->i_d.di_cowextsize = 0;
 	}
 
 	flags = XFS_ILOG_CORE;
-	switch (mode & S_IFMT) {
+	switch (args->mode & S_IFMT) {
 	case S_IFIFO:
 	case S_IFSOCK:
-		/* doesn't make sense to set an rdev for these */
-		rdev = 0;
-		/* FALLTHROUGH */
 	case S_IFCHR:
 	case S_IFBLK:
 		ip->i_d.di_format = XFS_DINODE_FMT_DEV;
 		flags |= XFS_ILOG_DEV;
-		VFS_I(ip)->i_rdev = rdev;
+		VFS_I(ip)->i_rdev = args->rdev;
 		break;
 	case S_IFREG:
 	case S_IFDIR:
 		if (pip && (pip->i_d.di_flags & XFS_DIFLAG_ANY)) {
 			uint	di_flags = 0;
 
-			if ((mode & S_IFMT) == S_IFDIR) {
+			if ((args->mode & S_IFMT) == S_IFDIR) {
 				if (pip->i_d.di_flags & XFS_DIFLAG_RTINHERIT)
 					di_flags |= XFS_DIFLAG_RTINHERIT;
 				if (pip->i_d.di_flags & XFS_DIFLAG_EXTSZINHERIT) {
@@ -249,13 +258,21 @@ libxfs_inode_alloc(
 	struct fsxattr	*fsx,
 	xfs_inode_t	**ipp)
 {
+	struct xfs_ialloc_args	args = {
+		.pip		= pip,
+		.uid		= make_kuid(cr->cr_uid),
+		.gid		= make_kgid(cr->cr_gid),
+		.prid		= pip ? 0 : fsx->fsx_projid,
+		.nlink		= nlink,
+		.rdev		= rdev,
+		.mode		= mode,
+	};
 	xfs_buf_t	*ialloc_context;
 	xfs_inode_t	*ip;
 	int		error;
 
 	ialloc_context = (xfs_buf_t *)0;
-	error = libxfs_ialloc(*tp, pip, mode, nlink, rdev, cr, fsx,
-			   &ialloc_context, &ip);
+	error = libxfs_ialloc(*tp, &args, &ialloc_context, &ip);
 	if (error) {
 		*ipp = NULL;
 		return error;
@@ -276,8 +293,7 @@ libxfs_inode_alloc(
 			exit(1);
 		}
 		xfs_trans_bjoin(*tp, ialloc_context);
-		error = libxfs_ialloc(*tp, pip, mode, nlink, rdev, cr,
-				   fsx, &ialloc_context, &ip);
+		error = libxfs_ialloc(*tp, &args, &ialloc_context, &ip);
 		if (!ip)
 			error = -ENOSPC;
 		if (error)
@@ -285,6 +301,8 @@ libxfs_inode_alloc(
 	}
 
 	*ipp = ip;
+	if (!pip)
+		xfs_ialloc_fsx_init(tp, ip, fsx);
 	return error;
 }
 
