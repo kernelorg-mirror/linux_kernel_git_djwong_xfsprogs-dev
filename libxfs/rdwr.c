@@ -170,7 +170,7 @@ do {						\
 	}					\
 } while (0)
 
-struct xfs_buf *
+int
 libxfs_trace_readbuf(
 	const char		*func,
 	const char		*file,
@@ -179,14 +179,15 @@ libxfs_trace_readbuf(
 	xfs_daddr_t		blkno,
 	size_t			len,
 	int			flags,
-	const struct xfs_buf_ops *ops)
+	const struct xfs_buf_ops *ops,
+	struct xfs_buf		**bpp)
 {
-	struct xfs_buf		*bp;
+	int			error;
 	DEFINE_SINGLE_BUF_MAP(map, blkno, numblks);
 
-	libxfs_buf_read_map(btp, &map, 1, flags, &bp, ops);
-	__add_trace(bp, func, file, line);
-	return bp;
+	error = libxfs_buf_read_map(btp, &map, 1, flags, bpp, ops);
+	__add_trace(*bpp, func, file, line);
+	return error;
 }
 
 int
@@ -270,8 +271,11 @@ struct xfs_buf *
 libxfs_getsb(
 	struct xfs_mount	*mp)
 {
-	return libxfs_buf_read(mp->m_ddev_targp, XFS_SB_DADDR,
-			XFS_FSS_TO_BB(mp, 1), 0, &xfs_sb_buf_ops);
+	struct xfs_buf		*bp;
+
+	libxfs_buf_read(mp->m_ddev_targp, XFS_SB_DADDR, XFS_FSS_TO_BB(mp, 1),
+			0, &bp, &xfs_sb_buf_ops);
+	return bp;
 }
 
 kmem_zone_t			*xfs_buf_zone;
