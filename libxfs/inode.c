@@ -46,6 +46,17 @@ xfs_ialloc_fsx_init(
 	xfs_trans_log_inode(*tpp, ip, XFS_ILOG_CORE);
 }
 
+/* Set up the inode ops structure that the libxfs code relies on. */
+static void
+xfs_setup_inode(
+	struct xfs_inode	*ip)
+{
+	if (XFS_ISDIR(ip))
+		ip->d_ops = ip->i_mount->m_dir_inode_ops;
+	else
+		ip->d_ops = ip->i_mount->m_nondir_inode_ops;
+}
+
 /*
  * Allocate an inode on disk and return a copy of its in-core version.
  * Set mode, nlink, and rdev appropriately within the inode.
@@ -94,8 +105,8 @@ libxfs_ialloc(
 	inode->i_mode = args->mode;
 	set_nlink(inode, args->nlink);
 	inode->i_uid = args->uid;
+	inode->i_rdev = args->rdev;
 	ip->i_d.di_projid = args->prid;
-	times = XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD | XFS_ICHGTIME_ACCESS;
 
 	if (pip && (VFS_I(pip)->i_mode & S_ISGID)) {
 		inode->i_gid = VFS_I(pip)->i_gid;
@@ -107,6 +118,8 @@ libxfs_ialloc(
 	ip->i_d.di_size = 0;
 	ip->i_d.di_nextents = 0;
 	ASSERT(ip->i_d.di_nblocks == 0);
+
+	times = XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD | XFS_ICHGTIME_ACCESS;
 	ip->i_d.di_extsize = 0;
 	ip->i_d.di_dmevmask = 0;
 	ip->i_d.di_dmstate = 0;
@@ -175,18 +188,14 @@ libxfs_ialloc(
 	ip->i_d.di_anextents = 0;
 
 	/*
-	 * set up the inode ops structure that the libxfs code relies on
-	 */
-	if (XFS_ISDIR(ip))
-		ip->d_ops = ip->i_mount->m_dir_inode_ops;
-	else
-		ip->d_ops = ip->i_mount->m_nondir_inode_ops;
-
-	/*
 	 * Log the new values stuffed into the inode.
 	 */
 	xfs_trans_ijoin(tp, ip, 0);
 	xfs_trans_log_inode(tp, ip, flags);
+
+	/* now that we have an i_mode we can setup the inode structure */
+	xfs_setup_inode(ip);
+
 	*ipp = ip;
 	return 0;
 }
