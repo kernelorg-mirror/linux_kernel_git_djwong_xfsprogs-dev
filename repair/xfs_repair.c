@@ -1111,12 +1111,7 @@ _("Note - stripe unit (%d) and width (%d) were copied from a backup superblock.\
 	if (error)
 		exit(1);
 
-	if (x.rtdev)
-		libxfs_device_close(x.rtdev);
-	if (x.logdev && x.logdev != x.ddev)
-		libxfs_device_close(x.logdev);
-	libxfs_device_close(x.ddev);
-	libxfs_destroy();
+	libxfs_destroy(&x);
 
 	if (verbose)
 		summary_report();

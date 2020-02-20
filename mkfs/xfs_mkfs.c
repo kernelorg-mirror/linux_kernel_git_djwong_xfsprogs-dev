@@ -3945,11 +3945,6 @@ main(
 	if (error)
 		exit(1);
 
-	if (xi.rtdev)
-		libxfs_device_close(xi.rtdev);
-	if (xi.logdev && xi.logdev != xi.ddev)
-		libxfs_device_close(xi.logdev);
-	libxfs_device_close(xi.ddev);
-	libxfs_destroy();
+	libxfs_destroy(&xi);
 	return 0;
 }
