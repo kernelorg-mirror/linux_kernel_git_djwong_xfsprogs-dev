@@ -33,7 +33,7 @@ typedef enum {
 	DBM_LOG,	DBM_MISSING,	DBM_QUOTA,	DBM_RTBITMAP,
 	DBM_RTDATA,	DBM_RTFREE,	DBM_RTSUM,	DBM_SB,
 	DBM_SYMLINK,	DBM_BTFINO,	DBM_BTRMAP,	DBM_BTREFC,
-	DBM_RLDATA,	DBM_COWDATA,
+	DBM_RLDATA,	DBM_COWDATA,	DBM_BTRTRMAP,
 	DBM_NDBM
 } dbm_t;
 
@@ -134,6 +134,7 @@ static int		serious_error;
 static int		sflag;
 static xfs_suminfo_t	*sumcompute;
 static xfs_suminfo_t	*sumfile;
+static xfs_ino_t	rrmapino = NULLFSINO;
 static const char	*typename[] = {
 	"unknown",
 	"agf",
@@ -165,6 +166,7 @@ static const char	*typename[] = {
 	"btrefcnt",
 	"rldata",
 	"cowdata",
+	"btrtrmap",
 	NULL
 };
 
@@ -315,6 +317,9 @@ static void		process_quota(qtype_t qtype, inodata_t *id,
 				      blkmap_t *blkmap);
 static void		process_rtbitmap(blkmap_t *blkmap);
 static void		process_rtsummary(blkmap_t *blkmap);
+static void		process_rtrmap(struct inodata *id,
+				       struct xfs_dinode *dip,
+				       xfs_rfsblock_t *toti);
 static xfs_ino_t	process_sf_dir_v2(xfs_dinode_t *dip, int *dot,
 					  int *dotdot, inodata_t *id);
 static void		quota_add(xfs_dqid_t *p, xfs_dqid_t *g, xfs_dqid_t *u,
@@ -337,6 +342,12 @@ static void		scan_sbtree(xfs_agf_t *agf, xfs_agblock_t root,
 				    int nlevels, int isroot,
 				    scan_sbtree_f_t func, typnm_t btype);
 static void		scanfunc_bmap(struct xfs_btree_block *block,
+				      int level, dbm_t type, xfs_fsblock_t bno,
+				      inodata_t *id, xfs_rfsblock_t *totd,
+				      xfs_rfsblock_t *toti, xfs_extnum_t *nex,
+				      blkmap_t **blkmapp, int isroot,
+				      typnm_t btype);
+static void		scanfunc_rtrmap(struct xfs_btree_block *block,
 				      int level, dbm_t type, xfs_fsblock_t bno,
 				      inodata_t *id, xfs_rfsblock_t *totd,
 				      xfs_rfsblock_t *toti, xfs_extnum_t *nex,
@@ -804,6 +815,8 @@ blockget_f(
 		return 0;
 	}
 
+	libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &rrmapino);
+
 	if (!init(argc, argv)) {
 		if (serious_error)
 			exitcode = 3;
@@ -1059,6 +1072,7 @@ blocktrash_f(
 		   (1 << DBM_QUOTA) |
 		   (1 << DBM_RTBITMAP) |
 		   (1 << DBM_RTSUM) |
+		   (1 << DBM_BTRTRMAP) |
 		   (1 << DBM_SYMLINK) |
 		   (1 << DBM_BTFINO) |
 		   (1 << DBM_BTRMAP) |
@@ -2725,6 +2739,8 @@ is_meta_ino(
 		type = DBM_QUOTA;
 	else if (id->ino == mp->m_sb.sb_metadirino)
 		type = DBM_DIR;
+	else if (id->ino == rrmapino)
+		type = DBM_BTRTRMAP;
 
 	if (type != DBM_UNKNOWN) {
 		if (!xfs_sb_version_hasmetadir(&mp->m_sb) ||
@@ -2787,7 +2803,7 @@ process_inode(
 		0				/* type 15 unused */
 	};
 	static char		*fmtnames[] = {
-		"dev", "local", "extents", "btree", "uuid"
+		"dev", "local", "extents", "btree", "uuid", "rtrmap"
 	};
 
 	/* xfs_inode_from_disk expects to have an mp to work with */
@@ -2844,12 +2860,23 @@ process_inode(
 				be32_to_cpu(dip->di_next_unlinked), ino);
 		error++;
 	}
-	/*
-	 * di_mode is a 16-bit uint so no need to check the < 0 case
-	 */
+
+	/* Check that mode and data fork format match. */
 	mode = be16_to_cpu(dip->di_mode);
-	if ((((mode & S_IFMT) >> 12) > 15) ||
-	    (!(okfmts[(mode & S_IFMT) >> 12] & (1 << xino.i_d.di_format)))) {
+	if (ino == rrmapino) {
+		if ((mode & S_IFMT) != S_IFREG ||
+		    xino.i_d.di_format != XFS_DINODE_FMT_RMAP) {
+			if (v)
+				dbprintf(_("bad format %d for rtrmap inode %lld type %#o\n"),
+					xino.i_d.di_format, id->ino, mode & S_IFMT);
+			error++;
+			return;
+		}
+	} else if ((((mode & S_IFMT) >> 12) > 15) ||
+		   (!(okfmts[(mode & S_IFMT) >> 12] & (1 << xino.i_d.di_format)))) {
+		/*
+		 * di_mode is a 16-bit uint so no need to check the < 0 case
+		 */
 		if (v)
 			dbprintf(_("bad format %d for inode %lld type %#o\n"),
 				xino.i_d.di_format, id->ino, mode & S_IFMT);
@@ -2931,6 +2958,9 @@ process_inode(
 	case XFS_DINODE_FMT_BTREE:
 		process_btinode(id, dip, type, &totdblocks, &totiblocks,
 			&nextents, &blkmap, XFS_DATA_FORK);
+		break;
+	case XFS_DINODE_FMT_RMAP:
+		process_rtrmap(id, dip, &totiblocks);
 		break;
 	}
 	if (XFS_DFORK_Q(dip)) {
@@ -3677,6 +3707,70 @@ process_rtsummary(
 		memcpy((char *)sumfile + sumbno * mp->m_sb.sb_blocksize, bytes,
 			mp->m_sb.sb_blocksize);
 		pop_cur();
+	}
+}
+
+static void
+process_rtrmap(
+	struct inodata		*id,
+	struct xfs_dinode	*dip,
+	xfs_rfsblock_t		*toti)
+{
+	xfs_extnum_t		nex = 0;
+	xfs_rfsblock_t		totd = 0;
+	struct xfs_rtrmap_root	*dib;
+	int			whichfork = XFS_DATA_FORK;
+	int			i;
+	int			maxrecs;
+	xfs_rtrmap_ptr_t	*pp;
+
+	dib = (struct xfs_rtrmap_root *)XFS_DFORK_PTR(dip, whichfork);
+	if (be16_to_cpu(dib->bb_level) >= mp->m_rtrmap_maxlevels) {
+		if (!sflag || id->ilist)
+			dbprintf(_("level for ino %lld rtrmap root too "
+				 "large (%u)\n"),
+				id->ino,
+				be16_to_cpu(dib->bb_level));
+		error++;
+		return;
+	}
+	maxrecs = libxfs_rtrmapbt_maxrecs(XFS_DFORK_SIZE(dip, mp, whichfork),
+			be16_to_cpu(dib->bb_level) == 0);
+	if (be16_to_cpu(dib->bb_numrecs) > maxrecs) {
+		if (!sflag || id->ilist)
+			dbprintf(_("numrecs for ino %lld rtrmap root too "
+				 "large (%u)\n"),
+				id->ino,
+				be16_to_cpu(dib->bb_numrecs));
+		error++;
+		return;
+	}
+	if (be16_to_cpu(dib->bb_level) == 0) {
+		struct xfs_rtrmap_rec	*rp;
+		xfs_fsblock_t		lastblock;
+
+		rp = XFS_RTRMAP_ROOT_REC_ADDR(dib, 1);
+		lastblock = 0;
+		for (i = 0; i < be16_to_cpu(dib->bb_numrecs); i++) {
+			if (be64_to_cpu(rp[i].rm_startblock) < lastblock) {
+				dbprintf(_(
+		"out-of-order rtrmap btree record %d (%u %u) root\n"),
+					 i, be64_to_cpu(rp[i].rm_startblock),
+					 be32_to_cpu(rp[i].rm_startblock));
+			} else {
+				lastblock = be64_to_cpu(rp[i].rm_startblock) +
+					    be64_to_cpu(rp[i].rm_blockcount);
+			}
+		}
+		return;
+	} else {
+		pp = XFS_RTRMAP_ROOT_PTR_ADDR(dib, 1, maxrecs);
+		for (i = 0; i < be16_to_cpu(dib->bb_numrecs); i++)
+			scan_lbtree(get_unaligned_be64(&pp[i]),
+					be16_to_cpu(dib->bb_level),
+					scanfunc_rtrmap, DBM_BTRTRMAP,
+					id, &totd, toti,
+					&nex, NULL, 1, TYP_RTRMAPBT);
 	}
 }
 
@@ -4771,6 +4865,86 @@ scanfunc_rmap(
 	for (i = 0; i < be16_to_cpu(block->bb_numrecs); i++)
 		scan_sbtree(agf, be32_to_cpu(pp[i]), level, 0, scanfunc_rmap,
 				TYP_RMAPBT);
+}
+
+static void
+scanfunc_rtrmap(
+	struct xfs_btree_block	*block,
+	int			level,
+	dbm_t			type,
+	xfs_fsblock_t		bno,
+	inodata_t		*id,
+	xfs_rfsblock_t		*totd,
+	xfs_rfsblock_t		*toti,
+	xfs_extnum_t		*nex,
+	blkmap_t		**blkmapp,
+	int			isroot,
+	typnm_t			btype)
+{
+	xfs_agblock_t		agbno;
+	xfs_agnumber_t		agno;
+	int			i;
+	xfs_rtrmap_ptr_t	*pp;
+	struct xfs_rtrmap_rec	*rp;
+	xfs_fsblock_t		lastblock;
+
+	agno = XFS_FSB_TO_AGNO(mp, bno);
+	agbno = XFS_FSB_TO_AGBNO(mp, bno);
+	if (be32_to_cpu(block->bb_magic) != XFS_RTRMAP_CRC_MAGIC) {
+		dbprintf(_("bad magic # %#x in rtrmapbt block %u/%u\n"),
+			be32_to_cpu(block->bb_magic), agno, bno);
+		serious_error++;
+		return;
+	}
+	if (be16_to_cpu(block->bb_level) != level) {
+		if (!sflag)
+			dbprintf(_("expected level %d got %d in rtrmapbt block "
+				 "%u/%u\n"),
+				level, be16_to_cpu(block->bb_level), agno, bno);
+		error++;
+	}
+	set_dbmap(agno, bno, 1, type, agno, bno);
+	set_inomap(agno, agbno, 1, id);
+	(*toti)++;
+	if (level == 0) {
+		if (be16_to_cpu(block->bb_numrecs) > mp->m_rtrmap_mxr[0] ||
+		    (isroot == 0 && be16_to_cpu(block->bb_numrecs) < mp->m_rtrmap_mnr[0])) {
+			dbprintf(_("bad btree nrecs (%u, min=%u, max=%u) in "
+				 "rtrmapbt block %u/%u\n"),
+				be16_to_cpu(block->bb_numrecs), mp->m_rtrmap_mnr[0],
+				mp->m_rtrmap_mxr[0], agno, bno);
+			serious_error++;
+			return;
+		}
+		rp = XFS_RTRMAP_REC_ADDR(block, 1);
+		lastblock = 0;
+		for (i = 0; i < be16_to_cpu(block->bb_numrecs); i++) {
+			if (be64_to_cpu(rp[i].rm_startblock) < lastblock) {
+				dbprintf(_(
+		"out-of-order rtrmap btree record %d (%u %u) block %u/%u l %llu\n"),
+					 i, be64_to_cpu(rp[i].rm_startblock),
+					 be64_to_cpu(rp[i].rm_blockcount),
+					 agno, bno, lastblock);
+			} else {
+				lastblock = be64_to_cpu(rp[i].rm_startblock) +
+					    be64_to_cpu(rp[i].rm_blockcount);
+			}
+		}
+		return;
+	}
+	if (be16_to_cpu(block->bb_numrecs) > mp->m_rtrmap_mxr[1] ||
+	    (isroot == 0 && be16_to_cpu(block->bb_numrecs) < mp->m_rtrmap_mnr[1])) {
+		dbprintf(_("bad btree nrecs (%u, min=%u, max=%u) in rtrmapbt "
+			 "block %u/%u\n"),
+			be16_to_cpu(block->bb_numrecs), mp->m_rtrmap_mnr[1],
+			mp->m_rtrmap_mxr[1], agno, bno);
+		serious_error++;
+		return;
+	}
+	pp = XFS_RTRMAP_PTR_ADDR(block, 1, mp->m_rtrmap_mxr[1]);
+	for (i = 0; i < be16_to_cpu(block->bb_numrecs); i++)
+		scan_lbtree(be64_to_cpu(pp[i]), level, scanfunc_rtrmap, type, id,
+					totd, toti, nex, blkmapp, 0, btype);
 }
 
 static void
