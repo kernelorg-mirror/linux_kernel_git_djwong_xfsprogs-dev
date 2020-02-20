@@ -44,6 +44,22 @@ const field_t	dqblk_flds[] = {
 	{ NULL }
 };
 
+static int
+dquot_timestamp_count(
+	void		*obj,
+	int		startoff)
+{
+	return xfs_sb_version_hasbigtime(&mp->m_sb) ? 0 : 1;
+}
+
+static int
+dquot_bigtimestamp_count(
+	void		*obj,
+	int		startoff)
+{
+	return xfs_sb_version_hasbigtime(&mp->m_sb) ? 1 : 0;
+}
+
 #define	DOFF(f)		bitize(offsetof(struct xfs_disk_dquot, d_ ## f))
 const field_t	disk_dquot_flds[] = {
 	{ "magic", FLDT_UINT16X, OI(DOFF(magic)), C1, 0, TYP_NONE },
@@ -60,8 +76,14 @@ const field_t	disk_dquot_flds[] = {
 	  TYP_NONE },
 	{ "bcount", FLDT_QCNT, OI(DOFF(bcount)), C1, 0, TYP_NONE },
 	{ "icount", FLDT_QCNT, OI(DOFF(icount)), C1, 0, TYP_NONE },
-	{ "itimer", FLDT_INT32D, OI(DOFF(itimer)), C1, 0, TYP_NONE },
-	{ "btimer", FLDT_INT32D, OI(DOFF(btimer)), C1, 0, TYP_NONE },
+	{ "itimer", FLDT_INT32D, OI(DOFF(itimer)), dquot_timestamp_count,
+	  FLD_COUNT, TYP_NONE },
+	{ "btimer", FLDT_INT32D, OI(DOFF(btimer)), dquot_timestamp_count,
+	  FLD_COUNT, TYP_NONE },
+	{ "itimer", FLDT_BTQTIMER, OI(DOFF(itimer)), dquot_bigtimestamp_count,
+	  FLD_COUNT, TYP_NONE },
+	{ "btimer", FLDT_BTQTIMER, OI(DOFF(btimer)), dquot_bigtimestamp_count,
+	  FLD_COUNT, TYP_NONE },
 	{ "iwarns", FLDT_QWARNCNT, OI(DOFF(iwarns)), C1, 0, TYP_NONE },
 	{ "bwarns", FLDT_QWARNCNT, OI(DOFF(bwarns)), C1, 0, TYP_NONE },
 	{ "pad0", FLDT_UINT32X, OI(DOFF(pad0)), C1, FLD_SKIPALL, TYP_NONE },
@@ -70,7 +92,10 @@ const field_t	disk_dquot_flds[] = {
 	{ "rtb_softlimit", FLDT_QCNT, OI(DOFF(rtb_softlimit)), C1, 0,
 	  TYP_NONE },
 	{ "rtbcount", FLDT_QCNT, OI(DOFF(rtbcount)), C1, 0, TYP_NONE },
-	{ "rtbtimer", FLDT_INT32D, OI(DOFF(rtbtimer)), C1, 0, TYP_NONE },
+	{ "rtbtimer", FLDT_INT32D, OI(DOFF(rtbtimer)), dquot_timestamp_count,
+	  FLD_COUNT, TYP_NONE },
+	{ "rtbtimer", FLDT_BTQTIMER, OI(DOFF(rtbtimer)),
+	  dquot_bigtimestamp_count, FLD_COUNT, TYP_NONE },
 	{ "rtbwarns", FLDT_QWARNCNT, OI(DOFF(rtbwarns)), C1, 0, TYP_NONE },
 	{ "pad", FLDT_UINT16X, OI(DOFF(pad)), C1, FLD_SKIPALL, TYP_NONE },
 	{ NULL }
