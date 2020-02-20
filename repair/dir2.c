@@ -15,6 +15,8 @@
 #include "da_util.h"
 #include "prefetch.h"
 #include "progress.h"
+#include "slab.h"
+#include "rmap.h"
 
 /*
  * Known bad inode list.  These are seen when the leaf and node
@@ -143,6 +145,8 @@ is_meta_ino(
 		reason = _("realtime bitmap");
 	else if (lino == mp->m_sb.sb_rsumino)
 		reason = _("realtime summary");
+	else if (rmap_is_rtrmap_ino(lino))
+		reason = _("realtime rmap");
 	else if (lino == mp->m_sb.sb_uquotino)
 		reason = _("user quota");
 	else if (lino == mp->m_sb.sb_gquotino)
