@@ -904,6 +904,7 @@ libxfs_umount(
 	if (mp->m_logdev_targp != mp->m_ddev_targp)
 		kmem_free(mp->m_logdev_targp);
 	kmem_free(mp->m_ddev_targp);
+	memset(mp, 0, sizeof(struct xfs_mount));
 
 	return error;
 }
