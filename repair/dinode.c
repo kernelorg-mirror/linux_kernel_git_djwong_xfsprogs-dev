@@ -2526,6 +2526,26 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 			}
 		}
 
+		if ((flags2 & XFS_DIFLAG2_METADATA) &&
+		    !xfs_sb_version_hasmetadir(&mp->m_sb)) {
+			if (!uncertain) {
+				do_warn(
+	_("inode %" PRIu64 " is marked metadata but file system does not support metadata inode directories\n"),
+					lino);
+			}
+			goto clear_bad_out;
+		}
+
+		if ((flags2 & XFS_DIFLAG2_METADATA) &&
+		    (flags2 & XFS_DIFLAG2_REFLINK)) {
+			if (!uncertain) {
+				do_warn(
+	_("inode %" PRIu64 " is marked metadata and cannot be marked reflinked\n"),
+					lino);
+			}
+			goto clear_bad_out;
+		}
+
 		if ((flags2 & XFS_DIFLAG2_REFLINK) &&
 		    !xfs_sb_version_hasreflink(&mp->m_sb)) {
 			if (!uncertain) {
