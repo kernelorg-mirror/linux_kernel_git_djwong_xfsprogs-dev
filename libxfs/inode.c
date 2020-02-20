@@ -341,7 +341,7 @@ libxfs_iget(
 	struct xfs_mount	*mp,
 	struct xfs_trans	*tp,
 	xfs_ino_t		ino,
-	uint			lock_flags,
+	uint			iget_flags,
 	struct xfs_inode	**ipp,
 	struct xfs_ifork_ops	*ifork_ops)
 {
@@ -354,7 +354,7 @@ libxfs_iget(
 
 	ip->i_ino = ino;
 	ip->i_mount = mp;
-	error = xfs_iread(mp, tp, ip, 0);
+	error = xfs_iread(mp, tp, ip, iget_flags);
 	if (error) {
 		kmem_cache_free(xfs_inode_zone, ip);
 		*ipp = NULL;
