@@ -7,6 +7,13 @@
 #ifndef __LIBXFS_API_DEFS_H__
 #define __LIBXFS_API_DEFS_H__
 
+typedef long long int time64_t;
+
+struct timespec64 {
+	time64_t	tv_sec;			/* seconds */
+	long		tv_nsec;		/* nanoseconds */
+};
+
 /*
  * This file defines all the kernel based functions we expose to userspace
  * via the libxfs_* namespace. This is kept in a separate header file so
