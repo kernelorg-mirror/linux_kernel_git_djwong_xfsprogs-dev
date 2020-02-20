@@ -141,6 +141,11 @@ const struct xfrog_scrub_descr xfrog_scrubbers[XFS_SCRUB_TYPE_NR] = {
 		.type	= XFROG_SCRUB_TYPE_FS,
 		.flags	= XFROG_SCRUB_DESCR_SUMMARY,
 	},
+	[XFS_SCRUB_TYPE_RTRMAPBT] = {
+		.name	= "rtrmapbt",
+		.descr	= "realtime reverse mapping btree",
+		.type	= XFROG_SCRUB_TYPE_FS,
+	},
 };
 
 /* Invoke the scrub ioctl.  Returns zero or negative error code. */
