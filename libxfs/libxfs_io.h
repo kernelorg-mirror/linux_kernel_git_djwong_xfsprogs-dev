@@ -126,6 +126,8 @@ extern struct cache_operations	libxfs_bcache_operations;
 
 /* Exit on buffer read error */
 #define LIBXFS_READBUF_FAIL_EXIT	(1 << 0)
+/* Return the buffer even if the IO or verifier fail. */
+#define LIBXFS_READBUF_SALVAGE		(1 << 1)
 
 /* Exit on buffer write error */
 #define LIBXFS_WRITEBUF_FAIL_EXIT	(1 << 0)
@@ -135,9 +137,9 @@ extern struct cache_operations	libxfs_bcache_operations;
 #define libxfs_buf_read(dev, daddr, len, flags, ops) \
 	libxfs_trace_readbuf(__FUNCTION__, __FILE__, __LINE__, \
 			    (dev), (daddr), (len), (flags), (ops))
-#define libxfs_buf_read_map(dev, map, nmaps, flags, ops) \
+#define libxfs_buf_read_map(dev, map, nmaps, flags, bpp, ops) \
 	libxfs_trace_readbuf_map(__FUNCTION__, __FILE__, __LINE__, \
-			    (dev), (map), (nmaps), (flags), (ops))
+			    (dev), (map), (nmaps), (flags), (bpp), (ops))
 #define libxfs_buf_dirty(buf, flags) \
 	libxfs_trace_dirtybuf(__FUNCTION__, __FILE__, __LINE__, \
 			      (buf), (flags))
@@ -153,9 +155,10 @@ extern struct cache_operations	libxfs_bcache_operations;
 struct xfs_buf *libxfs_trace_readbuf(const char *func, const char *file,
 			int line, struct xfs_buftarg *btp, xfs_daddr_t daddr,
 			size_t len, int flags, const struct xfs_buf_ops *ops);
-extern xfs_buf_t *libxfs_trace_readbuf_map(const char *, const char *, int,
-			struct xfs_buftarg *, struct xfs_buf_map *, int, int,
-			const struct xfs_buf_ops *);
+int libxfs_trace_readbuf_map(const char *func, const char *file, int line,
+			struct xfs_buftarg *btp, struct xfs_buf_map *maps,
+			int nmaps, int flags, struct xfs_buf **bpp,
+			const struct xfs_buf_ops *ops);
 void libxfs_trace_dirtybuf(const char *func, const char *file, int line,
 			struct xfs_buf *bp, int flags);
 struct xfs_buf *libxfs_trace_getbuf(const char *func, const char *file,
@@ -169,8 +172,9 @@ extern void	libxfs_trace_putbuf (const char *, const char *, int,
 
 #else
 
-extern xfs_buf_t *libxfs_buf_read_map(struct xfs_buftarg *, struct xfs_buf_map *,
-			int, int, const struct xfs_buf_ops *);
+int libxfs_buf_read_map(struct xfs_buftarg *btp, struct xfs_buf_map *maps,
+			int nmaps, int flags, struct xfs_buf **bpp,
+			const struct xfs_buf_ops *ops);
 void libxfs_buf_dirty(struct xfs_buf *bp, int flags);
 int libxfs_buf_get_map(struct xfs_buftarg *btp, struct xfs_buf_map *maps,
 			int nmaps, int flags, struct xfs_buf **bpp);
@@ -200,9 +204,14 @@ libxfs_buf_read(
 	xfs_buf_flags_t		flags,
 	const struct xfs_buf_ops *ops)
 {
+	struct xfs_buf		*bp;
+	int			error;
 	DEFINE_SINGLE_BUF_MAP(map, blkno, numblks);
 
-	return libxfs_buf_read_map(target, &map, 1, flags, ops);
+	error = libxfs_buf_read_map(target, &map, 1, flags, &bp, ops);
+	if (error)
+		return NULL;
+	return bp;
 }
 
 #endif /* XFS_BUF_TRACING */
