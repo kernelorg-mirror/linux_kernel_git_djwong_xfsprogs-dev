@@ -95,7 +95,7 @@ libxfs_ialloc(
 	set_nlink(inode, args->nlink);
 	inode->i_uid = args->uid;
 	ip->i_d.di_projid = args->prid;
-	times = XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD;
+	times = XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD | XFS_ICHGTIME_ACCESS;
 
 	if (pip && (VFS_I(pip)->i_mode & S_ISGID)) {
 		inode->i_gid = VFS_I(pip)->i_gid;
