@@ -36,6 +36,7 @@ struct xfs_ag_rmap {
 static struct xfs_ag_rmap *ag_rmaps;
 bool rmapbt_suspect;
 static bool refcbt_suspect;
+static xfs_ino_t rrmapino;
 
 static inline int rmap_compare(const void *a, const void *b)
 {
@@ -65,6 +66,14 @@ rmap_needs_work(
 	       xfs_sb_version_hasrmapbt(&mp->m_sb);
 }
 
+/* Is this a realtime rmap inode? */
+bool
+rmap_is_rtrmap_ino(
+	xfs_ino_t		ino)
+{
+	return ino == rrmapino;
+}
+
 /*
  * Initialize per-AG reverse map data.
  */
@@ -77,6 +86,8 @@ rmaps_init(
 
 	if (!rmap_needs_work(mp))
 		return;
+
+	libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &rrmapino);
 
 	/* One ag_rmap per AG, and one more for the realtime device. */
 	ag_rmaps = calloc(mp->m_sb.sb_agcount + 1, sizeof(struct xfs_ag_rmap));
@@ -1042,6 +1053,7 @@ rmaps_verify_btree(
 		if (error || ino == NULLFSINO) {
 			do_warn(
 _("garbage in sb_rrmapino, not checking realtime rmaps\n"));
+			need_rrmapino = true;
 			goto err;
 		}
 
