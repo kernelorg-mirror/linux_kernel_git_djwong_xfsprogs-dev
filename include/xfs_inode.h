@@ -141,6 +141,11 @@ static inline bool xfs_is_reflink_inode(struct xfs_inode *ip)
 	return ip->i_d.di_flags2 & XFS_DIFLAG2_REFLINK;
 }
 
+static inline bool xfs_is_always_cow_inode(struct xfs_inode *ip)
+{
+	return false;
+}
+
 typedef struct cred {
 	uid_t	cr_uid;
 	gid_t	cr_gid;
@@ -164,5 +169,7 @@ extern int	libxfs_iget(struct xfs_mount *, struct xfs_trans *, xfs_ino_t,
 				uint, struct xfs_inode **,
 				struct xfs_ifork_ops *);
 extern void	libxfs_irele(struct xfs_inode *ip);
+
+#define XFS_DEFAULT_COWEXTSZ_HINT 32
 
 #endif /* __XFS_INODE_H__ */
