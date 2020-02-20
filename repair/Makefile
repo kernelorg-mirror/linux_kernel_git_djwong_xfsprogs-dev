@@ -17,8 +17,8 @@ CFILES = agheader.c attr_repair.c avl.c bload.c bmap.c bmap_repair.c btree.c \
 	da_util.c dino_chunks.c dinode.c dir2.c globals.c incore.c \
 	incore_bmc.c init.c incore_ext.c incore_ino.c phase1.c \
 	phase2.c phase3.c phase4.c phase5.c phase6.c phase7.c \
-	progress.c prefetch.c rmap.c rt.c sb.c scan.c slab.c threads.c \
-	versions.c xfs_repair.c
+	progress.c prefetch.c rmap.c rtrmap_repair.c rt.c sb.c scan.c slab.c \
+	threads.c versions.c xfs_repair.c
 
 LLDLIBS = $(LIBXFS) $(LIBXLOG) $(LIBXCMD) $(LIBFROG) $(LIBUUID) $(LIBRT) \
 	$(LIBPTHREAD) $(LIBBLKID)
