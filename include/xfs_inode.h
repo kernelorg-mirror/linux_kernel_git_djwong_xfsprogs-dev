@@ -7,6 +7,31 @@
 #ifndef __XFS_INODE_H__
 #define __XFS_INODE_H__
 
+/*
+ * Borrow the kernel's uid/gid types.  These are used by xfs_inode_util.h, so
+ * they must come first in the header file.
+ */
+
+typedef struct {
+	uid_t val;
+} kuid_t;
+
+typedef struct {
+	gid_t val;
+} kgid_t;
+
+static inline kuid_t make_kuid(uid_t uid)
+{
+	kuid_t	v = { .val = uid };
+	return v;
+}
+
+static inline kgid_t make_kgid(gid_t gid)
+{
+	kgid_t	v = { .val = gid };
+	return v;
+}
+
 /* These match kernel side includes */
 #include "xfs_inode_buf.h"
 #include "xfs_inode_fork.h"
@@ -26,16 +51,6 @@ struct xfs_dir_ops;
 
 #define IS_I_VERSION(inode)			(0)
 #define inode_maybe_inc_iversion(inode,flags)	(0)
-
-/* Borrow the kernel's uid/gid types. */
-
-typedef struct {
-	uid_t val;
-} kuid_t;
-
-typedef struct {
-	gid_t val;
-} kgid_t;
 
 /*
  * Inode interface. This fakes up a "VFS inode" to make the xfs_inode appear
