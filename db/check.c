@@ -2942,8 +2942,11 @@ process_inode(
 			break;
 		}
 		if (ic) {
-			quota_add(&xino.i_d.di_projid, &VFS_I(&xino)->i_gid,
-				  &VFS_I(&xino)->i_uid, 0, bc, ic, rc);
+			xfs_dqid_t	uid = i_uid_read(VFS_I(&xino));
+			xfs_dqid_t	gid = i_gid_read(VFS_I(&xino));
+
+			quota_add(&xino.i_d.di_projid, &gid, &uid, 0, bc, ic,
+					rc);
 		}
 	}
 	totblocks = totdblocks + totiblocks + atotdblocks + atotiblocks;
