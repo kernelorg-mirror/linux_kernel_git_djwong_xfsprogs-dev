@@ -657,11 +657,25 @@ libxfs_mountfs_imeta(
 	if (mp->m_sb.sb_inprogress != 0)
 		return;
 
+	if (xfs_sb_version_hasmetadir(&mp->m_sb)) {
+		error = -libxfs_imeta_iget(mp, mp->m_sb.sb_metadirino,
+				XFS_DIR3_FT_DIR, &mp->m_metadirip);
+		if (error)
+			fprintf(stderr,
+_("%s: could not open metadata inode directory, error %d\n"),
+					progname, error);
+	}
+
 	error = -xfs_imeta_mount(mp);
-	if (error)
+	if (error) {
+		if (mp->m_metadirip)
+			libxfs_imeta_irele(mp->m_metadirip);
+		mp->m_metadirip = NULL;
+
 		fprintf(stderr,
 _("%s: metadata inode mounting failed, error %d\n"),
 			progname, error);
+	}
 }
 
 /*
@@ -933,6 +947,8 @@ libxfs_umount(
 	int			error;
 
 	libxfs_rtmount_destroy(mp);
+	if (mp->m_metadirip)
+		libxfs_imeta_irele(mp->m_metadirip);
 
 	error = libxfs_flush_mount(mp);
 
