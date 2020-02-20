@@ -264,5 +264,6 @@ xfs_buf_delwri_queue(struct xfs_buf *bp, struct list_head *buffer_list)
 }
 
 int xfs_buf_delwri_submit(struct list_head *buffer_list);
+void xfs_buf_delwri_cancel(struct list_head *list);
 
 #endif	/* __LIBXFS_IO_H__ */
