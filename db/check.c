@@ -3509,7 +3509,10 @@ process_quota(
 				error++;
 				continue;
 			}
-			if (dqb->dd_diskdq.d_flags != exp_flags) {
+			if (((dqb->dd_diskdq.d_flags & XFS_DQ_ALLTYPES) !=
+					exp_flags) ||
+			    (dqb->dd_diskdq.d_flags & ~(XFS_DQ_ALLTYPES |
+						        XFS_DQ_BIGTIME))) {
 				if (scicb)
 					dbprintf(_("bad flags %#x for %s dqblk "
 						 "%lld entry %d id %u\n"),
