@@ -118,6 +118,7 @@ enum {
 	M_UUID,
 	M_RMAPBT,
 	M_REFLINK,
+	M_INOBTCNT,
 	M_MAX_OPTS,
 };
 
@@ -657,6 +658,7 @@ static struct opt_params mopts = {
 		[M_UUID] = "uuid",
 		[M_RMAPBT] = "rmapbt",
 		[M_REFLINK] = "reflink",
+		[M_INOBTCNT] = "inobtcount",
 	},
 	.subopt_params = {
 		{ .index = M_CRC,
@@ -682,6 +684,12 @@ static struct opt_params mopts = {
 		  .defaultval = 1,
 		},
 		{ .index = M_REFLINK,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
+		{ .index = M_INOBTCNT,
 		  .conflicts = { { NULL, LAST_CONFLICT } },
 		  .minval = 0,
 		  .maxval = 1,
@@ -738,6 +746,7 @@ struct sb_feat_args {
 	bool	spinodes;		/* XFS_SB_FEAT_INCOMPAT_SPINODES */
 	bool	rmapbt;			/* XFS_SB_FEAT_RO_COMPAT_RMAPBT */
 	bool	reflink;		/* XFS_SB_FEAT_RO_COMPAT_REFLINK */
+	bool	inobtcnt;		/* XFS_SB_FEAT_RO_COMPAT_INOBTCNT */
 	bool	nodalign;
 	bool	nortalign;
 };
@@ -860,7 +869,8 @@ usage( void )
 {
 	fprintf(stderr, _("Usage: %s\n\
 /* blocksize */		[-b size=num]\n\
-/* metadata */		[-m crc=0|1,finobt=0|1,uuid=xxx,rmapbt=0|1,reflink=0|1]\n\
+/* metadata */		[-m crc=0|1,finobt=0|1,uuid=xxx,rmapbt=0|1,reflink=0|1,\n\
+			    inobtcnt=0|1]\n\
 /* data subvol */	[-d agcount=n,agsize=n,file,name=xxx,size=num,\n\
 			    (sunit=value,swidth=value|su=num,sw=num|noalign),\n\
 			    sectsize=num\n\
@@ -1594,6 +1604,9 @@ meta_opts_parser(
 	case M_REFLINK:
 		cli->sb_feat.reflink = getnum(value, opts, subopt);
 		break;
+	case M_INOBTCNT:
+		cli->sb_feat.inobtcnt = getnum(value, opts, subopt);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2024,6 +2037,15 @@ _("reflink not supported without CRC support\n"));
 			usage();
 		}
 		cli->sb_feat.reflink = false;
+	}
+
+	if (!cli->sb_feat.finobt) {
+		if (cli->sb_feat.inobtcnt && cli_opt_set(&mopts, M_INOBTCNT)) {
+			fprintf(stderr,
+_("inode btree counters not supported without finobt support\n"));
+			usage();
+		}
+		cli->sb_feat.inobtcnt = false;
 	}
 
 	if ((cli->fsx.fsx_xflags & FS_XFLAG_COWEXTSIZE) &&
@@ -2989,6 +3011,8 @@ sb_set_features(
 		sbp->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_RMAPBT;
 	if (fp->reflink)
 		sbp->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_REFLINK;
+	if (fp->inobtcnt)
+		sbp->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_INOBTCNT;
 
 	/*
 	 * Sparse inode chunk support has two main inode alignment requirements.
@@ -3657,6 +3681,7 @@ main(
 			.spinodes = true,
 			.rmapbt = true,
 			.reflink = true,
+			.inobtcnt = false,
 			.parent_pointers = false,
 			.nodalign = false,
 			.nortalign = false,
