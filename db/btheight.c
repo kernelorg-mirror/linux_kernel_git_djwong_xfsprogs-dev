@@ -12,6 +12,11 @@
 #include "input.h"
 #include "libfrog/convert.h"
 
+static int rtrmap_maxrecs(struct xfs_mount *mp, int blocklen, int leaf)
+{
+	return libxfs_rtrmapbt_maxrecs(blocklen, leaf != 0);
+}
+
 static int refc_maxrecs(struct xfs_mount *mp, int blocklen, int leaf)
 {
 	return libxfs_refcountbt_maxrecs(blocklen, leaf != 0);
@@ -34,6 +39,7 @@ struct btmap {
 	{"bmapbt", libxfs_bmbt_maxrecs},
 	{"refcountbt", refc_maxrecs},
 	{"rmapbt", rmap_maxrecs},
+	{"rtrmapbt", rtrmap_maxrecs},
 };
 
 static void
