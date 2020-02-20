@@ -8,8 +8,7 @@ status=0
 DB_OPTS=""
 REPAIR_OPTS=""
 IO_OPTS=""
-USAGE="Usage: xfs_admin [-efjlpuV] [-c 0|1] [-L label] [-U uuid] device [logdev]"
-
+USAGE="Usage: xfs_admin [-efjlpuV] [-O feature] [-c 0|1] [-L label] [-U uuid] device [logdev]"
 # Try to find a loop device associated with a file.  We only want to return
 # one loopdev (multiple loop devices can attach to a single file) so we grab
 # the last line and return it if it's actually a block device.
@@ -31,7 +30,7 @@ find_mntpt_for_arg() {
 	findmnt -t xfs -f -n -o TARGET "${arg}" 2> /dev/null
 }
 
-while getopts "efjlpuc:L:U:V" c
+while getopts "efjlpuc:L:O:U:V" c
 do
 	case $c in
 	c)	REPAIR_OPTS=$REPAIR_OPTS" -c lazycount="$OPTARG;;
@@ -49,6 +48,8 @@ do
 		fi
 		;;
 	p)	DB_OPTS=$DB_OPTS" -c 'version projid32bit'";;
+	O)	DB_OPTS=$DB_OPTS" -c 'version "$OPTARG"'";
+		REPAIR_OPTS="$REPAIR_OPTS ";;
 	u)	DB_OPTS=$DB_OPTS" -r -c uuid";;
 	U)	DB_OPTS=$DB_OPTS" -c 'uuid "$OPTARG"'";;
 	V)	xfs_db -p xfs_admin -V
