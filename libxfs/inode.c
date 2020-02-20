@@ -246,6 +246,31 @@ libxfs_iget(
 	return 0;
 }
 
+/* Get a metadata inode.  The ftype must match exactly. */
+int
+libxfs_imeta_iget(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino,
+	unsigned char		ftype,
+	struct xfs_inode	**ipp)
+{
+	struct xfs_inode	*ip;
+	int			error;
+
+	error = libxfs_iget(mp, NULL, ino, 0, &ip, &xfs_default_ifork_ops);
+	if (error)
+		return error;
+
+	if (ftype == XFS_DIR3_FT_UNKNOWN ||
+	    xfs_mode_to_ftype(VFS_I(ip)->i_mode) != ftype) {
+		libxfs_irele(ip);
+		return -EFSCORRUPTED;
+	}
+
+	*ipp = ip;
+	return 0;
+}
+
 static void
 libxfs_idestroy(xfs_inode_t *ip)
 {
@@ -269,6 +294,13 @@ libxfs_irele(
 	ASSERT(ip->i_itemp == NULL);
 	libxfs_idestroy(ip);
 	kmem_cache_free(xfs_inode_zone, ip);
+}
+
+void
+libxfs_imeta_irele(
+	struct xfs_inode	*ip)
+{
+	libxfs_irele(ip);
 }
 
 /*
