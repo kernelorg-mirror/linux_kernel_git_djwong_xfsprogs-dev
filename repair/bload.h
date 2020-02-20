@@ -74,4 +74,7 @@ void xrep_newbt_destroy(struct xrep_newbt *xnr, int error);
 int xrep_newbt_claim_block(struct xfs_btree_cur *cur, struct xrep_newbt *xnr,
 		union xfs_btree_ptr *ptr);
 
+void estimate_inode_bload_slack(struct xfs_mount *mp,
+		struct xfs_btree_bload *bload);
+
 #endif /* __XFS_REPAIR_BLOAD_H__ */
