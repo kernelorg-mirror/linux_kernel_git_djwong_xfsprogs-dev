@@ -17,6 +17,7 @@
 #include "xfs_dir2.h"
 #include "xfs_dir2_priv.h"
 #include "xfs_trace.h"
+#include "xfs_health.h"
 
 /*
  * Local function prototypes.
@@ -149,6 +150,7 @@ xfs_dir3_block_read(
 		xfs_buf_corruption_error(*bpp, fa);
 		xfs_trans_brelse(tp, *bpp);
 		*bpp = NULL;
+		xfs_dirattr_mark_sick(dp, XFS_DATA_FORK);
 		return -EFSCORRUPTED;
 	}
 

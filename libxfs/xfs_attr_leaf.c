@@ -24,7 +24,7 @@
 #include "xfs_attr_leaf.h"
 #include "xfs_trace.h"
 #include "xfs_dir2.h"
-
+#include "xfs_health.h"
 
 /*
  * xfs_attr_leaf.c
@@ -2354,6 +2354,7 @@ xfs_attr3_leaf_lookup_int(
 	entries = xfs_attr3_leaf_entryp(leaf);
 	if (ichdr.count >= args->geo->blksize / 8) {
 		xfs_buf_corruption_error(bp, __this_address);
+		xfs_da_mark_sick(args);
 		return -EFSCORRUPTED;
 	}
 
@@ -2373,10 +2374,12 @@ xfs_attr3_leaf_lookup_int(
 	}
 	if (!(probe >= 0 && (!ichdr.count || probe < ichdr.count))) {
 		xfs_buf_corruption_error(bp, __this_address);
+		xfs_da_mark_sick(args);
 		return -EFSCORRUPTED;
 	}
 	if (!(span <= 4 || be32_to_cpu(entry->hashval) == hashval)) {
 		xfs_buf_corruption_error(bp, __this_address);
+		xfs_da_mark_sick(args);
 		return -EFSCORRUPTED;
 	}
 
