@@ -86,6 +86,7 @@ enum {
 	L_FILE,
 	L_NAME,
 	L_LAZYSBCNTR,
+	L_ATOMICSWAP,
 	L_MAX_OPTS,
 };
 
@@ -456,6 +457,7 @@ static struct opt_params lopts = {
 		[L_FILE] = "file",
 		[L_NAME] = "name",
 		[L_LAZYSBCNTR] = "lazy-count",
+		[L_ATOMICSWAP] = "atomicswap",
 	},
 	.subopt_params = {
 		{ .index = L_AGNUM,
@@ -533,6 +535,12 @@ static struct opt_params lopts = {
 		  .defaultval = SUBOPT_NEEDS_VAL,
 		},
 		{ .index = L_LAZYSBCNTR,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
+		{ .index = L_ATOMICSWAP,
 		  .conflicts = { { NULL, LAST_CONFLICT } },
 		  .minval = 0,
 		  .maxval = 1,
@@ -765,6 +773,7 @@ struct sb_feat_args {
 	bool	inobtcnt;		/* XFS_SB_FEAT_RO_COMPAT_INOBTCNT */
 	bool	bigtime;		/* XFS_SB_FEAT_INCOMPAT_BIGTIME */
 	bool	metadir;		/* XFS_SB_FEAT_INCOMPAT_METADIR */
+	bool	atomicswap;		/* XFS_SB_FEAT_INCOMPAT_LOG_ATOMICSWAP */
 	bool	nodalign;
 	bool	nortalign;
 };
@@ -897,7 +906,8 @@ usage( void )
 			    projid32bit=0|1,sparse=0|1]\n\
 /* no discard */	[-K]\n\
 /* log subvol */	[-l agnum=n,internal,size=num,logdev=xxx,version=n\n\
-			    sunit=value|su=num,sectsize=num,lazy-count=0|1]\n\
+			    sunit=value|su=num,sectsize=num,lazy-count=0|1,\n\
+			    atomicswap=0|1]\n\
 /* label */		[-L label (maximum 12 characters)]\n\
 /* naming */		[-n size=num,version=2|ci,ftype=0|1]\n\
 /* no-op info only */	[-N]\n\
@@ -1588,6 +1598,9 @@ log_opts_parser(
 	case L_LAZYSBCNTR:
 		cli->sb_feat.lazy_sb_counters = getnum(value, opts, subopt);
 		break;
+	case L_ATOMICSWAP:
+		cli->sb_feat.atomicswap = getnum(value, opts, subopt);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2075,6 +2088,13 @@ _("metadata directory not supported without CRC support\n"));
 			usage();
 		}
 		cli->sb_feat.metadir = false;
+
+		if (cli->sb_feat.atomicswap) {
+			fprintf(stderr,
+_("atomic extent swapping not supported without CRC support\n"));
+			usage();
+		}
+		cli->sb_feat.atomicswap = false;
 	}
 
 	if (!cli->sb_feat.finobt) {
@@ -3081,6 +3101,8 @@ sb_set_features(
 		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_BIGTIME;
 	if (fp->metadir)
 		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_METADIR;
+	if (fp->atomicswap)
+		sbp->sb_features_log_incompat |= XFS_SB_FEAT_INCOMPAT_LOG_ATOMIC_SWAP;
 
 	/*
 	 * Sparse inode chunk support has two main inode alignment requirements.
