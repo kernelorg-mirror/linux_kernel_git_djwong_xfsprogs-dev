@@ -16,6 +16,7 @@
 #include "xfs_bmap.h"
 #include "xfs_swapext.h"
 #include "xfs_trace.h"
+#include "xfs_errortag.h"
 
 /* Prepare both inodes' reflink state for an extent swap. */
 void
@@ -269,6 +270,9 @@ xfs_swapext_finish_one(
 		*blockcount -= irec1.br_blockcount;
 		break;
 	}
+
+	if (XFS_TEST_ERROR(false, tp->t_mountp, XFS_ERRTAG_SWAPEXT_FINISH_ONE))
+		return -EIO;
 
 	return 0;
 }
