@@ -20,6 +20,7 @@
 #include "xfs_refcount.h"
 #include "xfs_bmap.h"
 #include "xfs_inode.h"
+#include "xfs_swapext.h"
 
 /* Dummy defer item ops, since we don't do logging. */
 
@@ -534,4 +535,161 @@ const struct xfs_defer_op_type xfs_bmap_update_defer_type = {
 	.cancel_item	= xfs_bmap_update_cancel_item,
 	.freeze_item	= xfs_bmap_freeze_item,
 	.thaw_item	= xfs_bmap_thaw_item,
+};
+
+/* Atomic Swapping of File Ranges */
+
+/* Sort swapext intents by inode. */
+static int
+xfs_swapext_diff_items(
+	void				*priv,
+	struct list_head		*a,
+	struct list_head		*b)
+{
+	struct xfs_swapext_intent	*sa;
+	struct xfs_swapext_intent	*sb;
+
+	sa = container_of(a, struct xfs_swapext_intent, sxi_list);
+	sb = container_of(b, struct xfs_swapext_intent, sxi_list);
+	return sa->sxi_ip1->i_ino - sb->sxi_ip2->i_ino;
+}
+
+/* Get an SXI. */
+STATIC void *
+xfs_swapext_create_intent(
+	struct xfs_trans		*tp,
+	unsigned int			count)
+{
+	return NULL;
+}
+
+/* Log swapext updates in the intent item. */
+STATIC void
+xfs_swapext_log_item(
+	struct xfs_trans		*tp,
+	void				*intent,
+	struct list_head		*item)
+{
+}
+
+/* Get an SXD so we can process all the deferred swapext updates. */
+STATIC void *
+xfs_swapext_create_done(
+	struct xfs_trans		*tp,
+	void				*intent,
+	unsigned int			count)
+{
+	return NULL;
+}
+
+/* Process a deferred swapext update. */
+STATIC int
+xfs_swapext_finish_item(
+	struct xfs_trans		*tp,
+	struct list_head		*item,
+	void				*done_item,
+	void				**state)
+{
+	struct xfs_swapext_intent	*sxi;
+	int				error;
+
+	sxi = container_of(item, struct xfs_swapext_intent, sxi_list);
+
+	/*
+	 * Swap one more extent between the two files.  If there's still more
+	 * work to do, we want to requeue ourselves after all other pending
+	 * deferred operations have finished.  This includes all of the dfops
+	 * that we queued directly as well as any new ones created in the
+	 * process of finishing the others.  Doing so prevents us from queuing
+	 * a large number of SXI log items in kernel memory, which in turn
+	 * prevents us from pinning the tail of the log (while logging those
+	 * new SXI items) until the first SXI items can be processed.
+	 */
+	error = xfs_swapext_finish_one(tp, sxi);
+	if (!error && sxi->sxi_blockcount > 0)
+		return -EMULTIHOP;
+
+	kmem_free(sxi);
+	return error;
+}
+
+/* Abort all pending SXIs. */
+STATIC void
+xfs_swapext_abort_intent(
+	void				*intent)
+{
+}
+
+/* Cancel a deferred swapext update. */
+STATIC void
+xfs_swapext_cancel_item(
+	struct list_head		*item)
+{
+	struct xfs_swapext_intent	*sxi;
+
+	sxi = container_of(item, struct xfs_swapext_intent, sxi_list);
+	kmem_free(sxi);
+}
+
+/* Prepare a deferred swapext item for freezing by detaching the inodes. */
+STATIC int
+xfs_swapext_freeze_item(
+	struct xfs_defer_freezer	*freezer,
+	struct list_head		*item)
+{
+	struct xfs_swapext_intent	*sxi;
+	struct xfs_inode		*ip;
+	int				error;
+
+	sxi = container_of(item, struct xfs_swapext_intent, sxi_list);
+
+	ip = sxi->sxi_ip1;
+	error = xfs_defer_freezer_ijoin(freezer, ip);
+	if (error)
+		return error;
+	sxi->sxi_ino1 = ip->i_ino;
+
+	ip = sxi->sxi_ip2;
+	error = xfs_defer_freezer_ijoin(freezer, ip);
+	if (error)
+		return error;
+	sxi->sxi_ino2 = ip->i_ino;
+
+	return 0;
+}
+
+/* Thaw a deferred swapext item by reattaching the inodes. */
+STATIC int
+xfs_swapext_thaw_item(
+	struct xfs_defer_freezer	*freezer,
+	struct list_head		*item)
+{
+	struct xfs_swapext_intent	*sxi;
+	struct xfs_inode		*ip;
+
+	sxi = container_of(item, struct xfs_swapext_intent, sxi_list);
+
+	ip = xfs_defer_freezer_igrab(freezer, sxi->sxi_ino1);
+	if (!ip)
+		return -EFSCORRUPTED;
+	sxi->sxi_ip1 = ip;
+
+	ip = xfs_defer_freezer_igrab(freezer, sxi->sxi_ino2);
+	if (!ip)
+		return -EFSCORRUPTED;
+	sxi->sxi_ip2 = ip;
+
+	return 0;
+}
+
+const struct xfs_defer_op_type xfs_swapext_defer_type = {
+	.diff_items	= xfs_swapext_diff_items,
+	.create_intent	= xfs_swapext_create_intent,
+	.abort_intent	= xfs_swapext_abort_intent,
+	.log_item	= xfs_swapext_log_item,
+	.create_done	= xfs_swapext_create_done,
+	.finish_item	= xfs_swapext_finish_item,
+	.cancel_item	= xfs_swapext_cancel_item,
+	.freeze_item	= xfs_swapext_freeze_item,
+	.thaw_item	= xfs_swapext_thaw_item,
 };
