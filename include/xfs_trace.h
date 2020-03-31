@@ -332,4 +332,10 @@
 #define trace_xfs_imeta_dir_unlinked(...)	((void) 0)
 #define trace_xfs_imeta_dir_zap(...)		((void) 0)
 
+#define trace_xfs_swapext_defer(...)		((void) 0)
+#define trace_xfs_swapext_estimate(...)		((void) 0)
+#define trace_xfs_swapext_extent1(...)		((void) 0)
+#define trace_xfs_swapext_extent2(...)		((void) 0)
+#define trace_xfs_swapext_update_inode_size(...) ((void) 0)
+
 #endif /* __TRACE_H__ */
