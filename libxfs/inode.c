@@ -366,3 +366,51 @@ xfs_iunlink_change_backref(
 {
 	return 0;
 }
+
+/* Release all the inode resources attached to this freezer. */
+void
+xfs_defer_freezer_irele(
+	struct xfs_defer_freezer	*dff)
+{
+	unsigned int			i;
+
+	for (i = 0; i < XFS_DEFER_FREEZER_INODES; i++) {
+		if (dff->dff_inodes[i]) {
+			xfs_iunlock(dff->dff_inodes[i], XFS_ILOCK_EXCL);
+			libxfs_irele(dff->dff_inodes[i]);
+			dff->dff_inodes[i] = NULL;
+		}
+	}
+}
+
+/* Attach inodes to this freezer. */
+int
+xfs_defer_freezer_iget(
+	struct xfs_defer_freezer	*dff,
+	struct xfs_trans		*tp)
+{
+	unsigned int			i;
+	int				error;
+
+	for (i = 0; i < XFS_DEFER_FREEZER_INODES; i++) {
+		if (dff->dff_ino[i] == NULLFSINO)
+			continue;
+		error = libxfs_iget(tp->t_mountp, tp, dff->dff_ino[i], 0,
+				&dff->dff_inodes[i], NULL);
+		if (error) {
+			xfs_defer_freezer_irele(dff);
+			return error;
+		}
+	}
+	if (dff->dff_inodes[1]) {
+		xfs_lock_two_inodes(dff->dff_inodes[0], XFS_ILOCK_EXCL,
+				    dff->dff_inodes[1], XFS_ILOCK_EXCL);
+		libxfs_trans_ijoin(tp, dff->dff_inodes[0], 0);
+		libxfs_trans_ijoin(tp, dff->dff_inodes[1], 0);
+	} else if (dff->dff_inodes[0]) {
+		xfs_ilock(dff->dff_inodes[0], XFS_ILOCK_EXCL);
+		libxfs_trans_ijoin(tp, dff->dff_inodes[0], 0);
+	}
+
+	return 0;
+}
