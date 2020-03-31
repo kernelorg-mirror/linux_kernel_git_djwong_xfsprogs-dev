@@ -113,8 +113,8 @@ xfs_swapext_reflink_finish(
 		if (rs->ip1_reflink)
 			ip2->i_d.di_flags2 |= XFS_DIFLAG2_REFLINK;
 
-	xfs_trans_log_inode(tp, ip1, XFS_ILOG_CORE);
-	xfs_trans_log_inode(tp, ip2, XFS_ILOG_CORE);
+		xfs_trans_log_inode(tp, ip1, XFS_ILOG_CORE);
+		xfs_trans_log_inode(tp, ip2, XFS_ILOG_CORE);
 	}
 
 	xfs_swapext_ensure_cowfork(ip1);
@@ -230,6 +230,20 @@ xfs_swapext_finish_one(
 			continue;
 		}
 
+		/* Update quota accounting. */
+		if (xfs_bmap_is_real_extent(&irec1)) {
+			xfs_trans_mod_dquot_byino(tp, ip1, XFS_TRANS_DQ_BCOUNT,
+					-irec1.br_blockcount);
+			xfs_trans_mod_dquot_byino(tp, ip2, XFS_TRANS_DQ_BCOUNT,
+					irec1.br_blockcount);
+		}
+		if (xfs_bmap_is_real_extent(&irec2)) {
+			xfs_trans_mod_dquot_byino(tp, ip2, XFS_TRANS_DQ_BCOUNT,
+				-irec2.br_blockcount);
+			xfs_trans_mod_dquot_byino(tp, ip1, XFS_TRANS_DQ_BCOUNT,
+				irec2.br_blockcount);
+		}
+
 		/* Remove both mappings. */
 		xfs_bmap_unmap_extent(tp, ip1, whichfork, &irec1);
 		xfs_bmap_unmap_extent(tp, ip2, whichfork, &irec2);
@@ -289,7 +303,49 @@ xfs_swapext_atomic(
 			startoff2, blockcount);
 	error = xfs_defer_finish(tpp);
 	if (error)
-	return error;
+		return error;
+
+	xfs_swapext_reflink_finish(*tpp, ip1, ip2, &reflink_state);
+	return 0;
+}
+
+/*
+ * Swap a range of extents from one inode to another, non-atomically.
+ *
+ * Use deferred bmap log items swap a range of extents from one inode with
+ * another.  Overall extent swap progress is /not/ tracked through the log,
+ * which means that while log recovery can finish remapping a single extent,
+ * it cannot finish the entire operation.
+ */
+int
+xfs_swapext_deferred_bmap(
+	struct xfs_trans	**tpp,
+	struct xfs_inode	*ip1,
+	struct xfs_inode	*ip2,
+	int			whichfork,
+	xfs_fileoff_t		startoff1,
+	xfs_fileoff_t		startoff2,
+	xfs_filblks_t		blockcount)
+{
+	struct xfs_swapext_reflink_state reflink_state = { 0 };
+	int			error;
+
+	ASSERT(xfs_isilocked(ip1, XFS_ILOCK_EXCL));
+	ASSERT(xfs_isilocked(ip2, XFS_ILOCK_EXCL));
+	ASSERT(whichfork != XFS_COW_FORK);
+
+	xfs_swapext_reflink_prep(ip1, ip2, whichfork, startoff1, startoff2,
+			blockcount, &reflink_state);
+
+	while (blockcount > 0) {
+		error = xfs_swapext_finish_one(*tpp, ip1, ip2, whichfork,
+				&startoff1, &startoff2, &blockcount);
+		if (error)
+			return error;
+		error = xfs_defer_finish(tpp);
+		if (error)
+			return error;
+	}
 
 	xfs_swapext_reflink_finish(*tpp, ip1, ip2, &reflink_state);
 	return 0;
