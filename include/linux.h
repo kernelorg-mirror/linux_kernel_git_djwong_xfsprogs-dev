@@ -345,4 +345,69 @@ fsmap_advance(
 #include <asm-generic/mman-common.h>
 #endif /* HAVE_MAP_SYNC */
 
+#ifndef HAVE_FISWAPRANGE
+/*
+ * Swap part of file1 with part of the file that this ioctl that is being
+ * called against (which we'll call file2).  Filesystems must be able to
+ * complete the operation even if the system goes down.
+ */
+struct file_swap_range {
+	__s64		file1_fd;
+	__s64		file1_offset;	/* file1 offset, bytes */
+	__s64		file2_offset;	/* file2 offset, bytes */
+	__s64		length;		/* bytes to swap */
+
+	__u64		flags;		/* see FILE_SWAP_RANGE_* below */
+
+	/* file2 metadata for optional freshness checks */
+	__s64		file2_ino;	/* inode number */
+	__s64		file2_mtime;	/* modification time */
+	__s64		file2_ctime;	/* change time */
+	__s32		file2_mtime_nsec; /* mod time, nsec */
+	__s32		file2_ctime_nsec; /* change time, nsec */
+
+	__u64		pad[6];		/* must be zeroes */
+};
+
+/*
+ * Atomic swap operations are not required.  This relaxes the requirement that
+ * the filesystem must be able to complete the operation after a crash.
+ */
+#define FILE_SWAP_RANGE_NONATOMIC	(1 << 0)
+
+/*
+ * Check that file2's inode number, mtime, and ctime against the values
+ * provided, and return -EBUSY if there isn't an exact match.
+ */
+#define FILE_SWAP_RANGE_FILE2_FRESH	(1 << 1)
+
+/*
+ * Check that the file1's length is equal to file1_offset + length, and that
+ * file2's length is equal to file2_offset + length.  Returns -EDOM if there
+ * isn't an exact match.
+ */
+#define FILE_SWAP_RANGE_FULL_FILES	(1 << 2)
+
+/*
+ * Swap file data all the way to the ends of both files, and then swap the file
+ * sizes.  This flag can be used to replace a file's contents with a different
+ * amount of data.  length will be ignored.
+ */
+#define FILE_SWAP_RANGE_TO_EOF		(1 << 3)
+
+/*
+ * Caller wishes to defragment the file.  Returns -EOPNOTSUPP if performing the
+ * swap would result in more fragmentation.
+ */
+#define FILE_SWAP_RANGE_DEFRAGMENT	(1 << 4)
+
+#define FILE_SWAP_RANGE_ALL_FLAGS	(FILE_SWAP_RANGE_NONATOMIC | \
+					 FILE_SWAP_RANGE_FILE2_FRESH | \
+					 FILE_SWAP_RANGE_FULL_FILES | \
+					 FILE_SWAP_RANGE_TO_EOF | \
+					 FILE_SWAP_RANGE_DEFRAGMENT)
+
+#define FISWAPRANGE	_IOWR('X', 129, struct file_swap_range)
+#endif /* HAVE_FISWAPRANGE */
+
 #endif	/* __XFS_LINUX_H__ */
