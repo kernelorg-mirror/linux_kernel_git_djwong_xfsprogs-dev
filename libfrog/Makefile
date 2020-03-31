@@ -27,6 +27,7 @@ projects.c \
 ptvar.c \
 radix-tree.c \
 scrub.c \
+swapext.c \
 topology.c \
 util.c \
 workqueue.c
@@ -47,6 +48,7 @@ projects.h \
 ptvar.h \
 radix-tree.h \
 scrub.h \
+swapext.h \
 topology.h \
 workqueue.h
 
