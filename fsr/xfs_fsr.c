@@ -964,6 +964,20 @@ fsr_setup_attr_fork(
 		return 0;
 
 	/*
+	 * If the filesystem has atomicswap=1 or rmapbt=1, the extent swap
+	 * implementation uses a higher level algorithm that calls into the
+	 * bmap code instead of playing games with swapping the extent forks.
+	 *
+	 * Only the extent fork swap code requires bs_forkoff to be set to a
+	 * specific value, which means that this (error prone) process of
+	 * messing around with xattrs on the donor file is not needed with the
+	 * newer implementations.
+	 */
+	if (fsgeom.flags & (XFS_FSOP_GEOM_FLAGS_ATOMIC_SWAP |
+			    XFS_FSOP_GEOM_FLAGS_RMAPBT))
+		return 0;
+
+	/*
 	 * use the old method if we have attr1 or the kernel does not yet
 	 * support passing the fork offset in the bulkstat data.
 	 */
