@@ -324,17 +324,21 @@ open_f(
 	return 0;
 }
 
-static int
-close_f(
-	int		argc,
-	char		**argv)
+int
+closefile(void)
 {
 	size_t		length;
 	unsigned int	offset;
 
+	if (file->flags & IO_ATOMICUPDATE) {
+		fprintf(stderr,
+	_("%s: atomic update in progress, cannot close.\n"),
+			file->name);
+		return 1;
+	}
 	if (close(file->fd) < 0) {
 		perror("close");
-		return 0;
+		return 1;
 	}
 	free(file->name);
 
@@ -356,7 +360,19 @@ close_f(
 		free(filetable);
 		file = filetable = NULL;
 	}
-	filelist_f();
+	return 0;
+}
+
+static int
+close_f(
+	int		argc,
+	char		**argv)
+{
+	int		ret;
+
+	ret = closefile();
+	if (!ret)
+		filelist_f();
 	return 0;
 }
 
