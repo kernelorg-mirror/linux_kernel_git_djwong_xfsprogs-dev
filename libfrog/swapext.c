@@ -13,6 +13,23 @@
 #include "bulkstat.h"
 #include "swapext.h"
 
+/*
+ * Enable checking that the target (or destination) file has not been modified
+ * since a particular point in time.
+ */
+void
+xfrog_swapext_require_file2_fresh(
+	struct file_swap_range	*req,
+	struct xfs_bulkstat	*bulkstat)
+{
+	req->flags |= FILE_SWAP_RANGE_FILE2_FRESH;
+	req->file2_ino = bulkstat->bs_ino;
+	req->file2_mtime = bulkstat->bs_mtime;
+	req->file2_ctime = bulkstat->bs_ctime;
+	req->file2_mtime_nsec = bulkstat->bs_mtime_nsec;
+	req->file2_ctime_nsec = bulkstat->bs_ctime_nsec;
+}
+
 /* Prepare an extent swap request. */
 int
 xfrog_swapext_prep(
@@ -50,11 +67,7 @@ xfrog_swapext_prep(
 		if (error)
 			return error;
 
-		req->file2_ino = stat.st_ino;
-		req->file2_mtime = bulkstat.bs_mtime;
-		req->file2_ctime = bulkstat.bs_ctime;
-		req->file2_mtime_nsec = bulkstat.bs_mtime_nsec;
-		req->file2_ctime_nsec = bulkstat.bs_ctime_nsec;
+		xfrog_swapext_require_file2_fresh(req, &bulkstat);
 	}
 
 	return 0;
