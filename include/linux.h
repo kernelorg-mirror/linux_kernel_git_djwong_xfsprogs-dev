@@ -345,4 +345,14 @@ fsmap_advance(
 #include <asm-generic/mman-common.h>
 #endif /* HAVE_MAP_SYNC */
 
+/* Get XATTR_CREATE and XATTR_REPLACE from somewhere... */
+#ifdef HAVE_FSETXATTR
+# include <sys/xattr.h>
+#elif defined HAVE_LIBATTR
+# include <attr/xattr.h>
+#else
+# include <linux/xattr.h>
+#endif /* HAVE_FSETXATTR */
+
+
 #endif	/* __XFS_LINUX_H__ */
