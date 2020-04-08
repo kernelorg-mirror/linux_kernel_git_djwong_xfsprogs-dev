@@ -494,7 +494,7 @@ _("inode %" PRIu64 " bad # of bmap records (%u, min - %u, max - %u)\n"),
 		 * we'd do it right here.  For now, if there's a problem,
 		 * we'll bail out and presumably clear the inode.
 		 */
-		if (!verify_dfsbno(mp, be64_to_cpu(pp[i])))  {
+		if (!libxfs_verify_fsbno(mp, be64_to_cpu(pp[i])))  {
 			do_warn(
 _("bad bmap btree ptr 0x%llx in ino %" PRIu64 "\n"),
 			       (unsigned long long) be64_to_cpu(pp[i]), ino);
@@ -1620,7 +1620,7 @@ _("invalid flags in high key %u of %s btree block %u/%u\n"),
 			continue;
 		}
 
-		if (!verify_dfsbno(mp, pbno)) {
+		if (!libxfs_verify_fsbno(mp, pbno)) {
 			do_warn(
 _("bad %s btree ptr 0x%llx in ino %" PRIu64 "\n"),
 			       name, (unsigned long long)pbno, ino);
