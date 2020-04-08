@@ -782,6 +782,14 @@ _("%s freespace btree block claimed (state %d), agno %d, bno %d, suspect %d\n"),
 	for (i = 0; i < numrecs; i++)  {
 		xfs_agblock_t		agbno = be32_to_cpu(pp[i]);
 
+		if (!libxfs_verify_agbno(mp, agno, agbno)) {
+			do_warn(
+	_("bad btree pointer (%u) in %sbt block %u/%u\n"),
+				agbno, name, agno, bno);
+			suspect++;
+			return;
+		}
+
 		/*
 		 * XXX - put sibling detection right here.
 		 * we know our sibling chain is good.  So as we go,
@@ -791,10 +799,8 @@ _("%s freespace btree block claimed (state %d), agno %d, bno %d, suspect %d\n"),
 		 * pointer mismatch, try and extract as much data
 		 * as possible.
 		 */
-		if (agbno != 0 && verify_agbno(mp, agno, agbno)) {
-			scan_sbtree(agbno, level, agno, suspect, scan_allocbt,
-				    0, magic, priv, ops);
-		}
+		scan_sbtree(agbno, level, agno, suspect, scan_allocbt, 0,
+				magic, priv, ops);
 	}
 }
 
@@ -1230,10 +1236,16 @@ advance:
 			continue;
 		}
 
-		if (agbno != 0 && verify_agbno(mp, agno, agbno)) {
-			scan_sbtree(agbno, level, agno, suspect, scan_rmapbt, 0,
-				    magic, priv, ops);
+		if (!libxfs_verify_agbno(mp, agno, agbno)) {
+			do_warn(
+	_("bad btree pointer (%u) in %sbt block %u/%u\n"),
+				agbno, name, agno, bno);
+			suspect++;
+			return;
 		}
+
+		scan_sbtree(agbno, level, agno, suspect, scan_rmapbt, 0, magic,
+				priv, ops);
 	}
 
 out:
@@ -1833,10 +1845,16 @@ _("extent (%u/%u) len %u claimed, state is %d\n"),
 	for (i = 0; i < numrecs; i++)  {
 		xfs_agblock_t		agbno = be32_to_cpu(pp[i]);
 
-		if (agbno != 0 && verify_agbno(mp, agno, agbno)) {
-			scan_sbtree(agbno, level, agno, suspect, scan_refcbt, 0,
-				    magic, priv, ops);
+		if (!libxfs_verify_agbno(mp, agno, agbno)) {
+			do_warn(
+	_("bad btree pointer (%u) in %sbt block %u/%u\n"),
+				agbno, name, agno, bno);
+			suspect++;
+			return;
 		}
+
+		scan_sbtree(agbno, level, agno, suspect, scan_refcbt, 0, magic,
+				priv, ops);
 	}
 out:
 	if (suspect)
@@ -2523,11 +2541,18 @@ _("%sbt btree block claimed (state %d), agno %d, bno %d, suspect %d\n"),
 	}
 
 	for (i = 0; i < numrecs; i++)  {
-		if (be32_to_cpu(pp[i]) != 0 && verify_agbno(mp, agno,
-							be32_to_cpu(pp[i])))
-			scan_sbtree(be32_to_cpu(pp[i]), level, agno,
-					suspect, scan_inobt, 0, magic, priv,
-					ops);
+		xfs_agblock_t	agbno = be32_to_cpu(pp[i]);
+
+		if (!libxfs_verify_agbno(mp, agno, agbno)) {
+			do_warn(
+	_("bad btree pointer (%u) in %sbt block %u/%u\n"),
+				agbno, name, agno, bno);
+			suspect++;
+			return;
+		}
+
+		scan_sbtree(be32_to_cpu(pp[i]), level, agno, suspect,
+				scan_inobt, 0, magic, priv, ops);
 	}
 }
 
