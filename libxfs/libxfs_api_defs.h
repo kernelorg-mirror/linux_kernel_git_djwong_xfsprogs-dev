@@ -246,6 +246,7 @@ struct timespec64 {
 #define xfs_trans_roll			libxfs_trans_roll
 
 #define xfs_verify_agbno		libxfs_verify_agbno
+#define xfs_verify_agino		libxfs_verify_agino
 #define xfs_verify_cksum		libxfs_verify_cksum
 #define xfs_verify_dir_ino		libxfs_verify_dir_ino
 #define xfs_verify_fsbno		libxfs_verify_fsbno
