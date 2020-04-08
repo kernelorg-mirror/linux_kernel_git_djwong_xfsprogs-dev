@@ -687,7 +687,8 @@ _("%s freespace btree block claimed (state %d), agno %d, bno %d, suspect %d\n"),
 					b, i, name, agno, bno);
 				continue;
 			}
-			if (len == 0 || !verify_agbno(mp, agno, end - 1)) {
+			if (len == 0 || end <= b ||
+			    !verify_agbno(mp, agno, end - 1)) {
 				do_warn(
 	_("invalid length %u in record %u of %s btree block %u/%u\n"),
 					len, i, name, agno, bno);
@@ -1062,7 +1063,8 @@ _("%s rmap btree block claimed (state %d), agno %d, bno %d, suspect %d\n"),
 					b, i, name, agno, bno);
 				continue;
 			}
-			if (len == 0 || !verify_agbno(mp, agno, end - 1)) {
+			if (len == 0 || end <= b ||
+			    !verify_agbno(mp, agno, end - 1)) {
 				do_warn(
 	_("invalid length %u in record %u of %s btree block %u/%u\n"),
 					len, i, name, agno, bno);
@@ -1732,7 +1734,8 @@ _("leftover CoW extent has invalid startblock in record %u of %s btree block %u/
 					b, i, name, agno, bno);
 				continue;
 			}
-			if (len == 0 || !verify_agbno(mp, agno, end - 1)) {
+			if (len == 0 || end <= b ||
+			    !verify_agbno(mp, agno, end - 1)) {
 				do_warn(
 	_("invalid length %u in record %u of %s btree block %u/%u\n"),
 					len, i, name, agno, bno);
