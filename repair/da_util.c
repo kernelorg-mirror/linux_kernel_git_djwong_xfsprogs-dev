@@ -140,11 +140,24 @@ _("can't read %s block %u for inode %" PRIu64 "\n"),
 		if (whichfork == XFS_DATA_FORK &&
 		    (nodehdr.magic == XFS_DIR2_LEAFN_MAGIC ||
 		    nodehdr.magic == XFS_DIR3_LEAFN_MAGIC)) {
+			int bad = 0;
+
 			if (i != -1) {
 				do_warn(
 _("found non-root LEAFN node in inode %" PRIu64 " bno = %u\n"),
 					da_cursor->ino, bno);
+				bad++;
 			}
+
+			/* corrupt leafn node; rebuild the dir. */
+			if (!bad &&
+			    (bp->b_error == -EFSBADCRC ||
+			     bp->b_error == -EFSCORRUPTED)) {
+				do_warn(
+_("corrupt %s LEAFN block %u for inode %" PRIu64 "\n"),
+					FORKNAME(whichfork), bno, da_cursor->ino);
+			}
+
 			*rbno = 0;
 			libxfs_buf_relse(bp);
 			return 1;
@@ -597,6 +610,14 @@ _("entry count %d too large in %s block %u for inode %" PRIu64 "\n"),
 _("bad level %d in %s block %u for inode %" PRIu64 "\n"),
 				nodehdr.level, FORKNAME(whichfork),
 				dabno, cursor->ino);
+			bad++;
+		}
+		if (!bad &&
+		    (bp->b_error == -EFSCORRUPTED ||
+		     bp->b_error == -EFSBADCRC)) {
+			do_warn(
+_("corruption error reading %s block %u for inode %" PRIu64 "\n"),
+				FORKNAME(whichfork), dabno, cursor->ino);
 			bad++;
 		}
 		if (bad) {
