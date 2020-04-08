@@ -921,15 +921,15 @@ _("unknown block (%d,%d-%d) mismatch on %s tree, state - %d,%" PRIx64 "\n"),
 static bool
 rmap_in_order(
 	xfs_agblock_t	b,
-	xfs_agblock_t	lastblock,
+	xfs_agblock_t	laststartblock,
 	uint64_t	owner,
 	uint64_t	lastowner,
 	uint64_t	offset,
 	uint64_t	lastoffset)
 {
-	if (b > lastblock)
+	if (b > laststartblock)
 		return true;
-	else if (b < lastblock)
+	else if (b < laststartblock)
 		return false;
 
 	if (owner > lastowner)
@@ -960,6 +960,7 @@ scan_rmapbt(
 	int			hdr_errors = 0;
 	int			numrecs;
 	int			state;
+	xfs_agblock_t		laststartblock = 0;
 	xfs_agblock_t		lastblock = 0;
 	uint64_t		lastowner = 0;
 	uint64_t		lastoffset = 0;
@@ -1097,14 +1098,15 @@ _("%s rmap btree block claimed (state %d), agno %d, bno %d, suspect %d\n"),
 			/* Check for out of order records. */
 			if (i == 0) {
 advance:
-				lastblock = b;
+				laststartblock = b;
+				lastblock = end - 1;
 				lastowner = owner;
 				lastoffset = offset;
 			} else {
 				bool bad;
 
 				if (xfs_sb_version_hasreflink(&mp->m_sb))
-					bad = !rmap_in_order(b, lastblock,
+					bad = !rmap_in_order(b, laststartblock,
 							owner, lastowner,
 							offset, lastoffset);
 				else
