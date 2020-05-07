@@ -25,6 +25,7 @@ HFILES = \
 	prefetch.h \
 	progress.h \
 	protos.h \
+	quotacheck.h \
 	rmap.h \
 	rt.h \
 	scan.h \
@@ -58,6 +59,7 @@ CFILES = \
 	phase7.c \
 	prefetch.c \
 	progress.c \
+	quotacheck.c \
 	rmap.c \
 	rt.c \
 	sb.c \
