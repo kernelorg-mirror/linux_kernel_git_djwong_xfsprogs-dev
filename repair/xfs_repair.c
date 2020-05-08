@@ -25,6 +25,7 @@
 #include "libfrog/fsgeom.h"
 #include "libfrog/platform.h"
 #include "bload.h"
+#include "quotacheck.h"
 
 /*
  * option tables for getsubopt calls
@@ -1100,7 +1101,8 @@ _("Warning:  project quota information would be cleared.\n"
 
 	dsb = sbp->b_addr;
 
-	if (be16_to_cpu(dsb->sb_qflags) & XFS_ALL_QUOTA_CHKD) {
+	if ((be16_to_cpu(dsb->sb_qflags) & XFS_ALL_QUOTA_CHKD) !=
+			quotacheck_results()) {
 		do_warn(_("Note - quota info will be regenerated on next "
 			"quota mount.\n"));
 		dsb->sb_qflags &= cpu_to_be16(~XFS_ALL_QUOTA_CHKD);

@@ -16,6 +16,16 @@
  */
 static uint16_t chkd_flags;
 
+/*
+ * Return CHKD flags for the quota types that we checked.  If we encountered
+ * any errors at all, return zero.
+ */
+uint16_t
+quotacheck_results(void)
+{
+	return chkd_flags;
+}
+
 /* Global incore dquot tree */
 struct qc_dquots {
 	pthread_mutex_t		lock;
