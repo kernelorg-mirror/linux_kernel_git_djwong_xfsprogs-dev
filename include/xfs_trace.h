@@ -63,6 +63,10 @@
 #define trace_xfs_iext_insert(a,b,c,d)		((void) 0)
 #define trace_xfs_iext_remove(a,b,c,d)		((void) 0)
 
+#define trace_xfs_defer_relog(a,b)		((void) 0)
+#define trace_xfs_defer_relog_intent(a,b)	((void) 0)
+#define trace_xfs_defer_relog_done(a,b)		((void) 0)
+
 #define trace_xfs_dir2_grow_inode(a,b)		((void) 0)
 #define trace_xfs_dir2_shrink_inode(a,b)	((void) 0)
 

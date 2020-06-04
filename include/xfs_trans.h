@@ -12,6 +12,10 @@ struct xfs_buftarg;
 struct xfs_buf;
 struct xfs_buf_map;
 
+struct xfs_log_item;
+
+#define xfs_trans_item_relog(lip, tp)	(NULL)
+
 /*
  * Userspace Transaction interface
  */
