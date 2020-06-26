@@ -143,6 +143,11 @@ clear_dinode(xfs_mount_t *mp, xfs_dinode_t *dino, xfs_ino_t ino_num)
 	clear_dinode_core(mp, dino, ino_num);
 	clear_dinode_unlinked(mp, dino);
 
+	if (rmap_is_rtrmap_ino(ino_num)) {
+		need_rrmapino = true;
+		rmap_avoid_check();
+	}
+
 	/* and clear the forks */
 	memset(XFS_DFORK_DPTR(dino), 0, XFS_LITINO(mp));
 	return;
@@ -1747,6 +1752,9 @@ process_check_sb_inodes(
 	if (lino == mp->m_sb.sb_rbmino)
 		return process_check_rt_inode(mp, dinoc, lino, type, dirty,
 				XR_INO_RTBITMAP, _("realtime bitmap"));
+	if (rmap_is_rtrmap_ino(lino))
+		return process_check_rt_inode(mp, dinoc, lino, type, dirty,
+				XR_INO_RTRMAP, _("realtime rmap btree"));
 	return 0;
 }
 
@@ -1841,6 +1849,18 @@ _("realtime bitmap inode %" PRIu64 " has bad size %" PRId64 " (should be %" PRIu
 			do_warn(
 _("realtime summary inode %" PRIu64 " has bad size %" PRId64 " (should be %d)\n"),
 				lino, size, mp->m_rsumsize);
+			return 1;
+		}
+		break;
+
+	case XR_INO_RTRMAP:
+		/*
+		 * if we have no rmapbt, any inode claiming
+		 * to be a real-time file is bogus
+		 */
+		if (!xfs_sb_version_hasrmapbt(&mp->m_sb)) {
+			do_warn(
+_("found inode %" PRIu64 " claiming to be a rtrmapbt file, but rmapbt is disabled\n"), lino);
 			return 1;
 		}
 		break;
@@ -2857,6 +2877,8 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 			type = XR_INO_GQUOTA;
 		else if (lino == mp->m_sb.sb_pquotino)
 			type = XR_INO_PQUOTA;
+		else if (dino->di_format == XFS_DINODE_FMT_RMAP)
+			type = XR_INO_RTRMAP;
 		else
 			type = XR_INO_DATA;
 		break;
