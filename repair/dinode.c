@@ -2127,6 +2127,9 @@ check_nsec(
 {
 	struct timespec64	tv;
 
+	if (xfs_dinode_has_bigtime(dip))
+		return;
+
 	tv = libxfs_inode_from_disk_ts(dip, *t);
 	if (tv.tv_nsec < NSEC_PER_SEC)
 		return;
@@ -2550,6 +2553,27 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 					lino);
 			}
 			flags2 &= ~XFS_DIFLAG2_COWEXTSIZE;
+		}
+
+		if (xfs_dinode_has_bigtime(dino) &&
+		    !xfs_sb_version_hasbigtime(&mp->m_sb)) {
+			if (!uncertain) {
+				do_warn(
+	_("inode %" PRIu64 " is marked bigtime but file system does not support large timestamps\n"),
+					lino);
+			}
+			flags2 &= ~XFS_DIFLAG2_BIGTIME;
+
+			if (no_modify) {
+				do_warn(_("would zero timestamps.\n"));
+			} else {
+				do_warn(_("zeroing timestamps.\n"));
+				dino->di_atime = 0;
+				dino->di_mtime = 0;
+				dino->di_ctime = 0;
+				dino->di_crtime = 0;
+				*dirty = 1;
+			}
 		}
 
 		if (!verify_mode && flags2 != be64_to_cpu(dino->di_flags2)) {
