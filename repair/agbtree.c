@@ -65,8 +65,8 @@ consume_freespace(
 }
 
 /* Reserve blocks for the new per-AG structures. */
-static void
-reserve_btblocks(
+static uint32_t
+reserve_agblocks(
 	struct xfs_mount	*mp,
 	xfs_agnumber_t		agno,
 	struct bt_rebuild	*btr,
@@ -86,8 +86,7 @@ reserve_btblocks(
 		 */
 		ext_ptr = findfirst_bcnt_extent(agno);
 		if (!ext_ptr)
-			do_error(
-_("error - not enough free space in filesystem\n"));
+			break;
 
 		/* Use up the extent we've got. */
 		len = min(ext_ptr->ex_blockcount, nr_blocks - blocks_allocated);
@@ -110,6 +109,23 @@ _("error - not enough free space in filesystem\n"));
 	fprintf(stderr, "blocks_allocated = %d\n",
 		blocks_allocated);
 #endif
+	return blocks_allocated;
+}
+
+static inline void
+reserve_btblocks(
+	struct xfs_mount	*mp,
+	xfs_agnumber_t		agno,
+	struct bt_rebuild	*btr,
+	uint32_t		nr_blocks)
+{
+	uint32_t		got;
+
+	got = reserve_agblocks(mp, agno, btr, nr_blocks);
+	if (got != nr_blocks)
+		do_error(
+	_("error - not enough free space in filesystem, AG %u\n"),
+				agno);
 }
 
 /* Feed one of the new btree blocks to the bulk loader. */
@@ -217,7 +233,10 @@ init_freespace_cursors(
 	struct bt_rebuild	*btr_bno,
 	struct bt_rebuild	*btr_cnt)
 {
+	unsigned int		agfl_goal;
 	int			error;
+
+	agfl_goal = libxfs_alloc_min_freelist(sc->mp, NULL);
 
 	init_rebuild(sc, &XFS_RMAP_OINFO_AG, free_space, btr_bno);
 	init_rebuild(sc, &XFS_RMAP_OINFO_AG, free_space, btr_cnt);
@@ -243,6 +262,7 @@ init_freespace_cursors(
 	do {
 		unsigned int	num_freeblocks;
 		int		delta_bno, delta_cnt;
+		int		agfl_wanted;
 
 		/* Compute how many bnobt blocks we'll need. */
 		error = -libxfs_btree_bload_compute_geometry(btr_bno->cur,
@@ -268,16 +288,33 @@ _("Unable to compute free space by length btree geometry, error %d.\n"), -error)
 				 btr_cnt->bload.nr_blocks;
 
 		/* We don't need any more blocks, so we're done. */
-		if (delta_bno >= 0 && delta_cnt >= 0) {
+		if (delta_bno >= 0 && delta_cnt >= 0 &&
+		    delta_bno + delta_cnt >= agfl_goal) {
 			*extra_blocks = delta_bno + delta_cnt;
 			break;
 		}
 
 		/* Allocate however many more blocks we need this time. */
-		if (delta_bno < 0)
+		if (delta_bno < 0) {
 			reserve_btblocks(sc->mp, agno, btr_bno, -delta_bno);
-		if (delta_cnt < 0)
+			delta_bno = 0;
+		}
+		if (delta_cnt < 0) {
 			reserve_btblocks(sc->mp, agno, btr_cnt, -delta_cnt);
+			delta_cnt = 0;
+		}
+
+		/*
+		 * Try to fill the bnobt cursor with extra blocks to populate
+		 * the AGFL.  If we don't get all the blocks we want, stop
+		 * trying to fill the AGFL because the AG is totally out of
+		 * space.
+		 */
+		agfl_wanted = agfl_goal - (delta_bno + delta_cnt);
+		if (agfl_wanted > 0 &&
+		    agfl_wanted != reserve_agblocks(sc->mp, agno, btr_bno,
+						    agfl_wanted))
+			agfl_goal = 0;
 
 		/* Ok, now how many free space records do we have? */
 		*nr_extents = count_bno_extents_blocks(agno, &num_freeblocks);
