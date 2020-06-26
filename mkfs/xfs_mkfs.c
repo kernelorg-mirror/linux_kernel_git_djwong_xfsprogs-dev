@@ -2135,12 +2135,14 @@ _("reflink not supported with realtime devices\n"));
 		}
 		cli->sb_feat.reflink = false;
 
-		if (cli->sb_feat.rmapbt && cli_opt_set(&mopts, M_RMAPBT)) {
-			fprintf(stderr,
-_("rmapbt not supported with realtime devices\n"));
-			usage();
+		if (!cli->sb_feat.metadir && cli->sb_feat.rmapbt) {
+			if (cli_opt_set(&mopts, M_RMAPBT)) {
+				fprintf(stderr,
+_("rmapbt not supported on realtime device without metadir feature\n"));
+				usage();
+			}
+			cli->sb_feat.rmapbt = false;
 		}
-		cli->sb_feat.rmapbt = false;
 	}
 
 	/*
