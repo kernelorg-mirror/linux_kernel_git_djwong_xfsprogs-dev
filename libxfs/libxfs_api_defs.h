@@ -184,6 +184,8 @@
 #define xfs_rmap_query_all		libxfs_rmap_query_all
 #define xfs_rmap_query_range		libxfs_rmap_query_range
 
+#define xfs_rtrmapbt_maxrecs		libxfs_rtrmapbt_maxrecs
+
 #define xfs_rtfree_extent		libxfs_rtfree_extent
 #define xfs_sb_from_disk		libxfs_sb_from_disk
 #define xfs_sb_quota_from_disk		libxfs_sb_quota_from_disk
