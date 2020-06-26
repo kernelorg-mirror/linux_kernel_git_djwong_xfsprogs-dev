@@ -150,4 +150,7 @@ libxfs_trans_read_buf(
 	return libxfs_trans_read_buf_map(mp, tp, btp, &map, 1, flags, bpp, ops);
 }
 
+int libxfs_trans_reserve_more(struct xfs_trans *tp, uint blocks,
+			uint rtextents);
+
 #endif	/* __XFS_TRANS_H__ */
