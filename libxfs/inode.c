@@ -46,151 +46,24 @@ xfs_ialloc_fsx_init(
 	xfs_trans_log_inode(*tpp, ip, XFS_ILOG_CORE);
 }
 
+void
+xfs_setup_inode(
+	struct xfs_inode	*ip)
+{
+	/* empty */
+}
+
 /*
  * Create in-core inode for a newly allocated on-disk inode.  We don't have
  * any effective inode locking so we don't need to grab anything.
  */
-static int
+int
 xfs_ialloc_iget(
 	struct xfs_trans	*tp,
 	xfs_ino_t		ino,
 	struct xfs_inode	**ipp)
 {
 	return libxfs_iget(tp->t_mountp, tp, ino, 0, ipp);
-}
-
-/*
- * Allocate an inode on disk and return a copy of its in-core version.
- * Set mode, nlink, and rdev appropriately within the inode.
- * The uid and gid for the inode are set according to the contents of
- * the given cred structure.
- *
- * This was once shared with the kernel, but has diverged to the point
- * where it's no longer worth the hassle of maintaining common code.
- */
-int
-libxfs_ialloc(
-	struct xfs_trans		*tp,
-	const struct xfs_ialloc_args	*args,
-	struct xfs_buf			**ialloc_context,
-	struct xfs_inode		**ipp)
-{
-	struct xfs_inode		*ip;
-	struct xfs_inode		*pip = args->pip;
-	xfs_ino_t			ino;
-	uint				flags;
-	int				times;
-	int				error;
-
-	/*
-	 * Call the space management code to pick
-	 * the on-disk inode to be allocated.
-	 */
-	error = xfs_dialloc(tp, pip ? pip->i_ino : 0, args->mode,
-			    ialloc_context, &ino);
-	if (error != 0)
-		return error;
-	if (*ialloc_context || ino == NULLFSINO) {
-		*ipp = NULL;
-		return 0;
-	}
-	ASSERT(*ialloc_context == NULL);
-
-	error = xfs_ialloc_iget(tp, ino, &ip);
-	if (error != 0)
-		return error;
-	ASSERT(ip != NULL);
-
-	VFS_I(ip)->i_mode = args->mode;
-	set_nlink(VFS_I(ip), args->nlink);
-	VFS_I(ip)->i_uid = args->uid;
-	VFS_I(ip)->i_rdev = args->rdev;
-	ip->i_d.di_projid = args->prid;
-
-	if (pip && (VFS_I(pip)->i_mode & S_ISGID)) {
-		VFS_I(ip)->i_gid = VFS_I(pip)->i_gid;
-		if ((VFS_I(pip)->i_mode & S_ISGID) && S_ISDIR(args->mode))
-			VFS_I(ip)->i_mode |= S_ISGID;
-	} else
-		VFS_I(ip)->i_gid = args->gid;
-
-	ip->i_d.di_size = 0;
-	ip->i_df.if_nextents = 0;
-	ASSERT(ip->i_d.di_nblocks == 0);
-
-	times = XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD | XFS_ICHGTIME_ACCESS;
-	ip->i_d.di_extsize = 0;
-	ip->i_d.di_dmevmask = 0;
-	ip->i_d.di_dmstate = 0;
-	ip->i_d.di_flags = 0;
-
-	if (xfs_sb_version_has_v3inode(&ip->i_mount->m_sb)) {
-		ASSERT(ip->i_d.di_ino == ino);
-		ASSERT(uuid_equal(&ip->i_d.di_uuid, &mp->m_sb.sb_meta_uuid));
-		VFS_I(ip)->i_version = 1;
-		ip->i_d.di_flags2 = 0;
-		if (xfs_sb_version_hasbigtime(&ip->i_mount->m_sb))
-			ip->i_d.di_flags2 |= XFS_DIFLAG2_BIGTIME;
-		times |= XFS_ICHGTIME_CREATE;
-		ip->i_d.di_cowextsize = 0;
-	}
-
-	xfs_trans_ichgtime(tp, ip, times);
-
-	flags = XFS_ILOG_CORE;
-	switch (args->mode & S_IFMT) {
-	case S_IFIFO:
-	case S_IFSOCK:
-	case S_IFCHR:
-	case S_IFBLK:
-		ip->i_df.if_format = XFS_DINODE_FMT_DEV;
-		flags |= XFS_ILOG_DEV;
-		VFS_I(ip)->i_rdev = args->rdev;
-		break;
-	case S_IFREG:
-	case S_IFDIR:
-		if (pip && (pip->i_d.di_flags & XFS_DIFLAG_ANY)) {
-			uint	di_flags = 0;
-
-			if ((args->mode & S_IFMT) == S_IFDIR) {
-				if (pip->i_d.di_flags & XFS_DIFLAG_RTINHERIT)
-					di_flags |= XFS_DIFLAG_RTINHERIT;
-				if (pip->i_d.di_flags & XFS_DIFLAG_EXTSZINHERIT) {
-					di_flags |= XFS_DIFLAG_EXTSZINHERIT;
-					ip->i_d.di_extsize = pip->i_d.di_extsize;
-				}
-			} else {
-				if (pip->i_d.di_flags & XFS_DIFLAG_RTINHERIT) {
-					di_flags |= XFS_DIFLAG_REALTIME;
-				}
-				if (pip->i_d.di_flags & XFS_DIFLAG_EXTSZINHERIT) {
-					di_flags |= XFS_DIFLAG_EXTSIZE;
-					ip->i_d.di_extsize = pip->i_d.di_extsize;
-				}
-			}
-			if (pip->i_d.di_flags & XFS_DIFLAG_PROJINHERIT)
-				di_flags |= XFS_DIFLAG_PROJINHERIT;
-			ip->i_d.di_flags |= di_flags;
-		}
-		/* FALLTHROUGH */
-	case S_IFLNK:
-		ip->i_df.if_format = XFS_DINODE_FMT_EXTENTS;
-		ip->i_df.if_flags = XFS_IFEXTENTS;
-		ip->i_df.if_bytes = 0;
-		ip->i_df.if_u1.if_root = NULL;
-		break;
-	default:
-		ASSERT(0);
-	}
-
-	/*
-	 * Log the new values stuffed into the inode.
-	 */
-	xfs_trans_ijoin(tp, ip, 0);
-	xfs_trans_log_inode(tp, ip, flags);
-
-	*ipp = ip;
-	return 0;
 }
 
 /*
@@ -261,6 +134,9 @@ libxfs_iflush_int(
 
 	return 0;
 }
+
+/* Temporary: Fix this up until we migrate libxfs_inode_alloc */
+#define libxfs_ialloc xfs_ialloc
 
 /*
  * Wrapper around call to libxfs_ialloc. Takes care of committing and
