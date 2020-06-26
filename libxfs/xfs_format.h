@@ -1228,12 +1228,14 @@ static inline void xfs_dinode_put_rdev(struct xfs_dinode *dip, xfs_dev_t rdev)
 #define XFS_DQFLAG_USER		0x01		/* user dquot record */
 #define XFS_DQFLAG_PROJ		0x02		/* project dquot record */
 #define XFS_DQFLAG_GROUP	0x04		/* group dquot record */
+#define XFS_DQFLAG_BIGTIME	0x08		/* timers store shifted values */
 
 #define XFS_DQFLAG_TYPE_MASK	(XFS_DQFLAG_USER | \
 				 XFS_DQFLAG_PROJ | \
 				 XFS_DQFLAG_GROUP)
 
-#define XFS_DQFLAG_ALL		(XFS_DQFLAG_TYPE_MASK)
+#define XFS_DQFLAG_ALL		(XFS_DQFLAG_TYPE_MASK | \
+				 XFS_DQFLAG_BIGTIME)
 /*
  * XFS Quota Timers
  * ================
@@ -1268,6 +1270,28 @@ static inline void xfs_dinode_put_rdev(struct xfs_dinode *dip, xfs_dev_t rdev)
  */
 #define XFS_DQ_GRACE_MIN	((int64_t)0)
 #define XFS_DQ_GRACE_MAX	((int64_t)U32_MAX)
+
+/*
+ * When bigtime is enabled, we trade a few bits of precision to expand the
+ * expiration timeout range to match that of big inode timestamps.  The grace
+ * periods stored in dquot 0 are not shifted, since they record an interval,
+ * not a timestamp.
+ */
+#define XFS_DQ_BIGTIME_SHIFT		(2)
+
+/*
+ * Smallest possible quota expiration with big timestamps, which is
+ * Jan  1 00:00:01 UTC 1970.
+ */
+#define XFS_DQ_BIGTIMEOUT_MIN		(XFS_DQ_TIMEOUT_MIN)
+
+/*
+ * Largest supported quota expiration with traditional timestamps, which is
+ * the largest bigtime inode timestamp, or Jul  2 20:20:25 UTC 2486.  The field
+ * is large enough that it's possible to fit expirations up to 2514, but we
+ * want to keep the maximum timestamp in sync.
+ */
+#define XFS_DQ_BIGTIMEOUT_MAX		(XFS_INO_BIGTIME_MAX)
 
 /*
  * This is the main portion of the on-disk representation of quota
