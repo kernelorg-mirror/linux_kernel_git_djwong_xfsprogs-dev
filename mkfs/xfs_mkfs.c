@@ -2127,9 +2127,9 @@ _("reflink not supported with realtime devices\n"));
 		cli->sb_feat.reflink = false;
 	}
 
-	if (cli->sb_feat.rmapbt && cli->xi->rtname) {
+	if (cli->sb_feat.rmapbt && cli->xi->rtname && !cli->sb_feat.metadir) {
 		fprintf(stderr,
-_("rmapbt not supported with realtime devices\n"));
+_("rmapbt not supported on realtime device without metadir feature\n"));
 		usage();
 		cli->sb_feat.rmapbt = false;
 	}
@@ -2812,6 +2812,32 @@ reported by the device (%u).\n"),
 	cfg->rtextents = cfg->rtblocks / cfg->rtextblocks;
 	cfg->rtbmblocks = (xfs_extlen_t)howmany(cfg->rtextents,
 						NBBY * cfg->blocksize);
+}
+
+/*
+ * The realtime rmapbt mustn't grow taller than max btree height.
+ *
+ * For the per-AG btrees we set XFS_BTREE_MAXLEVELS large enough to handle any
+ * possible AG configuration.  Realtime volumes can be much larger than an AG
+ * but for now we don't want to bloat the xfs_btree_cursor to handle the
+ * theoretical maximum rtvol size (2^64 blocks) because the current
+ * XFS_BTREE_MAXLEVELS (9) is big enough to handle a 2^64-byte rt volume
+ * assuming 4k blocks or a 2^54-byte rt volume assuming 1k blocks.
+ */
+static void
+validate_rtrmapbt_geometry(
+	struct xfs_mount	*mp)
+{
+	if (!xfs_sb_version_hasrtrmapbt(&mp->m_sb))
+		return;
+
+	if (mp->m_rtrmap_maxlevels > XFS_BTREE_MAXLEVELS) {
+		fprintf(stderr,
+_("%s: max realtime rmapbt height (%u) exceeds configured maximum (%u)\n"),
+				progname, mp->m_rtrmap_maxlevels,
+				XFS_BTREE_MAXLEVELS);
+		exit(1);
+	}
 }
 
 static void
@@ -3952,6 +3978,12 @@ main(
 			progname);
 		exit(1);
 	}
+
+	/*
+	 * Validate btree geometries for the realtime device.  This relies on
+	 * fields in the xfs_mount, so we have to validate after libxfs_mount.
+	 */
+	validate_rtrmapbt_geometry(mp);
 
 	/*
 	 * Initialise all the static on disk metadata.
