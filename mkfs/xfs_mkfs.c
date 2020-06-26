@@ -120,6 +120,7 @@ enum {
 	M_RMAPBT,
 	M_REFLINK,
 	M_INOBTCNT,
+	M_BIGTIME,
 	M_MAX_OPTS,
 };
 
@@ -667,6 +668,7 @@ static struct opt_params mopts = {
 		[M_RMAPBT] = "rmapbt",
 		[M_REFLINK] = "reflink",
 		[M_INOBTCNT] = "inobtcount",
+		[M_BIGTIME] = "bigtime",
 	},
 	.subopt_params = {
 		{ .index = M_CRC,
@@ -698,6 +700,12 @@ static struct opt_params mopts = {
 		  .defaultval = 1,
 		},
 		{ .index = M_INOBTCNT,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
+		{ .index = M_BIGTIME,
 		  .conflicts = { { NULL, LAST_CONFLICT } },
 		  .minval = 0,
 		  .maxval = 1,
@@ -755,6 +763,7 @@ struct sb_feat_args {
 	bool	rmapbt;			/* XFS_SB_FEAT_RO_COMPAT_RMAPBT */
 	bool	reflink;		/* XFS_SB_FEAT_RO_COMPAT_REFLINK */
 	bool	inobtcnt;		/* XFS_SB_FEAT_RO_COMPAT_INOBTCNT */
+	bool	bigtime;		/* XFS_SB_FEAT_INCOMPAT_BIGTIME */
 	bool	nodalign;
 	bool	nortalign;
 };
@@ -878,7 +887,7 @@ usage( void )
 	fprintf(stderr, _("Usage: %s\n\
 /* blocksize */		[-b size=num]\n\
 /* metadata */		[-m crc=0|1,finobt=0|1,uuid=xxx,rmapbt=0|1,reflink=0|1,\n\
-			    inobtcnt=0|1]\n\
+			    inobtcnt=0|1,bigtime=0|1]\n\
 /* data subvol */	[-d agcount=n,agsize=n,file,name=xxx,size=num,\n\
 			    (sunit=value,swidth=value|su=num,sw=num|noalign),\n\
 			    sectsize=num\n\
@@ -1621,6 +1630,9 @@ meta_opts_parser(
 	case M_INOBTCNT:
 		cli->sb_feat.inobtcnt = getnum(value, opts, subopt);
 		break;
+	case M_BIGTIME:
+		cli->sb_feat.bigtime = getnum(value, opts, subopt);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2044,6 +2056,13 @@ _("reflink not supported without CRC support\n"));
 			usage();
 		}
 		cli->sb_feat.reflink = false;
+
+		if (cli->sb_feat.bigtime) {
+			fprintf(stderr,
+_("big timestamps not supported without CRC support\n"));
+			usage();
+		}
+		cli->sb_feat.bigtime = false;
 	}
 
 	if (!cli->sb_feat.finobt) {
@@ -3020,6 +3039,8 @@ sb_set_features(
 		sbp->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_REFLINK;
 	if (fp->inobtcnt)
 		sbp->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_INOBTCNT;
+	if (fp->bigtime)
+		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_BIGTIME;
 
 	/*
 	 * Sparse inode chunk support has two main inode alignment requirements.
@@ -3692,6 +3713,7 @@ main(
 			.parent_pointers = false,
 			.nodalign = false,
 			.nortalign = false,
+			.bigtime = false,
 		},
 	};
 
