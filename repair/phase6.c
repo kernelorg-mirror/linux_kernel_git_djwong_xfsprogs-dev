@@ -17,6 +17,8 @@
 #include "dinode.h"
 #include "progress.h"
 #include "versions.h"
+#include "slab.h"
+#include "rmap.h"
 
 static struct cred		zerocr;
 static struct fsxattr 		zerofsx;
@@ -936,6 +938,92 @@ mk_rsumino(
 	_("allocation of the realtime summary ino failed, error = %d\n"),
 			error);
 	}
+	libxfs_irele(ip);
+}
+
+static void
+mk_rrmapino(
+	struct xfs_mount	*mp)
+{
+	struct xfs_trans	*tp;
+	struct xfs_inode	*ip;
+	struct xfs_imeta_end	ic;
+	xfs_ino_t		ino = NULLFSINO;
+	int			error;
+
+	if (!xfs_sb_version_hasrtrmapbt(&mp->m_sb))
+		return;
+
+	error = ensure_imeta_dirpath(mp, &XFS_IMETA_RTRMAPBT);
+	if (error)
+		do_error(
+	_("Couldn't create realtime metadata directory, error %d\n"), error);
+
+	error = -libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &ino);
+	if (error || ino == NULLFSINO)
+		goto zap;
+
+	/* Load the inode. */
+	error = -libxfs_imeta_iget(mp, ino, XFS_DIR3_FT_REG_FILE, &ip);
+	if (error) {
+		do_warn(_("Couldn't iget rtrmap inode, error %d\n"),
+			 error);
+		goto zap;
+	}
+
+	/*
+	 * If this inode has an rmap-format data fork, we're ready to rebuild
+	 * the rtrmap btree, so release the inode and go.
+	 */
+	if (ip->i_df.if_format == XFS_DINODE_FMT_RMAP) {
+		libxfs_irele(ip);
+		return;
+	}
+
+zap:
+	/* Zap the old pointer. */
+	if (ino != NULLFSINO) {
+		error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_unlink,
+				libxfs_imeta_unlink_space_res(mp), 0, 0, &tp);
+		if (error)
+			res_failed(error);
+
+		error = -libxfs_imeta_zap(&tp, &XFS_IMETA_RTRMAPBT, &ic);
+		if (error)
+			do_error(
+	_("couldn't zap realtime rmapbt inode -- error - %d\n"),
+				error);
+
+		error = -libxfs_trans_commit(tp);
+		if (error)
+			do_error(
+	_("error %d zapping old realtime rmapbt inode pointer %llu\n"),
+					error, (unsigned long long)ino);
+		libxfs_imeta_end_update(mp, &ic, error);
+	}
+
+	/* Now create a new rt rmapbt inode. */
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+			libxfs_imeta_create_space_res(mp), 0, 0, &tp);
+	if (error)
+		res_failed(error);
+
+	error = -libxfs_rtrmapbt_create(&tp, &ic, &ip);
+	if (error)
+		do_error(
+	_("couldn't create realtime rmapbt inode -- error - %d\n"),
+			error);
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		do_error(
+	_("error %d committing new realtime rmapbt inode %llu\n"),
+				error, (unsigned long long)ip->i_ino);
+	libxfs_imeta_end_update(mp, &ic, error);
+
+	/* Mark the inode in use. */
+	mark_ino_inuse(mp, ip->i_ino, S_IFREG,
+			lookup_imeta_path_dirname(mp, &XFS_IMETA_RTRMAPBT));
 	libxfs_irele(ip);
 }
 
@@ -3335,6 +3423,7 @@ void
 phase6(xfs_mount_t *mp)
 {
 	ino_tree_node_t		*irec;
+	int			error;
 	int			i;
 
 	memset(&zerocr, 0, sizeof(struct cred));
@@ -3396,6 +3485,18 @@ phase6(xfs_mount_t *mp)
 		}
 	}
 
+	/*
+	 * We always reinitialize the rrmapbt inode, but if it was bad we
+	 * ought to say something.
+	 */
+	if (no_modify) {
+		if (need_rrmapino)
+			do_warn(_("would reinitialize realtime rmap btree\n"));
+	} else {
+		need_rrmapino = false;
+		mk_rrmapino(mp);
+	}
+
 	if (!no_modify)  {
 		do_log(
 _("        - resetting contents of realtime bitmap and summary inodes\n"));
@@ -3408,6 +3509,12 @@ _("        - resetting contents of realtime bitmap and summary inodes\n"));
 			do_warn(
 			_("Warning:  realtime bitmap may be inconsistent\n"));
 		}
+
+		error = rmap_populate_realtime_rmapbt(mp);
+		if (error)
+			do_error(
+	_("Realtime reverse mapping btree could not be rebuilt, error=%d\n"),
+					error);
 	}
 
 	mark_standalone_inodes(mp);
