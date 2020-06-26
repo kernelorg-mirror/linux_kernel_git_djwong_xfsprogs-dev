@@ -387,6 +387,14 @@ _("zero length extent (off = %" PRIu64 ", fsbno = %" PRIu64 ") in ino %" PRIu64 
 		if (type == XR_INO_RTDATA && whichfork == XFS_DATA_FORK) {
 			pthread_mutex_lock(&rt_lock.lock);
 			error2 = process_rt_rec(mp, &irec, ino, tot, check_dups);
+			if (!error2 && collect_rmaps && !check_dups) {
+				error2 = rmap_add_rec(mp, ino, whichfork,
+						&irec, true);
+				if (error2)
+					do_error(
+_("couldn't add reverse mapping\n")
+						);
+			}
 			pthread_mutex_unlock(&rt_lock.lock);
 			if (error2)
 				return error2;
