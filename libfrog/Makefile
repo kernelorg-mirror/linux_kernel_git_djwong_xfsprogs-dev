@@ -27,6 +27,7 @@ projects.c \
 ptvar.c \
 radix-tree.c \
 scrub.c \
+swapext.c \
 topology.c \
 util.c \
 workqueue.c
@@ -47,6 +48,7 @@ projects.h \
 ptvar.h \
 radix-tree.h \
 scrub.h \
+swapext.h \
 topology.h \
 workqueue.h
 
@@ -54,6 +56,10 @@ LSRCFILES += gen_crc32table.c
 
 ifeq ($(HAVE_GETMNTENT),yes)
 LCFLAGS += -DHAVE_GETMNTENT
+endif
+
+ifeq ($(HAVE_FISWAPRANGE),yes)
+LCFLAGS += -DHAVE_FISWAPRANGE
 endif
 
 LDIRT = gen_crc32table crc32table.h crc32selftest
