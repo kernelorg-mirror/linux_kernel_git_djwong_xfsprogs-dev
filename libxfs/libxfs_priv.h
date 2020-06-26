@@ -459,6 +459,7 @@ void __xfs_buf_mark_corrupt(struct xfs_buf *bp, xfs_failaddr_t fa);
 #define xfs_ilock(ip,mode)				((void) 0)
 #define xfs_ilock_data_map_shared(ip)			(0)
 #define xfs_ilock_attr_map_shared(ip)			(0)
+#define xfs_lock_two_inodes(ip1, mode1, ip2, mode2)	((void) 0)
 #define xfs_iunlock(ip,mode)				({	\
 	typeof(mode) __mode = mode;				\
 	__mode = __mode; /* no set-but-unused warning */	\
