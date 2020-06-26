@@ -19,6 +19,7 @@
 #include "sig.h"
 #include "malloc.h"
 #include "io.h"
+#include "init.h"
 
 int
 fp_charns(
@@ -139,6 +140,125 @@ fp_time(
 				sizeof(int32_t) * 8, BVSIGNED);
 		c = ctime(&t);
 		dbprintf("%24.24s", c);
+		if (i < count - 1)
+			dbprintf(" ");
+	}
+	return 1;
+}
+
+static void
+fp_timespec64(
+	struct timespec64	*ts)
+{
+	BUILD_BUG_ON(sizeof(long) != sizeof(time_t));
+
+	if (ts->tv_sec > LONG_MAX || ts->tv_sec < LONG_MIN) {
+		dbprintf("%lld", (long long)ts->tv_sec);
+	} else {
+		time_t	tt = ts->tv_sec;
+		char	*c;
+
+		c = ctime(&tt);
+		dbprintf("%24.24s", c);
+	}
+}
+
+int
+fp_btsec(
+	void			*obj,
+	int			bit,
+	int			count,
+	char			*fmtstr,
+	int			size,
+	int			arg,
+	int			base,
+	int			array)
+{
+	struct timespec64	ts;
+	union xfs_timestamp	*xts;
+	int			bitpos;
+	int			i;
+
+	ASSERT(bitoffs(bit) == 0);
+	for (i = 0, bitpos = bit;
+	     i < count && !seenint();
+	     i++, bitpos += size) {
+		if (array)
+			dbprintf("%d:", i + base);
+		xts = obj + byteize(bitpos);
+		libxfs_inode_from_disk_timestamp(obj, &ts, xts);
+		fp_timespec64(&ts);
+		if (i < count - 1)
+			dbprintf(" ");
+	}
+	return 1;
+}
+
+int
+fp_btnsec(
+	void			*obj,
+	int			bit,
+	int			count,
+	char			*fmtstr,
+	int			size,
+	int			arg,
+	int			base,
+	int			array)
+{
+	struct timespec64	ts;
+	union xfs_timestamp	*xts;
+	int			bitpos;
+	int			i;
+
+	ASSERT(bitoffs(bit) == 0);
+	for (i = 0, bitpos = bit;
+	     i < count && !seenint();
+	     i++, bitpos += size) {
+		if (array)
+			dbprintf("%d:", i + base);
+		xts = obj + byteize(bitpos);
+		libxfs_inode_from_disk_timestamp(obj, &ts, xts);
+		dbprintf("%u", ts.tv_nsec);
+		if (i < count - 1)
+			dbprintf(" ");
+	}
+	return 1;
+}
+
+int
+fp_btqtimer(
+	void			*obj,
+	int			bit,
+	int			count,
+	char			*fmtstr,
+	int			size,
+	int			arg,
+	int			base,
+	int			array)
+{
+	struct timespec64	ts = { 0 };
+	struct xfs_disk_dquot	*ddq = obj;
+	__be32			*t;
+	int			bitpos;
+	int			i;
+
+	ASSERT(bitoffs(bit) == 0);
+	for (i = 0, bitpos = bit;
+	     i < count && !seenint();
+	     i++, bitpos += size) {
+		if (array)
+			dbprintf("%d:", i + base);
+		t = obj + byteize(bitpos);
+		libxfs_dquot_from_disk_timestamp(ddq, &ts.tv_sec, *t);
+
+		/*
+		 * Display the raw value if it's the default grace expiration
+		 * period (root dquot) or if the quota has not expired.
+		 */
+		if (ddq->d_id == 0 || ts.tv_sec == 0)
+			dbprintf("%llu", (unsigned long long)ts.tv_sec);
+		else
+			fp_timespec64(&ts);
 		if (i < count - 1)
 			dbprintf(" ");
 	}
