@@ -50,6 +50,12 @@ struct xfs_fd {
 /* Only use v5 bulkstat/inumbers ioctls. */
 #define XFROG_FLAG_BULKSTAT_FORCE_V5	(1 << 1)
 
+/* Only use v0 (xfs) swapext ioctl. */
+#define XFROG_FLAG_SWAPEXT_FORCE_V0	(1 << 2)
+
+/* Only use new vfs swapext ioctl. */
+#define XFROG_FLAG_SWAPEXT_FORCE_VFS	(1 << 3)
+
 /* Static initializers */
 #define XFS_FD_INIT(_fd)	{ .fd = (_fd), }
 #define XFS_FD_INIT_EMPTY	XFS_FD_INIT(-1)
