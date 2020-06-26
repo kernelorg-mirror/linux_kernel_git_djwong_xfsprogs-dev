@@ -116,6 +116,7 @@ struct timespec64 {
 #define xfs_dir_replace			libxfs_dir_replace
 
 #define xfs_dqblk_repair		libxfs_dqblk_repair
+#define xfs_dquot_from_disk_timestamp	libxfs_dquot_from_disk_timestamp
 #define xfs_dquot_verify		libxfs_dquot_verify
 
 #define xfs_finobt_calc_reserves	libxfs_finobt_calc_reserves
@@ -137,7 +138,9 @@ struct timespec64 {
 #define xfs_inobt_maxrecs		libxfs_inobt_maxrecs
 #define xfs_inobt_stage_cursor		libxfs_inobt_stage_cursor
 #define xfs_inode_from_disk		libxfs_inode_from_disk
+#define xfs_inode_from_disk_timestamp	libxfs_inode_from_disk_timestamp
 #define xfs_inode_to_disk		libxfs_inode_to_disk
+#define xfs_inode_to_disk_timestamp	libxfs_inode_to_disk_timestamp
 #define xfs_inode_validate_cowextsize	libxfs_inode_validate_cowextsize
 #define xfs_inode_validate_extsize	libxfs_inode_validate_extsize
 
