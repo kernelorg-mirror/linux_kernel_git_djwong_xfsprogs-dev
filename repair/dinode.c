@@ -2173,7 +2173,8 @@ check_nsec(
 	union xfs_timestamp	*t,
 	int			*dirty)
 {
-	if ((dip->di_flags2 & be64_to_cpu(XFS_DIFLAG2_BIGTIME)) ||
+	if ((dip->di_version >= 3 &&
+	     (dip->di_flags2 & cpu_to_be64(XFS_DIFLAG2_BIGTIME))) ||
 	    be32_to_cpu(t->t_nsec) < NSEC_PER_SEC)
 		return;
 
@@ -2599,6 +2600,16 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 					lino);
 			}
 			flags2 &= ~XFS_DIFLAG2_COWEXTSIZE;
+		}
+
+		if ((flags2 & XFS_DIFLAG2_BIGTIME) &&
+		    !xfs_sb_version_hasbigtime(&mp->m_sb)) {
+			if (!uncertain) {
+				do_warn(
+	_("inode %" PRIu64 " is marked bigtime but file system does not support large timestamps\n"),
+					lino);
+			}
+			flags2 &= ~XFS_DIFLAG2_BIGTIME;
 		}
 
 		if (!verify_mode && flags2 != be64_to_cpu(dino->di_flags2)) {
