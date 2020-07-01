@@ -1065,15 +1065,15 @@ process_quota_inode(
 
 	switch (ino_type) {
 		case XR_INO_UQUOTA:
-			quota_type = XFS_DQ_USER;
+			quota_type = XFS_DQFLAG_USER;
 			quota_string = _("User quota");
 			break;
 		case XR_INO_GQUOTA:
-			quota_type = XFS_DQ_GROUP;
+			quota_type = XFS_DQFLAG_GROUP;
 			quota_string = _("Group quota");
 			break;
 		case XR_INO_PQUOTA:
-			quota_type = XFS_DQ_PROJ;
+			quota_type = XFS_DQFLAG_PROJ;
 			quota_string = _("Project quota");
 			break;
 		default:

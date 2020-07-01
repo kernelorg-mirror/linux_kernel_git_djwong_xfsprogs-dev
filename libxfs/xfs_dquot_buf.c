@@ -38,6 +38,8 @@ xfs_dquot_verify(
 	xfs_dqid_t		id,
 	uint			type)	/* used only during quotacheck */
 {
+	unsigned int		dtype;
+
 	/*
 	 * We can encounter an uninitialized dquot buffer for 2 reasons:
 	 * 1. If we crash while deleting the quotainode(s), and those blks got
@@ -58,11 +60,14 @@ xfs_dquot_verify(
 	if (ddq->d_version != XFS_DQUOT_VERSION)
 		return __this_address;
 
-	if (type && ddq->d_flags != type)
+	if (ddq->d_flags & ~XFS_DQFLAG_ALL)
 		return __this_address;
-	if (ddq->d_flags != XFS_DQ_USER &&
-	    ddq->d_flags != XFS_DQ_PROJ &&
-	    ddq->d_flags != XFS_DQ_GROUP)
+	dtype = ddq->d_flags & XFS_DQFLAG_TYPE_MASK;
+	if (type && dtype != type)
+		return __this_address;
+	if (dtype != XFS_DQFLAG_USER &&
+	    dtype != XFS_DQFLAG_PROJ &&
+	    dtype != XFS_DQFLAG_GROUP)
 		return __this_address;
 
 	if (id != -1 && id != be32_to_cpu(ddq->d_id))
@@ -121,7 +126,7 @@ xfs_dqblk_repair(
 
 	dqb->dd_diskdq.d_magic = cpu_to_be16(XFS_DQUOT_MAGIC);
 	dqb->dd_diskdq.d_version = XFS_DQUOT_VERSION;
-	dqb->dd_diskdq.d_flags = type;
+	dqb->dd_diskdq.d_flags = type & XFS_DQFLAG_TYPE_MASK;
 	dqb->dd_diskdq.d_id = cpu_to_be32(id);
 
 	if (xfs_sb_version_hascrc(&mp->m_sb)) {
