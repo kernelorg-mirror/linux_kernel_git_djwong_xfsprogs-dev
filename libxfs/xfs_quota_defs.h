@@ -18,8 +18,6 @@
 typedef uint64_t	xfs_qcnt_t;
 typedef uint16_t	xfs_qwarncnt_t;
 
-#define XFS_DQUOT_CLUSTER_SIZE_FSB (xfs_filblks_t)1
-
 typedef uint8_t		xfs_dqtype_t;
 
 #define XFS_DQTYPE_NONE		(0)
