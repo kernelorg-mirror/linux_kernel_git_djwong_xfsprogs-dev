@@ -23,9 +23,9 @@ typedef uint16_t	xfs_qwarncnt_t;
 typedef uint8_t		xfs_dqtype_t;
 
 #define XFS_DQTYPE_NONE		(0)
-#define XFS_DQTYPE_USER		(XFS_DQ_USER)
-#define XFS_DQTYPE_PROJ		(XFS_DQ_PROJ)
-#define XFS_DQTYPE_GROUP	(XFS_DQ_GROUP)
+#define XFS_DQTYPE_USER		(XFS_DDQTYPE_USER)
+#define XFS_DQTYPE_PROJ		(XFS_DDQTYPE_PROJ)
+#define XFS_DQTYPE_GROUP	(XFS_DDQTYPE_GROUP)
 
 #define XFS_DQTYPE_STRINGS \
 	{ XFS_DQTYPE_NONE,	"NONE" }, \
@@ -36,18 +36,10 @@ typedef uint8_t		xfs_dqtype_t;
 /*
  * flags for q_flags field in the dquot.
  */
-#define XFS_DQ_USER		0x0001		/* a user quota */
-#define XFS_DQ_PROJ		0x0002		/* project quota */
-#define XFS_DQ_GROUP		0x0004		/* a group quota */
-#define XFS_DQFLAG_DIRTY	0x0008		/* dquot is dirty */
-#define XFS_DQFLAG_FREEING	0x0010		/* dquot is being torn down */
-
-#define XFS_DQ_ALLTYPES		(XFS_DQ_USER|XFS_DQ_PROJ|XFS_DQ_GROUP)
+#define XFS_DQFLAG_DIRTY	(1 << 0)	/* dquot is dirty */
+#define XFS_DQFLAG_FREEING	(1 << 1)	/* dquot is being torn down */
 
 #define XFS_DQFLAG_STRINGS \
-	{ XFS_DQ_USER,		"USER" }, \
-	{ XFS_DQ_PROJ,		"PROJ" }, \
-	{ XFS_DQ_GROUP,		"GROUP" }, \
 	{ XFS_DQFLAG_DIRTY,	"DIRTY" }, \
 	{ XFS_DQFLAG_FREEING,	"FREEING" }
 

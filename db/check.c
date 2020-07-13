@@ -3447,15 +3447,15 @@ process_quota(
 	switch (qtype) {
 	case IS_USER_QUOTA:
 		s = "user";
-		exp_flags = XFS_DQ_USER;
+		exp_flags = XFS_DDQTYPE_USER;
 		break;
 	case IS_PROJECT_QUOTA:
 		s = "project";
-		exp_flags = XFS_DQ_PROJ;
+		exp_flags = XFS_DDQTYPE_PROJ;
 		break;
 	case IS_GROUP_QUOTA:
 		s = "group";
-		exp_flags = XFS_DQ_GROUP;
+		exp_flags = XFS_DDQTYPE_GROUP;
 		break;
 	default:
 		ASSERT(0);
@@ -3509,11 +3509,20 @@ process_quota(
 				error++;
 				continue;
 			}
-			if (dqb->dd_diskdq.d_flags != exp_flags) {
+			if (dqb->dd_diskdq.d_type & ~XFS_DDQTYPE_ANY) {
 				if (scicb)
 					dbprintf(_("bad flags %#x for %s dqblk "
 						 "%lld entry %d id %u\n"),
-						dqb->dd_diskdq.d_flags, s,
+						dqb->dd_diskdq.d_type, s,
+						(xfs_fileoff_t)qbno, i, dqid);
+				error++;
+				continue;
+			}
+			if ((dqb->dd_diskdq.d_type & XFS_DDQTYPE_REC_MASK) != exp_flags) {
+				if (scicb)
+					dbprintf(_("bad quota type %#x for %s dqblk "
+						 "%lld entry %d id %u\n"),
+						(dqb->dd_diskdq.d_type & XFS_DDQTYPE_REC_MASK), s,
 						(xfs_fileoff_t)qbno, i, dqid);
 				error++;
 				continue;
