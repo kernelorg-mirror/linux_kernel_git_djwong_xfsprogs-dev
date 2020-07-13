@@ -36,8 +36,10 @@ xfs_dquot_verify(
 	struct xfs_mount	*mp,
 	struct xfs_disk_dquot	*ddq,
 	xfs_dqid_t		id,
-	uint			type)	/* used only during quotacheck */
+	xfs_dqtype_t		type)	/* used only during quotacheck */
 {
+	uint8_t			ddq_type;
+
 	/*
 	 * We can encounter an uninitialized dquot buffer for 2 reasons:
 	 * 1. If we crash while deleting the quotainode(s), and those blks got
@@ -58,11 +60,12 @@ xfs_dquot_verify(
 	if (ddq->d_version != XFS_DQUOT_VERSION)
 		return __this_address;
 
-	if (type && ddq->d_flags != type)
+	ddq_type = ddq->d_flags & XFS_DQ_ALLTYPES;
+	if (type != XFS_DQTYPE_NONE && ddq_type != type)
 		return __this_address;
-	if (ddq->d_flags != XFS_DQ_USER &&
-	    ddq->d_flags != XFS_DQ_PROJ &&
-	    ddq->d_flags != XFS_DQ_GROUP)
+	if (ddq_type != XFS_DQ_USER &&
+	    ddq_type != XFS_DQ_PROJ &&
+	    ddq_type != XFS_DQ_GROUP)
 		return __this_address;
 
 	if (id != -1 && id != be32_to_cpu(ddq->d_id))
@@ -93,8 +96,8 @@ xfs_failaddr_t
 xfs_dqblk_verify(
 	struct xfs_mount	*mp,
 	struct xfs_dqblk	*dqb,
-	xfs_dqid_t	 	id,
-	uint		 	type)	/* used only during quotacheck */
+	xfs_dqid_t		id,
+	xfs_dqtype_t		type)	/* used only during quotacheck */
 {
 	if (xfs_sb_version_hascrc(&mp->m_sb) &&
 	    !uuid_equal(&dqb->dd_uuid, &mp->m_sb.sb_meta_uuid))
@@ -111,7 +114,7 @@ xfs_dqblk_repair(
 	struct xfs_mount	*mp,
 	struct xfs_dqblk	*dqb,
 	xfs_dqid_t		id,
-	uint			type)
+	xfs_dqtype_t		type)
 {
 	/*
 	 * Typically, a repair is only requested by quotacheck.
@@ -203,7 +206,7 @@ xfs_dquot_buf_verify(
 		if (i == 0)
 			id = be32_to_cpu(ddq->d_id);
 
-		fa = xfs_dqblk_verify(mp, &dqb[i], id + i, 0);
+		fa = xfs_dqblk_verify(mp, &dqb[i], id + i, XFS_DQTYPE_NONE);
 		if (fa) {
 			if (!readahead)
 				xfs_buf_verifier_error(bp, -EFSCORRUPTED,

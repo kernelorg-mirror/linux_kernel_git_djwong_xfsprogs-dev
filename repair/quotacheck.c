@@ -39,8 +39,8 @@ struct qc_dquots {
 	pthread_mutex_t		lock;
 	struct avl64tree_desc	tree;
 
-	/* One of XFS_DQ_{USER,GROUP,PROJ} */
-	uint16_t		type;
+	/* One of XFS_DQTYPE_{USER,GROUP,PROJ} */
+	xfs_dqtype_t		type;
 };
 
 #define qc_dquots_foreach(dquots, pos, n) \
@@ -68,13 +68,13 @@ struct qc_rec {
 
 static const char *
 qflags_typestr(
-	unsigned int		type)
+	xfs_dqtype_t		type)
 {
-	if (type & XFS_DQ_USER)
+	if (type & XFS_DQTYPE_USER)
 		return _("user quota");
-	else if (type & XFS_DQ_GROUP)
+	else if (type & XFS_DQTYPE_GROUP)
 		return _("group quota");
-	else if (type & XFS_DQ_PROJ)
+	else if (type & XFS_DQTYPE_PROJ)
 		return _("project quota");
 	return NULL;
 }
@@ -333,7 +333,7 @@ _("cannot read %s inode %"PRIu64", block %"PRIu64", disk block %"PRIu64", err=%d
 void
 quotacheck_verify(
 	struct xfs_mount	*mp,
-	unsigned int		type)
+	xfs_dqtype_t		type)
 {
 	struct xfs_bmbt_irec	map;
 	struct xfs_iext_cursor	icur;
@@ -345,15 +345,15 @@ quotacheck_verify(
 	int			error;
 
 	switch (type) {
-	case XFS_DQ_USER:
+	case XFS_DQTYPE_USER:
 		ino = mp->m_sb.sb_uquotino;
 		dquots = user_dquots;
 		break;
-	case XFS_DQ_GROUP:
+	case XFS_DQTYPE_GROUP:
 		ino = mp->m_sb.sb_gquotino;
 		dquots = group_dquots;
 		break;
-	case XFS_DQ_PROJ:
+	case XFS_DQTYPE_PROJ:
 		ino = mp->m_sb.sb_pquotino;
 		dquots = proj_dquots;
 		break;
@@ -427,24 +427,24 @@ err:
 static inline bool
 qc_has_quotafile(
 	struct xfs_mount	*mp,
-	unsigned int		type)
+	xfs_dqtype_t		type)
 {
 	bool			lost;
 	xfs_ino_t		ino;
 	unsigned int		qflag;
 
 	switch (type) {
-	case XFS_DQ_USER:
+	case XFS_DQTYPE_USER:
 		lost = lost_uquotino;
 		ino = mp->m_sb.sb_uquotino;
 		qflag = XFS_UQUOTA_CHKD;
 		break;
-	case XFS_DQ_GROUP:
+	case XFS_DQTYPE_GROUP:
 		lost = lost_gquotino;
 		ino = mp->m_sb.sb_gquotino;
 		qflag = XFS_GQUOTA_CHKD;
 		break;
-	case XFS_DQ_PROJ:
+	case XFS_DQTYPE_PROJ:
 		lost = lost_pquotino;
 		ino = mp->m_sb.sb_pquotino;
 		qflag = XFS_PQUOTA_CHKD;
@@ -465,7 +465,7 @@ qc_has_quotafile(
 /* Initialize an incore dquot tree. */
 static struct qc_dquots *
 qc_dquots_init(
-	uint16_t		type)
+	xfs_dqtype_t		type)
 {
 	struct qc_dquots	*dquots;
 
@@ -493,22 +493,22 @@ quotacheck_setup(
 	if (!fs_quotas || lost_quotas || noquota)
 		return 0;
 
-	if (qc_has_quotafile(mp, XFS_DQ_USER)) {
-		user_dquots = qc_dquots_init(XFS_DQ_USER);
+	if (qc_has_quotafile(mp, XFS_DQTYPE_USER)) {
+		user_dquots = qc_dquots_init(XFS_DQTYPE_USER);
 		if (!user_dquots)
 			goto err;
 		chkd_flags |= XFS_UQUOTA_CHKD;
 	}
 
-	if (qc_has_quotafile(mp, XFS_DQ_GROUP)) {
-		group_dquots = qc_dquots_init(XFS_DQ_GROUP);
+	if (qc_has_quotafile(mp, XFS_DQTYPE_GROUP)) {
+		group_dquots = qc_dquots_init(XFS_DQTYPE_GROUP);
 		if (!group_dquots)
 			goto err;
 		chkd_flags |= XFS_GQUOTA_CHKD;
 	}
 
-	if (qc_has_quotafile(mp, XFS_DQ_PROJ)) {
-		proj_dquots = qc_dquots_init(XFS_DQ_PROJ);
+	if (qc_has_quotafile(mp, XFS_DQTYPE_PROJ)) {
+		proj_dquots = qc_dquots_init(XFS_DQTYPE_PROJ);
 		if (!proj_dquots)
 			goto err;
 		chkd_flags |= XFS_PQUOTA_CHKD;

@@ -1055,7 +1055,7 @@ process_quota_inode(
 	struct xfs_buf		*bp;
 	xfs_filblks_t		dqchunklen;
 	uint			dqperchunk;
-	int			quota_type = 0;
+	xfs_dqtype_t		quota_type = XFS_DQTYPE_NONE;
 	char			*quota_string = NULL;
 	xfs_dqid_t		dqid;
 	xfs_fileoff_t		qbno;
@@ -1065,15 +1065,15 @@ process_quota_inode(
 
 	switch (ino_type) {
 		case XR_INO_UQUOTA:
-			quota_type = XFS_DQ_USER;
+			quota_type = XFS_DQTYPE_USER;
 			quota_string = _("User quota");
 			break;
 		case XR_INO_GQUOTA:
-			quota_type = XFS_DQ_GROUP;
+			quota_type = XFS_DQTYPE_GROUP;
 			quota_string = _("Group quota");
 			break;
 		case XR_INO_PQUOTA:
-			quota_type = XFS_DQ_PROJ;
+			quota_type = XFS_DQTYPE_PROJ;
 			quota_string = _("Project quota");
 			break;
 		default:
