@@ -1162,10 +1162,9 @@ static inline void xfs_dinode_put_rdev(struct xfs_dinode *dip, xfs_dev_t rdev)
 #define XFS_DDQTYPE_ANY		(XFS_DDQTYPE_REC_MASK)
 
 /*
- * This is the main portion of the on-disk representation of quota
- * information for a user. This is the q_core of the struct xfs_dquot that
- * is kept in kernel memory. We pad this with some more expansion room
- * to construct the on disk structure.
+ * This is the main portion of the on-disk representation of quota information
+ * for a user.  We pad this with some more expansion room to construct the on
+ * disk structure.
  */
 struct xfs_disk_dquot {
 	__be16		d_magic;	/* dquot magic = XFS_DQUOT_MAGIC */
