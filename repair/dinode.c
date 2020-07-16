@@ -1055,7 +1055,7 @@ process_quota_inode(
 	struct xfs_buf		*bp;
 	xfs_filblks_t		dqchunklen;
 	uint			dqperchunk;
-	int			quota_type = 0;
+	xfs_dqtype_t		quota_type;
 	char			*quota_string = NULL;
 	xfs_dqid_t		dqid;
 	xfs_fileoff_t		qbno;
@@ -1078,6 +1078,7 @@ process_quota_inode(
 			break;
 		default:
 			ASSERT(0);
+			return 1;
 	}
 
 	dqchunklen = XFS_FSB_TO_BB(mp, XFS_DQUOT_CLUSTER_SIZE_FSB);

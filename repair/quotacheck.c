@@ -39,8 +39,8 @@ struct qc_dquots {
 	pthread_mutex_t		lock;
 	struct avl64tree_desc	tree;
 
-	/* One of XFS_DQ_{USER,GROUP,PROJ} */
-	uint16_t		type;
+	/* One of XFS_DQTYPE_{USER,GROUP,PROJ} */
+	xfs_dqtype_t		type;
 };
 
 #define qc_dquots_foreach(dquots, pos, n) \
@@ -68,7 +68,7 @@ struct qc_rec {
 
 static const char *
 qflags_typestr(
-	unsigned int		type)
+	xfs_dqtype_t		type)
 {
 	if (type & XFS_DQTYPE_USER)
 		return _("user quota");
@@ -333,7 +333,7 @@ _("cannot read %s inode %"PRIu64", block %"PRIu64", disk block %"PRIu64", err=%d
 void
 quotacheck_verify(
 	struct xfs_mount	*mp,
-	unsigned int		type)
+	xfs_dqtype_t		type)
 {
 	struct xfs_bmbt_irec	map;
 	struct xfs_iext_cursor	icur;
@@ -427,7 +427,7 @@ err:
 static inline bool
 qc_has_quotafile(
 	struct xfs_mount	*mp,
-	unsigned int		type)
+	xfs_dqtype_t		type)
 {
 	bool			lost;
 	xfs_ino_t		ino;
@@ -465,7 +465,7 @@ qc_has_quotafile(
 /* Initialize an incore dquot tree. */
 static struct qc_dquots *
 qc_dquots_alloc(
-	uint16_t		type)
+	xfs_dqtype_t		type)
 {
 	struct qc_dquots	*dquots;
 
