@@ -692,4 +692,7 @@ int xfs_bmap_last_extent(struct xfs_trans *tp, struct xfs_inode *ip,
 			 int whichfork, struct xfs_bmbt_irec *rec,
 			 int *is_empty);
 
+#define xlog_grant_push_threshold(log, need)	(NULLCOMMITLSN)
+#define XFS_LSN_CMP(a, b)			(0)
+
 #endif	/* __LIBXFS_INTERNAL_XFS_H__ */
