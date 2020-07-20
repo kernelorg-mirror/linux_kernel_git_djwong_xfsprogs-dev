@@ -1482,7 +1482,21 @@ This option is not compatible with the
 flag.
 .RE
 .PD
-
+.TP
+.BI "aginfo [ \-a " agno " ] [ \-o " nr " ]"
+Show information about or update the state of allocation groups.
+.RE
+.RS 1.0i
+.PD 0
+.TP
+.BI \-a
+Act only on a specific allocation group.
+.TP
+.BI \-o
+If 0, clear the NOALLOC flag.
+If 1, set the NOALLOC flag.
+.PD
+.RE
 
 .SH OTHER COMMANDS
 .TP
