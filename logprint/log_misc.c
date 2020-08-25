@@ -435,6 +435,19 @@ xlog_print_trans_qoff(char **ptr, uint len)
     }
 }	/* xlog_print_trans_qoff */
 
+static inline time64_t
+xlog_extract_dinode_ts(
+	const xfs_ictimestamp_t	its)
+{
+#ifdef __LITTLE_ENDIAN
+	return (time64_t)its & 0xffffffff;
+#elif __BIG_ENDIAN
+	return (time64_t)its >> 32;
+#else
+# error System is neither little nor big endian?
+#endif
+}
+
 void
 xlog_print_dinode_ts(
 	struct xfs_log_dinode	*ldip,
@@ -443,12 +456,13 @@ xlog_print_dinode_ts(
 	const char		*fmt;
 
 	if (compact)
-		fmt = _("atime 0x%x mtime 0x%x ctime 0x%x\n");
+		fmt = _("atime 0x%llx mtime 0x%llx ctime 0x%llx\n");
 	else
-		fmt = _("		atime:%d  mtime:%d  ctime:%d\n");
+		fmt = _("		atime:%lld  mtime:%lld  ctime:%lld\n");
 
-	printf(fmt, ldip->di_atime.t_sec, ldip->di_mtime.t_sec,
-			ldip->di_ctime.t_sec);
+	printf(fmt, xlog_extract_dinode_ts(ldip->di_atime),
+		    xlog_extract_dinode_ts(ldip->di_mtime),
+		    xlog_extract_dinode_ts(ldip->di_ctime));
 }
 
 static void
