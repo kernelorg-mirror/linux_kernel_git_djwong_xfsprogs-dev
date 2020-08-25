@@ -19,6 +19,8 @@
 #include "libfrog/fsgeom.h"
 #include "libfrog/bulkstat.h"
 
+#define XFS_INODES_PER_CHUNK 64
+
 /*
  * Iterate a range of inodes.
  *

@@ -2121,12 +2121,13 @@ static void
 check_nsec(
 	const char		*name,
 	xfs_ino_t		lino,
+	struct xfs_dinode	*dip,
 	xfs_timestamp_t		*t,
 	int			*dirty)
 {
 	struct timespec64	tv;
 
-	tv = libxfs_inode_from_disk_ts(*t);
+	tv = libxfs_inode_from_disk_ts(dip, *t);
 	if (tv.tv_nsec < NSEC_PER_SEC)
 		return;
 
@@ -2678,11 +2679,11 @@ _("Bad CoW extent size %u on inode %" PRIu64 ", "),
 	}
 
 	/* nsec fields cannot be larger than 1 billion */
-	check_nsec("atime", lino, &dino->di_atime, dirty);
-	check_nsec("mtime", lino, &dino->di_mtime, dirty);
-	check_nsec("ctime", lino, &dino->di_ctime, dirty);
+	check_nsec("atime", lino, dino, &dino->di_atime, dirty);
+	check_nsec("mtime", lino, dino, &dino->di_mtime, dirty);
+	check_nsec("ctime", lino, dino, &dino->di_ctime, dirty);
 	if (dino->di_version >= 3)
-		check_nsec("crtime", lino, &dino->di_crtime, dirty);
+		check_nsec("crtime", lino, dino, &dino->di_crtime, dirty);
 
 	/*
 	 * general size/consistency checks:
