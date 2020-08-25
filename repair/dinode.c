@@ -2121,19 +2121,22 @@ static void
 check_nsec(
 	const char		*name,
 	xfs_ino_t		lino,
-	struct xfs_timestamp	*t,
+	xfs_timestamp_t		*t,
 	int			*dirty)
 {
-	if (be32_to_cpu(t->t_nsec) < NSEC_PER_SEC)
+	struct timespec64	tv;
+
+	tv = libxfs_inode_from_disk_ts(*t);
+	if (tv.tv_nsec < NSEC_PER_SEC)
 		return;
 
-	do_warn(
-_("Bad %s nsec %u on inode %" PRIu64 ", "), name, be32_to_cpu(t->t_nsec), lino);
+	do_warn(_("Bad %s nsec %lu on inode %" PRIu64 ", "),
+			name, tv.tv_nsec, lino);
 	if (no_modify) {
 		do_warn(_("would reset to zero\n"));
 	} else {
 		do_warn(_("resetting to zero\n"));
-		t->t_nsec = 0;
+		*t = cpu_to_be64((int64_t)tv.tv_sec << 32);
 		*dirty = 1;
 	}
 }
