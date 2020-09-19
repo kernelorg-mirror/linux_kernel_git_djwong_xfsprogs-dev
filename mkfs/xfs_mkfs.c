@@ -2128,12 +2128,14 @@ _("cowextsize not supported without reflink support\n"));
 	}
 
 	if (cli->xi->rtname) {
-		if (cli->sb_feat.reflink && cli_opt_set(&mopts, M_REFLINK)) {
-			fprintf(stderr,
-_("reflink not supported with realtime devices\n"));
-			usage();
+		if (!cli->sb_feat.metadir && cli->sb_feat.reflink) {
+			if (cli_opt_set(&mopts, M_REFLINK)) {
+				fprintf(stderr,
+_("reflink not supported on realtime devices without metadir feature\n"));
+				usage();
+			}
+			cli->sb_feat.reflink = false;
 		}
-		cli->sb_feat.reflink = false;
 
 		if (!cli->sb_feat.metadir && cli->sb_feat.rmapbt) {
 			if (cli_opt_set(&mopts, M_RMAPBT)) {

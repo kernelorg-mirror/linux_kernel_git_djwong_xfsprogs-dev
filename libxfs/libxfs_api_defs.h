@@ -188,6 +188,7 @@
 
 #define xfs_rtrefcountbt_commit_staged_btree	libxfs_rtrefcountbt_commit_staged_btree
 #define xfs_rtrefcountbt_droot_maxrecs	libxfs_rtrefcountbt_droot_maxrecs
+#define xfs_rtrefcountbt_create		libxfs_rtrefcountbt_create
 #define xfs_rtrefcountbt_init_cursor	libxfs_rtrefcountbt_init_cursor
 #define xfs_rtrefcountbt_maxrecs	libxfs_rtrefcountbt_maxrecs
 #define xfs_rtrefcountbt_stage_cursor	libxfs_rtrefcountbt_stage_cursor
