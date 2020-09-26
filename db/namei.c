@@ -139,11 +139,11 @@ rele:
 /* Walk a directory path to an inode and set the io cursor to that inode. */
 static int
 path_walk(
+	xfs_ino_t	rootino,
 	char		*path)
 {
 	struct dirpath	*dirpath;
 	char		*p = path;
-	xfs_ino_t	rootino = mp->m_sb.sb_rootino;
 	int		ret = 0;
 
 	if (*p == '/') {
@@ -186,6 +186,9 @@ path_help(void)
 	dbprintf(_(
 "\n"
 " Navigate to an inode via directory path.\n"
+"\n"
+" Options:\n"
+"   -m -- Walk an absolute path down the metadata directory tree.\n"
 	));
 }
 
@@ -194,17 +197,32 @@ path_f(
 	int		argc,
 	char		**argv)
 {
+	xfs_ino_t	rootino = mp->m_sb.sb_rootino;
 	int		c;
 
-	while ((c = getopt(argc, argv, "")) != -1) {
+	while ((c = getopt(argc, argv, "m")) != -1) {
 		switch (c) {
+		case 'm':
+			/* Absolute path, start from metadata rootdir. */
+			if (!xfs_sb_version_hasmetadir(&mp->m_sb)) {
+				dbprintf(
+	_("filesystem does not support metadata directories.\n"));
+				return -1;
+			}
+			rootino = mp->m_sb.sb_metadirino;
+			break;
 		default:
 			path_help();
 			return 0;
 		}
 	}
 
-	if (path_walk(argv[optind]))
+	if (argc == optind || argc > optind + 1) {
+		dbprintf(_("Only supply one path.\n"));
+		return -1;
+	}
+
+	if (path_walk(rootino, argv[optind]))
 		exitcode = 1;
 	return 0;
 }
@@ -214,7 +232,7 @@ static const cmdinfo_t path_cmd = {
 	.altname	= NULL,
 	.cfunc		= path_f,
 	.argmin		= 1,
-	.argmax		= 1,
+	.argmax		= -1,
 	.canpush	= 0,
 	.args		= "",
 	.oneline	= N_("navigate to an inode by path"),
@@ -491,6 +509,9 @@ ls_help(void)
 " List the contents of the currently selected directory inode.\n"
 " Directory contents will be listed in the format:\n"
 " inode_number	type	hash	name_length	name\n"
+"\n"
+" Options:\n"
+"   -m -- Walk an absolute path down the metadata directory tree.\n"
 	));
 }
 
@@ -499,11 +520,21 @@ ls_f(
 	int			argc,
 	char			**argv)
 {
+	xfs_ino_t		rootino = mp->m_sb.sb_rootino;
 	int			c;
 	int			ret = 0;
 
-	while ((c = getopt(argc, argv, "")) != -1) {
+	while ((c = getopt(argc, argv, "m")) != -1) {
 		switch (c) {
+		case 'm':
+			/* Absolute path, start from metadata rootdir. */
+			if (!xfs_sb_version_hasmetadir(&mp->m_sb)) {
+				dbprintf(
+	_("filesystem does not support metadata directories.\n"));
+				return -1;
+			}
+			rootino = mp->m_sb.sb_metadirino;
+			break;
 		default:
 			ls_help();
 			return 0;
@@ -519,7 +550,7 @@ ls_f(
 	for (c = optind; c < argc; c++) {
 		push_cur();
 
-		ret = path_walk(argv[c]);
+		ret = path_walk(rootino, argv[c]);
 		if (ret)
 			goto err_cur;
 
