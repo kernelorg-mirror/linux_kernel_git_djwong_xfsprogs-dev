@@ -53,6 +53,7 @@ phase1(xfs_mount_t *mp)
 	need_rbmino = 0;
 	need_rsumino = 0;
 	need_rrmapino = false;
+	need_rrefcountino = false;
 	lost_quotas = 0;
 
 	/*

@@ -60,4 +60,6 @@ extern void rmap_store_agflcount(struct xfs_mount *, xfs_agnumber_t, int);
 extern bool rmap_is_rtrmap_ino(xfs_ino_t ino);
 extern int rmap_populate_realtime_rmapbt(struct xfs_mount *mp);
 
+extern bool rmap_is_rtrefcount_ino(xfs_ino_t ino);
+
 #endif /* RMAP_H_ */

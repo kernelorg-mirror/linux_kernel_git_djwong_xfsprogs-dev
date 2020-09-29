@@ -67,6 +67,7 @@ int	need_metadir_dotdot;
 int	need_rbmino;
 int	need_rsumino;
 bool	need_rrmapino;
+bool	need_rrefcountino;
 
 int	lost_quotas;
 int	have_uquotino;

@@ -148,6 +148,11 @@ clear_dinode(xfs_mount_t *mp, xfs_dinode_t *dino, xfs_ino_t ino_num)
 		rmap_avoid_check();
 	}
 
+	if (rmap_is_rtrefcount_ino(ino_num)) {
+		need_rrefcountino = true;
+		refcount_avoid_check();
+	}
+
 	/* and clear the forks */
 	memset(XFS_DFORK_DPTR(dino), 0, XFS_LITINO(mp));
 	return;
@@ -1884,6 +1889,9 @@ process_check_sb_inodes(
 	if (rmap_is_rtrmap_ino(lino))
 		return process_check_rt_inode(mp, dinoc, lino, type, dirty,
 				XR_INO_RTRMAP, _("realtime rmap btree"));
+	if (rmap_is_rtrefcount_ino(lino))
+		return process_check_rt_inode(mp, dinoc, lino, type, dirty,
+				XR_INO_RTREFC, _("realtime refcount btree"));
 	return 0;
 }
 
@@ -1990,6 +1998,18 @@ _("realtime summary inode %" PRIu64 " has bad size %" PRId64 " (should be %d)\n"
 		if (!xfs_sb_version_hasrmapbt(&mp->m_sb)) {
 			do_warn(
 _("found inode %" PRIu64 " claiming to be a rtrmapbt file, but rmapbt is disabled\n"), lino);
+			return 1;
+		}
+		break;
+
+	case XR_INO_RTREFC:
+		/*
+		 * if we have no refcountbt, any inode claiming
+		 * to be a real-time file is bogus
+		 */
+		if (!xfs_sb_version_hasreflink(&mp->m_sb)) {
+			do_warn(
+_("found inode %" PRIu64 " claiming to be a rtrefcountbt file, but reflink is disabled\n"), lino);
 			return 1;
 		}
 		break;

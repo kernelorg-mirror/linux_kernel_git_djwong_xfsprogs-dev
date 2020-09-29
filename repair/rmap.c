@@ -37,6 +37,7 @@ static struct xfs_ag_rmap *ag_rmaps;
 bool rmapbt_suspect;
 static bool refcbt_suspect;
 static xfs_ino_t rrmapino;
+static xfs_ino_t rrefcountino;
 
 static inline int rmap_compare(const void *a, const void *b)
 {
@@ -74,6 +75,14 @@ rmap_is_rtrmap_ino(
 	return ino == rrmapino;
 }
 
+/* Is this a realtime refcount inode? */
+bool
+rmap_is_rtrefcount_ino(
+	xfs_ino_t		ino)
+{
+	return ino == rrefcountino;
+}
+
 /*
  * Initialize per-AG reverse map data.
  */
@@ -88,6 +97,7 @@ rmaps_init(
 		return;
 
 	libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &rrmapino);
+	libxfs_imeta_lookup(mp, &XFS_IMETA_RTREFCOUNTBT, &rrefcountino);
 
 	/* One ag_rmap per AG, and one more for the realtime device. */
 	ag_rmaps = calloc(mp->m_sb.sb_agcount + 1, sizeof(struct xfs_ag_rmap));
@@ -1447,6 +1457,7 @@ check_refcounts(
 		if (error || ino == NULLFSINO) {
 			do_warn(
 _("garbage in realtime refcount root, not checking realtime reference counts\n"));
+			need_rrefcountino = true;
 			goto err;
 		}
 
