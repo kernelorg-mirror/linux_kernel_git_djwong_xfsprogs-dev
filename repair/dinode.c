@@ -272,6 +272,8 @@ _("data fork in rt inode %" PRIu64 " found metadata block %" PRIu64 " in rt bmap
 				break;
 			/* fall through */
 		case XR_E_MULT:
+			if (xfs_sb_version_hasrtreflink(&mp->m_sb))
+				break;
 			set_rtbmap(ext, XR_E_MULT);
 			do_warn(
 _("data fork in rt inode %" PRIu64 " claims used rt block %" PRIu64 "\n"),
@@ -846,6 +848,132 @@ _("bad rtrmap btree ptr 0x%" PRIx64 " in ino %" PRIu64 "\n"),
 			return 1;
 	}
 
+	return suspect ? 1 : 0;
+}
+
+/*
+ * return 1 if inode should be cleared, 0 otherwise
+ */
+static int
+process_rtrefc(
+	struct xfs_mount		*mp,
+	xfs_agnumber_t			agno,
+	xfs_agino_t			ino,
+	struct xfs_dinode		*dip,
+	int				type,
+	int				*dirty,
+	xfs_rfsblock_t			*tot,
+	uint64_t			*nex,
+	blkmap_t			**blkmapp,
+	int				check_dups)
+{
+	struct refc_priv		priv = { .nr_blocks = 0 };
+	struct xfs_rtrefcount_root	*dib;
+	xfs_rtrefcount_ptr_t		*pp;
+	struct xfs_rtrefcount_key	*kp;
+	struct xfs_rtrefcount_rec	*rp;
+	char				*forkname = get_forkname(XFS_DATA_FORK);
+	xfs_rtblock_t			oldkey, key;
+	xfs_ino_t			lino;
+	xfs_fsblock_t			bno;
+	size_t				droot_sz;
+	int				i;
+	int				level;
+	int				numrecs;
+	int				dmxr;
+	int				suspect = 0;
+	int				error;
+
+	/* We rebuild the rtrefcountbt, so no need to process blocks again. */
+	if (check_dups) {
+		*tot = be64_to_cpu(dip->di_nblocks);
+		return 0;
+	}
+
+	/* Have to be a metadata inode. */
+	if (!(dip->di_flags2 & be64_to_cpu(XFS_DIFLAG2_METADATA)))
+		return 1;
+
+	dib = (struct xfs_rtrefcount_root *)XFS_DFORK_PTR(dip, XFS_DATA_FORK);
+	lino = XFS_AGINO_TO_INO(mp, agno, ino);
+	*tot = 0;
+	*nex = 0;
+
+	level = be16_to_cpu(dib->bb_level);
+	numrecs = be16_to_cpu(dib->bb_numrecs);
+
+	if (level > mp->m_rtrefc_maxlevels) {
+		do_warn(
+_("bad level %d in inode %" PRIu64 " rtrefcount btree root block\n"),
+			level, lino);
+		return 1;
+	}
+
+	/*
+	 * use rtroot/dfork_dsize since the root block is in the data fork
+	 */
+	droot_sz = xfs_rtrefcount_droot_space_calc(level, numrecs);
+	if (droot_sz > XFS_DFORK_SIZE(dip, mp, XFS_DATA_FORK)) {
+		do_warn(
+_("computed size of rtrefcountbt root (%zu bytes) is greater than space in "
+	  "inode %" PRIu64 " %s fork\n"),
+				droot_sz, lino, forkname);
+		return 1;
+	}
+
+	if (level == 0) {
+		rp = xfs_rtrefcount_droot_rec_addr(dib, 1);
+		error = process_rtrefc_reclist(mp, rp, numrecs,
+				&priv, "rtrefcountbt root");
+		if (error) {
+			refcount_avoid_check();
+			return 1;
+		}
+		return 0;
+	}
+
+	dmxr = libxfs_rtrefcountbt_droot_maxrecs(
+			XFS_DFORK_SIZE(dip, mp, XFS_DATA_FORK), false);
+	pp = xfs_rtrefcount_droot_ptr_addr(dib, 1, dmxr);
+
+	/* check for in-order keys */
+	for (i = 0; i < numrecs; i++)  {
+		kp = xfs_rtrefcount_droot_key_addr(dib, i + 1);
+
+		key = be64_to_cpu(kp->rc_startblock);
+		if (i == 0) {
+			oldkey = key;
+			continue;
+		}
+		if (key < oldkey) {
+			do_warn(
+_("out of order key %u in rtrefcount root ino %" PRIu64 "\n"),
+				i, lino);
+			suspect++;
+			continue;
+		}
+		oldkey = key;
+	}
+
+	/* probe keys */
+	for (i = 0; i < numrecs; i++)  {
+		bno = get_unaligned_be64(&pp[i]);
+
+		if (!libxfs_verify_fsbno(mp, bno))  {
+			do_warn(
+_("bad rtrefcount btree ptr 0x%" PRIx64 " in ino %" PRIu64 "\n"),
+				bno, lino);
+			return 1;
+		}
+
+		if (scan_lbtree(bno, level, scan_rtrefcbt,
+				type, XFS_DATA_FORK, lino, tot, nex, blkmapp,
+				NULL, 1, check_dups, XFS_RTREFC_CRC_MAGIC,
+				&priv, &xfs_rtrefcountbt_buf_ops))
+			return 1;
+	}
+
+	*tot = priv.nr_blocks;
 	return suspect ? 1 : 0;
 }
 
@@ -1648,6 +1776,7 @@ check_dinode_mode_format(
 		case XFS_DINODE_FMT_RMAP:
 		case XFS_DINODE_FMT_EXTENTS:
 		case XFS_DINODE_FMT_BTREE:
+		case XFS_DINODE_FMT_REFCOUNT:
 			return 0;
 		}
 		return -1;
@@ -2058,6 +2187,10 @@ retry:
 		err = process_rtrmap(mp, agno, ino, dino, type, dirty,
 			totblocks, nextents, dblkmap, check_dups);
 		break;
+	case XFS_DINODE_FMT_REFCOUNT:
+		err = process_rtrefc(mp, agno, ino, dino, type, dirty,
+			totblocks, nextents, dblkmap, check_dups);
+		break;
 	case XFS_DINODE_FMT_DEV:	/* fall through */
 		err = 0;
 		break;
@@ -2118,6 +2251,7 @@ _("would have tried to rebuild inode %"PRIu64" data fork\n"),
 			break;
 		case XFS_DINODE_FMT_DEV:	/* fall through */
 		case XFS_DINODE_FMT_RMAP:
+		case XFS_DINODE_FMT_REFCOUNT:
 			err = 0;
 			break;
 		default:
@@ -2879,6 +3013,8 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 			type = XR_INO_PQUOTA;
 		else if (dino->di_format == XFS_DINODE_FMT_RMAP)
 			type = XR_INO_RTRMAP;
+		else if (dino->di_format == XFS_DINODE_FMT_REFCOUNT)
+			type = XR_INO_RTREFC;
 		else
 			type = XR_INO_DATA;
 		break;
