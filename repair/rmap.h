@@ -61,5 +61,6 @@ extern bool rmap_is_rtrmap_ino(xfs_ino_t ino);
 extern int rmap_populate_realtime_rmapbt(struct xfs_mount *mp);
 
 extern bool rmap_is_rtrefcount_ino(xfs_ino_t ino);
+extern int rmap_populate_realtime_refcbt(struct xfs_mount *mp);
 
 #endif /* RMAP_H_ */
