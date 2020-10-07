@@ -468,6 +468,8 @@ void __xfs_buf_mark_corrupt(struct xfs_buf *bp, xfs_failaddr_t fa);
 	typeof(mode) __mode = mode;				\
 	__mode = __mode; /* no set-but-unused warning */	\
 })
+#define xfs_rtlock(tp, mp, mode)			((void) 0)
+#define xfs_rtunlock(mp, mode)				((void) 0)
 
 #define mutex_lock(l)					((void) 0)
 #define mutex_unlock(l)					((void) 0)
