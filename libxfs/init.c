@@ -734,6 +734,7 @@ libxfs_mount(
 	xfs_rmapbt_compute_maxlevels(mp);
 	xfs_rtrmapbt_compute_maxlevels(mp);
 	xfs_refcountbt_compute_maxlevels(mp);
+	xfs_rtrefcountbt_compute_maxlevels(mp);
 
 	/*
 	 * Check that the data (and log if separate) are an ok size.
