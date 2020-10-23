@@ -121,8 +121,8 @@ libxfs_ialloc(
 	VFS_I(ip)->i_mode = args->mode;
 	set_nlink(VFS_I(ip), args->nlink);
 	VFS_I(ip)->i_uid = args->uid;
+	VFS_I(ip)->i_rdev = args->rdev;
 	ip->i_d.di_projid = args->prid;
-	times = XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD | XFS_ICHGTIME_ACCESS;
 
 	if (pip && (VFS_I(pip)->i_mode & S_ISGID)) {
 		VFS_I(ip)->i_gid = VFS_I(pip)->i_gid;
@@ -134,6 +134,8 @@ libxfs_ialloc(
 	ip->i_d.di_size = 0;
 	ip->i_df.if_nextents = 0;
 	ASSERT(ip->i_d.di_nblocks == 0);
+
+	times = XFS_ICHGTIME_CHG | XFS_ICHGTIME_MOD | XFS_ICHGTIME_ACCESS;
 	ip->i_d.di_extsize = 0;
 	ip->i_d.di_dmevmask = 0;
 	ip->i_d.di_dmstate = 0;
@@ -180,6 +182,7 @@ libxfs_ialloc(
 	 */
 	xfs_trans_ijoin(tp, ip, 0);
 	xfs_trans_log_inode(tp, ip, flags);
+
 	*ipp = ip;
 	return 0;
 }
