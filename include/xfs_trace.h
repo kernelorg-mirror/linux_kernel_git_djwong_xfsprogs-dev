@@ -307,6 +307,9 @@
 #define trace_xfs_rmap_map_error(...)		((void) 0)
 #define trace_xfs_rmap_delete_error(...)	((void) 0)
 
+#define trace_xfs_rt_resv_free(...)		((void) 0)
+#define trace_xfs_rt_resv_init(...)		((void) 0)
+
 #define trace_xfs_swapext_defer(...)		((void) 0)
 #define trace_xfs_swapext_estimate(...)		((void) 0)
 #define trace_xfs_swapext_extent1(...)		((void) 0)
