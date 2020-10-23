@@ -6,6 +6,8 @@
 #ifndef __LIBFROG_SWAPEXT_H__
 #define __LIBFROG_SWAPEXT_H__
 
+void xfrog_swapext_require_file2_fresh(struct file_swap_range *req,
+		struct xfs_bulkstat *bulkstat);
 int xfrog_swapext_prep(struct xfs_fd *file2, uint64_t flags,
 		int64_t file2_offset, int file1_fd, int64_t file1_offset,
 		int64_t length, struct file_swap_range *req);
