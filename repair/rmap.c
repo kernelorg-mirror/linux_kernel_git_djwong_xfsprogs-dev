@@ -37,6 +37,7 @@ static struct xfs_ag_rmap *ag_rmaps;
 bool rmapbt_suspect;
 static bool refcbt_suspect;
 static xfs_ino_t rrmapino = NULLFSINO;
+static xfs_ino_t rrefcountino = NULLFSINO;
 
 static inline int rmap_compare(const void *a, const void *b)
 {
@@ -74,6 +75,14 @@ is_rtrmap_ino(
 	return ino == rrmapino;
 }
 
+/* Is this a realtime refcount inode? */
+bool
+is_rtrefcount_ino(
+	xfs_ino_t		ino)
+{
+	return ino == rrefcountino;
+}
+
 /*
  * Initialize per-AG reverse map data.
  */
@@ -88,6 +97,7 @@ rmaps_init(
 		return;
 
 	libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &rrmapino);
+	libxfs_imeta_lookup(mp, &XFS_IMETA_RTREFCOUNTBT, &rrefcountino);
 
 	/* One ag_rmap per AG, and one more for the realtime device. */
 	ag_rmaps = calloc(mp->m_sb.sb_agcount + 1, sizeof(struct xfs_ag_rmap));
@@ -1440,20 +1450,18 @@ check_refcounts(
 		return error;
 
 	if (agno == NULLAGNUMBER) {
-		xfs_ino_t	ino;
-
-		error = -libxfs_imeta_lookup(mp, &XFS_IMETA_RTREFCOUNTBT, &ino);
-		if (error || ino == NULLFSINO) {
+		if (rrefcountino == NULLFSINO) {
 			do_warn(
 _("cannot find realtime refcount file, not checking realtime reference counts\n"));
 			goto err;
 		}
 
-		error = -libxfs_imeta_iget(mp, ino, XFS_DIR3_FT_REG_FILE, &ip);
+		error = -libxfs_imeta_iget(mp, rrefcountino,
+				XFS_DIR3_FT_REG_FILE, &ip);
 		if (error) {
 			do_warn(
 _("cannot iget realtime refcount inode 0x%llx, error %d\n"),
-				 (unsigned long long)ino, error);
+				 (unsigned long long)rrefcountino, error);
 			goto err;
 		}
 		bt_cur = libxfs_rtrefcountbt_init_cursor(mp, NULL, ip);
@@ -1617,4 +1625,11 @@ xfs_ino_t
 get_rtrmap_ino(void)
 {
 	return rrmapino;
+}
+
+void
+forget_rtrefcount(void)
+{
+	rrefcountino = NULLFSINO;
+	refcount_avoid_check();
 }
