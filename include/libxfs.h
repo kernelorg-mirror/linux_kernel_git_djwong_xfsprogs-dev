@@ -72,6 +72,7 @@ struct iomap;
 #include "xfs_trans.h"
 #include "xfs_ag.h"
 #include "xfs_rmap_btree.h"
+#include "xfs_rtrmap_btree.h"
 #include "xfs_rmap.h"
 #include "xfs_refcount_btree.h"
 #include "xfs_refcount.h"
