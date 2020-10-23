@@ -87,6 +87,7 @@ enum {
 	L_FILE,
 	L_NAME,
 	L_LAZYSBCNTR,
+	L_ATOMICSWAP,
 	L_MAX_OPTS,
 };
 
@@ -463,6 +464,7 @@ static struct opt_params lopts = {
 		[L_FILE] = "file",
 		[L_NAME] = "name",
 		[L_LAZYSBCNTR] = "lazy-count",
+		[L_ATOMICSWAP] = "atomicswap",
 	},
 	.subopt_params = {
 		{ .index = L_AGNUM,
@@ -540,6 +542,12 @@ static struct opt_params lopts = {
 		  .defaultval = SUBOPT_NEEDS_VAL,
 		},
 		{ .index = L_LAZYSBCNTR,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
+		{ .index = L_ATOMICSWAP,
 		  .conflicts = { { NULL, LAST_CONFLICT } },
 		  .minval = 0,
 		  .maxval = 1,
@@ -764,6 +772,7 @@ struct sb_feat_args {
 	bool	reflink;		/* XFS_SB_FEAT_RO_COMPAT_REFLINK */
 	bool	inobtcnt;		/* XFS_SB_FEAT_RO_COMPAT_INOBTCNT */
 	bool	bigtime;		/* XFS_SB_FEAT_INCOMPAT_BIGTIME */
+	bool	atomicswap;		/* XFS_SB_FEAT_INCOMPAT_LOG_ATOMICSWAP */
 	bool	nodalign;
 	bool	nortalign;
 };
@@ -896,7 +905,8 @@ usage( void )
 			    projid32bit=0|1,sparse=0|1]\n\
 /* no discard */	[-K]\n\
 /* log subvol */	[-l agnum=n,internal,size=num,logdev=xxx,version=n\n\
-			    sunit=value|su=num,sectsize=num,lazy-count=0|1]\n\
+			    sunit=value|su=num,sectsize=num,lazy-count=0|1,\n\
+			    atomicswap=0|1]\n\
 /* label */		[-L label (maximum 12 characters)]\n\
 /* naming */		[-n size=num,version=2|ci,ftype=0|1]\n\
 /* no-op info only */	[-N]\n\
@@ -1593,6 +1603,9 @@ log_opts_parser(
 	case L_LAZYSBCNTR:
 		cli->sb_feat.lazy_sb_counters = getnum(value, opts, subopt);
 		break;
+	case L_ATOMICSWAP:
+		cli->sb_feat.atomicswap = getnum(value, opts, subopt);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2070,6 +2083,13 @@ _("timestamps later than 2038 not supported without CRC support\n"));
 			usage();
 		}
 		cli->sb_feat.bigtime = false;
+
+		if (cli->sb_feat.atomicswap) {
+			fprintf(stderr,
+_("atomic extent swapping not supported without CRC support\n"));
+			usage();
+		}
+		cli->sb_feat.atomicswap = false;
 	}
 
 	if (!cli->sb_feat.finobt) {
@@ -2271,6 +2291,20 @@ validate_rtextsize(
 		}
 	}
 	ASSERT(cfg->rtextblocks);
+
+	/*
+	 * The kernel's atomic extent swap helper code requires that allocation
+	 * units are an even power of two.
+	 */
+	if (cli->sb_feat.atomicswap && !is_power_of_2(cfg->rtextblocks)) {
+		if (cli->rtextsize) {
+			fprintf(stderr,
+	_("illegal rt extent size %lld blocks, must be an even power of two\n"),
+				(long long)cfg->rtextblocks);
+			usage();
+		}
+		cfg->rtextblocks = 1;
+	}
 }
 
 /* Validate the incoming extsize hint. */
@@ -3050,6 +3084,9 @@ sb_set_features(
 		sbp->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_INOBTCNT;
 	if (fp->bigtime)
 		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_BIGTIME;
+	if (fp->atomicswap)
+		sbp->sb_features_log_incompat |=
+					XFS_SB_FEAT_INCOMPAT_LOG_ATOMIC_SWAP;
 
 	/*
 	 * Sparse inode chunk support has two main inode alignment requirements.
