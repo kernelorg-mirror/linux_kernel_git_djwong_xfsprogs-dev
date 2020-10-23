@@ -146,6 +146,9 @@ clear_dinode(xfs_mount_t *mp, xfs_dinode_t *dino, xfs_ino_t ino_num)
 	if (is_rtrmap_ino(ino_num))
 		forget_rtrmap();
 
+	if (is_rtrefcount_ino(ino_num))
+		forget_rtrefcount();
+
 	/* and clear the forks */
 	memset(XFS_DFORK_DPTR(dino), 0, XFS_LITINO(mp));
 	return;
@@ -963,8 +966,10 @@ process_rtrefc(
 		return 0;
 	}
 
-	/* Have to be a metadata inode. */
+	/* This must be recognized as /the/ realtime refcount metadata inode. */
 	if (!(dip->di_flags2 & cpu_to_be64(XFS_DIFLAG2_METADATA)))
+		return 1;
+	if (type != XR_INO_RTREFC)
 		return 1;
 
 	dib = (struct xfs_rtrefcount_root *)XFS_DFORK_PTR(dip, XFS_DATA_FORK);
@@ -1959,6 +1964,9 @@ process_check_sb_inodes(
 	if (is_rtrmap_ino(lino))
 		return process_check_rt_inode(mp, dinoc, lino, type, dirty,
 				XR_INO_RTRMAP, _("realtime rmap btree"));
+	if (is_rtrefcount_ino(lino))
+		return process_check_rt_inode(mp, dinoc, lino, type, dirty,
+				XR_INO_RTREFC, _("realtime refcount btree"));
 	return 0;
 }
 
@@ -2065,6 +2073,18 @@ _("realtime summary inode %" PRIu64 " has bad size %" PRId64 " (should be %d)\n"
 		if (!xfs_sb_version_hasrmapbt(&mp->m_sb)) {
 			do_warn(
 _("found inode %" PRIu64 " claiming to be a rtrmapbt file, but rmapbt is disabled\n"), lino);
+			return 1;
+		}
+		break;
+
+	case XR_INO_RTREFC:
+		/*
+		 * if we have no refcountbt, any inode claiming
+		 * to be a real-time file is bogus
+		 */
+		if (!xfs_sb_version_hasreflink(&mp->m_sb)) {
+			do_warn(
+_("found inode %" PRIu64 " claiming to be a rtrefcountbt file, but reflink is disabled\n"), lino);
 			return 1;
 		}
 		break;
@@ -3094,6 +3114,8 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 			type = XR_INO_PQUOTA;
 		else if (is_rtrmap_ino(lino))
 			type = XR_INO_RTRMAP;
+		else if (is_rtrefcount_ino(lino))
+			type = XR_INO_RTREFC;
 		else
 			type = XR_INO_DATA;
 		break;
@@ -3219,6 +3241,7 @@ _("Bad CoW extent size %u on inode %" PRIu64 ", "),
 		case XR_INO_GQUOTA:
 		case XR_INO_PQUOTA:
 		case XR_INO_RTRMAP:
+		case XR_INO_RTREFC:
 			/*
 			 * This inode was recognized as being filesystem
 			 * metadata, so preserve the inode and its contents for
