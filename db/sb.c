@@ -729,6 +729,8 @@ version_string(
 		strcat(s, ",INOBTCNT");
 	if (xfs_sb_version_hasbigtime(sbp))
 		strcat(s, ",BIGTIME");
+	if (xfs_sb_version_hasmetadir(sbp))
+		strcat(s, ",METADIR");
 	return s;
 }
 
