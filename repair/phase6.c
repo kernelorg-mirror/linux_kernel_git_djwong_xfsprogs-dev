@@ -484,11 +484,117 @@ reset_root_ino(
 	libxfs_inode_init(tp, &args, ip);
 }
 
+/* Mark a newly allocated inode in use in the incore bitmap. */
+static void
+mark_ino_inuse(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino,
+	int			mode,
+	xfs_ino_t		parent)
+{
+	struct ino_tree_node	*irec;
+	int			ino_offset;
+	int			i;
+
+	irec = find_inode_rec(mp, XFS_INO_TO_AGNO(mp, ino),
+			XFS_INO_TO_AGINO(mp, ino));
+
+	if (irec == NULL) {
+		/*
+		 * This inode is allocated from a newly created inode
+		 * chunk and therefore did not exist when inode chunks
+		 * were processed in phase3. Add this group of inodes to
+		 * the entry avl tree as if they were discovered in phase3.
+		 */
+		irec = set_inode_free_alloc(mp,
+				XFS_INO_TO_AGNO(mp, ino),
+				XFS_INO_TO_AGINO(mp, ino));
+		alloc_ex_data(irec);
+
+		for (i = 0; i < XFS_INODES_PER_CHUNK; i++)
+			set_inode_free(irec, i);
+	}
+
+	ino_offset = get_inode_offset(mp, ino, irec);
+
+	/*
+	 * Mark the inode allocated so it is not skipped in phase 7.  We'll
+	 * find it with the directory traverser soon, so we don't need to
+	 * mark it reached.
+	 */
+	set_inode_used(irec, ino_offset);
+	set_inode_ftype(irec, ino_offset, libxfs_mode_to_ftype(mode));
+	set_inode_parent(irec, ino_offset, parent);
+	if (S_ISDIR(mode))
+		set_inode_isadir(irec, ino_offset);
+}
+
+/* Make sure this metadata directory path exists. */
+static int
+ensure_imeta_dirpath(
+	struct xfs_mount		*mp,
+	const struct xfs_imeta_path	*path)
+{
+	struct xfs_imeta_path temp_path = {
+		.im_path		= path->im_path,
+		.im_depth		= 1,
+	};
+	unsigned int			i;
+	xfs_ino_t			parent = mp->m_metadirip->i_ino;
+	int				error;
+
+	if (!xfs_sb_version_hasmetadir(&mp->m_sb))
+		return 0;
+
+	error = -libxfs_imeta_ensure_dirpath(mp, path);
+	if (error)
+		return error;
+
+	for (i = 0; i < path->im_depth - 1; i++) {
+		xfs_ino_t		ino;
+
+		temp_path.im_depth = i + 1;
+		error = -libxfs_imeta_lookup(mp, &temp_path, &ino);
+		if (error)
+			return error;
+		if (ino == NULLFSINO)
+			return -ENOENT;
+		mark_ino_inuse(mp, ino, S_IFDIR, parent);
+		parent = ino;
+	}
+
+	return 0;
+}
+
+/* Look up the parent of this path. */
+static xfs_ino_t
+lookup_imeta_path_dirname(
+	struct xfs_mount		*mp,
+	const struct xfs_imeta_path	*path)
+{
+	struct xfs_imeta_path temp_path = {
+		.im_path		= path->im_path,
+		.im_depth		= path->im_depth - 1,
+	};
+	xfs_ino_t			ino;
+	int				error;
+
+	if (!xfs_sb_version_hasmetadir(&mp->m_sb))
+		return NULLFSINO;
+
+	error = -libxfs_imeta_lookup(mp, &temp_path, &ino);
+	if (error)
+		return NULLFSINO;
+
+	return ino;
+}
+
 /* Load a realtime metadata inode from disk and reset it. */
 static int
 ensure_rtino(
 	struct xfs_trans		**tpp,
 	const struct xfs_imeta_path	*path,
+	xfs_ino_t			*sb_inop,
 	struct xfs_inode		**ipp,
 	struct xfs_imeta_end		**cleanup)
 {
@@ -498,15 +604,56 @@ ensure_rtino(
 
 	*cleanup = NULL;
 
-	error = -libxfs_imeta_lookup(mp, path, &ino);
-	if (error)
-		return error;
+	if (!xfs_sb_version_hasmetadir(&mp->m_sb)) {
+		error = -libxfs_imeta_lookup(mp, path, &ino);
+		if (error)
+			return error;
 
-	error = -libxfs_iget(mp, *tpp, ino, 0, ipp);
-	if (error)
-		return error;
+		error = -libxfs_iget(mp, *tpp, ino, 0, ipp);
+		if (error)
+			return error;
 
-	reset_root_ino(*tpp, S_IFREG, *ipp);
+		reset_root_ino(*tpp, S_IFREG, *ipp);
+		return 0;
+	}
+
+	*cleanup = malloc(sizeof(struct xfs_imeta_end));
+	if (!*cleanup)
+		do_error(
+_("couldn't allocate rt metadata inode cleanup info -- error - %d\n"),
+			ENOMEM);
+
+	if (*sb_inop != NULLFSINO) {
+		/*
+		 * This rt metadata inode was fine, so we'll just link it
+		 * into the new metadata directory tree.
+		 */
+		error = -libxfs_imeta_iget(mp, *sb_inop, XFS_DIR3_FT_REG_FILE,
+				ipp);
+		if (error)
+			do_error(
+	_("failed to iget rt metadata inode 0x%llx, error %d\n"),
+					(unsigned long long)*sb_inop, error);
+
+		error = -libxfs_imeta_link(*tpp, path, *ipp, *cleanup);
+		if (error)
+			do_error(
+	_("failed to link rt metadata inode 0x%llx, error %d\n"),
+					(unsigned long long)*sb_inop, error);
+
+		set_nlink(VFS_I(*ipp), 1);
+		libxfs_trans_log_inode(*tpp, *ipp, XFS_ILOG_CORE);
+		return 0;
+	}
+
+	/* Allocate a new inode. */
+	error = -libxfs_imeta_create(tpp, path, S_IFREG, ipp, *cleanup);
+	if (error)
+		do_error(
+_("couldn't create new metadata inode, error %d\n"), error);
+
+	mark_ino_inuse(mp, (*ipp)->i_ino, S_IFREG,
+			lookup_imeta_path_dirname(mp, path));
 	return 0;
 }
 
@@ -525,15 +672,22 @@ mk_rbmino(
 	struct xfs_bmbt_irec	map[XFS_BMAP_MAX_NMAP];
 	uint			blocks;
 
+	error = ensure_imeta_dirpath(mp, &XFS_IMETA_RTBITMAP);
+	if (error)
+		do_error(
+	_("Couldn't create realtime metadata directory, error %d\n"), error);
+
 	/*
 	 * first set up inode
 	 */
-	i = -libxfs_trans_alloc_rollable(mp, 10, &tp);
+	i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+			libxfs_imeta_create_space_res(mp), 0, 0, &tp);
 	if (i)
 		res_failed(i);
 
 	/* Reset the realtime bitmap inode. */
-	error = ensure_rtino(&tp, &XFS_IMETA_RTBITMAP, &ip, &cleanup);
+	error = ensure_rtino(&tp, &XFS_IMETA_RTBITMAP, &mp->m_sb.sb_rbmino,
+			&ip, &cleanup);
 	if (error) {
 		do_error(
 		_("couldn't iget realtime bitmap inode -- error - %d\n"),
@@ -742,15 +896,22 @@ mk_rsumino(
 	struct xfs_bmbt_irec	map[XFS_BMAP_MAX_NMAP];
 	uint			blocks;
 
+	error = ensure_imeta_dirpath(mp, &XFS_IMETA_RTSUMMARY);
+	if (error)
+		do_error(
+	_("Couldn't create realtime metadata directory, error %d\n"), error);
+
 	/*
 	 * first set up inode
 	 */
-	i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_ichange, 10, 0, 0, &tp);
+	i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+			libxfs_imeta_create_space_res(mp), 0, 0, &tp);
 	if (i)
 		res_failed(i);
 
 	/* Reset the rt summary inode. */
-	error = ensure_rtino(&tp, &XFS_IMETA_RTSUMMARY, &ip, &cleanup);
+	error = ensure_rtino(&tp, &XFS_IMETA_RTSUMMARY, &mp->m_sb.sb_rsumino,
+			&ip, &cleanup);
 	if (error) {
 		do_error(
 		_("couldn't iget realtime summary inode -- error - %d\n"),
@@ -858,6 +1019,37 @@ mk_root_dir(xfs_mount_t *mp)
 			error);
 
 	libxfs_irele(ip);
+}
+
+/* Create a new metadata directory root. */
+static void
+mk_metadir(
+	struct xfs_mount	*mp)
+{
+	struct xfs_trans	*tp;
+	int			error;
+
+	error = init_fs_root_dir(mp, mp->m_sb.sb_metadirino, 0,
+			&mp->m_metadirip);
+	if (error)
+		do_error(
+	_("Initialization of the metadata root directory failed, error %d\n"),
+			error);
+
+	/* Mark the new metadata root dir as metadata. */
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_ichange, 0, 0, 0, &tp);
+	if (error)
+		do_error(
+	_("Marking metadata root directory failed"));
+
+	mp->m_metadirip->i_d.di_flags2 |= XFS_DIFLAG2_METADATA;
+	libxfs_trans_ijoin(tp, mp->m_metadirip, 0);
+	libxfs_trans_log_inode(tp, mp->m_metadirip, XFS_ILOG_CORE);
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		do_error(
+	_("Marking metadata root directory failed, error %d\n"), error);
 }
 
 /*
@@ -1303,6 +1495,8 @@ longform_dir2_rebuild(
 
 	if (ino == mp->m_sb.sb_rootino)
 		need_root_dotdot = 0;
+	else if (ino == mp->m_sb.sb_metadirino)
+		need_metadir_dotdot = 0;
 
 	/* go through the hash list and re-add the inodes */
 
@@ -2877,7 +3071,7 @@ process_dir_inode(
 
 	need_dot = dirty = num_illegal = 0;
 
-	if (mp->m_sb.sb_rootino == ino)  {
+	if (mp->m_sb.sb_rootino == ino || mp->m_sb.sb_metadirino == ino) {
 		/*
 		 * mark root inode reached and bump up
 		 * link count for root inode to account
@@ -2951,6 +3145,9 @@ _("error %d fixing shortform directory %llu\n"),
 	dir_hash_done(hashtab);
 
 	fix_dotdot(mp, ino, ip, mp->m_sb.sb_rootino, "root", &need_root_dotdot);
+	if (xfs_sb_version_hasmetadir(&mp->m_sb))
+		fix_dotdot(mp, ino, ip, mp->m_sb.sb_metadirino, "metadata",
+				&need_metadir_dotdot);
 
 	/*
 	 * if we need to create the '.' entry, do so only if
@@ -3030,6 +3227,15 @@ mark_inode(
 static void
 mark_standalone_inodes(xfs_mount_t *mp)
 {
+	if (xfs_sb_version_hasmetadir(&mp->m_sb)) {
+		/*
+		 * The directory connectivity scanner will pick up the metadata
+		 * inode directory, which will mark the rest of the metadata
+		 * inodes.
+		 */
+		return;
+	}
+
 	mark_inode(mp, mp->m_sb.sb_rbmino);
 	mark_inode(mp, mp->m_sb.sb_rsumino);
 
@@ -3180,6 +3386,17 @@ phase6(xfs_mount_t *mp)
 			need_root_dotdot = 0;
 		} else  {
 			do_warn(_("would reinitialize root directory\n"));
+		}
+	}
+
+	if (need_metadir_inode) {
+		if (!no_modify)  {
+			do_warn(_("reinitializing metadata directory\n"));
+			mk_metadir(mp);
+			need_metadir_inode = 0;
+			need_metadir_dotdot = 0;
+		} else  {
+			do_warn(_("would reinitialize metadata directory\n"));
 		}
 	}
 
