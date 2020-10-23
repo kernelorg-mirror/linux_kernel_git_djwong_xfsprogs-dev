@@ -11,6 +11,15 @@ struct xfs_inode;
 struct xfs_buftarg;
 struct xfs_da_geometry;
 
+struct xfs_ag_resv {
+	/* number of blocks originally reserved here */
+	xfs_extlen_t	ar_orig_reserved;
+	/* number of blocks reserved here */
+	xfs_extlen_t	ar_reserved;
+	/* number of blocks originally asked for */
+	xfs_extlen_t	ar_asked;
+};
+
 /*
  * Define a user-level mount structure with all we need
  * in order to make use of the numerous XFS_* macros.
@@ -102,18 +111,12 @@ typedef struct xfs_mount {
 	 * if warranted.
 	 */
 	struct xlog		*m_log;		/* log specific stuff */
+
+	/* Dummy reservation for realtime metadata. */
+	struct xfs_ag_resv	m_rtmeta_resv;
 } xfs_mount_t;
 
 #define M_IGEO(mp)		(&(mp)->m_ino_geo)
-
-struct xfs_ag_resv {
-	/* number of blocks originally reserved here */
-	xfs_extlen_t	ar_orig_reserved;
-	/* number of blocks reserved here */
-	xfs_extlen_t	ar_reserved;
-	/* number of blocks originally asked for */
-	xfs_extlen_t	ar_asked;
-};
 
 /*
  * Per-ag incore structure, copies of information in agf and agi,
