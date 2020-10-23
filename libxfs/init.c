@@ -857,13 +857,15 @@ libxfs_mount(
 void
 libxfs_rtmount_destroy(xfs_mount_t *mp)
 {
+	if (mp->m_rrefcountip)
+		libxfs_imeta_irele(mp->m_rrefcountip);
 	if (mp->m_rrmapip)
 		libxfs_imeta_irele(mp->m_rrmapip);
 	if (mp->m_rsumip)
 		libxfs_imeta_irele(mp->m_rsumip);
 	if (mp->m_rbmip)
 		libxfs_imeta_irele(mp->m_rbmip);
-	mp->m_rsumip = mp->m_rbmip = mp->m_rrmapip = NULL;
+	mp->m_rsumip = mp->m_rbmip = mp->m_rrmapip = mp->m_rrefcountip = NULL;
 }
 
 /* Flush a device and report on writes that didn't make it to stable storage. */
