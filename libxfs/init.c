@@ -655,6 +655,15 @@ libxfs_buftarg_init(
 	mp->m_rtdev_targp = libxfs_buftarg_alloc(mp, rtdev);
 }
 
+int
+xfs_sb_validate_mount(
+	struct xfs_mount	*mp,
+	struct xfs_buf		*bp,
+	struct xfs_sb		*sbp)
+{
+	return 0;
+}
+
 /*
  * Mount structure initialization, provides a filled-in xfs_mount_t
  * such that the numerous XFS_* macros can be used.  If dev is zero,
