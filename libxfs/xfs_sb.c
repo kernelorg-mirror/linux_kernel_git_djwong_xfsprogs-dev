@@ -220,6 +220,7 @@ xfs_validate_sb_common(
 	struct xfs_dsb		*dsb = bp->b_addr;
 	uint32_t		agcount = 0;
 	uint32_t		rem;
+	int			error;
 
 	if (!xfs_verify_magic(bp, dsb->sb_magicnum)) {
 		xfs_warn(mp, "bad magic number");
@@ -378,6 +379,10 @@ xfs_validate_sb_common(
 		xfs_notice(mp, "v5 SB sanity check failed");
 		return -EFSCORRUPTED;
 	}
+
+	error = xfs_sb_validate_mount(mp, bp, sbp);
+	if (error)
+		return error;
 
 	/*
 	 * Currently only very few inode sizes are supported.
