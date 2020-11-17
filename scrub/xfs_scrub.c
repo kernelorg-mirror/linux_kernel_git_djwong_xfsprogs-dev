@@ -618,6 +618,7 @@ main(
 	textdomain(PACKAGE);
 
 	pthread_mutex_init(&ctx.lock, NULL);
+	pthread_rwlock_init(&ctx.repair_rwlock, NULL);
 	ctx.mode = SCRUB_MODE_REPAIR;
 	ctx.error_action = ERRORS_CONTINUE;
 	ctx.freeze_ok = true;
