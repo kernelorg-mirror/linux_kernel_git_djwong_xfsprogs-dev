@@ -452,6 +452,17 @@ secondary_sb_whack(
 			rval |= XR_AG_SB_SEC;
 	}
 
+	if (xfs_sb_version_needsrepair(sb)) {
+		if (!no_modify)
+			sb->sb_features_incompat &=
+					~XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+		if (!do_bzero) {
+			rval |= XR_AG_SB;
+			do_warn(_("needsrepair flag set in sb %d\n"), i);
+		} else
+			rval |= XR_AG_SB_SEC;
+	}
+
 	return(rval);
 }
 
