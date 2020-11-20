@@ -619,6 +619,11 @@ static inline bool xfs_sb_version_hasatomicswap(struct xfs_sb *sbp)
 		 XFS_SB_FEAT_INCOMPAT_LOG_ATOMIC_SWAP);
 }
 
+static inline void xfs_sb_version_addatomicswap(struct xfs_sb *sbp)
+{
+	sbp->sb_features_log_incompat |= XFS_SB_FEAT_INCOMPAT_LOG_ATOMIC_SWAP;
+}
+
 /*
  * end of superblock version macros
  */
