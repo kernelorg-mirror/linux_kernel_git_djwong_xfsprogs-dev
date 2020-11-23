@@ -258,6 +258,7 @@ _("Optimizations of %s are possible."), _(xfrog_scrubbers[i].descr));
 
 /*
  * Scrub a single XFS_SCRUB_TYPE_*, saving corruption reports for later.
+ * Do not call this function to repair file metadata.
  *
  * Returns 0 for success.  If errors occur, this function will log them and
  * return a positive error code.
@@ -266,17 +267,28 @@ int
 scrub_meta_type(
 	struct scrub_ctx		*ctx,
 	unsigned int			type,
-	xfs_agnumber_t			agno,
-	struct action_list		*alist,
 	struct repair_item		*rpi)
 {
 	struct xfs_scrub_metadata	meta = {
 		.sm_type		= type,
-		.sm_agno		= agno,
 	};
 	enum check_outcome		fix;
 
 	background_sleep();
+
+	switch (xfrog_scrubbers[type].type) {
+	case XFROG_SCRUB_TYPE_AGHEADER:
+	case XFROG_SCRUB_TYPE_PERAG:
+		meta.sm_agno = rpi->rpi_agno;
+		break;
+	case XFROG_SCRUB_TYPE_FS:
+	case XFROG_SCRUB_TYPE_SUMMARY:
+	case XFROG_SCRUB_TYPE_NONE:
+		break;
+	default:
+		assert(0);
+		break;
+	}
 
 	/* Check the item. */
 	fix = xfs_check_metadata(ctx, &meta, false);
@@ -307,8 +319,6 @@ static bool
 scrub_all_types(
 	struct scrub_ctx		*ctx,
 	enum xfrog_scrub_type		scrub_type,
-	xfs_agnumber_t			agno,
-	struct action_list		*alist,
 	struct repair_item		*rpi)
 {
 	const struct xfrog_scrub_descr	*sc;
@@ -321,7 +331,7 @@ scrub_all_types(
 		if (sc->type != scrub_type)
 			continue;
 
-		ret = scrub_meta_type(ctx, type, agno, alist, rpi);
+		ret = scrub_meta_type(ctx, type, rpi);
 		if (ret)
 			return ret;
 	}
@@ -333,43 +343,36 @@ scrub_all_types(
 int
 scrub_ag_headers(
 	struct scrub_ctx		*ctx,
-	xfs_agnumber_t			agno,
-	struct action_list		*alist,
 	struct repair_item		*rpi)
 {
-	return scrub_all_types(ctx, XFROG_SCRUB_TYPE_AGHEADER, agno, alist,
-			rpi);
+	return scrub_all_types(ctx, XFROG_SCRUB_TYPE_AGHEADER, rpi);
 }
 
 /* Scrub each AG's metadata btrees. */
 int
 scrub_ag_metadata(
 	struct scrub_ctx		*ctx,
-	xfs_agnumber_t			agno,
-	struct action_list		*alist,
 	struct repair_item		*rpi)
 {
-	return scrub_all_types(ctx, XFROG_SCRUB_TYPE_PERAG, agno, alist, rpi);
+	return scrub_all_types(ctx, XFROG_SCRUB_TYPE_PERAG, rpi);
 }
 
 /* Scrub whole-FS metadata btrees. */
 int
 scrub_fs_metadata(
 	struct scrub_ctx		*ctx,
-	struct action_list		*alist,
 	struct repair_item		*rpi)
 {
-	return scrub_all_types(ctx, XFROG_SCRUB_TYPE_FS, 0, alist, rpi);
+	return scrub_all_types(ctx, XFROG_SCRUB_TYPE_FS, rpi);
 }
 
 /* Scrub FS summary metadata. */
 int
 scrub_summary(
 	struct scrub_ctx		*ctx,
-	struct action_list		*alist,
 	struct repair_item		*rpi)
 {
-	return scrub_all_types(ctx, XFROG_SCRUB_TYPE_SUMMARY, 0, alist, rpi);
+	return scrub_all_types(ctx, XFROG_SCRUB_TYPE_SUMMARY, rpi);
 }
 
 /* How many items do we have to check? */
@@ -408,7 +411,6 @@ scrub_file(
 	struct scrub_ctx		*ctx,
 	const struct xfs_bulkstat	*bstat,
 	unsigned int			type,
-	struct action_list		*alist,
 	struct repair_item		*rpi)
 {
 	struct xfs_scrub_metadata	meta = {0};
