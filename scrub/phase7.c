@@ -122,8 +122,7 @@ phase7_func(
 	error = scrub_summary(ctx, &alist, &rpi);
 	if (error)
 		return error;
-	error = action_list_process(ctx, ctx->mnt.fd, &alist,
-			ALP_COMPLAIN_IF_UNFIXED | ALP_NOPROGRESS);
+	error = repair_item_completely(ctx, &rpi);
 	if (error)
 		return error;
 
