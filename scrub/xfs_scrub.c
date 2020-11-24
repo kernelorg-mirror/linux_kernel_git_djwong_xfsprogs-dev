@@ -616,6 +616,11 @@ main(
 	setlocale(LC_ALL, "");
 	bindtextdomain(PACKAGE, LOCALEDIR);
 	textdomain(PACKAGE);
+	if (unicrash_load()) {
+		fprintf(stderr,
+			_("%s: could initialize Unicode library.\n"), progname);
+		goto out;
+	}
 
 	pthread_mutex_init(&ctx.lock, NULL);
 	pthread_rwlock_init(&ctx.repair_rwlock, NULL);
@@ -808,6 +813,7 @@ out:
 	phase_end(&all_pi, 0);
 	if (progress_fp)
 		fclose(progress_fp);
+	unicrash_unload();
 
 	/*
 	 * If we're being run as a service, the return code must fit the LSB
