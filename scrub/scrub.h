@@ -70,6 +70,18 @@ repair_item_init_file(struct repair_item *rpi, struct xfs_bulkstat *bstat)
 			  XFS_SCRUB_OFLAG_XFAIL | \
 			  XFS_SCRUB_OFLAG_XCORRUPT)
 
+/* Cross-referencing failures only. */
+#define REPAIR_CLASS_XREF (XFS_SCRUB_OFLAG_XFAIL | \
+			   XFS_SCRUB_OFLAG_XCORRUPT)
+
+/*
+ * Special "repair class" mask that will trigger a repair for any scrub type
+ * that was directly observed to be corrupt; or was observed to have some sort
+ * of cross-referencing issue and there's a higher level metadata also needing
+ * repair.
+ */
+#define REPAIR_CLASS_CORRUPT (XFS_SCRUB_OFLAG_CORRUPT | XFS_SCRUB_IFLAG_REPAIR)
+
 static inline void
 repair_item_save_state(
 	struct repair_item		*rpi,

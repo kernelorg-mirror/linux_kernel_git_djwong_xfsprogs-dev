@@ -201,6 +201,50 @@ action_list_process(
 }
 
 /*
+ * Bitmap showing the correctness dependencies of all the scrub types.  Note
+ * that scrub types for one fs object type (ag, inode, fs) cannot declare
+ * dependencies on scrub types for a different object type.
+ */
+#define B(x) (1U << (x))
+static const unsigned int repair_dep_mask[XFS_SCRUB_TYPE_NR] = {
+	[XFS_SCRUB_TYPE_PROBE]		= 0,
+	[XFS_SCRUB_TYPE_SB]		= 0,
+	[XFS_SCRUB_TYPE_AGF]		= B(XFS_SCRUB_TYPE_SB),
+	[XFS_SCRUB_TYPE_AGFL]		= B(XFS_SCRUB_TYPE_SB) |
+					  B(XFS_SCRUB_TYPE_AGF),
+	[XFS_SCRUB_TYPE_AGI]		= B(XFS_SCRUB_TYPE_SB),
+	[XFS_SCRUB_TYPE_BNOBT]		= B(XFS_SCRUB_TYPE_AGF),
+	[XFS_SCRUB_TYPE_CNTBT]		= B(XFS_SCRUB_TYPE_AGF),
+	[XFS_SCRUB_TYPE_INOBT]		= B(XFS_SCRUB_TYPE_AGI),
+	[XFS_SCRUB_TYPE_FINOBT]		= B(XFS_SCRUB_TYPE_AGI),
+	[XFS_SCRUB_TYPE_RMAPBT]		= B(XFS_SCRUB_TYPE_AGF),
+	[XFS_SCRUB_TYPE_REFCNTBT]	= B(XFS_SCRUB_TYPE_AGF),
+
+	[XFS_SCRUB_TYPE_INODE]		= 0,
+	[XFS_SCRUB_TYPE_BMBTD]		= B(XFS_SCRUB_TYPE_INODE),
+	[XFS_SCRUB_TYPE_BMBTA]		= B(XFS_SCRUB_TYPE_INODE),
+	[XFS_SCRUB_TYPE_BMBTC]		= B(XFS_SCRUB_TYPE_INODE),
+	[XFS_SCRUB_TYPE_DIR]		= B(XFS_SCRUB_TYPE_BMBTD),
+	[XFS_SCRUB_TYPE_XATTR]		= B(XFS_SCRUB_TYPE_BMBTA),
+	[XFS_SCRUB_TYPE_SYMLINK]	= B(XFS_SCRUB_TYPE_BMBTD),
+	[XFS_SCRUB_TYPE_PARENT]		= B(XFS_SCRUB_TYPE_BMBTD),
+
+	[XFS_SCRUB_TYPE_RTBITMAP]	= 0,
+	[XFS_SCRUB_TYPE_RTSUM]		= 0,
+	[XFS_SCRUB_TYPE_UQUOTA]		= 0,
+	[XFS_SCRUB_TYPE_GQUOTA]		= 0,
+	[XFS_SCRUB_TYPE_PQUOTA]		= 0,
+	[XFS_SCRUB_TYPE_FSCOUNTERS]	= 0,
+	[XFS_SCRUB_TYPE_QUOTACHECK]	= B(XFS_SCRUB_TYPE_UQUOTA) |
+					  B(XFS_SCRUB_TYPE_GQUOTA) |
+					  B(XFS_SCRUB_TYPE_PQUOTA),
+	[XFS_SCRUB_TYPE_HEALTHY]	= 0,
+	[XFS_SCRUB_TYPE_RTRMAPBT]	= 0,
+	[XFS_SCRUB_TYPE_RTREFCBT]	= 0,
+};
+#undef B
+
+/*
  * For a given filesystem object, perform all repairs of a given class
  * (corrupt, xcorrupt, xfail, preen) if the repair item says it's needed.
  */
@@ -242,6 +286,61 @@ repair_item_class(
 }
 
 /*
+ * The operation of higher level metadata objects depends on the correctness of
+ * lower level metadata objects.  This means that if X depends on Y, we must
+ * investigate and correct all the observed issues with Y before we try to make
+ * a correction to X.  For all scheduled repair activity on X, boost the
+ * priority of repairs on all the Ys to ensure this correctness.
+ */
+static void
+repair_item_boost_priorities(
+	struct repair_item		*rpi)
+{
+	unsigned int			scrub_type;
+
+	for (scrub_type = 0; scrub_type < XFS_SCRUB_TYPE_NR; scrub_type++) {
+		unsigned int		dep_mask;
+		unsigned int		b;
+
+		/* Skip this scrub type if we're not going to touch it. */
+		if (rpi->rpi_oflags[scrub_type] == 0)
+			continue;
+
+		/*
+		 * Check if the repairs for this scrub type depend on any other
+		 * scrub types that have been flagged with cross-referencing
+		 * errors and are not already tagged for the highest priority
+		 * repair (OFLAG_CORRUPT).  If so, boost the priority of that
+		 * scrub type to the highest level so that any problems with
+		 * the dependencies will (hopefully) be fixed before we start
+		 * repairs on this scrub type.
+		 *
+		 * We reuse IFLAG_REPAIR for this purpose so that the reporting
+		 * for the dependent type remains unchanged from the initial
+		 * scan; xfs_repair_metadata always sets this flag so it's not
+		 * an issue if we've already set it.  The boost will be cleared
+		 * the next time xfs_repair_metadata is called.
+		 *
+		 * So far in the history of xfs_scrub we have maintained that
+		 * lower numbered scrub types do not depend on higher numbered
+		 * scrub types, so we need only process the bit mask once.
+		 */
+		dep_mask = repair_dep_mask[scrub_type];
+		for (b = 0; b < XFS_SCRUB_TYPE_NR; b++, dep_mask >>= 1) {
+			if (!dep_mask)
+				break;
+			if (!(dep_mask & 1))
+				continue;
+			if (!(rpi->rpi_oflags[b] & REPAIR_CLASS_XREF))
+				continue;
+			if (rpi->rpi_oflags[b] & XFS_SCRUB_OFLAG_CORRUPT)
+				continue;
+			rpi->rpi_oflags[b] |= XFS_SCRUB_IFLAG_REPAIR;
+		}
+	}
+}
+
+/*
  * Repair all parts (i.e. scrub types) of this filesystem object for which
  * corruption has been observed directly.  Other types of repair work (fixing
  * cross referencing problems and preening) are deferred.
@@ -254,7 +353,9 @@ repair_item_corruption(
 	struct scrub_ctx	*ctx,
 	struct repair_item	*rpi)
 {
-	return repair_item_class(ctx, rpi, XFS_SCRUB_OFLAG_CORRUPT,
+	repair_item_boost_priorities(rpi);
+
+	return repair_item_class(ctx, rpi, REPAIR_CLASS_CORRUPT,
 			ALP_REPAIR_ONLY | ALP_NOPROGRESS);
 }
 
@@ -270,7 +371,9 @@ repair_item(
 {
 	int			ret;
 
-	ret = repair_item_class(ctx, rpi, XFS_SCRUB_OFLAG_CORRUPT, flags);
+	repair_item_boost_priorities(rpi);
+
+	ret = repair_item_class(ctx, rpi, REPAIR_CLASS_CORRUPT, flags);
 	if (ret)
 		return ret;
 
