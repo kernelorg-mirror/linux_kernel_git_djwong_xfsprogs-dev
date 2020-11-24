@@ -304,6 +304,25 @@ action_list_process(
 	return ret;
 }
 
+/* Decide if the dependent scrub types of the given scrub type are ok. */
+static bool
+repair_item_dependencies_ok(
+	const struct repair_item	*rpi,
+	unsigned int			scrub_type)
+{
+	unsigned int			dep_mask = repair_dep_mask[scrub_type];
+	unsigned int			b;
+
+	for (b = 0; dep_mask && b < XFS_SCRUB_TYPE_NR; b++, dep_mask >>= 1) {
+		if (!(dep_mask & 1))
+			continue;
+		if (rpi->rpi_oflags[b] & REPAIR_CLASS_BAD)
+			return false;
+	}
+
+	return true;
+}
+
 /*
  * For a given filesystem object, perform all repairs of a given class
  * (corrupt, xcorrupt, xfail, preen) if the repair item says it's needed.
@@ -323,6 +342,16 @@ repair_item_class(
 
 		if (rpi->rpi_oflags[scrub_type] & repair_mask) {
 			enum check_outcome	fix;
+
+			/*
+			 * Don't try to repair higher level items if their
+			 * dependencies haven't been verified, unless we're at
+			 * the end of phase 4 and it's therefore our last
+			 * chance to fix things.
+			 */
+			if (!(flags & XRM_COMPLAIN_IF_UNFIXED) &&
+			    !repair_item_dependencies_ok(rpi, scrub_type))
+				continue;
 
 			fix = xfs_repair_metadata(ctx, ctx->mnt.fd, scrub_type,
 					rpi, flags);
