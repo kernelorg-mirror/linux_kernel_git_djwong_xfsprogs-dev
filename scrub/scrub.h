@@ -74,6 +74,11 @@ repair_item_init_file(struct repair_item *rpi, struct xfs_bulkstat *bstat)
 #define REPAIR_CLASS_XREF (XFS_SCRUB_OFLAG_XFAIL | \
 			   XFS_SCRUB_OFLAG_XCORRUPT)
 
+/* Anything that suggests something is out of order. */
+#define REPAIR_CLASS_BAD (XFS_SCRUB_OFLAG_CORRUPT | \
+			  XFS_SCRUB_OFLAG_XFAIL | \
+			  XFS_SCRUB_OFLAG_XCORRUPT)
+
 /*
  * Special "repair class" mask that will trigger a repair for any scrub type
  * that was directly observed to be corrupt; or was observed to have some sort
