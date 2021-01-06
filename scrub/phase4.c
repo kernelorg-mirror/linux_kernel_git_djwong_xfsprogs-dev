@@ -128,8 +128,7 @@ phase4_func(
 	if (ret)
 		return ret;
 
-	ret = action_list_process(ctx, ctx->mnt.fd, &alist,
-			ALP_REPAIR_ONLY | ALP_NOPROGRESS);
+	ret = repair_item_corruption(ctx, &rpi);
 	if (ret)
 		return ret;
 	action_list_discard(&alist);
