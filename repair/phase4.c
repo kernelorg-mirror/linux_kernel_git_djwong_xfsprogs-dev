@@ -245,15 +245,15 @@ process_rmap_data(
 		return;
 
 	create_work_queue(&wq, mp, platform_nproc());
-	for_each_perag(mp, agno, pag)
+	for_each_rmap_group(mp, agno)
 		queue_work(&wq, compute_ag_refcounts, agno, NULL);
 	destroy_work_queue(&wq);
 
 	create_work_queue(&wq, mp, platform_nproc());
-	for_each_perag(mp, agno, pag) {
+	for_each_perag(mp, agno, pag)
 		queue_work(&wq, process_inode_reflink_flags, agno, NULL);
+	for_each_rmap_group(mp, agno)
 		queue_work(&wq, check_refcount_btrees, agno, NULL);
-	}
 	destroy_work_queue(&wq);
 }
 
