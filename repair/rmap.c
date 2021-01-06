@@ -36,6 +36,7 @@ struct xfs_ag_rmap {
 static struct xfs_ag_rmap *ag_rmaps;
 bool rmapbt_suspect;
 static bool refcbt_suspect;
+static xfs_ino_t rrmapino = NULLFSINO;
 
 static inline int rmap_compare(const void *a, const void *b)
 {
@@ -65,6 +66,14 @@ rmap_needs_work(
 	       xfs_sb_version_hasrmapbt(&mp->m_sb);
 }
 
+/* Is this a realtime rmap inode? */
+bool
+is_rtrmap_ino(
+	xfs_ino_t		ino)
+{
+	return ino == rrmapino;
+}
+
 /*
  * Initialize per-AG reverse map data.
  */
@@ -77,6 +86,8 @@ rmaps_init(
 
 	if (!rmap_needs_work(mp))
 		return;
+
+	libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &rrmapino);
 
 	/* One ag_rmap per AG, and one more for the realtime device. */
 	ag_rmaps = calloc(mp->m_sb.sb_agcount + 1, sizeof(struct xfs_ag_rmap));
@@ -1007,7 +1018,6 @@ rmaps_verify_btree(
 	struct xfs_rmap_irec	*rm_rec;
 	struct xfs_perag	*pag = NULL;
 	struct xfs_inode	*ip = NULL;
-	xfs_ino_t		ino;
 	int			have;
 	int			error;
 
@@ -1032,18 +1042,18 @@ rmaps_verify_btree(
 		return error;
 
 	if (agno == NULLAGNUMBER) {
-		error = -libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &ino);
-		if (error || ino == NULLFSINO) {
+		if (rrmapino == NULLFSINO) {
 			do_warn(
 _("cannot find realtime rmap file, not checking realtime rmaps\n"));
 			goto err;
 		}
 
-		error = -libxfs_imeta_iget(mp, ino, XFS_DIR3_FT_REG_FILE, &ip);
+		error = -libxfs_imeta_iget(mp, rrmapino, XFS_DIR3_FT_REG_FILE,
+				&ip);
 		if (error) {
 			do_warn(
 _("cannot iget realtime rmap inode 0x%llx, error %d\n"),
-				 (unsigned long long)ino, error);
+				 (unsigned long long)rrmapino, error);
 			goto err;
 		}
 
@@ -1562,4 +1572,11 @@ rmap_store_agflcount(
 		return;
 
 	rmap_for_ag(agno)->ar_flcount = count;
+}
+
+void
+forget_rtrmap(void)
+{
+	rrmapino = NULLFSINO;
+	rmap_avoid_check();
 }
