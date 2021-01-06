@@ -12,6 +12,8 @@ struct action_list {
 	bool			sorted;
 };
 
+struct action_item;
+
 int action_lists_alloc(size_t nr, struct action_list **listsp);
 void action_lists_free(struct action_list **listsp);
 
@@ -19,10 +21,8 @@ void action_list_init(struct action_list *alist);
 size_t action_list_length(struct action_list *alist);
 void action_list_add(struct action_list *dest, struct action_item *item);
 void action_list_discard(struct action_list *alist);
-void action_list_splice(struct action_list *dest, struct action_list *src);
 
-void action_list_find_mustfix(struct action_list *actions,
-		struct action_list *immediate_alist,
+void repair_item_mustfix(struct repair_item *rpi, struct repair_item *fix_now,
 		unsigned long long *broken_primaries,
 		unsigned long long *broken_secondaries);
 
@@ -33,9 +33,16 @@ void action_list_find_mustfix(struct action_list *actions,
 
 int action_list_process(struct scrub_ctx *ctx, int fd,
 		struct action_list *alist, unsigned int repair_flags);
-void action_list_defer(struct scrub_ctx *ctx, xfs_agnumber_t agno,
-		struct action_list *alist);
-int action_list_process_or_defer(struct scrub_ctx *ctx, xfs_agnumber_t agno,
-		struct action_list *alist);
+int repair_item_corruption(struct scrub_ctx *ctx, struct repair_item *rpi);
+int repair_item(struct scrub_ctx *ctx, struct repair_item *rpi,
+		unsigned int repair_flags);
+int repair_item_defer(struct scrub_ctx *ctx, const struct repair_item *rpi);
+static inline int
+repair_item_completely(
+	struct scrub_ctx	*ctx,
+	struct repair_item	*rpi)
+{
+	return repair_item(ctx, rpi, ALP_COMPLAIN_IF_UNFIXED | ALP_NOPROGRESS);
+}
 
 #endif /* XFS_SCRUB_REPAIR_H_ */
