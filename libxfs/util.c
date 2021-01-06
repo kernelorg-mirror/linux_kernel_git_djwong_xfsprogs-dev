@@ -515,3 +515,66 @@ libxfs_imeta_ensure_dirpath(
 
 	return error == -EEXIST ? 0 : error;
 }
+
+/*
+ * Write a buffer to a file on the data device.  We assume there are no holes
+ * and no unwritten extents.
+ */
+int
+libxfs_file_write(
+	struct xfs_trans	*tp,
+	struct xfs_inode	*ip,
+	void			*buf,
+	size_t			len,
+	bool			logit)
+{
+	struct xfs_bmbt_irec	map;
+	struct xfs_mount	*mp = tp->t_mountp;
+	struct xfs_buf		*bp;
+	xfs_daddr_t		d;
+	xfs_fileoff_t		bno = 0;
+	xfs_fileoff_t		end_bno = XFS_B_TO_FSB(mp, len);
+	size_t			count;
+	size_t			bcount;
+	int			nmap;
+	int			error = 0;
+
+	/* Write one block at a time. */
+	while (bno < end_bno) {
+		nmap = 1;
+		error = libxfs_bmapi_read(ip, bno, end_bno, &map, &nmap, 0);
+		if (error)
+			return error;
+		if (nmap != 1)
+			return -ENOSPC;
+
+		if (map.br_startblock == HOLESTARTBLOCK ||
+		    map.br_state == XFS_EXT_UNWRITTEN)
+			return -EINVAL;
+
+		d = XFS_FSB_TO_DADDR(mp, map.br_startblock);
+		error = libxfs_trans_get_buf(logit ? tp : NULL, mp->m_dev, d,
+				map.br_blockcount << mp->m_blkbb_log, 0, &bp);
+		if (error)
+			break;
+		count = min(len, XFS_FSB_TO_B(mp, map.br_blockcount));
+		memmove(bp->b_addr, buf, count);
+		bcount = BBTOB(bp->b_length);
+		if (count < bcount)
+			memset((char *)bp->b_addr + count, 0, bcount - count);
+		if (logit)
+			libxfs_trans_log_buf(tp, bp, 0, bcount - 1);
+		else {
+			libxfs_buf_mark_dirty(bp);
+			libxfs_buf_relse(bp);
+		}
+		if (error)
+			break;
+
+		buf += count;
+		len -= count;
+		bno += map.br_blockcount;
+	}
+
+	return error;
+}
