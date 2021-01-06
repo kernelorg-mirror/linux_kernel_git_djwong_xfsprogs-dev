@@ -303,7 +303,7 @@ xfs_refcount_update_finish_item(
 {
 	struct xfs_refcount_intent	*refc;
 	xfs_fsblock_t			new_fsb;
-	xfs_extlen_t			new_aglen;
+	xfs_filblks_t			new_aglen;
 	int				error;
 
 	refc = container_of(item, struct xfs_refcount_intent, ri_list);
