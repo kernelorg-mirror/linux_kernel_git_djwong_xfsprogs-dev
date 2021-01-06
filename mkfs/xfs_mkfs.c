@@ -2184,12 +2184,18 @@ _("inode btree counters not supported without finobt support\n"));
 	}
 
 	if (cli->xi->rtname) {
-		if (cli->sb_feat.reflink && cli_opt_set(&mopts, M_REFLINK)) {
-			fprintf(stderr,
-_("reflink not supported with realtime devices\n"));
-			usage();
+		if (!cli->sb_feat.metadir && cli->sb_feat.reflink) {
+			if (cli_opt_set(&mopts, M_REFLINK) &&
+			    cli_opt_set(&mopts, M_METADIR)) {
+				fprintf(stderr,
+_("reflink not supported on realtime devices without metadir feature\n"));
+				usage();
+			} else if (cli_opt_set(&mopts, M_REFLINK)) {
+				cli->sb_feat.metadir = true;
+			} else {
+				cli->sb_feat.reflink = false;
+			}
 		}
-		cli->sb_feat.reflink = false;
 
 		if (!cli->sb_feat.metadir && cli->sb_feat.rmapbt) {
 			if (cli_opt_set(&mopts, M_RMAPBT) &&
@@ -3899,7 +3905,14 @@ check_rt_meta_prealloc(
 	if (error)
 		prealloc_fail(mp, error, ask, _("realtime rmap btree"));
 
+	/* realtime reference count btree inode */
+	ask = libxfs_rtrefcountbt_calc_reserves(mp);
+	error = -libxfs_imeta_resv_init_inode(mp, mp->m_rrefcountip, ask);
+	if (error)
+		prealloc_fail(mp, error, ask, _("realtime refcount btree"));
+
 	/* Unreserve the realtime metadata reservations. */
+	libxfs_imeta_resv_free_inode(mp, mp->m_rrefcountip);
 	libxfs_imeta_resv_free_inode(mp, mp->m_rrmapip);
 
 	/* Unreserve the per-AG reservations. */
