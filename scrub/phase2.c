@@ -28,8 +28,6 @@ scan_ag_metadata(
 	struct repair_item		fix_now;
 	struct scrub_ctx		*ctx = (struct scrub_ctx *)wq->wq_ctx;
 	bool				*aborted = arg;
-	struct action_list		alist;
-	struct action_list		immediate_alist;
 	unsigned long long		broken_primaries;
 	unsigned long long		broken_secondaries;
 	char				descr[DESCR_BUFSZ];
@@ -39,15 +37,13 @@ scan_ag_metadata(
 		return;
 
 	repair_item_init_ag(&rpi, agno);
-	action_list_init(&alist);
-	action_list_init(&immediate_alist);
 	snprintf(descr, DESCR_BUFSZ, _("AG %u"), agno);
 
 	/*
 	 * First we scrub and fix the AG headers, because we need
 	 * them to work well enough to check the AG btrees.
 	 */
-	ret = scrub_ag_headers(ctx, agno, &alist, &rpi);
+	ret = scrub_ag_headers(ctx, &rpi);
 	if (ret)
 		goto err;
 
@@ -57,7 +53,7 @@ scan_ag_metadata(
 		goto err;
 
 	/* Now scrub the AG btrees. */
-	ret = scrub_ag_metadata(ctx, agno, &alist, &rpi);
+	ret = scrub_ag_metadata(ctx, &rpi);
 	if (ret)
 		goto err;
 
@@ -105,15 +101,13 @@ scan_fs_metadata(
 	struct repair_item		rpi;
 	struct scrub_ctx		*ctx = (struct scrub_ctx *)wq->wq_ctx;
 	bool				*aborted = arg;
-	struct action_list		alist;
 	int				ret;
 
 	if (*aborted)
 		return;
 
 	repair_item_init_fs(&rpi);
-	action_list_init(&alist);
-	ret = scrub_fs_metadata(ctx, &alist, &rpi);
+	ret = scrub_fs_metadata(ctx, &rpi);
 	if (ret) {
 		*aborted = true;
 		return;
@@ -131,7 +125,6 @@ int
 phase2_func(
 	struct scrub_ctx	*ctx)
 {
-	struct action_list	alist;
 	struct repair_item	rpi;
 	struct workqueue	wq;
 	xfs_agnumber_t		agno;
@@ -152,8 +145,7 @@ phase2_func(
 	 * If errors occur, this function will log them and return nonzero.
 	 */
 	repair_item_init_ag(&rpi, 0);
-	action_list_init(&alist);
-	ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_SB, 0, &alist, &rpi);
+	ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_SB, &rpi);
 	if (ret)
 		goto out;
 	ret = repair_item_completely(ctx, &rpi);
