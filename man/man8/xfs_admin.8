@@ -131,6 +131,13 @@ Flag the filesystem as needing repairs.
 Until
 .BR xfs_repair (8)
 is run, the filesystem will not be mountable.
+.TP
+.B inobtcount
+Keep a count the number of blocks in each inode btree in the AGI.
+This reduces mount time by speeding up metadata space reservation calculations.
+The filesystem cannot be downgraded after this feature is enabled.
+Once enabled, the filesystem will not be writable by older kernels.
+This feature was added to Linux 5.10.
 .RE
 .TP
 .BI \-U " uuid"
