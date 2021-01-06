@@ -146,7 +146,7 @@ process_ags(
 	int			error;
 
 	do_inode_prefetch(mp, ag_stride, process_ag_func, true, false);
-	for (i = 0; i < mp->m_sb.sb_agcount; i++) {
+	for_each_rmap_group(mp, i) {
 		error = rmap_finish_collecting_fork_recs(mp, i);
 		if (error)
 			do_error(
@@ -230,28 +230,29 @@ process_rmap_data(
 	struct xfs_mount	*mp)
 {
 	struct workqueue	wq;
-	xfs_agnumber_t		i;
+	struct xfs_perag	*pag;
+	xfs_agnumber_t		agno;
 
 	if (!rmap_needs_work(mp))
 		return;
 
 	create_work_queue(&wq, mp, platform_nproc());
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)
-		queue_work(&wq, check_rmap_btrees, i, NULL);
+	for_each_rmap_group(mp, agno)
+		queue_work(&wq, check_rmap_btrees, agno, NULL);
 	destroy_work_queue(&wq);
 
 	if (!xfs_sb_version_hasreflink(&mp->m_sb))
 		return;
 
 	create_work_queue(&wq, mp, platform_nproc());
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)
-		queue_work(&wq, compute_ag_refcounts, i, NULL);
+	for_each_perag(mp, agno, pag)
+		queue_work(&wq, compute_ag_refcounts, agno, NULL);
 	destroy_work_queue(&wq);
 
 	create_work_queue(&wq, mp, platform_nproc());
-	for (i = 0; i < mp->m_sb.sb_agcount; i++) {
-		queue_work(&wq, process_inode_reflink_flags, i, NULL);
-		queue_work(&wq, check_refcount_btrees, i, NULL);
+	for_each_perag(mp, agno, pag) {
+		queue_work(&wq, process_inode_reflink_flags, agno, NULL);
+		queue_work(&wq, check_refcount_btrees, agno, NULL);
 	}
 	destroy_work_queue(&wq);
 }
