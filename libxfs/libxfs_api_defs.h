@@ -194,6 +194,8 @@
 #define xfs_rt_resv_init		libxfs_rt_resv_init
 #define xfs_rt_resv_free		libxfs_rt_resv_free
 #define xfs_rtfree_extent		libxfs_rtfree_extent
+#define xfs_rtrefcountbt_droot_maxrecs	libxfs_rtrefcountbt_droot_maxrecs
+#define xfs_rtrefcountbt_maxrecs	libxfs_rtrefcountbt_maxrecs
 #define xfs_rtrmapbt_commit_staged_btree	libxfs_rtrmapbt_commit_staged_btree
 #define xfs_rtrmapbt_create		libxfs_rtrmapbt_create
 #define xfs_rtrmapbt_droot_maxrecs	libxfs_rtrmapbt_droot_maxrecs
