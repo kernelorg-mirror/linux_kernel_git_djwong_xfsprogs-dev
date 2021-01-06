@@ -1642,3 +1642,10 @@ forget_rtrefcount(void)
 	rrefcountino = NULLFSINO;
 	refcount_avoid_check();
 }
+
+xfs_ino_t
+get_rtrefc_ino(void)
+{
+	return rrefcountino;
+}
+
