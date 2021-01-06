@@ -238,6 +238,8 @@ extern void	libxfs_irele(struct xfs_inode *ip);
 /* stubs for inode state flags */
 #define XFS_IPRESERVE_DM_FIELDS		(0) /* has legacy DMAPI fields set */
 #define xfs_iflags_set(ip, flag)	((void)0)
+#define xfs_iflags_test(ip, flag)	(false)
+#define xfs_iflags_clear(ip, flag)	((void)0)
 
 #define XFS_DEFAULT_COWEXTSZ_HINT 32
 
