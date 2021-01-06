@@ -428,9 +428,9 @@ rtmount_init(
 	if (sbp->sb_rblocks == 0)
 		return 0;
 
-	if (xfs_sb_version_hasreflink(sbp)) {
+	if (xfs_sb_version_hasreflink(sbp) && sbp->sb_rextsize > 1) {
 		fprintf(stderr,
-	_("%s: Reflink not compatible with realtime device. Please try a newer xfsprogs.\n"),
+	_("%s: Reflink not compatible with realtime extent size > 1. Please try a newer xfsprogs.\n"),
 				progname);
 		return -1;
 	}

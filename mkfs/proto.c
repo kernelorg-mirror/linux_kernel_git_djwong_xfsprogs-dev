@@ -792,6 +792,30 @@ rtinit(
 		libxfs_imeta_end_update(mp, &ic, 0);
 	}
 
+	/* If we have reflink and a realtime device, create a rtrefcountbt inode. */
+	if (xfs_sb_version_hasrtreflink(&mp->m_sb)) {
+		error = -libxfs_imeta_ensure_dirpath(mp, &XFS_IMETA_RTREFCOUNTBT);
+		if (error)
+			fail(_("Realtime refc directory allocation failed"),
+					error);
+
+		i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+				libxfs_imeta_create_space_res(mp), 0, 0, &tp);
+		if (i)
+			res_failed(i);
+
+		error = -libxfs_rtrefcountbt_create(&tp, &ic,
+				&mp->m_rrefcountip);
+		if (error)
+			fail(_("Completion of the realtime refcountbt failed"),
+					error);
+		error = -libxfs_trans_commit(tp);
+		if (error)
+			fail(_("Completion of the realtime refcountbt inode failed"),
+					error);
+		libxfs_imeta_end_update(mp, &ic, 0);
+	}
+
 	/*
 	 * Next, give the bitmap file some zero-filled blocks.
 	 */
