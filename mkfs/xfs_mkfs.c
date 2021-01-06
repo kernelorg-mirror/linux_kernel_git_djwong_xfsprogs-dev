@@ -2191,12 +2191,18 @@ _("reflink not supported with realtime devices\n"));
 		}
 		cli->sb_feat.reflink = false;
 
-		if (cli->sb_feat.rmapbt && cli_opt_set(&mopts, M_RMAPBT)) {
-			fprintf(stderr,
-_("rmapbt not supported with realtime devices\n"));
-			usage();
+		if (!cli->sb_feat.metadir && cli->sb_feat.rmapbt) {
+			if (cli_opt_set(&mopts, M_RMAPBT) &&
+			    cli_opt_set(&mopts, M_METADIR)) {
+				fprintf(stderr,
+_("rmapbt not supported on realtime devices without metadir feature\n"));
+				usage();
+			} else if (cli_opt_set(&mopts, M_RMAPBT)) {
+				cli->sb_feat.metadir = true;
+			} else {
+				cli->sb_feat.rmapbt = false;
+			}
 		}
-		cli->sb_feat.rmapbt = false;
 	}
 
 	if ((cli->fsx.fsx_xflags & FS_XFLAG_COWEXTSIZE) &&
@@ -3817,6 +3823,34 @@ cfgfile_parse(
 		cli->cfgfile);
 }
 
+/*
+ * Make sure there's enough space on the data device to handle realtime
+ * metadata btree expansions.
+ * */
+static void
+check_rt_meta_prealloc(
+	struct xfs_mount	*mp)
+{
+	xfs_filblks_t		ask;
+	int			error;
+
+	ask = libxfs_rtrmapbt_calc_reserves(mp);
+	error = -libxfs_imeta_resv_init_inode(mp, mp->m_rrmapip, ask);
+	if (error) {
+		if (error == ENOSPC)
+			fprintf(stderr,
+	_("%s: not enough space to handle realtime rmap btree expansion\n"),
+					progname);
+		else
+			fprintf(stderr,
+	_("%s: error %d while ensuring free space for realtime rmap btree\n"),
+					progname, error);
+		exit(1);
+	}
+
+	libxfs_imeta_resv_free_inode(mp, mp->m_rrmapip);
+}
+
 int
 main(
 	int			argc,
@@ -4120,6 +4154,9 @@ main(
 	 * Protect ourselves against possible stupidity
 	 */
 	check_root_ino(mp);
+
+	/* Make sure we can handle space preallocations of rt metadata btrees */
+	check_rt_meta_prealloc(mp);
 
 	/*
 	 * Re-write multiple secondary superblocks with rootinode field set
