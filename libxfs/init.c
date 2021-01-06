@@ -870,9 +870,10 @@ _("%s: Flushing the %s failed, err=%d!\n"),
  * Flush all dirty buffers to stable storage and report on writes that didn't
  * make it to stable storage.
  */
-static int
+int
 libxfs_flush_mount(
-	struct xfs_mount	*mp)
+	struct xfs_mount	*mp,
+	bool			purge)
 {
 	int			error = 0;
 	int			err2;
@@ -884,7 +885,10 @@ libxfs_flush_mount(
 	 * cannot be written will cause the LOST_WRITE flag to be set in the
 	 * buftarg.
 	 */
-	libxfs_bcache_purge();
+	if (purge)
+		libxfs_bcache_purge();
+	else
+		libxfs_bcache_flush();
 
 	/* Flush all kernel and disk write caches, and report failures. */
 	if (mp->m_ddev_targp) {
@@ -923,7 +927,7 @@ libxfs_umount(
 
 	libxfs_rtmount_destroy(mp);
 
-	error = libxfs_flush_mount(mp);
+	error = libxfs_flush_mount(mp, true);
 
 	for (agno = 0; agno < mp->m_maxagi; agno++) {
 		pag = radix_tree_delete(&mp->m_perag_tree, agno);
