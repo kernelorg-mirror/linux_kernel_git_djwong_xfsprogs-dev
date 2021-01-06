@@ -85,6 +85,9 @@ struct scrub_ctx {
 	unsigned long long	slow_ops_skipped;
 	bool			scrub_setup_succeeded;
 	bool			preen_triggers[XFS_SCRUB_TYPE_NR];
+
+	/* Used to serialize certain scan-happy repair operations. */
+	pthread_rwlock_t	repair_rwlock;
 };
 
 /* Phase helper functions */
