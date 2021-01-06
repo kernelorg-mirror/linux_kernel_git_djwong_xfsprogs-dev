@@ -15,8 +15,6 @@ enum check_outcome {
 	CHECK_TOOSLOW,	/* skipped because freezes are not allowed */
 };
 
-struct action_item;
-
 struct repair_item {
 	/*
 	 * Information we need to call the repair ioctl.  Per-AG items should
@@ -87,6 +85,7 @@ repair_item_clean_state(
 {
 	rpi->rpi_oflags[meta->sm_type] = 0;
 }
+bool repair_item_is_clean(const struct repair_item *rpi);
 
 void scrub_report_preen_triggers(struct scrub_ctx *ctx);
 int scrub_ag_headers(struct scrub_ctx *ctx, xfs_agnumber_t agno,
@@ -114,16 +113,6 @@ int scrub_file(struct scrub_ctx *ctx, const struct xfs_bulkstat *bstat,
 		unsigned int type, struct action_list *alist,
 		struct repair_item *rpi);
 
-/* Repair parameters are the scrub inputs and retry count. */
-struct action_item {
-	struct list_head	list;
-	__u64			ino;
-	__u32			type;
-	__u32			flags;
-	__u32			gen;
-	__u32			agno;
-};
-
 /*
  * Only ask the kernel to repair this object if the kernel directly told us it
  * was corrupt.  Objects that are only flagged as having cross-referencing
@@ -135,6 +124,7 @@ struct action_item {
 #define XRM_COMPLAIN_IF_UNFIXED	(1U << 1)
 
 enum check_outcome xfs_repair_metadata(struct scrub_ctx *ctx, int fd,
-		struct action_item *aitem, unsigned int repair_flags);
+		unsigned int scrub_type, struct repair_item *rpi,
+		unsigned int repair_flags);
 
 #endif /* XFS_SCRUB_SCRUB_H_ */
