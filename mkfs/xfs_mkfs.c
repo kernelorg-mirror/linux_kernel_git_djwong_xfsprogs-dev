@@ -3950,11 +3950,11 @@ main(
 			.spinodes = true,
 			.rmapbt = true,
 			.reflink = true,
-			.inobtcnt = false,
+			.inobtcnt = true,
 			.parent_pointers = false,
 			.nodalign = false,
 			.nortalign = false,
-			.bigtime = false,
+			.bigtime = true,
 		},
 	};
 
