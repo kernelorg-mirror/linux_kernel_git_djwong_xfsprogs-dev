@@ -48,7 +48,6 @@ scrub_inode(
 	struct xfs_bulkstat	*bstat,
 	void			*arg)
 {
-	struct action_list	alist;
 	struct repair_item	rpi;
 	struct scrub_inode_ctx	*ictx = arg;
 	struct ptcounter	*icount = ictx->icount;
@@ -56,7 +55,6 @@ scrub_inode(
 	int			error;
 
 	repair_item_init_file(&rpi, bstat);
-	action_list_init(&alist);
 	background_sleep();
 
 	/* Try to open the inode to pin it. */
@@ -68,7 +66,7 @@ scrub_inode(
 	}
 
 	/* Scrub the inode. */
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_INODE, &alist, &rpi);
+	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_INODE, &rpi);
 	if (error)
 		goto out;
 
@@ -77,13 +75,13 @@ scrub_inode(
 		goto out;
 
 	/* Scrub all block mappings. */
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_BMBTD, &alist, &rpi);
+	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_BMBTD, &rpi);
 	if (error)
 		goto out;
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_BMBTA, &alist, &rpi);
+	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_BMBTA, &rpi);
 	if (error)
 		goto out;
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_BMBTC, &alist, &rpi);
+	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_BMBTC, &rpi);
 	if (error)
 		goto out;
 
@@ -93,23 +91,21 @@ scrub_inode(
 
 	if (S_ISLNK(bstat->bs_mode)) {
 		/* Check symlink contents. */
-		error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_SYMLINK, &alist,
-				&rpi);
+		error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_SYMLINK, &rpi);
 	} else if (S_ISDIR(bstat->bs_mode)) {
 		/* Check the directory entries. */
-		error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_DIR, &alist,
-				&rpi);
+		error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_DIR, &rpi);
 	}
 	if (error)
 		goto out;
 
 	/* Check all the extended attributes. */
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_XATTR, &alist, &rpi);
+	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_XATTR, &rpi);
 	if (error)
 		goto out;
 
 	/* Check parent pointers. */
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_PARENT, &alist, &rpi);
+	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_PARENT, &rpi);
 	if (error)
 		goto out;
 
