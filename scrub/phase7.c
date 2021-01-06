@@ -99,6 +99,7 @@ phase7_func(
 	struct scrub_ctx	*ctx)
 {
 	struct summary_counts	totalcount = {0};
+	struct repair_item	rpi;
 	struct action_list	alist;
 	struct ptvar		*ptvar;
 	unsigned long long	used_data;
@@ -117,8 +118,9 @@ phase7_func(
 	int			error;
 
 	/* Check and fix the summary counters. */
+	repair_item_init_fs(&rpi);
 	action_list_init(&alist);
-	error = scrub_summary(ctx, &alist);
+	error = scrub_summary(ctx, &alist, &rpi);
 	if (error)
 		return error;
 	error = action_list_process(ctx, ctx->mnt.fd, &alist,
