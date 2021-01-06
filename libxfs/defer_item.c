@@ -307,12 +307,10 @@ xfs_refcount_update_finish_item(
 	int				error;
 
 	refc = container_of(item, struct xfs_refcount_intent, ri_list);
-	error = xfs_refcount_finish_one(tp,
-			refc->ri_type,
-			refc->ri_startblock,
-			refc->ri_blockcount,
-			&new_fsb, &new_aglen,
-			state);
+	error = xfs_refcount_finish_one(tp, refc->ri_type, refc->ri_realtime,
+			refc->ri_startblock, refc->ri_blockcount, &new_fsb,
+			&new_aglen, state);
+
 	/* Did we run out of reservation?  Requeue what we didn't finish. */
 	if (!error && new_aglen > 0) {
 		ASSERT(refc->ri_type == XFS_REFCOUNT_INCREASE ||
