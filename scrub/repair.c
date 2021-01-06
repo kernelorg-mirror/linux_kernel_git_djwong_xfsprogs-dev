@@ -73,6 +73,7 @@ xfs_repair_metadata(
 	struct xfs_scrub_metadata	oldm;
 	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
 	bool				repair_only;
+	unsigned int			tries = 0;
 	int				error;
 
 	/*
@@ -215,9 +216,20 @@ _("Read-only filesystem; cannot make changes."));
 		return CHECK_DONE;
 	}
 
+	/*
+	 * If the kernel says the repair was incomplete or that there was a
+	 * cross-referencing discrepancy but no obvious corruption, we'll try
+	 * the repair again, just in case the fs was busy.  Only retry so many
+	 * times.
+	 */
+	if (want_retry(&meta) && tries < 10) {
+		tries++;
+		goto retry;
+	}
+
 	if (repair_flags & XRM_COMPLAIN_IF_UNFIXED)
 		scrub_warn_incomplete_scrub(ctx, &dsc, &meta);
-	if (needs_repair(&meta)) {
+	if (needs_repair(&meta) || is_incomplete(&meta)) {
 		/*
 		 * Still broken; if we've been told not to complain then we
 		 * just requeue this and try again later.  Otherwise we
