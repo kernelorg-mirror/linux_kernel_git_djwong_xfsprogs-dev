@@ -3817,6 +3817,29 @@ cfgfile_parse(
 		cli->cfgfile);
 }
 
+static void
+check_rt_prealloc(
+	struct xfs_mount	*mp)
+{
+	int			error;
+
+	error = -libxfs_rt_resv_init(mp);
+	if (error == ENOSPC) {
+		fprintf(stderr,
+	_("%s: not enough space to preallocate realtime metadata; use a larger data device\n"),
+			progname);
+		exit(1);
+	}
+	if (error) {
+		fprintf(stderr,
+	_("%s: error %d while preallocating realtime metadata\n"),
+			progname, error);
+		exit(1);
+	}
+
+	libxfs_rt_resv_free(mp);
+}
+
 int
 main(
 	int			argc,
@@ -4120,6 +4143,12 @@ main(
 	 * Protect ourselves against possible stupidity
 	 */
 	check_root_ino(mp);
+
+	/*
+	 * Make sure the data device has enough space to prealloc the rt
+	 * metadata.
+	 */
+	check_rt_prealloc(mp);
 
 	/*
 	 * Re-write multiple secondary superblocks with rootinode field set
