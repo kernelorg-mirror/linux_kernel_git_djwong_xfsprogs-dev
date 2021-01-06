@@ -88,16 +88,11 @@ repair_item_clean_state(
 bool repair_item_is_clean(const struct repair_item *rpi);
 
 void scrub_report_preen_triggers(struct scrub_ctx *ctx);
-int scrub_ag_headers(struct scrub_ctx *ctx, xfs_agnumber_t agno,
-		struct action_list *alist, struct repair_item *rpi);
-int scrub_ag_metadata(struct scrub_ctx *ctx, xfs_agnumber_t agno,
-		struct action_list *alist, struct repair_item *rpi);
-int scrub_fs_metadata(struct scrub_ctx *ctx, struct action_list *alist,
-		struct repair_item *rpi);
-int scrub_summary(struct scrub_ctx *ctx, struct action_list *alist,
-		struct repair_item *rpi);
+int scrub_ag_headers(struct scrub_ctx *ctx, struct repair_item *rpi);
+int scrub_ag_metadata(struct scrub_ctx *ctx, struct repair_item *rpi);
+int scrub_fs_metadata(struct scrub_ctx *ctx, struct repair_item *rpi);
+int scrub_summary(struct scrub_ctx *ctx, struct repair_item *rpi);
 int scrub_meta_type(struct scrub_ctx *ctx, unsigned int type,
-		xfs_agnumber_t agno, struct action_list *alist,
 		struct repair_item *rpi);
 
 bool can_scrub_fs_metadata(struct scrub_ctx *ctx);
@@ -110,8 +105,7 @@ bool can_scrub_parent(struct scrub_ctx *ctx);
 bool xfs_can_repair(struct scrub_ctx *ctx);
 
 int scrub_file(struct scrub_ctx *ctx, const struct xfs_bulkstat *bstat,
-		unsigned int type, struct action_list *alist,
-		struct repair_item *rpi);
+		unsigned int type, struct repair_item *rpi);
 
 /*
  * Only ask the kernel to repair this object if the kernel directly told us it
