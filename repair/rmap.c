@@ -32,6 +32,7 @@ struct xfs_ag_rmap {
 	struct xfs_slab	*ar_refcount_items;	/* refcount items, p4-5 */
 };
 
+/* One ag_rmap per AG, and one more for the realtime device. */
 static struct xfs_ag_rmap *ag_rmaps;
 bool rmapbt_suspect;
 static bool refcbt_suspect;
@@ -39,6 +40,17 @@ static bool refcbt_suspect;
 static inline int rmap_compare(const void *a, const void *b)
 {
 	return libxfs_rmap_compare(a, b);
+}
+
+/*
+ * Return the ag_rmap for a given AG.
+ * Note that NULLAGNUMBER (-1) is the realtime device.
+ */
+static struct xfs_ag_rmap*
+rmap_for_ag(
+	xfs_agnumber_t		agno)
+{
+	return &ag_rmaps[(signed)agno];
 }
 
 /*
@@ -66,11 +78,12 @@ rmaps_init(
 	if (!rmap_needs_work(mp))
 		return;
 
-	ag_rmaps = calloc(mp->m_sb.sb_agcount, sizeof(struct xfs_ag_rmap));
+	/* One ag_rmap per AG, and one more for the realtime device. */
+	ag_rmaps = calloc(mp->m_sb.sb_agcount + 1, sizeof(struct xfs_ag_rmap));
 	if (!ag_rmaps)
 		do_error(_("couldn't allocate per-AG reverse map roots\n"));
 
-	for (i = 0; i < mp->m_sb.sb_agcount; i++) {
+	for (i = 0; i < mp->m_sb.sb_agcount + 1; i++) {
 		error = init_slab(&ag_rmaps[i].ar_rmaps,
 				sizeof(struct xfs_rmap_irec));
 		if (error)
@@ -88,6 +101,7 @@ _("Insufficient memory while allocating raw metadata reverse mapping slabs."));
 			do_error(
 _("Insufficient memory while allocating refcount item slabs."));
 	}
+	ag_rmaps++;
 }
 
 /*
@@ -102,7 +116,8 @@ rmaps_free(
 	if (!rmap_needs_work(mp))
 		return;
 
-	for (i = 0; i < mp->m_sb.sb_agcount; i++) {
+	ag_rmaps--;
+	for (i = 0; i < mp->m_sb.sb_agcount + 1; i++) {
 		free_slab(&ag_rmaps[i].ar_rmaps);
 		free_slab(&ag_rmaps[i].ar_raw_rmaps);
 		free_slab(&ag_rmaps[i].ar_refcount_items);
@@ -145,22 +160,31 @@ rmap_add_rec(
 	struct xfs_mount	*mp,
 	xfs_ino_t		ino,
 	int			whichfork,
-	struct xfs_bmbt_irec	*irec)
+	struct xfs_bmbt_irec	*irec,
+	bool			realtime)
 {
+	struct xfs_ag_rmap	*ag_rmap;
 	struct xfs_rmap_irec	rmap;
 	xfs_agnumber_t		agno;
-	xfs_agblock_t		agbno;
+	xfs_fsblock_t		agbno;
 	struct xfs_rmap_irec	*last_rmap;
 	int			error = 0;
 
 	if (!rmap_needs_work(mp))
 		return 0;
 
-	agno = XFS_FSB_TO_AGNO(mp, irec->br_startblock);
-	agbno = XFS_FSB_TO_AGBNO(mp, irec->br_startblock);
-	ASSERT(agno != NULLAGNUMBER);
-	ASSERT(agno < mp->m_sb.sb_agcount);
-	ASSERT(agbno + irec->br_blockcount <= mp->m_sb.sb_agblocks);
+	if (realtime) {
+		agno = NULLAGNUMBER;
+		agbno = irec->br_startblock;
+		ASSERT(agbno + irec->br_blockcount <= mp->m_sb.sb_rblocks);
+	} else {
+		agno = XFS_FSB_TO_AGNO(mp, irec->br_startblock);
+		agbno = XFS_FSB_TO_AGBNO(mp, irec->br_startblock);
+		ASSERT(agno != NULLAGNUMBER);
+		ASSERT(agno < mp->m_sb.sb_agcount);
+		ASSERT(agbno + irec->br_blockcount <= mp->m_sb.sb_agblocks);
+	}
+	ag_rmap = rmap_for_ag(agno);
 	ASSERT(ino != NULLFSINO);
 	ASSERT(whichfork == XFS_DATA_FORK || whichfork == XFS_ATTR_FORK);
 
@@ -173,13 +197,13 @@ rmap_add_rec(
 	rmap.rm_blockcount = irec->br_blockcount;
 	if (irec->br_state == XFS_EXT_UNWRITTEN)
 		rmap.rm_flags |= XFS_RMAP_UNWRITTEN;
-	last_rmap = &ag_rmaps[agno].ar_last_rmap;
+	last_rmap = &ag_rmap->ar_last_rmap;
 	if (last_rmap->rm_owner == XFS_RMAP_OWN_UNKNOWN)
 		*last_rmap = rmap;
 	else if (rmaps_are_mergeable(last_rmap, &rmap))
 		last_rmap->rm_blockcount += rmap.rm_blockcount;
 	else {
-		error = slab_add(ag_rmaps[agno].ar_rmaps, last_rmap);
+		error = slab_add(ag_rmap->ar_rmaps, last_rmap);
 		if (error)
 			return error;
 		*last_rmap = rmap;
@@ -195,9 +219,10 @@ rmap_finish_collecting_fork_recs(
 	xfs_agnumber_t		agno)
 {
 	if (!rmap_needs_work(mp) ||
-	    ag_rmaps[agno].ar_last_rmap.rm_owner == XFS_RMAP_OWN_UNKNOWN)
+	    rmap_for_ag(agno)->ar_last_rmap.rm_owner == XFS_RMAP_OWN_UNKNOWN)
 		return 0;
-	return slab_add(ag_rmaps[agno].ar_rmaps, &ag_rmaps[agno].ar_last_rmap);
+	return slab_add(rmap_for_ag(agno)->ar_rmaps,
+			&rmap_for_ag(agno)->ar_last_rmap);
 }
 
 /* add a raw rmap; these will be merged later */
@@ -223,7 +248,7 @@ __rmap_add_raw_rec(
 		rmap.rm_flags |= XFS_RMAP_BMBT_BLOCK;
 	rmap.rm_startblock = agbno;
 	rmap.rm_blockcount = len;
-	return slab_add(ag_rmaps[agno].ar_raw_rmaps, &rmap);
+	return slab_add(rmap_for_ag(agno)->ar_raw_rmaps, &rmap);
 }
 
 /*
@@ -281,16 +306,18 @@ rmap_fold_raw_recs(
 	struct xfs_mount	*mp,
 	xfs_agnumber_t		agno)
 {
+	struct xfs_ag_rmap	*ag_rmap;
 	struct xfs_slab_cursor	*cur = NULL;
 	struct xfs_rmap_irec	*prev, *rec;
 	size_t			old_sz;
 	int			error = 0;
 
-	old_sz = slab_count(ag_rmaps[agno].ar_rmaps);
-	if (slab_count(ag_rmaps[agno].ar_raw_rmaps) == 0)
+	ag_rmap = rmap_for_ag(agno);
+	old_sz = slab_count(ag_rmap->ar_rmaps);
+	if (slab_count(ag_rmap->ar_raw_rmaps) == 0)
 		goto no_raw;
-	qsort_slab(ag_rmaps[agno].ar_raw_rmaps, rmap_compare);
-	error = init_slab_cursor(ag_rmaps[agno].ar_raw_rmaps, rmap_compare,
+	qsort_slab(ag_rmap->ar_raw_rmaps, rmap_compare);
+	error = init_slab_cursor(ag_rmap->ar_raw_rmaps, rmap_compare,
 			&cur);
 	if (error)
 		goto err;
@@ -303,26 +330,26 @@ rmap_fold_raw_recs(
 			rec = pop_slab_cursor(cur);
 			continue;
 		}
-		error = slab_add(ag_rmaps[agno].ar_rmaps, prev);
+		error = slab_add(ag_rmap->ar_rmaps, prev);
 		if (error)
 			goto err;
 		prev = rec;
 		rec = pop_slab_cursor(cur);
 	}
 	if (prev) {
-		error = slab_add(ag_rmaps[agno].ar_rmaps, prev);
+		error = slab_add(ag_rmap->ar_rmaps, prev);
 		if (error)
 			goto err;
 	}
-	free_slab(&ag_rmaps[agno].ar_raw_rmaps);
-	error = init_slab(&ag_rmaps[agno].ar_raw_rmaps,
+	free_slab(&ag_rmap->ar_raw_rmaps);
+	error = init_slab(&ag_rmap->ar_raw_rmaps,
 			sizeof(struct xfs_rmap_irec));
 	if (error)
 		do_error(
 _("Insufficient memory while allocating raw metadata reverse mapping slabs."));
 no_raw:
 	if (old_sz)
-		qsort_slab(ag_rmaps[agno].ar_rmaps, rmap_compare);
+		qsort_slab(ag_rmap->ar_rmaps, rmap_compare);
 err:
 	free_slab_cursor(&cur);
 	return error;
@@ -376,6 +403,9 @@ rmap_add_fixed_ag_rec(
 	int			nr;
 
 	if (!rmap_needs_work(mp))
+		return 0;
+
+	if (agno == NULLAGNUMBER)
 		return 0;
 
 	/* sb/agi/agf/agfl headers */
@@ -451,7 +481,7 @@ rmap_store_ag_btree_rec(
 	struct xfs_buf		*agflbp = NULL;
 	struct xfs_trans	*tp;
 	__be32			*agfl_bno, *b;
-	struct xfs_ag_rmap	*ag_rmap = &ag_rmaps[agno];
+	struct xfs_ag_rmap	*ag_rmap = rmap_for_ag(agno);
 	struct bitmap		*own_ag_bitmap = NULL;
 	int			error = 0;
 
@@ -721,7 +751,7 @@ refcount_emit(
 	int			error;
 	struct xfs_slab		*rlslab;
 
-	rlslab = ag_rmaps[agno].ar_refcount_items;
+	rlslab = rmap_for_ag(agno)->ar_refcount_items;
 	ASSERT(nr_rmaps > 0);
 
 	dbg_printf("REFL: agno=%u pblk=%u, len=%u -> refcount=%zu\n",
@@ -743,7 +773,7 @@ _("Insufficient memory while recreating refcount tree."));
 #define RMAP_END(r)	((r)->rm_startblock + (r)->rm_blockcount)
 int
 compute_refcounts(
-	struct xfs_mount		*mp,
+	struct xfs_mount	*mp,
 	xfs_agnumber_t		agno)
 {
 	struct xfs_bag		*stack_top = NULL;
@@ -761,7 +791,7 @@ compute_refcounts(
 	if (!xfs_sb_version_hasreflink(&mp->m_sb))
 		return 0;
 
-	rmaps = ag_rmaps[agno].ar_rmaps;
+	rmaps = rmap_for_ag(agno)->ar_rmaps;
 
 	error = init_slab_cursor(rmaps, rmap_compare, &rmaps_cur);
 	if (error)
@@ -871,7 +901,7 @@ rmap_record_count(
 	struct xfs_mount		*mp,
 	xfs_agnumber_t		agno)
 {
-	return slab_count(ag_rmaps[agno].ar_rmaps);
+	return slab_count(rmap_for_ag(agno)->ar_rmaps);
 }
 
 /*
@@ -882,7 +912,7 @@ rmap_init_cursor(
 	xfs_agnumber_t		agno,
 	struct xfs_slab_cursor	**cur)
 {
-	return init_slab_cursor(ag_rmaps[agno].ar_rmaps, rmap_compare, cur);
+	return init_slab_cursor(rmap_for_ag(agno)->ar_rmaps, rmap_compare, cur);
 }
 
 /*
@@ -1296,7 +1326,7 @@ refcount_record_count(
 	struct xfs_mount		*mp,
 	xfs_agnumber_t		agno)
 {
-	return slab_count(ag_rmaps[agno].ar_refcount_items);
+	return slab_count(rmap_for_ag(agno)->ar_refcount_items);
 }
 
 /*
@@ -1307,7 +1337,7 @@ init_refcount_cursor(
 	xfs_agnumber_t		agno,
 	struct xfs_slab_cursor	**cur)
 {
-	return init_slab_cursor(ag_rmaps[agno].ar_refcount_items, NULL, cur);
+	return init_slab_cursor(rmap_for_ag(agno)->ar_refcount_items, NULL, cur);
 }
 
 /*
@@ -1489,5 +1519,5 @@ rmap_store_agflcount(
 	if (!rmap_needs_work(mp))
 		return;
 
-	ag_rmaps[agno].ar_flcount = count;
+	rmap_for_ag(agno)->ar_flcount = count;
 }
