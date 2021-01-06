@@ -311,7 +311,7 @@ xfs_refcount_update_finish_item(
 			refc->ri_type,
 			refc->ri_startblock,
 			refc->ri_blockcount,
-			&new_fsb, &new_aglen,
+			&new_fsb, &new_aglen, refc->ri_realtime,
 			state);
 	/* Did we run out of reservation?  Requeue what we didn't finish. */
 	if (!error && new_aglen > 0) {
