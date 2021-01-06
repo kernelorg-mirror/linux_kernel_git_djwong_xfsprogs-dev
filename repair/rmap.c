@@ -1414,6 +1414,7 @@ check_refcounts(
 	struct xfs_buf			*agbp = NULL;
 	struct xfs_perag		*pag = NULL;
 	struct xfs_refcount_irec	*rl_rec;
+	struct xfs_inode		*ip = NULL;
 	int				have;
 	int				i;
 	int				error;
@@ -1425,21 +1426,57 @@ check_refcounts(
 			do_warn(_("would rebuild corrupt refcount btrees.\n"));
 		return 0;
 	}
+	if (agno == NULLAGNUMBER && mp->m_sb.sb_rblocks == 0) {
+		if (rmap_record_count(mp, NULLAGNUMBER) != 0) {
+			do_error(_("realtime extents but no rtdev?\n"));
+			return -EFSCORRUPTED;
+		}
+		return 0;
+	}
 
 	/* Create cursors to refcount structures */
 	error = init_refcount_cursor(agno, &rl_cur);
 	if (error)
 		return error;
 
-	error = -libxfs_alloc_read_agf(mp, NULL, agno, 0, &agbp);
-	if (error)
-		goto err;
+	if (agno == NULLAGNUMBER) {
+		xfs_ino_t	ino;
 
-	/* Leave the per-ag data "uninitialized" since we rewrite it later */
-	pag = libxfs_perag_get(mp, agno);
-	pag->pagf_init = 0;
+		error = -libxfs_imeta_lookup(mp, &XFS_IMETA_RTREFCOUNTBT, &ino);
+		if (error || ino == NULLFSINO) {
+			do_warn(
+_("cannot find realtime refcount file, not checking realtime reference counts\n"));
+			goto err;
+		}
 
-	bt_cur = libxfs_refcountbt_init_cursor(mp, NULL, agbp, pag);
+		error = -libxfs_imeta_iget(mp, ino, XFS_DIR3_FT_REG_FILE, &ip);
+		if (error) {
+			do_warn(
+_("cannot iget realtime refcount inode 0x%llx, error %d\n"),
+				 (unsigned long long)ino, error);
+			goto err;
+		}
+
+		/*
+		 * Set m_rrefcountip so the btree verifier confirms inode
+		 * number.
+		 */
+		mp->m_rrefcountip = ip;
+		bt_cur = libxfs_rtrefcountbt_init_cursor(mp, NULL, ip);
+	} else {
+		error = -libxfs_alloc_read_agf(mp, NULL, agno, 0, &agbp);
+		if (error)
+			goto err;
+
+		/*
+		 * Leave the per-ag data "uninitialized" since we rewrite it
+		 * later.
+		 */
+		pag = libxfs_perag_get(mp, agno);
+		pag->pagf_init = 0;
+
+		bt_cur = libxfs_refcountbt_init_cursor(mp, NULL, agbp, pag);
+	}
 	if (!bt_cur) {
 		error = -ENOMEM;
 		goto err;
@@ -1492,6 +1529,10 @@ err:
 		libxfs_perag_put(pag);
 	if (agbp)
 		libxfs_buf_relse(agbp);
+	if (ip) {
+		libxfs_imeta_irele(ip);
+		mp->m_rrefcountip = NULL;
+	}
 	free_slab_cursor(&rl_cur);
 	return 0;
 }
