@@ -112,6 +112,7 @@ phase4_func(
 	struct scrub_ctx	*ctx)
 {
 	struct action_list	alist;
+	struct repair_item	rpi;
 	int			ret;
 
 	/*
@@ -121,8 +122,9 @@ phase4_func(
 	 * chance that repairs of primary metadata fail due to secondary
 	 * metadata.  If repairs fails, we'll come back during phase 7.
 	 */
+	repair_item_init_fs(&rpi);
 	action_list_init(&alist);
-	ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_FSCOUNTERS, 0, &alist);
+	ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_FSCOUNTERS, 0, &alist, &rpi);
 	if (ret)
 		return ret;
 
