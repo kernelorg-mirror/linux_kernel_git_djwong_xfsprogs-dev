@@ -6,10 +6,11 @@
 
 status=0
 DB_OPTS=""
+DASH_O_DB_OPTS=""
 REPAIR_OPTS=""
-USAGE="Usage: xfs_admin [-efjlpuV] [-c 0|1] [-L label] [-U uuid] device [logdev]"
+USAGE="Usage: xfs_admin [-efjlpuV] [-c 0|1] [-L label] [-U uuid] [-O v5_feature] device [logdev]"
 
-while getopts "efjlpuc:L:U:V" c
+while getopts "efjlpuc:L:O:U:V" c
 do
 	case $c in
 	c)	REPAIR_OPTS=$REPAIR_OPTS" -c lazycount="$OPTARG;;
@@ -19,6 +20,13 @@ do
 	l)	DB_OPTS=$DB_OPTS" -r -c label";;
 	L)	DB_OPTS=$DB_OPTS" -c 'label "$OPTARG"'";;
 	p)	DB_OPTS=$DB_OPTS" -c 'version projid32bit'";;
+	O)
+		if [ -n "$DASH_O_DB_OPTS" ]; then
+			echo "-O can only be specified once." 1>&2
+			exit 1
+		fi
+		DASH_O_DB_OPTS=" -c 'version "$OPTARG"'"
+		;;
 	u)	DB_OPTS=$DB_OPTS" -r -c uuid";;
 	U)	DB_OPTS=$DB_OPTS" -c 'uuid "$OPTARG"'";;
 	V)	xfs_db -p xfs_admin -V
@@ -30,6 +38,13 @@ do
 		;;
 	esac
 done
+if [ -n "$DASH_O_DB_OPTS" ]; then
+	if [ -n "$DB_OPTS" ]; then
+		echo "-O can only be used by itself." 1>&2
+		exit 1
+	fi
+	DB_OPTS="$DASH_O_DB_OPTS"
+fi
 set -- extra $@
 shift $OPTIND
 case $# in
@@ -48,6 +63,12 @@ case $# in
 		fi
 		if [ $status -eq 1 ]; then
 			echo "Conversion failed due to filesystem errors; run xfs_repair."
+		elif xfs_db -c 'version' "$1" | grep -q NEEDSREPAIR; then
+			# Upgrade required us to run repair, so force
+			# xfs_repair to run by adding a single space to
+			# REPAIR_OPTS.
+			echo "Running xfs_repair to complete the upgrade."
+			REPAIR_OPTS="$REPAIR_OPTS "
 		fi
 		if [ -n "$REPAIR_OPTS" ]
 		then
