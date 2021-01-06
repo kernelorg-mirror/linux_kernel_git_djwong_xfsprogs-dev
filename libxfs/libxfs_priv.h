@@ -472,6 +472,8 @@ void __xfs_buf_mark_corrupt(struct xfs_buf *bp, xfs_failaddr_t fa);
 	__mode = __mode; /* no set-but-unused warning */	\
 })
 #define xfs_lock_two_inodes(ip1, mode1, ip2, mode2)	((void) 0)
+#define xfs_rtlock(tp, mp, mode)			((void) 0)
+#define xfs_rtunlock(mp, mode)				((void) 0)
 
 #define mutex_lock(l)					((void) 0)
 #define mutex_unlock(l)					((void) 0)
