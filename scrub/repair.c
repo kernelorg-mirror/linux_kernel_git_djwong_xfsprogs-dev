@@ -22,6 +22,24 @@
 
 /* General repair routines. */
 
+/*
+ * Decide if this repair item should be run one at a time.  The only types
+ * requiring serialization are the ones that need to freeze the filesystem
+ * and the ones that have to use trylocking to avoid ABBA deadlocks.
+ */
+static inline bool
+repair_needs_excl(unsigned int scrub_type)
+{
+	switch (scrub_type) {
+	case XFS_SCRUB_TYPE_PARENT:
+	case XFS_SCRUB_TYPE_RMAPBT:
+	case XFS_SCRUB_TYPE_RTRMAPBT:
+		return true;
+	}
+
+	return false;
+}
+
 /* Repair some metadata. */
 static enum check_outcome
 xfs_repair_metadata(
@@ -63,7 +81,19 @@ xfs_repair_metadata(
 		str_info(ctx, descr_render(&dsc),
 				_("Attempting optimization."));
 retry:
+	/*
+	 * Certain types of repairs involve full filesystem scans and
+	 * trylocking.  These repair activities are substantially more likely
+	 * to succeed if they don't have to compete with other activity.  Use a
+	 * exclusive lock to serialize the repair functions that require it,
+	 * and a shared lock for those that can run concurrently.
+	 */
+	if (repair_needs_excl(meta.sm_type))
+		pthread_rwlock_wrlock(&ctx->repair_rwlock);
+	else
+		pthread_rwlock_rdlock(&ctx->repair_rwlock);
 	error = -xfrog_scrub_metadata(&ctx->mnt, &meta);
+	pthread_rwlock_unlock(&ctx->repair_rwlock);
 	switch (error) {
 	case 0:
 		/* No operational errors encountered. */
