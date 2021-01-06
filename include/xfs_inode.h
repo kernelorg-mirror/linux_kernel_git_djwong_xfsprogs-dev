@@ -168,6 +168,11 @@ static inline bool xfs_inode_has_bigrtextents(struct xfs_inode *ip)
 	return XFS_IS_REALTIME_INODE(ip) && ip->i_mount->m_sb.sb_rextsize > 1;
 }
 
+static inline bool xfs_is_always_cow_inode(struct xfs_inode *ip)
+{
+	return false;
+}
+
 typedef struct cred {
 	uid_t	cr_uid;
 	gid_t	cr_gid;
@@ -193,5 +198,7 @@ extern void	libxfs_irele(struct xfs_inode *ip);
 /* stubs for inode state flags */
 #define XFS_IPRESERVE_DM_FIELDS		(0) /* has legacy DMAPI fields set */
 #define xfs_iflags_set(ip, flag)	((void)0)
+
+#define XFS_DEFAULT_COWEXTSZ_HINT 32
 
 #endif /* __XFS_INODE_H__ */
