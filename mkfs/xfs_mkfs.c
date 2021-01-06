@@ -2184,12 +2184,18 @@ _("inode btree counters not supported without finobt support\n"));
 	}
 
 	if (cli->xi->rtname) {
-		if (cli->sb_feat.reflink && cli_opt_set(&mopts, M_REFLINK)) {
-			fprintf(stderr,
-_("reflink not supported with realtime devices\n"));
-			usage();
+		if (!cli->sb_feat.metadir && cli->sb_feat.reflink) {
+			if (cli_opt_set(&mopts, M_REFLINK) &&
+			    cli_opt_set(&mopts, M_METADIR)) {
+				fprintf(stderr,
+_("reflink not supported on realtime devices without metadir feature\n"));
+				usage();
+			} else if (cli_opt_set(&mopts, M_REFLINK)) {
+				cli->sb_feat.metadir = true;
+			} else {
+				cli->sb_feat.reflink = false;
+			}
 		}
-		cli->sb_feat.reflink = false;
 
 		if (!cli->sb_feat.metadir && cli->sb_feat.rmapbt) {
 			if (cli_opt_set(&mopts, M_RMAPBT) &&
@@ -2379,6 +2385,20 @@ validate_rtextsize(
 		}
 	}
 	ASSERT(cfg->rtextblocks);
+
+	/*
+	 * The kernel vfs reflink remap helper code requires that allocation
+	 * units are an even power of two.
+	 */
+	if (cli->sb_feat.reflink && !is_power_of_2(cfg->rtextblocks)) {
+		if (cli->rtextsize) {
+			fprintf(stderr,
+	_("illegal rt extent size %lld blocks, must be an even power of two\n"),
+				(long long)cfg->rtextblocks);
+			usage();
+		}
+		cfg->rtextblocks = 1;
+	}
 }
 
 /* Validate the incoming extsize hint. */
