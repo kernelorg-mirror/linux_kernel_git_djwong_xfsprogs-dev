@@ -15,6 +15,8 @@
 #include "versions.h"
 #include "prefetch.h"
 #include "progress.h"
+#include "slab.h"
+#include "rmap.h"
 
 /*
  * validates inode block or chunk, returns # of good inodes
@@ -1009,6 +1011,17 @@ next_readbuf:
 				} else  {
 					do_warn(
 	_("would clear realtime summary inode %" PRIu64 "\n"),
+						ino);
+				}
+			} else if (is_rtrmap_ino(ino)) {
+				forget_rtrmap();
+				if (!no_modify)  {
+					do_warn(
+	_("cleared realtime rmap inode %" PRIu64 "\n"),
+						ino);
+				} else  {
+					do_warn(
+	_("would clear realtime rmap inode %" PRIu64 "\n"),
 						ino);
 				}
 			} else if (!no_modify)  {
