@@ -794,6 +794,29 @@ rtinit(
 	mp->m_rsumip = rsumip;
 	libxfs_imeta_end_update(mp, &ic, 0);
 
+	/* If we have rmap and a realtime device, create a rtrmapbt inode. */
+	if (xfs_sb_version_hasrtrmapbt(&mp->m_sb)) {
+		error = -libxfs_imeta_ensure_dirpath(mp, &XFS_IMETA_RTRMAPBT);
+		if (error)
+			fail(_("Realtime rmap directory allocation failed"),
+					error);
+
+		i = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+				libxfs_imeta_create_space_res(mp), 0, 0, &tp);
+		if (i)
+			res_failed(i);
+
+		error = -libxfs_rtrmapbt_create(&tp, &ic, &mp->m_rrmapip);
+		if (error)
+			fail(_("Completion of the realtime rmapbt failed"),
+					error);
+		error = -libxfs_trans_commit(tp);
+		if (error)
+			fail(_("Completion of the realtime rmap inode failed"),
+					error);
+		libxfs_imeta_end_update(mp, &ic, 0);
+	}
+
 	/*
 	 * Next, give the bitmap file some zero-filled blocks.
 	 */
