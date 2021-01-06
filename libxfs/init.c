@@ -435,13 +435,6 @@ rtmount_init(
 		return -1;
 	}
 
-	if (xfs_sb_version_hasrmapbt(sbp)) {
-		fprintf(stderr,
-	_("%s: Reverse mapping btree not compatible with realtime device. Please try a newer xfsprogs.\n"),
-				progname);
-		return -1;
-	}
-
 	if (mp->m_rtdev_targp->bt_bdev == 0 && !(flags & LIBXFS_MOUNT_DEBUGGER)) {
 		fprintf(stderr, _("%s: filesystem has a realtime subvolume\n"),
 			progname);
