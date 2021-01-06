@@ -161,10 +161,14 @@ repair_item_mustfix(
 		case XFS_SCRUB_TYPE_RMAPBT:
 			(*broken_secondaries)++;
 			break;
+		case XFS_SCRUB_TYPE_AGI:
 		case XFS_SCRUB_TYPE_FINOBT:
 		case XFS_SCRUB_TYPE_INOBT:
 			fix_now->sri_state[scrub_type] = oflags;
 			/* fall through */
+		case XFS_SCRUB_TYPE_SB:
+		case XFS_SCRUB_TYPE_AGF:
+		case XFS_SCRUB_TYPE_AGFL:
 		case XFS_SCRUB_TYPE_BNOBT:
 		case XFS_SCRUB_TYPE_CNTBT:
 		case XFS_SCRUB_TYPE_REFCNTBT:
