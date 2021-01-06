@@ -47,7 +47,7 @@ scrub_iterate_fsmap(
 	int			i;
 	int			error;
 
-	head = malloc(fsmap_sizeof(FSMAP_NR));
+	head = calloc(1, fsmap_sizeof(FSMAP_NR));
 	if (!head)
 		return errno;
 

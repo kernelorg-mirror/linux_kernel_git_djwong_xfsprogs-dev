@@ -235,8 +235,11 @@ obj_to_handle(
 {
 	char		hbuf [MAXHANSIZ];
 	int		ret;
-	uint32_t	handlen;
+	uint32_t	handlen = 0;
 	xfs_fsop_handlereq_t hreq;
+
+	memset(&hreq, 0, sizeof(hreq));
+	memset(hbuf, 0, MAXHANSIZ);
 
 	if (opcode == XFS_IOC_FD_TO_HANDLE) {
 		hreq.fd      = obj.fd;
@@ -280,6 +283,7 @@ open_by_fshandle(
 	if ((fsfd = handle_to_fsfd(fshanp, &path)) < 0)
 		return -1;
 
+	memset(&hreq, 0, sizeof(hreq));
 	hreq.fd       = 0;
 	hreq.path     = NULL;
 	hreq.oflags   = rw | O_LARGEFILE;
@@ -387,6 +391,7 @@ attr_list_by_handle(
 	if ((fd = handle_to_fsfd(hanp, &path)) < 0)
 		return -1;
 
+	memset(&alhreq, 0, sizeof(alhreq));
 	alhreq.hreq.fd       = 0;
 	alhreq.hreq.path     = NULL;
 	alhreq.hreq.oflags   = O_LARGEFILE;

@@ -129,6 +129,7 @@ scan_ag_inodes(
 				minor(ctx->fsinfo.fs_datadev),
 				agno);
 
+	memset(&handle, 0, sizeof(handle));
 	memcpy(&handle.ha_fsid, ctx->fshandle, sizeof(handle.ha_fsid));
 	handle.ha_fid.fid_len = sizeof(xfs_fid_t) -
 			sizeof(handle.ha_fid.fid_len);
