@@ -95,6 +95,9 @@ extern int	lazy_count;		/* What to set if to if converting */
 extern bool	add_needsrepair;
 extern bool	add_inobtcount;
 extern bool	add_bigtime;
+extern bool	add_finobt;
+extern bool	add_reflink;
+extern bool	add_rmapbt;
 
 /* misc status variables */
 
