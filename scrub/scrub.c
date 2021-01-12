@@ -121,10 +121,13 @@ scrub_warn_incomplete_scrub(
 static enum check_outcome
 xfs_check_metadata(
 	struct scrub_ctx		*ctx,
+	int				fd,
 	struct xfs_scrub_metadata	*meta,
 	bool				is_inode)
 {
 	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
+	struct xfs_fd			xfd;
+	struct xfs_fd			*xfdp = &ctx->mnt;
 	unsigned int			tries = 0;
 	int				error;
 
@@ -132,9 +135,22 @@ xfs_check_metadata(
 	assert(meta->sm_type < XFS_SCRUB_TYPE_NR);
 	descr_set(&dsc, meta);
 
+	/*
+	 * If the caller passed us a file descriptor for a file scrub, use that
+	 * to supersede the handle information in @meta.  If the fd matches the
+	 * handle information, the kernel skips the untrusted iget lookup,
+	 * which reduces runtime by avoiding an inobt lookup.
+	 */
+	if (xfrog_scrubbers[meta->sm_type].type == XFROG_SCRUB_TYPE_INODE &&
+	    fd >= 0) {
+		xfdp = &xfd;
+		memcpy(xfdp, &ctx->mnt, sizeof(xfd));
+		xfd.fd = fd;
+	}
+
 	dbg_printf("check %s flags %xh\n", descr_render(&dsc), meta->sm_flags);
 retry:
-	error = -xfrog_scrub_metadata(&ctx->mnt, meta);
+	error = -xfrog_scrub_metadata(xfdp, meta);
 	if (debug_tweak_on("XFS_SCRUB_FORCE_REPAIR") && !error)
 		meta->sm_flags |= XFS_SCRUB_OFLAG_CORRUPT;
 	switch (error) {
@@ -291,7 +307,7 @@ scrub_meta_type(
 	}
 
 	/* Check the item. */
-	fix = xfs_check_metadata(ctx, &meta, false);
+	fix = xfs_check_metadata(ctx, -1, &meta, false);
 	progress_add(1);
 
 	switch (fix) {
@@ -409,6 +425,7 @@ scrub_estimate_ag_work(
 int
 scrub_file(
 	struct scrub_ctx		*ctx,
+	int				fd,
 	const struct xfs_bulkstat	*bstat,
 	unsigned int			type,
 	struct repair_item		*rpi)
@@ -424,7 +441,7 @@ scrub_file(
 	meta.sm_gen = bstat->bs_gen;
 
 	/* Scrub the piece of metadata. */
-	fix = xfs_check_metadata(ctx, &meta, true);
+	fix = xfs_check_metadata(ctx, fd, &meta, true);
 	if (fix == CHECK_ABORT)
 		return ECANCELED;
 	if (fix == CHECK_DONE) {
