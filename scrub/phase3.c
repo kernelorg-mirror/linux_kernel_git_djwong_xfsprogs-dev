@@ -66,7 +66,7 @@ scrub_inode(
 	}
 
 	/* Scrub the inode. */
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_INODE, &rpi);
+	error = scrub_file(ctx, fd, bstat, XFS_SCRUB_TYPE_INODE, &rpi);
 	if (error)
 		goto out;
 
@@ -75,13 +75,13 @@ scrub_inode(
 		goto out;
 
 	/* Scrub all block mappings. */
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_BMBTD, &rpi);
+	error = scrub_file(ctx, fd, bstat, XFS_SCRUB_TYPE_BMBTD, &rpi);
 	if (error)
 		goto out;
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_BMBTA, &rpi);
+	error = scrub_file(ctx, fd, bstat, XFS_SCRUB_TYPE_BMBTA, &rpi);
 	if (error)
 		goto out;
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_BMBTC, &rpi);
+	error = scrub_file(ctx, fd, bstat, XFS_SCRUB_TYPE_BMBTC, &rpi);
 	if (error)
 		goto out;
 
@@ -91,21 +91,21 @@ scrub_inode(
 
 	if (S_ISLNK(bstat->bs_mode)) {
 		/* Check symlink contents. */
-		error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_SYMLINK, &rpi);
+		error = scrub_file(ctx, fd, bstat, XFS_SCRUB_TYPE_SYMLINK, &rpi);
 	} else if (S_ISDIR(bstat->bs_mode)) {
 		/* Check the directory entries. */
-		error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_DIR, &rpi);
+		error = scrub_file(ctx, fd, bstat, XFS_SCRUB_TYPE_DIR, &rpi);
 	}
 	if (error)
 		goto out;
 
 	/* Check all the extended attributes. */
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_XATTR, &rpi);
+	error = scrub_file(ctx, fd, bstat, XFS_SCRUB_TYPE_XATTR, &rpi);
 	if (error)
 		goto out;
 
 	/* Check parent pointers. */
-	error = scrub_file(ctx, bstat, XFS_SCRUB_TYPE_PARENT, &rpi);
+	error = scrub_file(ctx, fd, bstat, XFS_SCRUB_TYPE_PARENT, &rpi);
 	if (error)
 		goto out;
 
