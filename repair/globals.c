@@ -53,6 +53,9 @@ int	lazy_count;		/* What to set if to if converting */
 bool	add_needsrepair;	/* forcibly set needsrepair while repairing */
 bool	add_inobtcount;		/* add inode btree counts to AGI */
 bool	add_bigtime;		/* add support for timestamps up to 2486 */
+bool	add_finobt;		/* add free inode btrees */
+bool	add_reflink;		/* add reference count btrees */
+bool	add_rmapbt;		/* add reverse mapping btrees */
 
 /* misc status variables */
 

@@ -70,6 +70,10 @@ enum c_opt_nums {
 	CONVERT_NEEDSREPAIR,
 	CONVERT_INOBTCOUNT,
 	CONVERT_BIGTIME,
+	CONVERT_FINOBT,
+	CONVERT_REFLINK,
+	CONVERT_RMAPBT,
+	CONVERT_SPINODES,
 	C_MAX_OPTS,
 };
 
@@ -78,6 +82,10 @@ static char *c_opts[] = {
 	[CONVERT_NEEDSREPAIR]	= "needsrepair",
 	[CONVERT_INOBTCOUNT]	= "inobtcount",
 	[CONVERT_BIGTIME]	= "bigtime",
+	[CONVERT_FINOBT]	= "finobt",
+	[CONVERT_REFLINK]	= "reflink",
+	[CONVERT_RMAPBT]	= "rmapbt",
+	[CONVERT_SPINODES]	= "spinodes",
 	[C_MAX_OPTS]		= NULL,
 };
 
@@ -337,6 +345,33 @@ process_args(int argc, char **argv)
 						do_abort(
 		_("-c bigtime only supports upgrades\n"));
 					add_bigtime = true;
+					break;
+				case CONVERT_FINOBT:
+					if (!val)
+						do_abort(
+		_("-c finobt requires a parameter\n"));
+					if (strtol(val, NULL, 0) != 1)
+						do_abort(
+		_("-c finobt only supports upgrades\n"));
+					add_finobt = true;
+					break;
+				case CONVERT_REFLINK:
+					if (!val)
+						do_abort(
+		_("-c reflink requires a parameter\n"));
+					if (strtol(val, NULL, 0) != 1)
+						do_abort(
+		_("-c reflink only supports upgrades\n"));
+					add_reflink = true;
+					break;
+				case CONVERT_RMAPBT:
+					if (!val)
+						do_abort(
+		_("-c rmapbt requires a parameter\n"));
+					if (strtol(val, NULL, 0) != 1)
+						do_abort(
+		_("-c rmapbt only supports upgrades\n"));
+					add_rmapbt = true;
 					break;
 				default:
 					unknown('c', val);
@@ -1164,6 +1199,8 @@ main(int argc, char **argv)
 	_("Found unsupported filesystem features.  Exiting now.\n"));
 		return(1);
 	}
+
+	phase1a(mp);
 
 	/* make sure the per-ag freespace maps are ok so we can mount the fs */
 	phase2(mp, phase2_threads);

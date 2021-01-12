@@ -33,6 +33,7 @@ char	*err_string(int err_code);
 void	thread_init(void);
 
 void	phase1(struct xfs_mount *);
+void	phase1a(struct xfs_mount *mp);
 void	phase2(struct xfs_mount *, int);
 void	phase3(struct xfs_mount *, int);
 void	phase4(struct xfs_mount *);
