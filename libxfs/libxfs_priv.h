@@ -495,8 +495,7 @@ void __xfs_buf_mark_corrupt(struct xfs_buf *bp, xfs_failaddr_t fa);
 /* quota bits */
 static inline int retzero(void) { return 0; }
 #define xfs_trans_mod_dquot_byino(t,i,f,d)		((void) 0)
-#define xfs_trans_reserve_quota_nblks(t,i,b,n,f)	(0)
-#define xfs_trans_unreserve_quota_nblks(t,i,b,n,f)	retzero()
+#define xfs_trans_reserve_quota_nblks(t,i,d,r,f)	(0)
 #define xfs_qm_dqattach(i)				(0)
 
 #define xfs_quota_reserve_blkres(ip, alen)		(0)
