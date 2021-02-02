@@ -981,6 +981,14 @@ and
 .I features2
 bits respectively, and their string equivalent reported
 (but no modifications are made).
+.IP
+If the feature upgrade succeeds, the program will return 0.
+If the requested upgrade has already been applied to the filesystem, the
+program will also return 0.
+If the upgrade fails due to corruption or IO errors, the program will return
+1.
+If the requested upgrade is not appropriate for this filesystem, the program
+will return 2.
 .TP
 .BI "write [\-c|\-d] [" "field value" "] ..."
 Write a value to disk.

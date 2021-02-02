@@ -46,6 +46,9 @@ case $# in
 			eval xfs_db -x -p xfs_admin $DB_OPTS "$1"
 			status=$?
 		fi
+		if [ $status -eq 1 ]; then
+			echo "Conversion failed due to filesystem errors; run xfs_repair."
+		fi
 		if [ -n "$REPAIR_OPTS" ]
 		then
 			# Hide normal repair output which is sent to stderr

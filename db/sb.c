@@ -617,6 +617,9 @@ do_version(xfs_agnumber_t agno, uint16_t version, uint32_t features)
 	tsb.sb_bad_features2 = features;
 	libxfs_sb_to_disk(iocur_top->data, &tsb);
 	write_cur();
+	if (!iocur_top->bp || iocur_top->bp->b_error)
+		return 0;
+
 	return 1;
 }
 
@@ -804,7 +807,8 @@ version_f(
 				if (!do_version(ag, version, features)) {
 					dbprintf(_("failed to set versionnum "
 						 "in AG %d\n"), ag);
-					break;
+					exitcode = 1;
+					return 1;
 				}
 			mp->m_sb.sb_versionnum = version;
 			mp->m_sb.sb_features2 = features;
