@@ -30,6 +30,26 @@ alloc_ag_buf(int size)
 	return(bp);
 }
 
+static void
+set_needsrepair(
+	struct xfs_sb	*sb)
+{
+	if (!xfs_sb_version_hascrc(sb)) {
+		printf(
+	_("needsrepair flag only supported on V5 filesystems.\n"));
+		exit(0);
+	}
+
+	if (xfs_sb_version_needsrepair(sb)) {
+		printf(_("Filesystem already marked as needing repair.\n"));
+		return;
+	}
+
+	printf(_("Marking filesystem in need of repair.\n"));
+	primary_sb_modified = 1;
+	sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+}
+
 /*
  * this has got to be big enough to hold 4 sectors
  */
@@ -125,6 +145,9 @@ _("Cannot disable lazy-counters on V5 fs\n"));
 			exit(0); /* no conversion required, exit */
 		}
 	}
+
+	if (add_needsrepair)
+		set_needsrepair(sb);
 
 	/* shared_vn should be zero */
 	if (sb->sb_shared_vn) {
