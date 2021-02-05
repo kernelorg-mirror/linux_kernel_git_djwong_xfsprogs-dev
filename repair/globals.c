@@ -49,6 +49,8 @@ int	rt_spec;		/* Realtime dev specified as option */
 int	convert_lazy_count;	/* Convert lazy-count mode on/off */
 int	lazy_count;		/* What to set if to if converting */
 
+bool	add_needsrepair;	/* forcibly set needsrepair while repairing */
+
 /* misc status variables */
 
 int	primary_sb_modified;

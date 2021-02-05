@@ -90,6 +90,8 @@ extern int	rt_spec;		/* Realtime dev specified as option */
 extern int	convert_lazy_count;	/* Convert lazy-count mode on/off */
 extern int	lazy_count;		/* What to set if to if converting */
 
+extern bool	add_needsrepair;
+
 /* misc status variables */
 
 extern int		primary_sb_modified;

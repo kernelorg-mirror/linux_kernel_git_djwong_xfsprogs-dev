@@ -131,6 +131,63 @@ zero_log(
 		libxfs_max_lsn = log->l_last_sync_lsn;
 }
 
+static bool
+set_needsrepair(
+	struct xfs_mount	*mp)
+{
+	if (!xfs_sb_version_hascrc(&mp->m_sb)) {
+		printf(
+	_("needsrepair flag only supported on V5 filesystems.\n"));
+		exit(0);
+	}
+
+	if (xfs_sb_version_needsrepair(&mp->m_sb)) {
+		printf(_("Filesystem already marked as needing repair.\n"));
+		exit(0);
+	}
+
+	printf(_("Marking filesystem in need of repair.\n"));
+	mp->m_sb.sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+	return true;
+}
+
+/* Perform the user's requested upgrades on filesystem. */
+static void
+upgrade_filesystem(
+	struct xfs_mount	*mp)
+{
+	struct xfs_buf		*bp;
+	bool			dirty = false;
+	int			error;
+
+	if (add_needsrepair)
+		dirty |= set_needsrepair(mp);
+
+        if (no_modify || !dirty)
+                return;
+
+        bp = libxfs_getsb(mp);
+        if (!bp || bp->b_error) {
+                do_error(
+	_("couldn't get superblock for feature upgrade, err=%d\n"),
+                                bp ? bp->b_error : ENOMEM);
+        } else {
+                libxfs_sb_to_disk(bp->b_addr, &mp->m_sb);
+
+                /*
+		 * Write the primary super to disk immediately so that
+		 * needsrepair will be set if repair doesn't complete.
+		 */
+                error = -libxfs_bwrite(bp);
+                if (error)
+                        do_error(
+	_("filesystem feature upgrade failed, err=%d\n"),
+                                        error);
+        }
+        if (bp)
+                libxfs_buf_relse(bp);
+}
+
 /*
  * ok, at this point, the fs is mounted but the root inode may be
  * trashed and the ag headers haven't been checked.  So we have
@@ -235,4 +292,10 @@ phase2(
 				do_warn(_("would correct\n"));
 		}
 	}
+
+	/*
+	 * Upgrade the filesystem now that we've done a preliminary check of
+	 * the superblocks, the AGs, the log, and the metadata inodes.
+	 */
+	upgrade_filesystem(mp);
 }
