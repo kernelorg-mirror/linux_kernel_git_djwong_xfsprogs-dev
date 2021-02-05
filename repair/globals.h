@@ -93,6 +93,7 @@ extern int	convert_lazy_count;	/* Convert lazy-count mode on/off */
 extern int	lazy_count;		/* What to set if to if converting */
 
 extern bool	add_needsrepair;
+extern bool	add_inobtcount;
 
 /* misc status variables */
 

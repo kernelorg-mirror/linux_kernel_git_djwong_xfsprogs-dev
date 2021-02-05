@@ -50,6 +50,33 @@ set_needsrepair(
 	sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
 }
 
+static void
+set_inobtcount(
+	struct xfs_sb	*sb)
+{
+	if (!xfs_sb_version_hascrc(sb)) {
+		printf(
+	_("Inode btree count feature only supported on V5 filesystems.\n"));
+		exit(0);
+	}
+
+	if (!xfs_sb_version_hasfinobt(sb)) {
+		printf(
+	_("Inode btree count feature requires free inode btree.\n"));
+		exit(0);
+	}
+
+	if (xfs_sb_version_hasinobtcounts(sb)) {
+		printf(_("Filesystem already has inode btree counts.\n"));
+		return;
+	}
+
+	printf(_("Adding inode btree counts to filesystem.\n"));
+	primary_sb_modified = 1;
+	sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_INOBTCNT;
+	sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+}
+
 /*
  * this has got to be big enough to hold 4 sectors
  */
@@ -148,6 +175,8 @@ _("Cannot disable lazy-counters on V5 fs\n"));
 
 	if (add_needsrepair)
 		set_needsrepair(sb);
+	if (add_inobtcount)
+		set_inobtcount(sb);
 
 	/* shared_vn should be zero */
 	if (sb->sb_shared_vn) {

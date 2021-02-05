@@ -68,12 +68,14 @@ static char *o_opts[] = {
 enum c_opt_nums {
 	CONVERT_LAZY_COUNT = 0,
 	CONVERT_NEEDSREPAIR,
+	CONVERT_INOBTCOUNT,
 	C_MAX_OPTS,
 };
 
 static char *c_opts[] = {
 	[CONVERT_LAZY_COUNT]	= "lazycount",
 	[CONVERT_NEEDSREPAIR]	= "needsrepair",
+	[CONVERT_INOBTCOUNT]	= "inobtcount",
 	[C_MAX_OPTS]		= NULL,
 };
 
@@ -315,6 +317,15 @@ process_args(int argc, char **argv)
 		_("-c needsrepair requires a parameter\n"));
 					if (strtol(val, NULL, 0) == 1)
 						add_needsrepair = true;
+					break;
+				case CONVERT_INOBTCOUNT:
+					if (!val)
+						do_abort(
+		_("-c inobtcount requires a parameter\n"));
+					if (strtol(val, NULL, 0) != 1)
+						do_abort(
+		_("-c inobtcount only supports upgrades\n"));
+					add_inobtcount = true;
 					break;
 				default:
 					unknown('c', val);
