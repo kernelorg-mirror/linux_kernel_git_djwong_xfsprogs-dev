@@ -77,6 +77,27 @@ set_inobtcount(
 	sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
 }
 
+static void
+set_bigtime(
+	struct xfs_sb	*sb)
+{
+	if (!xfs_sb_version_hascrc(sb)) {
+		printf(
+	_("Large timestamp feature only supported on V5 filesystems.\n"));
+		exit(0);
+	}
+
+	if (xfs_sb_version_hasbigtime(sb)) {
+		printf(_("Filesystem already supports large timestamps.\n"));
+		return;
+	}
+
+	printf(_("Adding large timestamp support to filesystem.\n"));
+	primary_sb_modified = 1;
+	sb->sb_features_incompat |= (XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR |
+				     XFS_SB_FEAT_INCOMPAT_BIGTIME);
+}
+
 /*
  * this has got to be big enough to hold 4 sectors
  */
@@ -177,6 +198,8 @@ _("Cannot disable lazy-counters on V5 fs\n"));
 		set_needsrepair(sb);
 	if (add_inobtcount)
 		set_inobtcount(sb);
+	if (add_bigtime)
+		set_bigtime(sb);
 
 	/* shared_vn should be zero */
 	if (sb->sb_shared_vn) {
