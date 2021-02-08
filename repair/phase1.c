@@ -170,5 +170,10 @@ _("Cannot disable lazy-counters on V5 fs\n"));
 	 */
 	sb_ifree = sb_icount = sb_fdblocks = sb_frextents = 0;
 
+	/* Simulate a crash after setting needsrepair. */
+	if (primary_sb_modified && add_needsrepair &&
+	    abort_after_force_needsrepair)
+		exit(55);
+
 	free(sb);
 }
