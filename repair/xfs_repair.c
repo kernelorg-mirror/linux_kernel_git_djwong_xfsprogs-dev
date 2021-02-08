@@ -1108,10 +1108,9 @@ _("Warning:  project quota information would be cleared.\n"
 	if ((mp->m_sb.sb_qflags & XFS_ALL_QUOTA_CHKD) != quotacheck_results()) {
 		do_warn(_("Note - quota info will be regenerated on next "
 			"quota mount.\n"));
-		dsb->sb_qflags &= cpu_to_be16(~(XFS_UQUOTA_CHKD |
-						XFS_GQUOTA_CHKD |
-						XFS_PQUOTA_CHKD |
-						XFS_OQUOTA_CHKD));
+		mp->m_sb.sb_qflags &= ~(XFS_UQUOTA_CHKD | XFS_GQUOTA_CHKD |
+					XFS_PQUOTA_CHKD | XFS_OQUOTA_CHKD);
+		libxfs_sb_to_disk(sbp->b_addr, &mp->m_sb);
 	}
 
 	if (copied_sunit) {
