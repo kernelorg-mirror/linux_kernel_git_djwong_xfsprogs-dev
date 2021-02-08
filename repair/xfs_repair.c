@@ -787,6 +787,45 @@ clear_needsrepair(
 		libxfs_buf_relse(bp);
 }
 
+/*
+ * Mark the filesystem as needing repair.  This should only be called by code
+ * that deliberately sets invalid sentinel values in the on-disk metadata to
+ * trigger a later reconstruction, and only after we've settled the primary
+ * super contents (i.e. after phase 1).
+ */
+void
+force_needsrepair(
+	struct xfs_mount	*mp)
+{
+	struct xfs_buf		*bp;
+	int			error;
+
+	if (!xfs_sb_version_hascrc(&mp->m_sb) ||
+	    xfs_sb_version_needsrepair(&mp->m_sb))
+		return;
+
+	bp = libxfs_getsb(mp);
+	if (!bp || bp->b_error) {
+		do_log(
+	_("couldn't get superblock to set needsrepair, err=%d\n"),
+				bp ? bp->b_error : ENOMEM);
+		return;
+	} else {
+		mp->m_sb.sb_features_incompat |=
+				XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+		libxfs_sb_to_disk(bp->b_addr, &mp->m_sb);
+
+		/* Force the primary super to disk immediately. */
+		error = -libxfs_bwrite(bp);
+		if (error)
+			do_log(_("couldn't force needsrepair, err=%d\n"), error);
+		if (abort_after_force_needsrepair)
+			exit(55);
+	}
+	if (bp)
+		libxfs_buf_relse(bp);
+}
+
 int
 main(int argc, char **argv)
 {
