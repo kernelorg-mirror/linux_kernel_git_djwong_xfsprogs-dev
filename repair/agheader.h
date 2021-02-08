@@ -82,3 +82,5 @@ typedef struct fs_geo_list  {
 #define XR_AG_AGF	0x2
 #define XR_AG_AGI	0x4
 #define XR_AG_SB_SEC	0x8
+
+void force_needsrepair(struct xfs_mount *mp);

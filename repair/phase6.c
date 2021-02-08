@@ -1649,6 +1649,7 @@ longform_dir2_entry_check_data(
 			if (entry_junked(
 	_("entry \"%s\" in directory inode %" PRIu64 " points to non-existent inode %" PRIu64 ""),
 					fname, ip->i_ino, inum)) {
+				force_needsrepair(mp);
 				dep->name[0] = '/';
 				libxfs_dir2_data_log_entry(&da, bp, dep);
 			}
@@ -1666,6 +1667,7 @@ longform_dir2_entry_check_data(
 			if (entry_junked(
 	_("entry \"%s\" in directory inode %" PRIu64 " points to free inode %" PRIu64),
 					fname, ip->i_ino, inum)) {
+				force_needsrepair(mp);
 				dep->name[0] = '/';
 				libxfs_dir2_data_log_entry(&da, bp, dep);
 			}
@@ -1684,6 +1686,7 @@ longform_dir2_entry_check_data(
 				if (entry_junked(
 	_("%s (ino %" PRIu64 ") in root (%" PRIu64 ") is not a directory"),
 						ORPHANAGE, inum, ip->i_ino)) {
+					force_needsrepair(mp);
 					dep->name[0] = '/';
 					libxfs_dir2_data_log_entry(&da, bp, dep);
 				}
@@ -1706,6 +1709,7 @@ longform_dir2_entry_check_data(
 			if (entry_junked(
 	_("entry \"%s\" (ino %" PRIu64 ") in dir %" PRIu64 " is a duplicate name"),
 					fname, inum, ip->i_ino)) {
+				force_needsrepair(mp);
 				dep->name[0] = '/';
 				libxfs_dir2_data_log_entry(&da, bp, dep);
 			}
@@ -1737,6 +1741,7 @@ longform_dir2_entry_check_data(
 				if (entry_junked(
 	_("entry \"%s\" (ino %" PRIu64 ") in dir %" PRIu64 " is not in the the first block"), fname,
 						inum, ip->i_ino)) {
+					force_needsrepair(mp);
 					dep->name[0] = '/';
 					libxfs_dir2_data_log_entry(&da, bp, dep);
 				}
@@ -1764,6 +1769,7 @@ longform_dir2_entry_check_data(
 				if (entry_junked(
 	_("entry \"%s\" in dir %" PRIu64 " is not the first entry"),
 						fname, inum, ip->i_ino)) {
+					force_needsrepair(mp);
 					dep->name[0] = '/';
 					libxfs_dir2_data_log_entry(&da, bp, dep);
 				}
@@ -1852,6 +1858,7 @@ _("entry \"%s\" in dir inode %" PRIu64 " inconsistent with .. value (%" PRIu64 "
 				orphanage_ino = 0;
 			nbad++;
 			if (!no_modify)  {
+				force_needsrepair(mp);
 				dep->name[0] = '/';
 				libxfs_dir2_data_log_entry(&da, bp, dep);
 				if (verbose)

@@ -15,6 +15,7 @@
 #include "da_util.h"
 #include "prefetch.h"
 #include "progress.h"
+#include "agheader.h"
 
 /*
  * Known bad inode list.  These are seen when the leaf and node
@@ -774,6 +775,7 @@ _("entry at block %u offset %" PRIdPTR " in directory inode %" PRIu64
 				do_warn(
 _("\tclearing inode number in entry at offset %" PRIdPTR "...\n"),
 					(intptr_t)ptr - (intptr_t)d);
+				force_needsrepair(mp);
 				dep->name[0] = '/';
 				*dirty = 1;
 			} else {
@@ -914,6 +916,7 @@ _("entry \"%*.*s\" in directory inode %" PRIu64 " points to self: "),
 		 */
 		if (junkit) {
 			if (!no_modify) {
+				force_needsrepair(mp);
 				dep->name[0] = '/';
 				*dirty = 1;
 				do_warn(_("clearing entry\n"));
