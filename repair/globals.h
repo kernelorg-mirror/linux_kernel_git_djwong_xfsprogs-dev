@@ -82,6 +82,8 @@ extern int	isa_file;
 extern int	zap_log;
 extern int	dumpcore;		/* abort, not exit on fatal errs */
 extern int	force_geo;		/* can set geo on low confidence info */
+/* Abort after forcing NEEDSREPAIR to test its functionality */
+extern bool	abort_after_force_needsrepair;
 extern int	assume_xfs;		/* assume we have an xfs fs */
 extern char	*log_name;		/* Name of log device */
 extern int	log_spec;		/* Log dev specified as option */

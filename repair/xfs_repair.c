@@ -44,6 +44,7 @@ enum o_opt_nums {
 	BLOAD_LEAF_SLACK,
 	BLOAD_NODE_SLACK,
 	NOQUOTA,
+	FORCE_NEEDSREPAIR_ABORT,
 	O_MAX_OPTS,
 };
 
@@ -57,6 +58,7 @@ static char *o_opts[] = {
 	[BLOAD_LEAF_SLACK]	= "debug_bload_leaf_slack",
 	[BLOAD_NODE_SLACK]	= "debug_bload_node_slack",
 	[NOQUOTA]		= "noquota",
+	[FORCE_NEEDSREPAIR_ABORT] = "debug_force_needsrepair_abort",
 	[O_MAX_OPTS]		= NULL,
 };
 
@@ -281,6 +283,9 @@ process_args(int argc, char **argv)
 						do_abort(
 		_("-o debug_bload_node_slack requires a parameter\n"));
 					bload_node_slack = (int)strtol(val, NULL, 0);
+					break;
+				case FORCE_NEEDSREPAIR_ABORT:
+					abort_after_force_needsrepair = true;
 					break;
 				case NOQUOTA:
 					quotacheck_skip();

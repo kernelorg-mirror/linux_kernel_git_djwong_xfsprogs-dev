@@ -183,6 +183,10 @@ upgrade_filesystem(
                         do_error(
 	_("filesystem feature upgrade failed, err=%d\n"),
                                         error);
+
+		/* Simulate a crash after setting needsrepair. */
+		if (abort_after_force_needsrepair)
+			exit(55);
         }
         if (bp)
                 libxfs_buf_relse(bp);

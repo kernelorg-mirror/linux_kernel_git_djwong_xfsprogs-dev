@@ -40,6 +40,7 @@ int	dangerously;		/* live dangerously ... fix ro mount */
 int	isa_file;
 int	zap_log;
 int	dumpcore;		/* abort, not exit on fatal errs */
+bool	abort_after_force_needsrepair;
 int	force_geo;		/* can set geo on low confidence info */
 int	assume_xfs;		/* assume we have an xfs fs */
 char	*log_name;		/* Name of log device */
