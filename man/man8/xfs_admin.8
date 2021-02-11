@@ -54,6 +54,8 @@ for a detailed description of the XFS log.
 Enables unwritten extent support on a filesystem that does not
 already have this enabled (for legacy filesystems, it can't be
 disabled anymore at mkfs time).
+.IP
+This option only applies to the deprecated V4 format.
 .TP
 .B \-f
 Specifies that the filesystem image to be processed is stored in a
@@ -67,12 +69,16 @@ option).
 .B \-j
 Enables version 2 log format (journal format supporting larger
 log buffers).
+.IP
+This option only applies to the deprecated V4 format.
 .TP
 .B \-l
 Print the current filesystem label.
 .TP
 .B \-p
 Enable 32bit project identifier support (PROJID32BIT feature).
+.IP
+This option only applies to the deprecated V4 format.
 .TP
 .B \-u
 Print the current filesystem UUID (Universally Unique IDentifier).
@@ -83,6 +89,8 @@ Enable (1) or disable (0) lazy-counters in the filesystem.
 Lazy-counters may not be disabled on Version 5 superblock filesystems
 (i.e. those with metadata CRCs enabled).
 .IP
+In other words, this option only applies to the deprecated V4 format.
+.IP
 This operation may take quite a bit of time on large filesystems as the
 entire filesystem needs to be scanned when this option is changed.
 .IP
@@ -92,6 +100,8 @@ information is kept in other parts of the filesystem to be able to
 maintain the counter values without needing to keep them in the
 superblock. This gives significant improvements in performance on some
 configurations and metadata intensive workloads.
+.IP
+This option only applies to the deprecated V4 format.
 .TP
 .BI \-L " label"
 Set the filesystem label to
