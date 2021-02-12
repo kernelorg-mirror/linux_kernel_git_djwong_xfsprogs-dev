@@ -410,6 +410,9 @@ timestamp(int end, int phase, char *buf)
 		current_phase = phase;
 	}
 
+	if (fail_after_phase && phase == fail_after_phase)
+		kill(getpid(), SIGKILL);
+
 	if (buf) {
 		tmp = localtime((const time_t *)&now);
 		sprintf(buf, _("%02d:%02d:%02d"), tmp->tm_hour, tmp->tm_min, tmp->tm_sec);

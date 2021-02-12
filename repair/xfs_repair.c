@@ -362,6 +362,10 @@ process_args(int argc, char **argv)
 
 	if (report_corrected && no_modify)
 		usage();
+
+	p = getenv("XFS_REPAIR_FAIL_AFTER_PHASE");
+	if (p)
+		fail_after_phase = (int)strtol(p, NULL, 0);
 }
 
 void __attribute__((noreturn))
