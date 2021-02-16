@@ -53,6 +53,11 @@ enum check_outcome {
 #define SCRUB_ITEM_REPAIR_CORRUPT (SCRUB_ITEM_CORRUPT | \
 				   SCRUB_ITEM_BOOST_REPAIR)
 
+/* The kernel reported that it found something bad when scrubbing. */
+#define SCRUB_ITEM_KERNEL_CORRUPT (SCRUB_ITEM_CORRUPT | \
+				   SCRUB_ITEM_XFAIL | \
+				   SCRUB_ITEM_XCORRUPT)
+
 struct scrub_item {
 	/*
 	 * Information we need to call the scrub and repair ioctls.  Per-AG
