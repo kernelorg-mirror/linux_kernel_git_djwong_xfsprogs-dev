@@ -592,7 +592,15 @@ xfs_repair_metadata(
 	struct xfs_scrub_metadata	meta = { 0 };
 	struct xfs_scrub_metadata	oldm;
 	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
+	bool				repair_only;
 	int				error;
+
+	/*
+	 * If the caller boosted the priority of this scrub type on behalf of a
+	 * higher level repair by setting IFLAG_REPAIR, turn off REPAIR_ONLY.
+	 */
+	repair_only = (repair_flags & XRM_REPAIR_ONLY) &&
+		      !(sri->sri_state[scrub_type] & SCRUB_ITEM_BOOST_REPAIR);
 
 	assert(scrub_type < XFS_SCRUB_TYPE_NR);
 	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
@@ -611,7 +619,7 @@ xfs_repair_metadata(
 		break;
 	}
 
-	if (!is_corrupt(&meta) && (repair_flags & XRM_REPAIR_ONLY))
+	if (!is_corrupt(&meta) && repair_only)
 		return CHECK_RETRY;
 
 	memcpy(&oldm, &meta, sizeof(oldm));

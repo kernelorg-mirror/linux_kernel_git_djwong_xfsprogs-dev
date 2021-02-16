@@ -16,6 +16,14 @@ enum check_outcome {
 };
 
 /*
+ * This flag boosts the repair priority of a scrub item when a dependent scrub
+ * item is scheduled for repair.  Use a separate flag to preserve the
+ * corruption state that we got from the kernel.  Priority boost is cleared the
+ * next time xfs_repair_metadata is called.
+ */
+#define SCRUB_ITEM_BOOST_REPAIR	(1 << 0)
+
+/*
  * These flags record the metadata object state that the kernel returned.
  * We want to remember if the object was corrupt, if the cross-referencing
  * revealed inconsistencies (xcorrupt), if the cross referencing itself failed
@@ -31,6 +39,19 @@ enum check_outcome {
 				 SCRUB_ITEM_PREEN | \
 				 SCRUB_ITEM_XFAIL | \
 				 SCRUB_ITEM_XCORRUPT)
+
+/* Cross-referencing failures only. */
+#define SCRUB_ITEM_REPAIR_XREF	(SCRUB_ITEM_XFAIL | \
+				 SCRUB_ITEM_XCORRUPT)
+
+/*
+ * Special "repair class" mask that will trigger a repair for any scrub type
+ * that was directly observed to be corrupt; or was observed to have some sort
+ * of cross-referencing issue and there's a higher level metadata also needing
+ * repair.
+ */
+#define SCRUB_ITEM_REPAIR_CORRUPT (SCRUB_ITEM_CORRUPT | \
+				   SCRUB_ITEM_BOOST_REPAIR)
 
 struct scrub_item {
 	/*
