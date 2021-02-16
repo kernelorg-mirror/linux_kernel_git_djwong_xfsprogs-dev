@@ -457,6 +457,29 @@ action_list_process(
 	return ret;
 }
 
+/* Decide if the dependent scrub types of the given scrub type are ok. */
+static bool
+repair_item_dependencies_ok(
+	const struct scrub_item	*sri,
+	unsigned int		scrub_type)
+{
+	unsigned int		dep_mask = xfrog_scrubber_deps[scrub_type];
+	unsigned int		b;
+
+	for (b = 0; dep_mask && b < XFS_SCRUB_TYPE_NR; b++, dep_mask >>= 1) {
+		if (!(dep_mask & 1))
+			continue;
+		/*
+		 * If this lower level object also needs repair, we can't fix
+		 * the higher level item.
+		 */
+		if (sri->sri_state[b] & SCRUB_ITEM_NEEDSREPAIR)
+			return false;
+	}
+
+	return true;
+}
+
 /*
  * For a given filesystem object, perform all repairs of a given class
  * (corrupt, xcorrupt, xfail, preen) if the repair item says it's needed.
@@ -477,6 +500,15 @@ repair_item_class(
 			return ECANCELED;
 
 		if (!(sri->sri_state[scrub_type] & repair_mask))
+			continue;
+
+		/*
+		 * Don't try to repair higher level items if their dependencies
+		 * haven't been verified, unless we're at the end of phase 4
+		 * and it's therefore our last chance to fix things.
+		 */
+		if (!(flags & XRM_COMPLAIN_IF_UNFIXED) &&
+		    !repair_item_dependencies_ok(sri, scrub_type))
 			continue;
 
 		fix = xfs_repair_metadata(ctx, scrub_type, sri, flags);
