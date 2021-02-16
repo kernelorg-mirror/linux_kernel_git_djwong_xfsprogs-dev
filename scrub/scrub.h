@@ -114,7 +114,7 @@ bool can_scrub_symlink(struct scrub_ctx *ctx);
 bool can_scrub_parent(struct scrub_ctx *ctx);
 bool can_repair(struct scrub_ctx *ctx);
 
-int scrub_file(struct scrub_ctx *ctx, const struct xfs_bulkstat *bstat,
+int scrub_file(struct scrub_ctx *ctx, int fd, const struct xfs_bulkstat *bstat,
 		unsigned int type, struct scrub_item *sri);
 
 #endif /* XFS_SCRUB_SCRUB_H_ */
