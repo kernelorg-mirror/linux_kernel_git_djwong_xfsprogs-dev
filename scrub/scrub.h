@@ -15,8 +15,6 @@ enum check_outcome {
 	CHECK_TOOSLOW,	/* skipped because freezes are not allowed */
 };
 
-struct action_item;
-
 /*
  * These flags record the metadata object state that the kernel returned.
  * We want to remember if the object was corrupt, if the cross-referencing
@@ -48,6 +46,9 @@ struct scrub_item {
 	/* Scrub item state flags, one for each XFS_SCRUB_TYPE. */
 	__u8			sri_state[XFS_SCRUB_TYPE_NR];
 };
+
+#define foreach_scrub_type(loopvar) \
+	for ((loopvar) = 0; (loopvar) < XFS_SCRUB_TYPE_NR; (loopvar)++)
 
 static inline void
 scrub_item_init_ag(struct scrub_item *sri, xfs_agnumber_t agno)
@@ -101,15 +102,5 @@ bool can_repair(struct scrub_ctx *ctx);
 int scrub_file(struct scrub_ctx *ctx, const struct xfs_bulkstat *bstat,
 		unsigned int type, struct action_list *alist,
 		struct scrub_item *sri);
-
-/* Repair parameters are the scrub inputs and retry count. */
-struct action_item {
-	struct list_head	list;
-	__u64			ino;
-	__u32			type;
-	__u32			flags;
-	__u32			gen;
-	__u32			agno;
-};
 
 #endif /* XFS_SCRUB_SCRUB_H_ */
