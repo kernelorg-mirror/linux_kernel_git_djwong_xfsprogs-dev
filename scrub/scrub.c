@@ -253,42 +253,6 @@ _("Optimizations of %s are possible."), _(xfrog_scrubbers[i].descr));
 	}
 }
 
-/* Save a scrub context for later repairs. */
-static int
-scrub_save_repair(
-	struct scrub_ctx		*ctx,
-	struct action_list		*alist,
-	struct xfs_scrub_metadata	*meta)
-{
-	struct action_item		*aitem;
-
-	/* Schedule this item for later repairs. */
-	aitem = malloc(sizeof(struct action_item));
-	if (!aitem) {
-		str_errno(ctx, _("adding item to repair list"));
-		return errno;
-	}
-
-	memset(aitem, 0, sizeof(*aitem));
-	aitem->type = meta->sm_type;
-	aitem->flags = meta->sm_flags;
-	switch (xfrog_scrubbers[meta->sm_type].group) {
-	case XFROG_SCRUB_GROUP_AGHEADER:
-	case XFROG_SCRUB_GROUP_PERAG:
-		aitem->agno = meta->sm_agno;
-		break;
-	case XFROG_SCRUB_GROUP_INODE:
-		aitem->ino = meta->sm_ino;
-		aitem->gen = meta->sm_gen;
-		break;
-	default:
-		break;
-	}
-
-	action_list_add(alist, aitem);
-	return 0;
-}
-
 /*
  * Scrub a single XFS_SCRUB_TYPE_*, saving corruption reports for later.
  *
@@ -308,7 +272,6 @@ scrub_meta_type(
 		.sm_agno		= agno,
 	};
 	enum check_outcome		fix;
-	int				ret;
 
 	background_sleep();
 
@@ -321,10 +284,7 @@ scrub_meta_type(
 		return ECANCELED;
 	case CHECK_REPAIR:
 		scrub_item_save_state(sri, type, meta.sm_flags);
-		ret = scrub_save_repair(ctx, alist, &meta);
-		if (ret)
-			return ret;
-		/* fall through */
+		return 0;
 	case CHECK_TOOSLOW:
 	case CHECK_DONE:
 		scrub_item_clean_state(sri, type);
@@ -466,7 +426,21 @@ scrub_file(
 	}
 
 	scrub_item_save_state(sri, type, meta.sm_flags);
-	return scrub_save_repair(ctx, alist, &meta);
+	return 0;
+}
+
+/* Is this filesystem object totally clean? */
+bool
+scrub_item_is_clean(
+	const struct scrub_item	*sri)
+{
+	unsigned int		scrub_type;
+
+	foreach_scrub_type(scrub_type)
+		if (sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY)
+			return false;
+
+	return true;
 }
 
 /*
@@ -608,7 +582,8 @@ enum check_outcome
 xfs_repair_metadata(
 	struct scrub_ctx		*ctx,
 	int				fd,
-	struct action_item		*aitem,
+	unsigned int			scrub_type,
+	struct scrub_item		*sri,
 	unsigned int			repair_flags)
 {
 	struct xfs_scrub_metadata	meta = { 0 };
@@ -616,18 +591,18 @@ xfs_repair_metadata(
 	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
 	int				error;
 
-	assert(aitem->type < XFS_SCRUB_TYPE_NR);
+	assert(scrub_type < XFS_SCRUB_TYPE_NR);
 	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
-	meta.sm_type = aitem->type;
-	meta.sm_flags = aitem->flags | XFS_SCRUB_IFLAG_REPAIR;
-	switch (xfrog_scrubbers[aitem->type].group) {
+	meta.sm_type = scrub_type;
+	meta.sm_flags = XFS_SCRUB_IFLAG_REPAIR;
+	switch (xfrog_scrubbers[scrub_type].group) {
 	case XFROG_SCRUB_GROUP_AGHEADER:
 	case XFROG_SCRUB_GROUP_PERAG:
-		meta.sm_agno = aitem->agno;
+		meta.sm_agno = sri->sri_agno;
 		break;
 	case XFROG_SCRUB_GROUP_INODE:
-		meta.sm_ino = aitem->ino;
-		meta.sm_gen = aitem->gen;
+		meta.sm_ino = sri->sri_ino;
+		meta.sm_gen = sri->sri_gen;
 		break;
 	default:
 		break;
@@ -637,6 +612,7 @@ xfs_repair_metadata(
 		return CHECK_RETRY;
 
 	memcpy(&oldm, &meta, sizeof(oldm));
+	oldm.sm_flags = sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY;
 	descr_set(&dsc, &oldm);
 
 	if (needs_repair(&meta))
@@ -669,8 +645,11 @@ retry:
 			meta.sm_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
 			goto retry;
 		}
+
+		/* Log that we skipped a slow check and forget this item. */
 		skip_slow_op(ctx, descr_render(&dsc),
 _("Repair skipped because we can't freeze the fs."));
+		scrub_item_clean_state(sri, scrub_type);
 		return CHECK_TOOSLOW;
 	case EDEADLOCK:
 	case EBUSY:
@@ -701,13 +680,16 @@ _("Filesystem is shut down, aborting."));
 		 * error out if the kernel doesn't know how to fix.
 		 */
 		if (is_unoptimized(&oldm) ||
-		    debug_tweak_on("XFS_SCRUB_FORCE_REPAIR"))
+		    debug_tweak_on("XFS_SCRUB_FORCE_REPAIR")) {
+			scrub_item_clean_state(sri, scrub_type);
 			return CHECK_DONE;
+		}
 		/* fall through */
 	case EINVAL:
 		/* Kernel doesn't know how to repair this? */
 		str_corrupt(ctx, descr_render(&dsc),
 _("Don't know how to fix; offline repair required."));
+		scrub_item_clean_state(sri, scrub_type);
 		return CHECK_DONE;
 	case EROFS:
 		/* Read-only filesystem, can't fix. */
@@ -717,23 +699,28 @@ _("Read-only filesystem; cannot make changes."));
 		return CHECK_ABORT;
 	case ENOENT:
 		/* Metadata not present, just skip it. */
+		scrub_item_clean_state(sri, scrub_type);
 		return CHECK_DONE;
 	case ENOMEM:
 	case ENOSPC:
 		/* Don't care if preen fails due to low resources. */
-		if (is_unoptimized(&oldm) && !needs_repair(&oldm))
+		if (is_unoptimized(&oldm) && !needs_repair(&oldm)) {
+			scrub_item_clean_state(sri, scrub_type);
 			return CHECK_DONE;
+		}
 		/* fall through */
 	default:
 		/*
-		 * Operational error.  If the caller doesn't want us
-		 * to complain about repair failures, tell the caller
-		 * to requeue the repair for later and don't say a
-		 * thing.  Otherwise, print error and bail out.
+		 * Operational error.  If the caller doesn't want us to
+		 * complain about repair failures, tell the caller to requeue
+		 * the repair for later and don't say a thing.  Otherwise,
+		 * print an error, mark the item clean because we're done with
+		 * trying to repair it, and bail out.
 		 */
 		if (!(repair_flags & XRM_COMPLAIN_IF_UNFIXED))
 			return CHECK_RETRY;
 		str_liberror(ctx, error, descr_render(&dsc));
+		scrub_item_clean_state(sri, scrub_type);
 		return CHECK_DONE;
 	}
 
@@ -762,5 +749,7 @@ _("Repair unsuccessful; offline repair required."));
 			record_preen(ctx, descr_render(&dsc),
 					_("Optimization successful."));
 	}
+
+	scrub_item_clean_state(sri, scrub_type);
 	return CHECK_DONE;
 }
