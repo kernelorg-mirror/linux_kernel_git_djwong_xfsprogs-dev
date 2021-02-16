@@ -155,6 +155,7 @@ const struct xfrog_scrub_descr xfrog_scrubbers[XFS_SCRUB_TYPE_NR] = {
 		.group	= XFROG_SCRUB_GROUP_FS,
 	},
 };
+#undef DEP
 
 /* Invoke the scrub ioctl.  Returns zero or negative error code. */
 int
