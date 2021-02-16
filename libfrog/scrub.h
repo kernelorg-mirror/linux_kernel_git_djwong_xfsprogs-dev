@@ -27,5 +27,6 @@ extern const struct xfrog_scrub_descr xfrog_scrubbers[XFS_SCRUB_TYPE_NR];
 extern const unsigned int xfrog_scrubber_deps[XFS_SCRUB_TYPE_NR];
 
 int xfrog_scrub_metadata(struct xfs_fd *xfd, struct xfs_scrub_metadata *meta);
+int xfrog_scrubv_metadata(struct xfs_fd *xfd, struct xfs_scrub_vec_head *vhead);
 
 #endif	/* __LIBFROG_SCRUB_H__ */
