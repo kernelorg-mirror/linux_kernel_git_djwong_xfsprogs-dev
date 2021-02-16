@@ -122,10 +122,9 @@ phase4_func(
 	 * metadata.  If repairs fails, we'll come back during phase 7.
 	 */
 	scrub_item_init_fs(&sri);
-	ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_FSCOUNTERS, &sri);
-	if (ret)
-		return ret;
-	ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_QUOTACHECK, &sri);
+	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_FSCOUNTERS);
+	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_QUOTACHECK);
+	ret = scrub_item_check(ctx, &sri);
 	if (ret)
 		return ret;
 
