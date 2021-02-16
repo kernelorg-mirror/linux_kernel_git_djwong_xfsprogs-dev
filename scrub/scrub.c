@@ -216,42 +216,6 @@ _("Optimizations of %s are possible."), _(xfrog_scrubbers[i].descr));
 	}
 }
 
-/* Save a scrub context for later repairs. */
-static int
-scrub_save_repair(
-	struct scrub_ctx		*ctx,
-	struct action_list		*alist,
-	struct xfs_scrub_metadata	*meta)
-{
-	struct action_item		*aitem;
-
-	/* Schedule this item for later repairs. */
-	aitem = malloc(sizeof(struct action_item));
-	if (!aitem) {
-		str_errno(ctx, _("adding item to repair list"));
-		return errno;
-	}
-
-	memset(aitem, 0, sizeof(*aitem));
-	aitem->type = meta->sm_type;
-	aitem->flags = meta->sm_flags;
-	switch (xfrog_scrubbers[meta->sm_type].group) {
-	case XFROG_SCRUB_GROUP_AGHEADER:
-	case XFROG_SCRUB_GROUP_PERAG:
-		aitem->agno = meta->sm_agno;
-		break;
-	case XFROG_SCRUB_GROUP_INODE:
-		aitem->ino = meta->sm_ino;
-		aitem->gen = meta->sm_gen;
-		break;
-	default:
-		break;
-	}
-
-	action_list_add(alist, aitem);
-	return 0;
-}
-
 /*
  * Scrub a single XFS_SCRUB_TYPE_*, saving corruption reports for later.
  *
@@ -271,7 +235,6 @@ scrub_meta_type(
 		.sm_agno		= agno,
 	};
 	enum check_outcome		fix;
-	int				ret;
 
 	background_sleep();
 
@@ -284,10 +247,7 @@ scrub_meta_type(
 		return ECANCELED;
 	case CHECK_REPAIR:
 		scrub_item_save_state(sri, type, meta.sm_flags);
-		ret = scrub_save_repair(ctx, alist, &meta);
-		if (ret)
-			return ret;
-		/* fall through */
+		return 0;
 	case CHECK_TOOSLOW:
 	case CHECK_DONE:
 		scrub_item_clean_state(sri, type);
@@ -429,7 +389,7 @@ scrub_file(
 	}
 
 	scrub_item_save_state(sri, type, meta.sm_flags);
-	return scrub_save_repair(ctx, alist, &meta);
+	return 0;
 }
 
 /* Dump a scrub item for debugging purposes. */
