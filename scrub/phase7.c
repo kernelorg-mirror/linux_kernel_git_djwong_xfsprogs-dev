@@ -123,8 +123,7 @@ phase7_func(
 	error = scrub_summary(ctx, &alist, &sri);
 	if (error)
 		return error;
-	error = action_list_process(ctx, &alist,
-			XRM_COMPLAIN_IF_UNFIXED | XRM_NOPROGRESS);
+	error = repair_item_completely(ctx, &sri);
 	if (error)
 		return error;
 
