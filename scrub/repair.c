@@ -44,7 +44,8 @@ repair_needs_excl(unsigned int scrub_type)
 static enum check_outcome
 xfs_repair_metadata(
 	struct scrub_ctx		*ctx,
-	struct action_item		*aitem,
+	unsigned int			scrub_type,
+	struct scrub_item		*sri,
 	unsigned int			repair_flags)
 {
 	struct xfs_scrub_metadata	meta = { 0 };
@@ -52,18 +53,18 @@ xfs_repair_metadata(
 	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
 	int				error;
 
-	assert(aitem->type < XFS_SCRUB_TYPE_NR);
+	assert(scrub_type < XFS_SCRUB_TYPE_NR);
 	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
-	meta.sm_type = aitem->type;
-	meta.sm_flags = aitem->flags | XFS_SCRUB_IFLAG_REPAIR;
-	switch (xfrog_scrubbers[aitem->type].group) {
+	meta.sm_type = scrub_type;
+	meta.sm_flags = XFS_SCRUB_IFLAG_REPAIR;
+	switch (xfrog_scrubbers[scrub_type].group) {
 	case XFROG_SCRUB_GROUP_AGHEADER:
 	case XFROG_SCRUB_GROUP_PERAG:
-		meta.sm_agno = aitem->agno;
+		meta.sm_agno = sri->sri_agno;
 		break;
 	case XFROG_SCRUB_GROUP_INODE:
-		meta.sm_ino = aitem->ino;
-		meta.sm_gen = aitem->gen;
+		meta.sm_ino = sri->sri_ino;
+		meta.sm_gen = sri->sri_gen;
 		break;
 	default:
 		break;
@@ -73,9 +74,10 @@ xfs_repair_metadata(
 		return CHECK_RETRY;
 
 	memcpy(&oldm, &meta, sizeof(oldm));
+	oldm.sm_flags = sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY;
 	descr_set(&dsc, &oldm);
 
-	if (needs_repair(&meta))
+	if (needs_repair(&oldm))
 		str_info(ctx, descr_render(&dsc), _("Attempting repair."));
 	else if (debug || verbose)
 		str_info(ctx, descr_render(&dsc),
@@ -105,8 +107,11 @@ retry:
 			meta.sm_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
 			goto retry;
 		}
+
+		/* Log that we skipped a slow check and forget this item. */
 		skip_slow_op(ctx, descr_render(&dsc),
 _("Repair skipped because we can't freeze the fs."));
+		scrub_item_clean_state(sri, scrub_type);
 		return CHECK_TOOSLOW;
 	case EDEADLOCK:
 	case EBUSY:
@@ -137,13 +142,16 @@ _("Filesystem is shut down, aborting."));
 		 * error out if the kernel doesn't know how to fix.
 		 */
 		if (is_unoptimized(&oldm) ||
-		    debug_tweak_on("XFS_SCRUB_FORCE_REPAIR"))
+		    debug_tweak_on("XFS_SCRUB_FORCE_REPAIR")) {
+			scrub_item_clean_state(sri, scrub_type);
 			return CHECK_DONE;
+		}
 		/* fall through */
 	case EINVAL:
 		/* Kernel doesn't know how to repair this? */
 		str_corrupt(ctx, descr_render(&dsc),
 _("Don't know how to fix; offline repair required."));
+		scrub_item_clean_state(sri, scrub_type);
 		return CHECK_DONE;
 	case EROFS:
 		/* Read-only filesystem, can't fix. */
@@ -153,23 +161,28 @@ _("Read-only filesystem; cannot make changes."));
 		return CHECK_ABORT;
 	case ENOENT:
 		/* Metadata not present, just skip it. */
+		scrub_item_clean_state(sri, scrub_type);
 		return CHECK_DONE;
 	case ENOMEM:
 	case ENOSPC:
 		/* Don't care if preen fails due to low resources. */
-		if (is_unoptimized(&oldm) && !needs_repair(&oldm))
+		if (is_unoptimized(&oldm) && !needs_repair(&oldm)) {
+			scrub_item_clean_state(sri, scrub_type);
 			return CHECK_DONE;
+		}
 		/* fall through */
 	default:
 		/*
-		 * Operational error.  If the caller doesn't want us
-		 * to complain about repair failures, tell the caller
-		 * to requeue the repair for later and don't say a
-		 * thing.  Otherwise, print error and bail out.
+		 * Operational error.  If the caller doesn't want us to
+		 * complain about repair failures, tell the caller to requeue
+		 * the repair for later and don't say a thing.  Otherwise,
+		 * print an error, mark the item clean because we're done with
+		 * trying to repair it, and bail out.
 		 */
 		if (!(repair_flags & XRM_COMPLAIN_IF_UNFIXED))
 			return CHECK_RETRY;
 		str_liberror(ctx, error, descr_render(&dsc));
+		scrub_item_clean_state(sri, scrub_type);
 		return CHECK_DONE;
 	}
 
@@ -198,12 +211,13 @@ _("Repair unsuccessful; offline repair required."));
 			record_preen(ctx, descr_render(&dsc),
 					_("Optimization successful."));
 	}
+
+	scrub_item_clean_state(sri, scrub_type);
 	return CHECK_DONE;
 }
 
 /*
  * Prioritize action items in order of how long we can wait.
- * 0 = do it now, 10000 = do it later.
  *
  * To minimize the amount of repair work, we want to prioritize metadata
  * objects by perceived corruptness.  If CORRUPT is set, the fields are
@@ -219,111 +233,46 @@ _("Repair unsuccessful; offline repair required."));
  * in order.
  */
 
-/* Sort action items in severity order. */
-static int
-PRIO(
-	struct action_item	*aitem,
-	int			order)
-{
-	if (aitem->flags & XFS_SCRUB_OFLAG_CORRUPT)
-		return order;
-	else if (aitem->flags & XFS_SCRUB_OFLAG_XCORRUPT)
-		return 100 + order;
-	else if (aitem->flags & XFS_SCRUB_OFLAG_XFAIL)
-		return 200 + order;
-	else if (aitem->flags & XFS_SCRUB_OFLAG_PREEN)
-		return 300 + order;
-	abort();
-}
-
-/* Sort the repair items in dependency order. */
-static int
-xfs_action_item_priority(
-	struct action_item	*aitem)
-{
-	switch (aitem->type) {
-	case XFS_SCRUB_TYPE_SB:
-	case XFS_SCRUB_TYPE_AGF:
-	case XFS_SCRUB_TYPE_AGFL:
-	case XFS_SCRUB_TYPE_AGI:
-	case XFS_SCRUB_TYPE_BNOBT:
-	case XFS_SCRUB_TYPE_CNTBT:
-	case XFS_SCRUB_TYPE_INOBT:
-	case XFS_SCRUB_TYPE_FINOBT:
-	case XFS_SCRUB_TYPE_REFCNTBT:
-	case XFS_SCRUB_TYPE_RMAPBT:
-	case XFS_SCRUB_TYPE_INODE:
-	case XFS_SCRUB_TYPE_BMBTD:
-	case XFS_SCRUB_TYPE_BMBTA:
-	case XFS_SCRUB_TYPE_BMBTC:
-		return PRIO(aitem, aitem->type - 1);
-	case XFS_SCRUB_TYPE_DIR:
-	case XFS_SCRUB_TYPE_XATTR:
-	case XFS_SCRUB_TYPE_SYMLINK:
-	case XFS_SCRUB_TYPE_PARENT:
-		return PRIO(aitem, XFS_SCRUB_TYPE_DIR);
-	case XFS_SCRUB_TYPE_RTBITMAP:
-	case XFS_SCRUB_TYPE_RTSUM:
-	case XFS_SCRUB_TYPE_RTRMAPBT:
-	case XFS_SCRUB_TYPE_RTREFCBT:
-		return PRIO(aitem, XFS_SCRUB_TYPE_RTBITMAP);
-	case XFS_SCRUB_TYPE_UQUOTA:
-	case XFS_SCRUB_TYPE_GQUOTA:
-	case XFS_SCRUB_TYPE_PQUOTA:
-		return PRIO(aitem, XFS_SCRUB_TYPE_UQUOTA);
-	case XFS_SCRUB_TYPE_QUOTACHECK:
-		/* This should always go after [UGP]QUOTA no matter what. */
-		return PRIO(aitem, aitem->type);
-	case XFS_SCRUB_TYPE_FSCOUNTERS:
-		/* This should always go after AG headers no matter what. */
-		return PRIO(aitem, INT_MAX);
-	}
-	abort();
-}
-
-/* Make sure that btrees get repaired before headers. */
-static int
-xfs_action_item_compare(
-	void				*priv,
-	struct list_head		*a,
-	struct list_head		*b)
-{
-	struct action_item		*ra;
-	struct action_item		*rb;
-
-	ra = container_of(a, struct action_item, list);
-	rb = container_of(b, struct action_item, list);
-
-	return xfs_action_item_priority(ra) - xfs_action_item_priority(rb);
-}
+struct action_item {
+	struct list_head	list;
+	struct scrub_item	sri;
+};
 
 /*
  * Figure out which AG metadata must be fixed before we can move on
  * to the inode scan.
  */
 void
-action_list_find_mustfix(
-	struct action_list		*alist,
-	struct action_list		*immediate_alist,
-	unsigned long long		*broken_primaries,
-	unsigned long long		*broken_secondaries)
+repair_item_mustfix(
+	struct scrub_item	*sri,
+	struct scrub_item	*fix_now,
+	unsigned long long	*broken_primaries,
+	unsigned long long	*broken_secondaries)
 {
-	struct action_item		*n;
-	struct action_item		*aitem;
+	unsigned int		scrub_type;
 
-	list_for_each_entry_safe(aitem, n, &alist->list, list) {
-		if (!(aitem->flags & XFS_SCRUB_OFLAG_CORRUPT))
+	assert(sri->sri_agno != -1U);
+	scrub_item_init_ag(fix_now, sri->sri_agno);
+
+	*broken_primaries = 0;
+	*broken_secondaries = 0;
+
+	foreach_scrub_type(scrub_type) {
+		if (!(sri->sri_state[scrub_type] & SCRUB_ITEM_CORRUPT))
 			continue;
-		switch (aitem->type) {
+
+		switch (scrub_type) {
 		case XFS_SCRUB_TYPE_RMAPBT:
 			(*broken_secondaries)++;
 			break;
+		case XFS_SCRUB_TYPE_AGI:
 		case XFS_SCRUB_TYPE_FINOBT:
 		case XFS_SCRUB_TYPE_INOBT:
-			alist->nr--;
-			list_move_tail(&aitem->list, &immediate_alist->list);
-			immediate_alist->nr++;
+			fix_now->sri_state[scrub_type] |= SCRUB_ITEM_CORRUPT;
 			/* fall through */
+		case XFS_SCRUB_TYPE_SB:
+		case XFS_SCRUB_TYPE_AGF:
+		case XFS_SCRUB_TYPE_AGFL:
 		case XFS_SCRUB_TYPE_BNOBT:
 		case XFS_SCRUB_TYPE_CNTBT:
 		case XFS_SCRUB_TYPE_REFCNTBT:
@@ -393,13 +342,18 @@ action_list_init(
 	alist->sorted = false;
 }
 
-/* Number of repairs in this list. */
+/* Number of pending repairs in this list. */
 size_t
 action_list_length(
 	struct action_list		*alist)
 {
-	return alist->nr;
-};
+	struct action_item		*aitem;
+	size_t				ret = 0;
+
+	list_for_each_entry(aitem, &alist->list, list)
+		ret += repair_item_count_needsrepair(&aitem->sri);
+	return ret;
+}
 
 /* Add to the list of repairs. */
 void
@@ -412,21 +366,6 @@ action_list_add(
 	alist->sorted = false;
 }
 
-/* Splice two repair lists. */
-void
-action_list_splice(
-	struct action_list		*dest,
-	struct action_list		*src)
-{
-	if (src->nr == 0)
-		return;
-
-	list_splice_tail_init(&src->list, &dest->list);
-	dest->nr += src->nr;
-	src->nr = 0;
-	dest->sorted = false;
-}
-
 /* Repair everything on this list. */
 int
 action_list_process(
@@ -436,23 +375,56 @@ action_list_process(
 {
 	struct action_item		*aitem;
 	struct action_item		*n;
-	enum check_outcome		fix;
-
-	if (!alist->sorted) {
-		list_sort(NULL, &alist->list, xfs_action_item_compare);
-		alist->sorted = true;
-	}
+	int				ret;
 
 	list_for_each_entry_safe(aitem, n, &alist->list, list) {
-		fix = xfs_repair_metadata(ctx, aitem, repair_flags);
+		if (scrub_excessive_errors(ctx))
+			return ECANCELED;
+
+		ret = repair_item(ctx, &aitem->sri, repair_flags);
+		if (ret)
+			break;
+
+		if (repair_item_count_needsrepair(&aitem->sri) == 0) {
+			list_del(&aitem->list);
+			free(aitem);
+		}
+	}
+
+	return ret;
+}
+
+/*
+ * For a given filesystem object, perform all repairs of a given class
+ * (corrupt, xcorrupt, xfail, preen) if the repair item says it's needed.
+ */
+static int
+repair_item_class(
+	struct scrub_ctx		*ctx,
+	struct scrub_item		*sri,
+	uint8_t				repair_mask,
+	unsigned int			flags)
+{
+	unsigned int			scrub_type;
+
+	if (ctx->mode < SCRUB_MODE_REPAIR)
+		return 0;
+
+	foreach_scrub_type(scrub_type) {
+		enum check_outcome	fix;
+
+		if (scrub_excessive_errors(ctx))
+			return ECANCELED;
+
+		if (!(sri->sri_state[scrub_type] & repair_mask))
+			continue;
+
+		fix = xfs_repair_metadata(ctx, scrub_type, sri, flags);
 		switch (fix) {
 		case CHECK_TOOSLOW:
 		case CHECK_DONE:
-			if (!(repair_flags & XRM_NOPROGRESS))
+			if (!(flags & XRM_NOPROGRESS))
 				progress_add(1);
-			alist->nr--;
-			list_del(&aitem->list);
-			free(aitem);
 			continue;
 		case CHECK_ABORT:
 			return ECANCELED;
@@ -463,37 +435,82 @@ action_list_process(
 		}
 	}
 
-	if (scrub_excessive_errors(ctx))
-		return ECANCELED;
 	return 0;
 }
 
-/* Defer all the repairs until phase 4. */
-void
-action_list_defer(
-	struct scrub_ctx		*ctx,
-	xfs_agnumber_t			agno,
-	struct action_list		*alist)
+/*
+ * Repair all parts (i.e. scrub types) of this filesystem object for which
+ * corruption has been observed directly.  Other types of repair work (fixing
+ * cross referencing problems and preening) are deferred.
+ *
+ * This function should only be called to perform spot repairs of fs objects
+ * during phase 2 and 3 while we still have open handles to those objects.
+ */
+int
+repair_item_corruption(
+	struct scrub_ctx	*ctx,
+	struct scrub_item	*sri)
 {
-	ASSERT(agno < ctx->mnt.fsgeom.agcount);
-
-	action_list_splice(&ctx->action_lists[agno], alist);
+	return repair_item_class(ctx, sri, SCRUB_ITEM_CORRUPT,
+			XRM_REPAIR_ONLY | XRM_NOPROGRESS);
 }
 
-/* Run actions now and defer unfinished items for later. */
+/*
+ * Repair everything in this filesystem object that needs it.  This includes
+ * cross-referencing and preening.
+ */
 int
-action_list_process_or_defer(
-	struct scrub_ctx		*ctx,
-	xfs_agnumber_t			agno,
-	struct action_list		*alist)
+repair_item(
+	struct scrub_ctx	*ctx,
+	struct scrub_item	*sri,
+	unsigned int		flags)
 {
-	int				ret;
+	int			ret;
 
-	ret = action_list_process(ctx, alist,
-			XRM_REPAIR_ONLY | XRM_NOPROGRESS);
+	ret = repair_item_class(ctx, sri, SCRUB_ITEM_CORRUPT, flags);
 	if (ret)
 		return ret;
 
-	action_list_defer(ctx, agno, alist);
+	ret = repair_item_class(ctx, sri, SCRUB_ITEM_XCORRUPT, flags);
+	if (ret)
+		return ret;
+
+	ret = repair_item_class(ctx, sri, SCRUB_ITEM_XFAIL, flags);
+	if (ret)
+		return ret;
+
+	return repair_item_class(ctx, sri, SCRUB_ITEM_PREEN, flags);
+}
+
+/* Defer all the repairs until phase 4. */
+int
+repair_item_defer(
+	struct scrub_ctx		*ctx,
+	const struct scrub_item	*sri)
+{
+	struct action_item		*aitem;
+	unsigned int			agno;
+
+	if (repair_item_count_needsrepair(sri) == 0)
+		return 0;
+
+	aitem = malloc(sizeof(struct action_item));
+	if (!aitem) {
+		int x = errno;
+		str_errno(ctx, _("adding item to repair list"));
+		return x;
+	}
+	INIT_LIST_HEAD(&aitem->list);
+	memcpy(&aitem->sri, sri, sizeof(struct scrub_item));
+
+	if (sri->sri_agno != -1U)
+		agno = sri->sri_agno;
+	else if (sri->sri_ino != -1ULL && sri->sri_gen != -1U)
+		agno = cvt_ino_to_agno(&ctx->mnt, sri->sri_ino);
+	else
+		agno = 0;
+	ASSERT(agno < ctx->mnt.fsgeom.agcount);
+
+	action_list_add(&ctx->action_lists[agno], aitem);
 	return 0;
 }
