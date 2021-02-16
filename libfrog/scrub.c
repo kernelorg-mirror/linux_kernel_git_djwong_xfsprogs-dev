@@ -156,6 +156,50 @@ const struct xfrog_scrub_descr xfrog_scrubbers[XFS_SCRUB_TYPE_NR] = {
 	},
 };
 
+/*
+ * Bitmap showing the full correctness dependencies of each scrub type.
+ * Note that scrub types for one fs object type (ag, inode, fs) cannot declare
+ * dependencies on scrub types for a different object type.
+ */
+#define B(x) (1U << (x))
+const unsigned int xfrog_scrubber_deps[XFS_SCRUB_TYPE_NR] = {
+	[XFS_SCRUB_TYPE_PROBE]		= 0,
+	[XFS_SCRUB_TYPE_SB]		= 0,
+	[XFS_SCRUB_TYPE_AGF]		= B(XFS_SCRUB_TYPE_SB),
+	[XFS_SCRUB_TYPE_AGFL]		= B(XFS_SCRUB_TYPE_SB) |
+					  B(XFS_SCRUB_TYPE_AGF),
+	[XFS_SCRUB_TYPE_AGI]		= B(XFS_SCRUB_TYPE_SB),
+	[XFS_SCRUB_TYPE_BNOBT]		= B(XFS_SCRUB_TYPE_AGF),
+	[XFS_SCRUB_TYPE_CNTBT]		= B(XFS_SCRUB_TYPE_AGF),
+	[XFS_SCRUB_TYPE_INOBT]		= B(XFS_SCRUB_TYPE_AGI),
+	[XFS_SCRUB_TYPE_FINOBT]		= B(XFS_SCRUB_TYPE_AGI),
+	[XFS_SCRUB_TYPE_RMAPBT]		= B(XFS_SCRUB_TYPE_AGF),
+	[XFS_SCRUB_TYPE_REFCNTBT]	= B(XFS_SCRUB_TYPE_AGF),
+
+	[XFS_SCRUB_TYPE_INODE]		= 0,
+	[XFS_SCRUB_TYPE_BMBTD]		= B(XFS_SCRUB_TYPE_INODE),
+	[XFS_SCRUB_TYPE_BMBTA]		= B(XFS_SCRUB_TYPE_INODE),
+	[XFS_SCRUB_TYPE_BMBTC]		= B(XFS_SCRUB_TYPE_INODE),
+	[XFS_SCRUB_TYPE_DIR]		= B(XFS_SCRUB_TYPE_BMBTD),
+	[XFS_SCRUB_TYPE_XATTR]		= B(XFS_SCRUB_TYPE_BMBTA),
+	[XFS_SCRUB_TYPE_SYMLINK]	= B(XFS_SCRUB_TYPE_BMBTD),
+	[XFS_SCRUB_TYPE_PARENT]		= B(XFS_SCRUB_TYPE_BMBTD),
+
+	[XFS_SCRUB_TYPE_RTBITMAP]	= 0,
+	[XFS_SCRUB_TYPE_RTSUM]		= 0,
+	[XFS_SCRUB_TYPE_UQUOTA]		= 0,
+	[XFS_SCRUB_TYPE_GQUOTA]		= 0,
+	[XFS_SCRUB_TYPE_PQUOTA]		= 0,
+	[XFS_SCRUB_TYPE_FSCOUNTERS]	= 0,
+	[XFS_SCRUB_TYPE_QUOTACHECK]	= B(XFS_SCRUB_TYPE_UQUOTA) |
+					  B(XFS_SCRUB_TYPE_GQUOTA) |
+					  B(XFS_SCRUB_TYPE_PQUOTA),
+	[XFS_SCRUB_TYPE_HEALTHY]	= 0,
+	[XFS_SCRUB_TYPE_RTRMAPBT]	= 0,
+	[XFS_SCRUB_TYPE_RTREFCBT]	= 0,
+};
+#undef B
+
 /* Invoke the scrub ioctl.  Returns zero or negative error code. */
 int
 xfrog_scrub_metadata(
