@@ -30,6 +30,9 @@ enum xfrog_scrub_group;
 /* This scrub type needs to be checked. */
 #define SCRUB_ITEM_NEEDSCHECK	(1 << 5)
 
+/* Ok to freeze filesystem. */
+#define SCRUB_ITEM_FREEZE_OK	(1 << 6)
+
 /* All of the state flags that we need to prioritize repair work. */
 #define SCRUB_ITEM_REPAIR_ANY	(SCRUB_ITEM_CORRUPT | \
 				 SCRUB_ITEM_PREEN | \
@@ -45,6 +48,9 @@ enum xfrog_scrub_group;
 				 SCRUB_ITEM_XFAIL | \
 				 SCRUB_ITEM_XCORRUPT)
 
+/* Maximum number of times we'll retry a scrub ioctl call. */
+#define SCRUB_ITEM_MAX_RETRIES	10
+
 struct scrub_item {
 	/*
 	 * Information we need to call the scrub and repair ioctls.  Per-AG
@@ -58,6 +64,9 @@ struct scrub_item {
 
 	/* Scrub item state flags, one for each XFS_SCRUB_TYPE. */
 	__u8			sri_state[XFS_SCRUB_TYPE_NR];
+
+	/* Track scrub and repair call retries for each scrub type. */
+	__u8			sri_tries[XFS_SCRUB_TYPE_NR];
 };
 
 #define foreach_scrub_type(loopvar) \
