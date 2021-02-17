@@ -24,8 +24,7 @@
 #include "scrub_private.h"
 
 static int scrub_epilogue(struct scrub_ctx *ctx, struct descr *dsc,
-		struct scrub_item *sri, struct xfs_scrub_metadata *meta,
-		int error);
+		struct scrub_item *sri, struct xfs_scrub_vec *vec);
 
 /* Online scrub and repair wrappers. */
 
@@ -62,7 +61,7 @@ void
 scrub_warn_incomplete_scrub(
 	struct scrub_ctx		*ctx,
 	struct descr			*dsc,
-	struct xfs_scrub_metadata	*meta)
+	const struct xfs_scrub_vec	*meta)
 {
 	if (is_incomplete(meta))
 		str_info(ctx, descr_render(dsc), _("Check incomplete."));
@@ -91,9 +90,9 @@ xfs_check_metadata(
 {
 	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
 	struct xfs_scrub_metadata	meta = { };
+	struct xfs_scrub_vec		vec;
 	enum xfrog_scrub_group		group;
 	bool				freeze_allowed;
-	int				error;
 
 	background_sleep();
 
@@ -123,8 +122,10 @@ xfs_check_metadata(
 
 	dbg_printf("check %s flags %xh\n", descr_render(&dsc), meta.sm_flags);
 
-	error = -xfrog_scrub_metadata(xfdp, &meta);
-	return scrub_epilogue(ctx, &dsc, sri, &meta, error);
+	vec.sv_ret = xfrog_scrub_metadata(xfdp, &meta);
+	vec.sv_type = scrub_type;
+	vec.sv_flags = meta.sm_flags;
+	return scrub_epilogue(ctx, &dsc, sri, &vec);
 }
 
 /*
@@ -136,15 +137,15 @@ scrub_epilogue(
 	struct scrub_ctx		*ctx,
 	struct descr			*dsc,
 	struct scrub_item		*sri,
-	struct xfs_scrub_metadata	*meta,
-	int				error)
+	struct xfs_scrub_vec		*meta)
 {
-	unsigned int			scrub_type = meta->sm_type;
+	unsigned int			scrub_type = meta->sv_type;
 	bool				freeze_allowed;
 	enum xfrog_scrub_group		group;
+	int				error = -meta->sv_ret;
 
 	if (!error && debug_tweak_on("XFS_SCRUB_FORCE_REPAIR"))
-		meta->sm_flags |= XFS_SCRUB_OFLAG_CORRUPT;
+		meta->sv_flags |= XFS_SCRUB_OFLAG_CORRUPT;
 
 	group = xfrog_scrubbers[scrub_type].group;
 	freeze_allowed = sri->sri_state[scrub_type] & SCRUB_ITEM_FREEZE_OK;
@@ -222,7 +223,7 @@ _("Repairs are required."));
 		}
 
 		/* Schedule repairs. */
-		scrub_item_save_state(sri, scrub_type, meta->sm_flags);
+		scrub_item_save_state(sri, scrub_type, meta->sv_flags);
 		return 0;
 	}
 
@@ -249,7 +250,7 @@ _("Optimization is possible."));
 		}
 
 		/* Schedule repairs. */
-		scrub_item_save_state(sri, scrub_type, meta->sm_flags);
+		scrub_item_save_state(sri, scrub_type, meta->sv_flags);
 		return 0;
 	}
 
