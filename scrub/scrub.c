@@ -23,6 +23,10 @@
 #include "descr.h"
 #include "scrub_private.h"
 
+static int scrub_epilogue(struct scrub_ctx *ctx, struct descr *dsc,
+		struct scrub_item *sri, struct xfs_scrub_metadata *meta,
+		int error);
+
 /* Online scrub and repair wrappers. */
 
 /* Format a scrub description. */
@@ -120,8 +124,31 @@ xfs_check_metadata(
 	dbg_printf("check %s flags %xh\n", descr_render(&dsc), meta.sm_flags);
 
 	error = -xfrog_scrub_metadata(xfdp, &meta);
-	if (debug_tweak_on("XFS_SCRUB_FORCE_REPAIR") && !error)
-		meta.sm_flags |= XFS_SCRUB_OFLAG_CORRUPT;
+	return scrub_epilogue(ctx, &dsc, sri, &meta, error);
+}
+
+/*
+ * Update all internal state after a scrub ioctl call.
+ * Returns 0 for success, or ECANCELED to abort the program.
+ */
+static int
+scrub_epilogue(
+	struct scrub_ctx		*ctx,
+	struct descr			*dsc,
+	struct scrub_item		*sri,
+	struct xfs_scrub_metadata	*meta,
+	int				error)
+{
+	unsigned int			scrub_type = meta->sm_type;
+	bool				freeze_allowed;
+	enum xfrog_scrub_group		group;
+
+	if (!error && debug_tweak_on("XFS_SCRUB_FORCE_REPAIR"))
+		meta->sm_flags |= XFS_SCRUB_OFLAG_CORRUPT;
+
+	group = xfrog_scrubbers[scrub_type].group;
+	freeze_allowed = sri->sri_state[scrub_type] & SCRUB_ITEM_FREEZE_OK;
+
 	switch (error) {
 	case 0:
 		/* No operational errors encountered. */
@@ -134,7 +161,7 @@ xfs_check_metadata(
 		}
 
 		/* Log that we skipped a slow check and forget this item. */
-		skip_slow_op(ctx, descr_render(&dsc),
+		skip_slow_op(ctx, descr_render(dsc),
 _("Check skipped because we can't freeze the fs."));
 		scrub_item_clean_state(sri, scrub_type);
 		return 0;
@@ -144,13 +171,13 @@ _("Check skipped because we can't freeze the fs."));
 		return 0;
 	case ESHUTDOWN:
 		/* FS already crashed, give up. */
-		str_error(ctx, descr_render(&dsc),
+		str_error(ctx, descr_render(dsc),
 _("Filesystem is shut down, aborting."));
 		return ECANCELED;
 	case EIO:
 	case ENOMEM:
 		/* Abort on I/O errors or insufficient memory. */
-		str_errno(ctx, descr_render(&dsc));
+		str_errno(ctx, descr_render(dsc));
 		return ECANCELED;
 	case EDEADLOCK:
 	case EBUSY:
@@ -164,7 +191,7 @@ _("Filesystem is shut down, aborting."));
 		/* fall through */
 	default:
 		/* Operational error.  Log it and move on. */
-		str_errno(ctx, descr_render(&dsc));
+		str_errno(ctx, descr_render(dsc));
 		scrub_item_clean_state(sri, scrub_type);
 		return 0;
 	}
@@ -175,27 +202,27 @@ _("Filesystem is shut down, aborting."));
 	 * we'll try the scan again, just in case the fs was busy.
 	 * Only retry so many times.
 	 */
-	if (want_retry(&meta) && scrub_item_schedule_retry(sri, scrub_type))
+	if (want_retry(meta) && scrub_item_schedule_retry(sri, scrub_type))
 		return 0;
 
 	/* Complain about incomplete or suspicious metadata. */
-	scrub_warn_incomplete_scrub(ctx, &dsc, &meta);
+	scrub_warn_incomplete_scrub(ctx, dsc, meta);
 
 	/*
 	 * If we need repairs or there were discrepancies, schedule a
 	 * repair if desired, otherwise complain.
 	 */
-	if (is_corrupt(&meta) || xref_disagrees(&meta)) {
+	if (is_corrupt(meta) || xref_disagrees(meta)) {
 		if (ctx->mode < SCRUB_MODE_REPAIR) {
 			/* Dry-run mode, so log an error and forget it. */
-			str_corrupt(ctx, descr_render(&dsc),
+			str_corrupt(ctx, descr_render(dsc),
 _("Repairs are required."));
 			scrub_item_clean_state(sri, scrub_type);
 			return 0;
 		}
 
 		/* Schedule repairs. */
-		scrub_item_save_state(sri, scrub_type, meta.sm_flags);
+		scrub_item_save_state(sri, scrub_type, meta->sm_flags);
 		return 0;
 	}
 
@@ -203,12 +230,12 @@ _("Repairs are required."));
 	 * If we could optimize, schedule a repair if desired,
 	 * otherwise complain.
 	 */
-	if (is_unoptimized(&meta)) {
+	if (is_unoptimized(meta)) {
 		if (ctx->mode != SCRUB_MODE_REPAIR) {
 			/* Dry-run mode, so log an error and forget it. */
 			if (group != XFROG_SCRUB_GROUP_INODE) {
 				/* AG or FS metadata, always warn. */
-				str_info(ctx, descr_render(&dsc),
+				str_info(ctx, descr_render(dsc),
 _("Optimization is possible."));
 			} else if (!ctx->preen_triggers[scrub_type]) {
 				/* File metadata, only warn once per type. */
@@ -222,7 +249,7 @@ _("Optimization is possible."));
 		}
 
 		/* Schedule repairs. */
-		scrub_item_save_state(sri, scrub_type, meta.sm_flags);
+		scrub_item_save_state(sri, scrub_type, meta->sm_flags);
 		return 0;
 	}
 
