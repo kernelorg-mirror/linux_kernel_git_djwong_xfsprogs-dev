@@ -122,7 +122,7 @@ phase7_func(
 	if (error)
 		return error;
 	error = action_list_process(ctx, ctx->mnt.fd, &alist,
-			ALP_COMPLAIN_IF_UNFIXED | ALP_NOPROGRESS);
+			XRM_COMPLAIN_IF_UNFIXED | XRM_NOPROGRESS);
 	if (error)
 		return error;
 
