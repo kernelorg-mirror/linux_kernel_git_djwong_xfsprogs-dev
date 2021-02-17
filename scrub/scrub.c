@@ -88,13 +88,16 @@ xfs_check_metadata(
 	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
 	struct xfs_scrub_metadata	meta = { };
 	enum xfrog_scrub_group		group;
-	unsigned int			tries = 0;
+	bool				freeze_allowed;
 	int				error;
 
 	background_sleep();
 
 	group = xfrog_scrubbers[scrub_type].group;
 	meta.sm_type = scrub_type;
+	freeze_allowed = sri->sri_state[scrub_type] & SCRUB_ITEM_FREEZE_OK;
+	if (freeze_allowed)
+		meta.sm_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
 	switch (group) {
 	case XFROG_SCRUB_GROUP_AGHEADER:
 	case XFROG_SCRUB_GROUP_PERAG:
@@ -115,7 +118,7 @@ xfs_check_metadata(
 	descr_set(&dsc, &meta);
 
 	dbg_printf("check %s flags %xh\n", descr_render(&dsc), meta.sm_flags);
-retry:
+
 	error = -xfrog_scrub_metadata(xfdp, &meta);
 	if (debug_tweak_on("XFS_SCRUB_FORCE_REPAIR") && !error)
 		meta.sm_flags |= XFS_SCRUB_OFLAG_CORRUPT;
@@ -125,10 +128,9 @@ retry:
 		break;
 	case EUSERS:
 		/* Operation skipped because we cannot freeze. */
-		if (!(meta.sm_flags & XFS_SCRUB_IFLAG_FREEZE_OK) &&
-		    ctx->freeze_ok) {
-			meta.sm_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
-			goto retry;
+		if (!freeze_allowed && ctx->freeze_ok) {
+			scrub_item_allow_freeze(sri, scrub_type);
+			return 0;
 		}
 
 		/* Log that we skipped a slow check and forget this item. */
@@ -173,10 +175,8 @@ _("Filesystem is shut down, aborting."));
 	 * we'll try the scan again, just in case the fs was busy.
 	 * Only retry so many times.
 	 */
-	if (want_retry(&meta) && tries < 10) {
-		tries++;
-		goto retry;
-	}
+	if (want_retry(&meta) && scrub_item_schedule_retry(sri, scrub_type))
+		return 0;
 
 	/* Complain about incomplete or suspicious metadata. */
 	scrub_warn_incomplete_scrub(ctx, &dsc, &meta);
@@ -303,6 +303,7 @@ scrub_item_check_file(
 	int				override_fd)
 {
 	struct xfs_fd			xfd;
+	struct scrub_item		old_sri;
 	struct xfs_fd			*xfdp = &ctx->mnt;
 	unsigned int			scrub_type;
 	int				error;
@@ -322,7 +323,14 @@ scrub_item_check_file(
 		if (!(sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSCHECK))
 			continue;
 
-		error = xfs_check_metadata(ctx, xfdp, scrub_type, sri);
+		sri->sri_tries[scrub_type] = SCRUB_ITEM_MAX_RETRIES;
+		do {
+			memcpy(&old_sri, sri, sizeof(old_sri));
+			error = xfs_check_metadata(ctx, xfdp, scrub_type, sri);
+			if (error)
+				return error;
+		} while (scrub_item_call_kernel_again(sri, scrub_type,
+					SCRUB_ITEM_NEEDSCHECK, &old_sri));
 
 		/*
 		 * Progress is counted by the inode for inode metadata; for
