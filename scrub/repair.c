@@ -72,8 +72,8 @@ xfs_repair_metadata(
 	struct xfs_scrub_metadata	meta = { 0 };
 	struct xfs_scrub_metadata	oldm;
 	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
+	bool				freeze_allowed;
 	bool				repair_only;
-	unsigned int			tries = 0;
 	int				error;
 
 	/*
@@ -87,6 +87,9 @@ xfs_repair_metadata(
 	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
 	meta.sm_type = scrub_type;
 	meta.sm_flags = XFS_SCRUB_IFLAG_REPAIR;
+	freeze_allowed = sri->sri_state[scrub_type] & SCRUB_ITEM_FREEZE_OK;
+	if (freeze_allowed)
+		meta.sm_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
 	switch (xfrog_scrubbers[scrub_type].group) {
 	case XFROG_SCRUB_GROUP_AGHEADER:
 	case XFROG_SCRUB_GROUP_PERAG:
@@ -112,7 +115,7 @@ xfs_repair_metadata(
 	else if (debug || verbose)
 		str_info(ctx, descr_render(&dsc),
 				_("Attempting optimization."));
-retry:
+
 	/*
 	 * Certain types of repairs involve full filesystem scans and
 	 * trylocking.  These repair activities are substantially more likely
@@ -132,10 +135,9 @@ retry:
 		break;
 	case EUSERS:
 		/* Operation skipped because we cannot freeze. */
-		if (!(meta.sm_flags & XFS_SCRUB_IFLAG_FREEZE_OK) &&
-		    ctx->freeze_ok) {
-			meta.sm_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
-			goto retry;
+		if (!freeze_allowed && ctx->freeze_ok) {
+			scrub_item_allow_freeze(sri, scrub_type);
+			return 0;
 		}
 
 		/* Log that we skipped a slow check and forget this item. */
@@ -222,10 +224,8 @@ _("Read-only filesystem; cannot make changes."));
 	 * the repair again, just in case the fs was busy.  Only retry so many
 	 * times.
 	 */
-	if (want_retry(&meta) && tries < 10) {
-		tries++;
-		goto retry;
-	}
+	if (want_retry(&meta) && scrub_item_schedule_retry(sri, scrub_type))
+		return 0;
 
 	if (repair_flags & XRM_COMPLAIN_IF_UNFIXED)
 		scrub_warn_incomplete_scrub(ctx, &dsc, &meta);
@@ -522,6 +522,7 @@ repair_item_class(
 	uint8_t				repair_mask,
 	unsigned int			flags)
 {
+	struct scrub_item		old_sri;
 	unsigned int			scrub_type;
 	int				error = 0;
 
@@ -544,9 +545,15 @@ repair_item_class(
 		    !repair_item_dependencies_ok(sri, scrub_type))
 			continue;
 
-		error = xfs_repair_metadata(ctx, scrub_type, sri, flags);
-		if (error)
-			break;
+		sri->sri_tries[scrub_type] = SCRUB_ITEM_MAX_RETRIES;
+		do {
+			memcpy(&old_sri, sri, sizeof(old_sri));
+			error = xfs_repair_metadata(ctx, scrub_type, sri,
+					flags);
+			if (error)
+				return error;
+		} while (scrub_item_call_kernel_again(sri, scrub_type,
+					repair_mask, &old_sri));
 
 		/* Maybe update progress if we fixed the problem. */
 		if (!(flags & XRM_NOPROGRESS) &&
