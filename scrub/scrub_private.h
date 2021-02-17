@@ -89,4 +89,21 @@ scrub_item_type_boosted(
 	return sri->sri_state[scrub_type] & SCRUB_ITEM_BOOST_REPAIR;
 }
 
+/* Grant permission to freeze the filesystem for a scrub operation. */
+static inline void
+scrub_item_allow_freeze(struct scrub_item *sri, unsigned int scrub_type)
+{
+	sri->sri_state[scrub_type] |= SCRUB_ITEM_FREEZE_OK;
+}
+
+/* Decide if we want to retry this operation and update bookkeeping if yes. */
+static inline bool
+scrub_item_schedule_retry(struct scrub_item *sri, unsigned int scrub_type)
+{
+	if (sri->sri_tries[scrub_type] == 0)
+		return false;
+	sri->sri_tries[scrub_type]--;
+	return true;
+}
+
 #endif /* XFS_SCRUB_SCRUB_PRIVATE_H_ */
