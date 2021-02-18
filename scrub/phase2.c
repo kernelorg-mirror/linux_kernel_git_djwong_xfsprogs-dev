@@ -33,6 +33,7 @@ scan_ag_metadata(
 	unsigned long long		broken_primaries;
 	unsigned long long		broken_secondaries;
 	char				descr[DESCR_BUFSZ];
+	unsigned int			to_check;
 	int				ret;
 
 	if (*aborted)
@@ -42,24 +43,40 @@ scan_ag_metadata(
 	snprintf(descr, DESCR_BUFSZ, _("AG %u"), agno);
 
 	/*
-	 * First we scrub and fix the AG headers, because we need
-	 * them to work well enough to check the AG btrees.
+	 * First we scrub and fix the AG headers, because we need them to work
+	 * well enough to check the AG btrees.  Then scrub the AG btrees.
 	 */
 	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_AGHEADER);
-	ret = scrub_item_check(ctx, &sri);
-	if (ret)
-		goto err;
-
-	/* Repair header damage. */
-	ret = repair_item_corruption(ctx, &sri);
-	if (ret)
-		goto err;
-
-	/* Now scrub the AG btrees. */
+	scrub_item_insert_barrier(&sri);
 	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_PERAG);
+
 	ret = scrub_item_check(ctx, &sri);
 	if (ret)
 		goto err;
+
+	/*
+	 * If the first round of checking doesn't clear all the NEEDSCHECK
+	 * flags in the scrub item, that means that there are problems with the
+	 * AG headers.  Try to repair them in the hopes of getting the btrees
+	 * checked, but don't get bogged down if we don't make progress.
+	 */
+	to_check = scrub_item_count(&sri);
+	while (to_check > 0) {
+		unsigned int	nr;
+
+		ret = repair_item_corruption(ctx, &sri);
+		if (ret)
+			goto err;
+
+		ret = scrub_item_check(ctx, &sri);
+		if (ret)
+			goto err;
+
+		nr = scrub_item_count(&sri);
+		if (nr == to_check)
+			break;
+		to_check = nr;
+	}
 
 	/*
 	 * Figure out if we need to perform early fixing.  The only

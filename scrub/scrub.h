@@ -33,6 +33,9 @@ enum xfrog_scrub_group;
 /* Ok to freeze filesystem. */
 #define SCRUB_ITEM_FREEZE_OK	(1 << 6)
 
+/* Scrub barrier. */
+#define SCRUB_ITEM_BARRIER	(1 << 7)
+
 /* All of the state flags that we need to prioritize repair work. */
 #define SCRUB_ITEM_REPAIR_ANY	(SCRUB_ITEM_CORRUPT | \
 				 SCRUB_ITEM_PREEN | \
@@ -102,8 +105,11 @@ scrub_item_init_file(struct scrub_item *sri, struct xfs_bulkstat *bstat)
 static inline void
 scrub_item_schedule(struct scrub_item *sri, unsigned int scrub_type)
 {
-	sri->sri_state[scrub_type] = SCRUB_ITEM_NEEDSCHECK;
+	sri->sri_state[scrub_type] &= SCRUB_ITEM_BARRIER;
+	sri->sri_state[scrub_type] |= SCRUB_ITEM_NEEDSCHECK;
 }
+
+void scrub_item_insert_barrier(struct scrub_item *sri);
 
 void scrub_item_schedule_group(struct scrub_item *sri,
 		enum xfrog_scrub_group group);
@@ -115,6 +121,20 @@ static inline int
 scrub_item_check(struct scrub_ctx *ctx, struct scrub_item *sri)
 {
 	return scrub_item_check_file(ctx, sri, -1);
+}
+
+/* Count the number of metadata objects still needing a scrub. */
+static inline unsigned int
+scrub_item_count(
+	const struct scrub_item		*sri)
+{
+	unsigned int			ret = 0;
+	unsigned int			i;
+
+	foreach_scrub_type(i)
+		if (sri->sri_state[i] & SCRUB_ITEM_NEEDSCHECK)
+			ret++;
+	return ret;
 }
 
 void scrub_report_preen_triggers(struct scrub_ctx *ctx);

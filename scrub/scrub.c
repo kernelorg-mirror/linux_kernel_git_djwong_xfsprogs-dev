@@ -248,6 +248,21 @@ scrub_vhead_add(
 	bighead->i = v - vhead->svh_vecs;
 }
 
+/* Add a barrier to the scrub vector. */
+void
+scrub_vhead_add_barrier(
+	struct scrubv_head		*bighead)
+{
+	struct xfs_scrub_vec_head	*vhead = &bighead->head;
+	struct xfs_scrub_vec		*v;
+
+	v = &vhead->svh_vecs[vhead->svh_nr++];
+	v->sv_type = XFS_SCRUB_TYPE_BARRIER;
+	v->sv_flags = XFS_SCRUB_OFLAG_CORRUPT | XFS_SCRUB_OFLAG_XFAIL |
+		      XFS_SCRUB_OFLAG_XCORRUPT | XFS_SCRUB_OFLAG_INCOMPLETE;
+	bighead->i = v - vhead->svh_vecs;
+}
+
 /* Do a read-only check of some metadata. */
 static int
 scrub_call_kernel(
@@ -259,6 +274,7 @@ scrub_call_kernel(
 	struct scrubv_head		bh = { };
 	struct xfs_scrub_vec		*v;
 	unsigned int			scrub_type;
+	bool				need_barrier = false;
 	int				error;
 
 	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
@@ -269,7 +285,16 @@ scrub_call_kernel(
 	foreach_scrub_type(scrub_type) {
 		if (!(sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSCHECK))
 			continue;
+
+		if (need_barrier) {
+			scrub_vhead_add_barrier(&bh);
+			need_barrier = false;
+		}
+
 		scrub_vhead_add(&bh, sri, scrub_type, false);
+
+		if (sri->sri_state[scrub_type] & SCRUB_ITEM_BARRIER)
+			need_barrier = true;
 
 		dbg_printf("check %s flags %xh tries %u\n", descr_render(&dsc),
 				sri->sri_state[scrub_type],
@@ -281,6 +306,13 @@ scrub_call_kernel(
 		return error;
 
 	foreach_bighead_vec(&bh, v) {
+		/* Deal with barriers separately. */
+		if (v->sv_type == XFS_SCRUB_TYPE_BARRIER) {
+			if (v->sv_ret)
+				return -v->sv_ret;
+			continue;
+		}
+
 		error = scrub_epilogue(ctx, &dsc, sri, v);
 		if (error)
 			return error;
@@ -332,6 +364,24 @@ scrub_item_schedule_group(
 	}
 }
 
+/*
+ * Make it so the kernel will stop at the current highest-level scrub type if
+ * there are errors.
+ */
+void
+scrub_item_insert_barrier(struct scrub_item *sri)
+{
+	unsigned int			scrub_type, last_scrub_type = 0;
+
+	foreach_scrub_type(scrub_type) {
+		if (sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSCHECK)
+			last_scrub_type = scrub_type;
+	}
+
+	if (last_scrub_type)
+		sri->sri_state[last_scrub_type] |= SCRUB_ITEM_BARRIER;
+}
+
 /* Decide if we're going to call the kernel to scrub metadata objects. */
 static inline bool
 more_to_check(
@@ -375,6 +425,8 @@ scrub_item_check_file(
 
 	while (!error && more_to_check(sri))
 		error = scrub_call_kernel(ctx, xfdp, sri);
+	if (error == EL3HLT)
+		error = 0;
 
 	return error;
 }
@@ -538,6 +590,9 @@ check_scrubv(
 	struct scrub_ctx	*ctx)
 {
 	struct xfs_scrub_vec_head	head = { };
+
+	if (debug_tweak_on("XFS_SCRUB_FORCE_SINGLE"))
+		ctx->mnt.flags |= XFROG_FLAG_SCRUB_FORCE_SINGLE;
 
 	/* We set the fallback flag if this doesn't work. */
 	xfrog_scrubv_metadata(&ctx->mnt, &head);
