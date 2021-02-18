@@ -20,11 +20,6 @@
 #include "descr.h"
 #include "scrub_private.h"
 
-static int repair_epilogue(struct scrub_ctx *ctx, struct descr *dsc,
-		struct scrub_item *sri, unsigned int repair_flags,
-		const struct xfs_scrub_vec *oldm,
-		const struct xfs_scrub_vec *meta);
-
 /* General repair routines. */
 
 /*
@@ -66,77 +61,14 @@ repair_needs_excl(unsigned int scrub_type)
 	return false;
 }
 
-/* Repair some metadata. */
-static int
-xfs_repair_metadata(
-	struct scrub_ctx		*ctx,
-	unsigned int			scrub_type,
-	struct scrub_item		*sri,
-	unsigned int			repair_flags)
+static inline void
+restore_oldvec(
+	struct xfs_scrub_vec	*oldvec,
+	const struct scrub_item	*sri,
+	unsigned int		scrub_type)
 {
-	struct xfs_scrub_metadata	meta = { 0 };
-	struct xfs_scrub_vec		oldm, vec;
-	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
-	bool				freeze_allowed;
-	bool				repair_only;
-
-	/*
-	 * If the caller boosted the priority of this scrub type on behalf of a
-	 * higher level repair by setting IFLAG_REPAIR, turn off REPAIR_ONLY.
-	 */
-	repair_only = (repair_flags & XRM_REPAIR_ONLY) &&
-			scrub_item_type_boosted(sri, scrub_type);
-
-	assert(scrub_type < XFS_SCRUB_TYPE_NR);
-	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
-	meta.sm_type = scrub_type;
-	meta.sm_flags = XFS_SCRUB_IFLAG_REPAIR;
-	freeze_allowed = sri->sri_state[scrub_type] & SCRUB_ITEM_FREEZE_OK;
-	if (freeze_allowed)
-		meta.sm_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
-	switch (xfrog_scrubbers[scrub_type].group) {
-	case XFROG_SCRUB_GROUP_AGHEADER:
-	case XFROG_SCRUB_GROUP_PERAG:
-		meta.sm_agno = sri->sri_agno;
-		break;
-	case XFROG_SCRUB_GROUP_INODE:
-		meta.sm_ino = sri->sri_ino;
-		meta.sm_gen = sri->sri_gen;
-		break;
-	default:
-		break;
-	}
-
-	vec.sv_type = scrub_type;
-	vec.sv_flags = sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY;
-	memcpy(&oldm, &vec, sizeof(struct xfs_scrub_vec));
-	if (!is_corrupt(&vec) && repair_only)
-		return 0;
-
-	descr_set(&dsc, &meta);
-
-	if (needs_repair(&vec))
-		str_info(ctx, descr_render(&dsc), _("Attempting repair."));
-	else if (debug || verbose)
-		str_info(ctx, descr_render(&dsc),
-				_("Attempting optimization."));
-
-	/*
-	 * Certain types of repairs involve full filesystem scans and
-	 * trylocking.  These repair activities are substantially more likely
-	 * to succeed if they don't have to compete with other activity.  Use a
-	 * exclusive lock to serialize the repair functions that require it,
-	 * and a shared lock for those that can run concurrently.
-	 */
-	if (repair_needs_excl(meta.sm_type))
-		pthread_rwlock_wrlock(&ctx->repair_rwlock);
-	else
-		pthread_rwlock_rdlock(&ctx->repair_rwlock);
-	vec.sv_ret = xfrog_scrub_metadata(&ctx->mnt, &meta);
-	pthread_rwlock_unlock(&ctx->repair_rwlock);
-	vec.sv_flags = meta.sm_flags;
-
-	return repair_epilogue(ctx, &dsc, sri, repair_flags, &oldm, &vec);
+	oldvec->sv_type = scrub_type;
+	oldvec->sv_flags = sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY;
 }
 
 static int
@@ -145,12 +77,15 @@ repair_epilogue(
 	struct descr			*dsc,
 	struct scrub_item		*sri,
 	unsigned int			repair_flags,
-	const struct xfs_scrub_vec	*oldm,
 	const struct xfs_scrub_vec	*meta)
 {
+	struct xfs_scrub_vec		oldv;
+	struct xfs_scrub_vec		*oldm = &oldv;
 	unsigned int			scrub_type = meta->sv_type;
 	bool				freeze_allowed;
 	int				error = -meta->sv_ret;
+
+	restore_oldvec(oldm, sri, meta->sv_type);
 
 	freeze_allowed = sri->sri_state[scrub_type] & SCRUB_ITEM_FREEZE_OK;
 
@@ -279,6 +214,146 @@ _("Repair unsuccessful; offline repair required."));
 	}
 
 	scrub_item_clean_state(sri, scrub_type);
+	return 0;
+}
+
+/* Decide if the dependent scrub types of the given scrub type are ok. */
+static bool
+repair_item_dependencies_ok(
+	const struct scrub_item	*sri,
+	unsigned int		scrub_type)
+{
+	unsigned int		dep_mask = repair_deps[scrub_type];
+	unsigned int		b;
+
+	for (b = 0; dep_mask && b < XFS_SCRUB_TYPE_NR; b++, dep_mask >>= 1) {
+		if (!(dep_mask & 1))
+			continue;
+		/*
+		 * If this lower level object also needs repair, we can't fix
+		 * the higher level item.
+		 */
+		if (sri->sri_state[b] & SCRUB_ITEM_NEEDSREPAIR)
+			return false;
+	}
+
+	return true;
+}
+
+/* Decide if we want to repair a particular type of metadata. */
+static bool
+can_repair_now(
+	const struct scrub_item	*sri,
+	unsigned int		scrub_type,
+	__u32			repair_mask,
+	unsigned int		repair_flags)
+{
+	struct xfs_scrub_vec	oldvec;
+	bool			repair_only;
+
+	/* Do we even need to repair this thing? */
+	if (!(sri->sri_state[scrub_type] & repair_mask))
+		return false;
+
+	restore_oldvec(&oldvec, sri, scrub_type);
+
+	/*
+	 * If the caller boosted the priority of this scrub type on behalf of a
+	 * higher level repair by setting IFLAG_REPAIR, ignore REPAIR_ONLY.
+	 */
+	repair_only = (repair_flags & XRM_REPAIR_ONLY) &&
+		      !(sri->sri_state[scrub_type] & SCRUB_ITEM_BOOST_REPAIR);
+	if (!is_corrupt(&oldvec) && repair_only)
+		return false;
+
+	/*
+	 * Don't try to repair higher level items if their lower-level
+	 * dependencies haven't been verified, unless this is our last chance
+	 * to fix things without complaint.
+	 */
+	if (!(repair_flags & XRM_COMPLAIN_IF_UNFIXED) &&
+	    !repair_item_dependencies_ok(sri, scrub_type))
+		return false;
+
+	return true;
+}
+
+/*
+ * Repair some metadata.
+ *
+ * Returns 0 for success (or repair item deferral), or ECANCELED to abort the
+ * program.
+ */
+int
+repair_call_kernel(
+	struct scrub_ctx		*ctx,
+	struct scrub_item		*sri,
+	__u32				repair_mask,
+	unsigned int			repair_flags)
+{
+	DEFINE_DESCR(dsc, ctx, format_scrubv_descr);
+	struct scrubv_head		bh = { };
+	struct xfs_scrub_vec		*v;
+	struct xfs_fd			*xfdp = &ctx->mnt;
+	unsigned int			scrub_type;
+	bool				serial_repair = false;
+	int				error;
+
+	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
+
+	scrub_item_to_vhead(&bh, sri);
+	descr_set(&dsc, &bh);
+
+	foreach_scrub_type(scrub_type) {
+		if (scrub_excessive_errors(ctx))
+			return ECANCELED;
+
+		if (!can_repair_now(sri, scrub_type, repair_mask,
+					repair_flags))
+			continue;
+
+		scrub_vhead_add(&bh, sri, scrub_type, true);
+		serial_repair |= repair_needs_excl(scrub_type);
+
+		if (sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSREPAIR)
+			str_info(ctx, descr_render(&dsc),
+					_("Attempting repair."));
+		else if (debug || verbose)
+			str_info(ctx, descr_render(&dsc),
+					_("Attempting optimization."));
+
+		dbg_printf("repair %s flags %xh tries %u\n", descr_render(&dsc),
+				sri->sri_state[scrub_type],
+				sri->sri_tries[scrub_type]);
+	}
+
+	/*
+	 * Certain types of repairs involve full filesystem scans and
+	 * trylocking.  These repair activities are substantially more likely
+	 * to succeed if they don't have to compete with other activity.  Use a
+	 * exclusive lock to serialize the repair functions that require it,
+	 * and a shared lock for those that can run concurrently.
+	 */
+	if (serial_repair)
+		pthread_rwlock_wrlock(&ctx->repair_rwlock);
+	else
+		pthread_rwlock_rdlock(&ctx->repair_rwlock);
+	error = -xfrog_scrubv_metadata(xfdp, &bh.head);
+	pthread_rwlock_unlock(&ctx->repair_rwlock);
+	if (error)
+		return error;
+
+	foreach_bighead_vec(&bh, v) {
+		error = repair_epilogue(ctx, &dsc, sri, repair_flags, v);
+		if (error)
+			return error;
+
+		/* Maybe update progress if we fixed the problem. */
+		if (!(repair_flags & XRM_NOPROGRESS) &&
+		    !(sri->sri_state[v->sv_type] & SCRUB_ITEM_REPAIR_ANY))
+			progress_add(1);
+	}
+
 	return 0;
 }
 
@@ -513,29 +588,6 @@ action_list_process(
 	return ret;
 }
 
-/* Decide if the dependent scrub types of the given scrub type are ok. */
-static bool
-repair_item_dependencies_ok(
-	const struct scrub_item	*sri,
-	unsigned int		scrub_type)
-{
-	unsigned int		dep_mask = repair_deps[scrub_type];
-	unsigned int		b;
-
-	for (b = 0; dep_mask && b < XFS_SCRUB_TYPE_NR; b++, dep_mask >>= 1) {
-		if (!(dep_mask & 1))
-			continue;
-		/*
-		 * If this lower level object also needs repair, we can't fix
-		 * the higher level item.
-		 */
-		if (sri->sri_state[b] & SCRUB_ITEM_NEEDSREPAIR)
-			return false;
-	}
-
-	return true;
-}
-
 /*
  * For a given filesystem object, perform all repairs of a given class
  * (corrupt, xcorrupt, xfail, preen) if the repair item says it's needed.
@@ -548,45 +600,20 @@ repair_item_class(
 	unsigned int			flags)
 {
 	struct scrub_item		old_sri;
-	unsigned int			scrub_type;
 	int				error = 0;
 
-	if (ctx->mode < SCRUB_MODE_REPAIR)
+	if (ctx->mode < SCRUB_MODE_REPAIR ||
+	    !scrub_item_schedule_work(sri, repair_mask))
 		return 0;
 
-	foreach_scrub_type(scrub_type) {
-		if (scrub_excessive_errors(ctx))
-			return ECANCELED;
+	do {
+		memcpy(&old_sri, sri, sizeof(struct scrub_item));
+		error = repair_call_kernel(ctx, sri, repair_mask, flags);
+		if (error)
+			return error;
+	} while (scrub_item_call_kernel_again(sri, repair_mask, &old_sri));
 
-		if (!(sri->sri_state[scrub_type] & repair_mask))
-			continue;
-
-		/*
-		 * Don't try to repair higher level items if their lower-level
-		 * dependencies haven't been verified, unless this is our last
-		 * chance to fix things without complaint.
-		 */
-		if (!(flags & XRM_COMPLAIN_IF_UNFIXED) &&
-		    !repair_item_dependencies_ok(sri, scrub_type))
-			continue;
-
-		sri->sri_tries[scrub_type] = SCRUB_ITEM_MAX_RETRIES;
-		do {
-			memcpy(&old_sri, sri, sizeof(old_sri));
-			error = xfs_repair_metadata(ctx, scrub_type, sri,
-					flags);
-			if (error)
-				return error;
-		} while (scrub_item_call_kernel_again(sri, scrub_type,
-					repair_mask, &old_sri));
-
-		/* Maybe update progress if we fixed the problem. */
-		if (!(flags & XRM_NOPROGRESS) &&
-		    !(sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY))
-			progress_add(1);
-	}
-
-	return error;
+	return 0;
 }
 
 /*
