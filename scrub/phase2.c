@@ -33,6 +33,7 @@ scan_ag_metadata(
 	unsigned long long		broken_primaries;
 	unsigned long long		broken_secondaries;
 	char				descr[DESCR_BUFSZ];
+	unsigned int			to_check;
 	int				ret;
 
 	if (*aborted)
@@ -42,24 +43,42 @@ scan_ag_metadata(
 	snprintf(descr, DESCR_BUFSZ, _("AG %u"), agno);
 
 	/*
-	 * First we scrub and fix the AG headers, because we need
-	 * them to work well enough to check the AG btrees.
+	 * First we scrub and fix the AG headers, because we need them to work
+	 * well enough to check the AG btrees.  Then scrub the AG btrees.
 	 */
 	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_AGHEADER);
-	ret = scrub_item_check(ctx, &sri);
-	if (ret)
-		goto err;
-
-	/* Repair header damage. */
-	ret = repair_item_corruption(ctx, &sri);
-	if (ret)
-		goto err;
-
-	/* Now scrub the AG btrees. */
 	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_PERAG);
+
+	/*
+	 * Try to check all of the metadata items that we just scheduled.  If
+	 * we return with some types still needing a check, try repairing any
+	 * damaged metadata that we've found so far, and try again.  Abort if
+	 * we stop making forward progress.
+	 */
 	ret = scrub_item_check(ctx, &sri);
 	if (ret)
 		goto err;
+
+	to_check = scrub_item_count_needscheck(&sri);
+	while (to_check > 0) {
+		unsigned int	nr;
+
+		ret = repair_item_corruption(ctx, &sri);
+		if (ret)
+			goto err;
+
+		ret = scrub_item_check(ctx, &sri);
+		if (ret)
+			goto err;
+
+		nr = scrub_item_count_needscheck(&sri);
+		if (nr == to_check) {
+			str_corrupt(ctx, descr,
+	_("Unable to make forward checking progress."));
+			goto err;
+		}
+		to_check = nr;
+	}
 
 	/*
 	 * Figure out if we need to perform early fixing.  The only
