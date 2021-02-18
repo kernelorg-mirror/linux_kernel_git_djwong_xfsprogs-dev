@@ -67,25 +67,13 @@ scrub_inode(
 
 	/* Scrub the inode. */
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_INODE);
-	error = scrub_item_check_file(ctx, &sri, fd);
-	if (error)
-		goto out;
-
-	error = repair_item_corruption(ctx, &sri);
-	if (error)
-		goto out;
+	scrub_item_insert_barrier(&sri);
 
 	/* Scrub all block mappings. */
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_BMBTD);
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_BMBTA);
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_BMBTC);
-	error = scrub_item_check_file(ctx, &sri, fd);
-	if (error)
-		goto out;
-
-	error = repair_item_corruption(ctx, &sri);
-	if (error)
-		goto out;
+	scrub_item_insert_barrier(&sri);
 
 	/* Check everything accessible via file mapping. */
 	if (S_ISLNK(bstat->bs_mode))
@@ -95,14 +83,17 @@ scrub_inode(
 
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_XATTR);
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_PARENT);
-	error = scrub_item_check_file(ctx, &sri, fd);
-	if (error)
-		goto out;
 
-	/* Try to repair the file while it's open. */
-	error = repair_item_corruption(ctx, &sri);
-	if (error)
-		goto out;
+	while (scrub_item_count(&sri) > 0) {
+		error = scrub_item_check_file(ctx, &sri, fd);
+		if (error)
+			goto out;
+
+		/* Try to repair the file while it's open. */
+		error = repair_item_corruption(ctx, &sri);
+		if (error)
+			goto out;
+	}
 
 out:
 	if (error)

@@ -276,6 +276,7 @@ repair_call_kernel(
 	struct xfs_fd			*xfdp = &ctx->mnt;
 	unsigned int			scrub_type;
 	bool				serial_repair = false;
+	bool				need_barrier = false;
 	int				error;
 
 	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
@@ -300,6 +301,11 @@ repair_call_kernel(
 		if (excl && bh.head.svh_nr > 0)
 			break;
 
+		if (need_barrier) {
+			scrub_vhead_add_barrier(&bh);
+			need_barrier = false;
+		}
+
 		scrub_vhead_add(&bh, sri, scrub_type, true);
 
 		if (sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSREPAIR)
@@ -321,6 +327,9 @@ repair_call_kernel(
 			serial_repair = true;
 			break;
 		}
+
+		if (sri->sri_state[scrub_type] & SCRUB_ITEM_BARRIER)
+			need_barrier = true;
 	}
 
 	/*
@@ -340,6 +349,13 @@ repair_call_kernel(
 		return error;
 
 	foreach_bighead_vec(&bh, v) {
+		/* Deal with barriers separately. */
+		if (v->sv_type == XFS_SCRUB_TYPE_BARRIER) {
+			if (v->sv_ret)
+				return -v->sv_ret;
+			continue;
+		}
+
 		error = repair_epilogue(ctx, &dsc, sri, repair_flags, v);
 		if (error)
 			return error;
@@ -429,7 +445,8 @@ repair_item_boost_priorities(
  * bits are left untouched to force a rescan in phase 4.
  */
 #define MUSTFIX_SAVE_STATE	(SCRUB_ITEM_CORRUPT | \
-				 SCRUB_ITEM_BOOST_REPAIR)
+				 SCRUB_ITEM_BOOST_REPAIR | \
+				 SCRUB_ITEM_BARRIER)
 /*
  * Figure out which AG metadata must be fixed before we can move on
  * to the inode scan.
@@ -646,6 +663,8 @@ repair_item_class(
 
 	while (!error && more_to_repair(sri, repair_mask, flags, &old_sri))
 		error = repair_call_kernel(ctx, sri, repair_mask, flags);
+	if (error == EL3HLT)
+		error = 0;
 
 	return error;
 }
