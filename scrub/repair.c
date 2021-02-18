@@ -297,6 +297,7 @@ repair_call_kernel(
 	struct xfs_fd			*xfdp = &ctx->mnt;
 	unsigned int			scrub_type;
 	bool				serial_repair = false;
+	bool				need_barrier = false;
 	int				error;
 
 	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
@@ -312,6 +313,11 @@ repair_call_kernel(
 					repair_flags))
 			continue;
 
+		if (need_barrier) {
+			scrub_vhead_add_barrier(&bh);
+			need_barrier = false;
+		}
+
 		scrub_vhead_add(&bh, sri, scrub_type, true);
 		serial_repair |= repair_needs_excl(scrub_type);
 
@@ -325,6 +331,17 @@ repair_call_kernel(
 		dbg_printf("repair %s flags %xh tries %u\n", descr_render(&dsc),
 				sri->sri_state[scrub_type],
 				sri->sri_tries[scrub_type]);
+
+		/*
+		 * One of the other scrub types depends on this one.  Set us up
+		 * to add a repair barrier if we decide to schedule a repair
+		 * after this one.  If the UNFIXED flag is set, that means this
+		 * is our last chance to fix things, so we skip the barriers
+		 * just let everything run.
+		 */
+		if (!(repair_flags & XRM_COMPLAIN_IF_UNFIXED) &&
+		    (sri->sri_state[scrub_type] & SCRUB_ITEM_BARRIER))
+			need_barrier = true;
 	}
 
 	/*
@@ -344,6 +361,16 @@ repair_call_kernel(
 		return error;
 
 	foreach_bighead_vec(&bh, v) {
+		/* Deal with barriers separately. */
+		if (v->sv_type == XFS_SCRUB_TYPE_BARRIER) {
+			/* -ECANCELED means the kernel stopped here. */
+			if (v->sv_ret == -ECANCELED)
+				return 0;
+			if (v->sv_ret)
+				return -v->sv_ret;
+			continue;
+		}
+
 		error = repair_epilogue(ctx, &dsc, sri, repair_flags, v);
 		if (error)
 			return error;
@@ -432,7 +459,8 @@ repair_item_boost_priorities(
  * bits are left untouched to force a rescan in phase 4.
  */
 #define MUSTFIX_SAVE_STATE	(SCRUB_ITEM_CORRUPT | \
-				 SCRUB_ITEM_BOOST_REPAIR)
+				 SCRUB_ITEM_BOOST_REPAIR | \
+				 SCRUB_ITEM_BARRIER)
 /*
  * Figure out which AG metadata must be fixed before we can move on
  * to the inode scan.
@@ -603,7 +631,7 @@ repair_item_class(
 	int				error = 0;
 
 	if (ctx->mode < SCRUB_MODE_REPAIR ||
-	    !scrub_item_schedule_work(sri, repair_mask))
+	    !scrub_item_schedule_work(sri, repair_mask, repair_deps))
 		return 0;
 
 	do {
