@@ -26,7 +26,7 @@
 /* Online scrub and repair wrappers. */
 
 /* Describe the current state of a vectored scrub. */
-static int
+int
 format_scrubv_descr(
 	struct scrub_ctx		*ctx,
 	char				*buf,
@@ -46,34 +46,6 @@ format_scrubv_descr(
 	case XFROG_SCRUB_GROUP_INODE:
 		return scrub_render_ino_descr(ctx, buf, buflen,
 				vhead->svh_ino, vhead->svh_gen, "%s",
-				_(sc->descr));
-	case XFROG_SCRUB_GROUP_FS:
-	case XFROG_SCRUB_GROUP_SUMMARY:
-	case XFROG_SCRUB_GROUP_NONE:
-		return snprintf(buf, buflen, _("%s"), _(sc->descr));
-	}
-	return -1;
-}
-
-/* Format a scrub description. */
-int
-format_scrub_descr(
-	struct scrub_ctx		*ctx,
-	char				*buf,
-	size_t				buflen,
-	void				*where)
-{
-	struct xfs_scrub_metadata	*meta = where;
-	const struct xfrog_scrub_descr	*sc = &xfrog_scrubbers[meta->sm_type];
-
-	switch (sc->group) {
-	case XFROG_SCRUB_GROUP_AGHEADER:
-	case XFROG_SCRUB_GROUP_PERAG:
-		return snprintf(buf, buflen, _("AG %u %s"), meta->sm_agno,
-				_(sc->descr));
-	case XFROG_SCRUB_GROUP_INODE:
-		return scrub_render_ino_descr(ctx, buf, buflen,
-				meta->sm_ino, meta->sm_gen, "%s",
 				_(sc->descr));
 	case XFROG_SCRUB_GROUP_FS:
 	case XFROG_SCRUB_GROUP_SUMMARY:
@@ -261,13 +233,16 @@ void
 scrub_vhead_add(
 	struct scrubv_head		*bighead,
 	const struct scrub_item		*sri,
-	unsigned int			scrub_type)
+	unsigned int			scrub_type,
+	bool				repair)
 {
 	struct xfs_scrub_vec_head	*vhead = &bighead->head;
 	struct xfs_scrub_vec		*v;
 
 	v = &vhead->svh_vecs[vhead->svh_nr++];
 	v->sv_type = scrub_type;
+	if (repair)
+		v->sv_flags |= XFS_SCRUB_IFLAG_REPAIR;
 	if (sri->sri_state[scrub_type] & SCRUB_ITEM_FREEZE_OK)
 		v->sv_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
 	bighead->i = v - vhead->svh_vecs;
@@ -294,7 +269,7 @@ scrub_call_kernel(
 	foreach_scrub_type(scrub_type) {
 		if (!(sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSCHECK))
 			continue;
-		scrub_vhead_add(&bh, sri, scrub_type);
+		scrub_vhead_add(&bh, sri, scrub_type, false);
 
 		dbg_printf("check %s flags %xh tries %u\n", descr_render(&dsc),
 				sri->sri_state[scrub_type],
