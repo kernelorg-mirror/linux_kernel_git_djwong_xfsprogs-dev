@@ -23,10 +23,37 @@
 #include "descr.h"
 #include "scrub_private.h"
 
-static int scrub_epilogue(struct scrub_ctx *ctx, struct descr *dsc,
-		struct scrub_item *sri, struct xfs_scrub_vec *vec);
-
 /* Online scrub and repair wrappers. */
+
+/* Describe the current state of a vectored scrub. */
+static int
+format_scrubv_descr(
+	struct scrub_ctx		*ctx,
+	char				*buf,
+	size_t				buflen,
+	void				*where)
+{
+	struct scrubv_head		*bh = where;
+	struct xfs_scrub_vec_head	*vhead = &bh->head;
+	struct xfs_scrub_vec		*v = bh->head.svh_vecs + bh->i;
+	const struct xfrog_scrub_descr	*sc = &xfrog_scrubbers[v->sv_type];
+
+	switch (sc->group) {
+	case XFROG_SCRUB_GROUP_AGHEADER:
+	case XFROG_SCRUB_GROUP_PERAG:
+		return snprintf(buf, buflen, _("AG %u %s"), vhead->svh_agno,
+				_(sc->descr));
+	case XFROG_SCRUB_GROUP_INODE:
+		return scrub_render_ino_descr(ctx, buf, buflen,
+				vhead->svh_ino, vhead->svh_gen, "%s",
+				_(sc->descr));
+	case XFROG_SCRUB_GROUP_FS:
+	case XFROG_SCRUB_GROUP_SUMMARY:
+	case XFROG_SCRUB_GROUP_NONE:
+		return snprintf(buf, buflen, _("%s"), _(sc->descr));
+	}
+	return -1;
+}
 
 /* Format a scrub description. */
 int
@@ -78,54 +105,6 @@ scrub_warn_incomplete_scrub(
 	if (xref_failed(meta))
 		str_info(ctx, descr_render(dsc),
 				_("Cross-referencing failed."));
-}
-
-/* Do a read-only check of some metadata. */
-static int
-xfs_check_metadata(
-	struct scrub_ctx		*ctx,
-	struct xfs_fd			*xfdp,
-	unsigned int			scrub_type,
-	struct scrub_item		*sri)
-{
-	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
-	struct xfs_scrub_metadata	meta = { };
-	struct xfs_scrub_vec		vec;
-	enum xfrog_scrub_group		group;
-	bool				freeze_allowed;
-
-	background_sleep();
-
-	group = xfrog_scrubbers[scrub_type].group;
-	meta.sm_type = scrub_type;
-	freeze_allowed = sri->sri_state[scrub_type] & SCRUB_ITEM_FREEZE_OK;
-	if (freeze_allowed)
-		meta.sm_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
-	switch (group) {
-	case XFROG_SCRUB_GROUP_AGHEADER:
-	case XFROG_SCRUB_GROUP_PERAG:
-		meta.sm_agno = sri->sri_agno;
-		break;
-	case XFROG_SCRUB_GROUP_FS:
-	case XFROG_SCRUB_GROUP_SUMMARY:
-	case XFROG_SCRUB_GROUP_NONE:
-		break;
-	case XFROG_SCRUB_GROUP_INODE:
-		meta.sm_ino = sri->sri_ino;
-		meta.sm_gen = sri->sri_gen;
-		break;
-	}
-
-	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
-	assert(scrub_type < XFS_SCRUB_TYPE_NR);
-	descr_set(&dsc, &meta);
-
-	dbg_printf("check %s flags %xh\n", descr_render(&dsc), meta.sm_flags);
-
-	vec.sv_ret = xfrog_scrub_metadata(xfdp, &meta);
-	vec.sv_type = scrub_type;
-	vec.sv_flags = meta.sm_flags;
-	return scrub_epilogue(ctx, &dsc, sri, &vec);
 }
 
 /*
@@ -259,6 +238,90 @@ _("Optimization is possible."));
 	return 0;
 }
 
+/* Fill out the scrub vector header. */
+void
+scrub_item_to_vhead(
+	struct scrubv_head		*bighead,
+	const struct scrub_item		*sri)
+{
+	struct xfs_scrub_vec_head	*vhead = &bighead->head;
+
+	if (bg_mode > 1)
+		vhead->svh_rest_us = bg_mode - 1;
+	if (sri->sri_agno != -1)
+		vhead->svh_agno = sri->sri_agno;
+	if (sri->sri_ino != -1ULL) {
+		vhead->svh_ino = sri->sri_ino;
+		vhead->svh_gen = sri->sri_gen;
+	}
+}
+
+/* Add a scrubber to the scrub vector. */
+void
+scrub_vhead_add(
+	struct scrubv_head		*bighead,
+	const struct scrub_item		*sri,
+	unsigned int			scrub_type)
+{
+	struct xfs_scrub_vec_head	*vhead = &bighead->head;
+	struct xfs_scrub_vec		*v;
+
+	v = &vhead->svh_vecs[vhead->svh_nr++];
+	v->sv_type = scrub_type;
+	if (sri->sri_state[scrub_type] & SCRUB_ITEM_FREEZE_OK)
+		v->sv_flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
+	bighead->i = v - vhead->svh_vecs;
+}
+
+/* Do a read-only check of some metadata. */
+static int
+scrub_call_kernel(
+	struct scrub_ctx		*ctx,
+	struct xfs_fd			*xfdp,
+	struct scrub_item		*sri)
+{
+	DEFINE_DESCR(dsc, ctx, format_scrubv_descr);
+	struct scrubv_head		bh = { };
+	struct xfs_scrub_vec		*v;
+	unsigned int			scrub_type;
+	int				error;
+
+	assert(!debug_tweak_on("XFS_SCRUB_NO_KERNEL"));
+
+	scrub_item_to_vhead(&bh, sri);
+	descr_set(&dsc, &bh);
+
+	foreach_scrub_type(scrub_type) {
+		if (!(sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSCHECK))
+			continue;
+		scrub_vhead_add(&bh, sri, scrub_type);
+
+		dbg_printf("check %s flags %xh tries %u\n", descr_render(&dsc),
+				sri->sri_state[scrub_type],
+				sri->sri_tries[scrub_type]);
+	}
+
+	error = -xfrog_scrubv_metadata(xfdp, &bh.head);
+	if (error)
+		return error;
+
+	foreach_bighead_vec(&bh, v) {
+		error = scrub_epilogue(ctx, &dsc, sri, v);
+		if (error)
+			return error;
+
+		/*
+		 * Progress is counted by the inode for inode metadata; for
+		 * everything else, it's counted for each scrub call.
+		 */
+		if (!(sri->sri_state[v->sv_type] & SCRUB_ITEM_NEEDSCHECK) &&
+		    sri->sri_ino == -1ULL)
+			progress_add(1);
+	}
+
+	return 0;
+}
+
 /* Bulk-notify user about things that could be optimized. */
 void
 scrub_report_preen_triggers(
@@ -294,6 +357,20 @@ scrub_item_schedule_group(
 	}
 }
 
+/* Decide if we're going to call the kernel to scrub metadata objects. */
+static inline bool
+more_to_check(
+	const struct scrub_item		*sri)
+{
+	unsigned int			i;
+
+	foreach_scrub_type(i)
+		if ((sri->sri_state[i] & SCRUB_ITEM_NEEDSCHECK) &&
+		    sri->sri_tries[i] > 0)
+			return true;
+	return false;
+}
+
 /* Run all the incomplete scans on this scrub principal. */
 int
 scrub_item_check_file(
@@ -304,7 +381,7 @@ scrub_item_check_file(
 	struct xfs_fd			xfd;
 	struct xfs_fd			*xfdp = &ctx->mnt;
 	unsigned int			scrub_type;
-	int				error;
+	int				error = 0;
 
 	/*
 	 * If the caller passed us a file descriptor for a scrub, use it
@@ -317,27 +394,12 @@ scrub_item_check_file(
 		xfdp = &xfd;
 	}
 
-	foreach_scrub_type(scrub_type) {
-		if (!(sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSCHECK))
-			continue;
+	foreach_scrub_type(scrub_type)
+		if (sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSCHECK)
+			scrub_item_start_op(sri, scrub_type);
 
-		sri->sri_tries[scrub_type] = SCRUB_ITEM_MAX_RETRIES;
-		do {
-			error = xfs_check_metadata(ctx, xfdp, scrub_type, sri);
-			if (error)
-				return error;
-		} while (sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSCHECK);
-
-		/*
-		 * Progress is counted by the inode for inode metadata; for
-		 * everything else, it's counted for each scrub call.
-		 */
-		if (sri->sri_ino == -1ULL)
-			progress_add(1);
-
-		if (error)
-			break;
-	}
+	while (!error && more_to_check(sri))
+		error = scrub_call_kernel(ctx, xfdp, sri);
 
 	return error;
 }
@@ -494,4 +556,14 @@ can_repair(
 	struct scrub_ctx	*ctx)
 {
 	return __scrub_test(ctx, XFS_SCRUB_TYPE_PROBE, true);
+}
+
+void
+check_scrubv(
+	struct scrub_ctx	*ctx)
+{
+	struct xfs_scrub_vec_head	head = { };
+
+	/* We set the fallback flag if this doesn't work. */
+	xfrog_scrubv_metadata(&ctx->mnt, &head);
 }
