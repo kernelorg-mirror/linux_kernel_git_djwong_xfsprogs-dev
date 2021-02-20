@@ -118,10 +118,13 @@ parse_args(
 	uint32_t			control2 = 0;
 	const struct xfrog_scrub_descr	*d = NULL;
 
-	while ((c = getopt(argc, argv, "f")) != EOF) {
+	while ((c = getopt(argc, argv, "fz")) != EOF) {
 		switch (c) {
 		case 'f':
 			flags |= XFS_SCRUB_IFLAG_FREEZE_OK;
+			break;
+		case 'z':
+			flags |= XFS_SCRUB_IFLAG_RETAIN_INODES;
 			break;
 		default:
 			return command_usage(cmdinfo);
@@ -417,7 +420,7 @@ scrubv_f(
 	int				c;
 	int				error;
 
-	while ((c = getopt(argc, argv, "b:dfm:rv:w:")) != EOF) {
+	while ((c = getopt(argc, argv, "b:dfm:rv:w:z")) != EOF) {
 		switch (c) {
 		case 'b':
 			barrier_interval = atoi(optarg);
@@ -452,6 +455,10 @@ scrubv_f(
 				printf(_("Rest time must be positive.\n"));
 				return 0;
 			}
+			break;
+		case 'z':
+			flags |= XFS_SCRUB_IFLAG_RETAIN_INODES;
+			vhead->svh_flags |= XFS_SCRUB_VEC_IFLAG_RETAIN_INODES;
 			break;
 		default:
 			scrubv_help();
