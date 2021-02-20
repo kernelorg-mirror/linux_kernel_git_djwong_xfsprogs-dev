@@ -57,6 +57,7 @@ bulkstat_for_inumbers(
 	struct xfs_bulkstat	*bstat = breq->bulkstat;
 	struct xfs_bulkstat	*bs;
 	int			i;
+	int			flags = 0;
 	int			error;
 
 	/* First we try regular bulkstat, for speed. */
@@ -69,6 +70,9 @@ bulkstat_for_inumbers(
 		str_info(ctx, descr_render(dsc), "%s",
 			 strerror_r(error, errbuf, DESCR_BUFSZ));
 	}
+
+	if (debug_tweak_on("XFS_SCRUB_RETAIN"))
+		flags |= XFS_BULK_IREQ_RETAIN_INODES;
 
 	/*
 	 * Check each of the stats we got back to make sure we got the inodes
@@ -84,7 +88,7 @@ bulkstat_for_inumbers(
 
 		/* Load the one inode. */
 		error = -xfrog_bulkstat_single(&ctx->mnt,
-				inumbers->xi_startino + i, 0, bs);
+				inumbers->xi_startino + i, flags, bs);
 		if (error || bs->bs_ino != inumbers->xi_startino + i) {
 			memset(bs, 0, sizeof(struct xfs_bulkstat));
 			bs->bs_ino = inumbers->xi_startino + i;
@@ -161,6 +165,8 @@ alloc_ichunk(
 	breq->hdr.icount = LIBFROG_BULKSTAT_CHUNKSIZE;
 	if (si->flags & SCRUB_SCAN_METADIR)
 		breq->hdr.flags |= XFS_BULK_IREQ_METADIR;
+	if (debug_tweak_on("XFS_SCRUB_RETAIN"))
+		breq->hdr.flags |= XFS_BULK_IREQ_RETAIN_INODES;
 
 	*ichunkp = ichunk;
 	return 0;
