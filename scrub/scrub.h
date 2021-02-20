@@ -109,6 +109,7 @@ void scrub_item_schedule_group(struct scrub_item *sri,
 		enum xfrog_scrub_group group);
 int scrub_item_check_file(struct scrub_ctx *ctx, struct scrub_item *sri,
 		int override_fd);
+void scrub_item_dump(struct scrub_item *sri, const char *tag);
 
 static inline int
 scrub_item_check(struct scrub_ctx *ctx, struct scrub_item *sri)
