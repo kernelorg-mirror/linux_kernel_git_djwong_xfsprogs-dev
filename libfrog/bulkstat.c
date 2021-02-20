@@ -154,6 +154,9 @@ xfrog_bulk_req_v1_setup(
 {
 	void			*buf;
 
+	if (hdr->flags & XFS_BULK_IREQ_RETAIN_INODES)
+		return -EINVAL;
+
 	if (hdr->flags & XFS_BULK_IREQ_AGNO) {
 		uint32_t	agno = cvt_ino_to_agno(xfd, hdr->ino);
 
