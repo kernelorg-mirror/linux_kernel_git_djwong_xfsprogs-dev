@@ -542,3 +542,22 @@ check_scrubv(
 	/* We set the fallback flag if this doesn't work. */
 	xfrog_scrubv_metadata(&ctx->mnt, &head);
 }
+
+void
+scrub_item_dump(
+	struct scrub_item	*sri,
+	const char		*tag)
+{
+	unsigned int		i;
+
+	printf("DUMP SCRUB ITEM FOR %s\n", tag);
+	if (sri->sri_ino != -1ULL)
+		printf("ino 0x%llx gen %u\n", sri->sri_ino, sri->sri_gen);
+	if (sri->sri_agno != -1U)
+		printf("agno %u\n", sri->sri_agno);
+
+	foreach_scrub_type(i)
+		printf("[%u]: type '%s' state 0x%x tries %u\n", i,
+				xfrog_scrubbers[i].name, sri->sri_state[i],
+				sri->sri_tries[i]);
+}
