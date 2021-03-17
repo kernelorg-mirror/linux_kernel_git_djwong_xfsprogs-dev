@@ -55,6 +55,7 @@ repair_needs_excl(unsigned int scrub_type)
 	case XFS_SCRUB_TYPE_PARENT:
 	case XFS_SCRUB_TYPE_RMAPBT:
 	case XFS_SCRUB_TYPE_RTRMAPBT:
+	case XFS_SCRUB_TYPE_NLINKS:
 		return true;
 	}
 
