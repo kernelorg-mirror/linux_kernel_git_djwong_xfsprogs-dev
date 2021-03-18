@@ -96,6 +96,10 @@ static const struct flag_map fs_flags[] = {
 		.descr = "realtime reference count btree",
 		.has_fn = has_rtreflink,
 	},
+	{
+		.mask = XFS_FSOP_GEOM_SICK_NLINKS,
+		.descr = "inode link counts",
+	},
 	{0},
 };
 
