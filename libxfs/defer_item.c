@@ -97,6 +97,7 @@ xfs_extent_free_abort_intent(
 /* Cancel a free extent. */
 STATIC void
 xfs_extent_free_cancel_item(
+	struct xfs_mount		*mp,
 	struct list_head		*item)
 {
 	struct xfs_extent_free_item	*free;
@@ -232,6 +233,7 @@ xfs_rmap_update_abort_intent(
 /* Cancel a deferred rmap update. */
 STATIC void
 xfs_rmap_update_cancel_item(
+	struct xfs_mount		*mp,
 	struct list_head		*item)
 {
 	struct xfs_rmap_intent		*rmap;
@@ -335,6 +337,7 @@ xfs_refcount_update_abort_intent(
 /* Cancel a deferred refcount update. */
 STATIC void
 xfs_refcount_update_cancel_item(
+	struct xfs_mount		*mp,
 	struct list_head		*item)
 {
 	struct xfs_refcount_intent	*refc;
@@ -434,6 +437,7 @@ xfs_bmap_update_abort_intent(
 /* Cancel a deferred rmap update. */
 STATIC void
 xfs_bmap_update_cancel_item(
+	struct xfs_mount		*mp,
 	struct list_head		*item)
 {
 	struct xfs_bmap_intent		*bmap;
@@ -512,6 +516,7 @@ xfs_swapext_abort_intent(
 /* Cancel a deferred swapext update. */
 STATIC void
 xfs_swapext_cancel_item(
+	struct xfs_mount		*mp,
 	struct list_head		*item)
 {
 	struct xfs_swapext_intent	*sxi;
