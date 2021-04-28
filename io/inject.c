@@ -59,6 +59,7 @@ error_tag(char *name)
 		{ XFS_ERRTAG_BMAP_ALLOC_MINLEN_EXTENT,	"bmap_alloc_minlen_extent" },
 		{ XFS_ERRTAG_AG_RESV_FAIL,		"ag_resv_fail" },
 		{ XFS_ERRTAG_SWAPEXT_FINISH_ONE,	"swapext_finish_one" },
+		{ XFS_ERRTAG_IMETA_RESV_CRITICAL,	"imeta_resv_critical" },
 		{ XFS_ERRTAG_MAX,			NULL }
 	};
 	int	count;
