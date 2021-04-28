@@ -108,7 +108,8 @@ typedef struct xfs_inode {
 	struct xfs_ifork	*i_cowfp;	/* copy on write extents */
 	struct xfs_ifork	i_df;		/* data fork */
 	struct xfs_inode_log_item *i_itemp;	/* logging information */
-	unsigned int		i_delayed_blks;	/* count of delay alloc blks */
+	uint64_t		i_delayed_blks;	/* count of delay alloc blks */
+	uint64_t		i_rtresv_asked;	/* reserved for rt btree */
 	struct xfs_icdinode	i_d;		/* most of ondisk inode */
 
 	xfs_extnum_t		i_cnextents;	/* # of extents in cow fork */

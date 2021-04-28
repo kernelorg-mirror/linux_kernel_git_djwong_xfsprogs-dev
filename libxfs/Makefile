@@ -46,6 +46,7 @@ HFILES = \
 	xfs_refcount_btree.h \
 	xfs_rmap.h \
 	xfs_rmap_btree.h \
+	xfs_rt_resv.h \
 	xfs_sb.h \
 	xfs_shared.h \
 	xfs_swapext.h \
@@ -99,6 +100,7 @@ CFILES = cache.c \
 	xfs_refcount_btree.c \
 	xfs_rmap.c \
 	xfs_rmap_btree.c \
+	xfs_rt_resv.c \
 	xfs_rtbitmap.c \
 	xfs_sb.c \
 	xfs_swapext.c \

@@ -306,6 +306,13 @@
 #define trace_xfs_rmap_map_error(...)		((void) 0)
 #define trace_xfs_rmap_delete_error(...)	((void) 0)
 
+#define trace_xfs_rt_resv_alloc_extent(...)	((void) 0)
+#define trace_xfs_rt_resv_critical(...)		((void) 0)
+#define trace_xfs_rt_resv_free(...)		((void) 0)
+#define trace_xfs_rt_resv_free_extent(...)	((void) 0)
+#define trace_xfs_rt_resv_init(...)		((void) 0)
+#define trace_xfs_rt_resv_init_error(...)	((void) 0)
+
 #define trace_xfs_swapext_defer(...)		((void) 0)
 #define trace_xfs_swapext_delta_nextents(...)	((void) 0)
 #define trace_xfs_swapext_delta_nextents_step(...)	((void) 0)
