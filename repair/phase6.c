@@ -3641,10 +3641,46 @@ traverse_ags(
 	do_inode_prefetch(mp, ag_stride, traverse_function, false, true);
 }
 
+int
+reserve_ag_blocks(
+	struct xfs_mount	*mp)
+{
+	xfs_agnumber_t		agno;
+	struct xfs_perag	*pag;
+	int			error = 0;
+	int			err2;
+
+	mp->m_finobt_nores = false;
+	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
+		pag = libxfs_perag_get(mp, agno);
+		err2 = -libxfs_ag_resv_init(pag, NULL);
+		libxfs_perag_put(pag);
+		if (err2 && !error)
+			error = err2;
+	}
+
+	return error;
+}
+
+void
+unreserve_ag_blocks(
+	struct xfs_mount	*mp)
+{
+	xfs_agnumber_t		agno;
+	struct xfs_perag	*pag;
+
+	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
+		pag = libxfs_perag_get(mp, agno);
+		libxfs_ag_resv_free(pag);
+		libxfs_perag_put(pag);
+	}
+}
+
 void
 phase6(xfs_mount_t *mp)
 {
 	ino_tree_node_t		*irec;
+	bool			reserve_perag;
 	int			error;
 	int			i;
 
@@ -3681,6 +3717,17 @@ phase6(xfs_mount_t *mp)
 		need_metadir_dotdot = 0;
 	} else if (need_metadir_inode) {
 		do_warn(_("would reinitialize metadata root directory\n"));
+	}
+
+	reserve_perag = xfs_sb_version_hasrealtime(&mp->m_sb) && !no_modify;
+	if (reserve_perag) {
+		error = reserve_ag_blocks(mp);
+		if (error) {
+			if (error != ENOSPC)
+				do_warn(
+	_("could not reserve per-AG space to rebuild realtime metadata"));
+			reserve_perag = false;
+		}
 	}
 
 	if (need_rbmino)  {
@@ -3726,6 +3773,9 @@ _("        - resetting contents of realtime bitmap and summary inodes\n"));
 	_("Realtime reverse mapping btree could not be rebuilt, error=%d\n"),
 					error);
 	}
+
+	if (reserve_perag)
+		unreserve_ag_blocks(mp);
 
 	reattach_metadir_quota_inodes(mp);
 
