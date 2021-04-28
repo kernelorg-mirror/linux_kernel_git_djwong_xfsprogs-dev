@@ -219,6 +219,7 @@ static inline bool WARN_ON(bool expr) {
 #define percpu_counter_read(x)		(*x)
 #define percpu_counter_read_positive(x)	((*x) > 0 ? (*x) : 0)
 #define percpu_counter_sum(x)		(*x)
+#define __percpu_counter_compare(x, rhs, batch)		((*x) - (rhs))
 
 #define READ_ONCE(x)			(x)
 #define WRITE_ONCE(x, val)		((x) = (val))
