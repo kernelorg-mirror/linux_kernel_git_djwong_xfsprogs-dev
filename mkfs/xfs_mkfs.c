@@ -2459,6 +2459,26 @@ _("illegal CoW extent size hint %lld, must be less than %u.\n"),
 				min(MAXEXTLEN, mp->m_sb.sb_agblocks / 2));
 		usage();
 	}
+
+	/*
+	 * If the value is to be passed on to realtime files, revalidate with
+	 * a realtime file so that we know the hint and flag that get passed on
+	 * to realtime files will be correct.
+	 */
+	if (!(cli->fsx.fsx_xflags & FS_XFLAG_RTINHERIT))
+		return;
+
+	fa = libxfs_inode_validate_cowextsize(mp, cli->fsx.fsx_cowextsize,
+			S_IFREG, XFS_DIFLAG_REALTIME, flags2);
+
+	if (fa) {
+		fprintf(stderr,
+_("illegal CoW extent size hint %lld, must be less than %u and a multiple of %u. %p\n"),
+				(long long)cli->fsx.fsx_cowextsize,
+				min(MAXEXTLEN, mp->m_sb.sb_agblocks / 2),
+				mp->m_sb.sb_rextsize, fa);
+		usage();
+	}
 }
 
 /*
