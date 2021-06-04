@@ -117,6 +117,11 @@ ifeq ($(HAVE_FIEXCHANGE),yes)
 LCFLAGS += -DHAVE_FIEXCHANGE
 endif
 
+# On linux we get fsrefcounts from the system or define it ourselves
+# so include this unconditionally.  If this reverts to only
+# the autoconf check w/o local definition, test HAVE_GETFSREFCOUNTS
+CFILES += fsrefcounts.c
+
 default: depend $(LTCOMMAND)
 
 include $(BUILDRULES)
