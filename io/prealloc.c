@@ -32,6 +32,10 @@
 #define FALLOC_FL_UNSHARE_RANGE 0x40
 #endif
 
+#ifndef FALLOC_FL_MAP_FREE_SPACE
+#define FALLOC_FL_MAP_FREE_SPACE	0x80
+#endif
+
 static cmdinfo_t allocsp_cmd;
 static cmdinfo_t freesp_cmd;
 static cmdinfo_t resvsp_cmd;
@@ -44,6 +48,7 @@ static cmdinfo_t fcollapse_cmd;
 static cmdinfo_t finsert_cmd;
 static cmdinfo_t fzero_cmd;
 static cmdinfo_t funshare_cmd;
+static cmdinfo_t fmapfree_cmd;
 #endif
 
 static int
@@ -370,6 +375,28 @@ funshare_f(
 	}
 	return 0;
 }
+
+static int
+fmapfree_f(
+	int		argc,
+	char		**argv)
+{
+	xfs_flock64_t	segment;
+	int		mode = FALLOC_FL_MAP_FREE_SPACE;
+	int		index = 1;
+
+	if (!offset_length(argv[index], argv[index + 1], &segment)) {
+		exitcode = 1;
+		return 0;
+	}
+
+	if (fallocate(file->fd, mode, segment.l_start, segment.l_len)) {
+		perror("fallocate");
+		exitcode = 1;
+		return 0;
+	}
+	return 0;
+}
 #endif	/* HAVE_FALLOCATE */
 
 void
@@ -485,5 +512,15 @@ prealloc_init(void)
 	funshare_cmd.oneline =
 	_("unshares shared blocks within the range");
 	add_command(&funshare_cmd);
+
+	fmapfree_cmd.name = "fmapfree";
+	fmapfree_cmd.cfunc = fmapfree_f;
+	fmapfree_cmd.argmin = 2;
+	fmapfree_cmd.argmax = 2;
+	fmapfree_cmd.flags = CMD_NOMAP_OK | CMD_FOREIGN_OK;
+	fmapfree_cmd.args = _("off len");
+	fmapfree_cmd.oneline =
+	_("maps free space into a file");
+	add_command(&fmapfree_cmd);
 #endif	/* HAVE_FALLOCATE */
 }
