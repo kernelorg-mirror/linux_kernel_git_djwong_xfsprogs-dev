@@ -2394,12 +2394,6 @@ validate_rtextsize(
 		}
 	}
 	ASSERT(cfg->rtextblocks);
-
-	if (cli->sb_feat.reflink && cfg->rtblocks > 0 && cfg->rtextblocks > 1) {
-		fprintf(stderr,
-_("reflink not supported on realtime with extent sizes > 1\n"));
-		usage();
-	}
 }
 
 /* Validate the incoming extsize hint. */
