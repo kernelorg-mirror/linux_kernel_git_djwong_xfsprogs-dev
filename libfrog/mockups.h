@@ -40,4 +40,9 @@ struct delayed_work {
 #define INIT_DELAYED_WORK(work, func)	do { } while(0)
 #define cancel_delayed_work_sync(work)	do { } while(0)
 
+struct shrinker {
+};
+
+#define unregister_shrinker(sc)		do { } while(0)
+
 #endif /* __LIBFROG_MOCKUPS_H__ */
