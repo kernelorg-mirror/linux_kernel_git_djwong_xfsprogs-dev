@@ -671,6 +671,9 @@ static inline void xfs_buf_hash_destroy(struct xfs_perag *pag) { }
 static inline int xfs_iunlink_init(struct xfs_perag *pag) { return 0; }
 static inline void xfs_iunlink_destroy(struct xfs_perag *pag) { }
 
+static inline int
+xfs_inodegc_register_shrinker(struct xfs_perag *pag) { return 0; }
+
 xfs_agnumber_t xfs_set_inode_alloc(struct xfs_mount *mp,
 		xfs_agnumber_t agcount);
 
