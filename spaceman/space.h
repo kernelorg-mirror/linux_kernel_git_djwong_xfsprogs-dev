@@ -33,5 +33,6 @@ extern void	freesp_init(void);
 #endif
 extern void	info_init(void);
 extern void	health_init(void);
+extern void	clearfree_init(void);
 
 #endif /* XFS_SPACEMAN_SPACE_H_ */

@@ -16,6 +16,7 @@ CFILES = \
 avl64.c \
 bitmap.c \
 bulkstat.c \
+clearspace.c \
 convert.c \
 crc32.c \
 file_exchange.c \
@@ -35,6 +36,7 @@ HFILES = \
 avl64.h \
 bulkstat.h \
 bitmap.h \
+clearspace.h \
 convert.h \
 crc32c.h \
 crc32cselftest.h \
