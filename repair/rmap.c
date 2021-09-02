@@ -1454,7 +1454,7 @@ check_refcounts(
 			goto err;
 		if (!have) {
 			do_warn(
-_("Missing reference count record for (%u/%u) len %u count %u\n"),
+_("Missing reference count record for (%u/%lu) len %lu nlinks %u\n"),
 				agno, rl_rec->rc_startblock,
 				rl_rec->rc_blockcount, rl_rec->rc_refcount);
 			goto next_loop;
@@ -1465,7 +1465,7 @@ _("Missing reference count record for (%u/%u) len %u count %u\n"),
 			goto err;
 		if (!i) {
 			do_warn(
-_("Missing reference count record for (%u/%u) len %u count %u\n"),
+_("Missing reference count record for (%u/%lu) len %lu nlinks %u\n"),
 				agno, rl_rec->rc_startblock,
 				rl_rec->rc_blockcount, rl_rec->rc_refcount);
 			goto next_loop;
@@ -1476,7 +1476,7 @@ _("Missing reference count record for (%u/%u) len %u count %u\n"),
 		    tmp.rc_blockcount != rl_rec->rc_blockcount ||
 		    tmp.rc_refcount != rl_rec->rc_refcount)
 			do_warn(
-_("Incorrect reference count: saw (%u/%u) len %u nlinks %u; should be (%u/%u) len %u nlinks %u\n"),
+_("Incorrect reference count: saw (%u/%lu) len %lu nlinks %u; should be (%u/%lu) len %lu nlinks %u\n"),
 				agno, tmp.rc_startblock, tmp.rc_blockcount,
 				tmp.rc_refcount, agno, rl_rec->rc_startblock,
 				rl_rec->rc_blockcount, rl_rec->rc_refcount);
