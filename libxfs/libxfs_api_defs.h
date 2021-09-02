@@ -126,6 +126,7 @@
 #define xfs_highbit32			libxfs_highbit32
 #define xfs_highbit64			libxfs_highbit64
 #define xfs_ialloc_calc_rootino		libxfs_ialloc_calc_rootino
+#define xfs_ialloc_read_agi		libxfs_ialloc_read_agi
 #define xfs_iallocbt_maxlevels_ondisk	libxfs_iallocbt_maxlevels_ondisk
 #define xfs_icreate			libxfs_icreate
 #define xfs_icreate_args_rootfile	libxfs_icreate_args_rootfile
