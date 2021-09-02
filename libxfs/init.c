@@ -271,7 +271,7 @@ init_zones(void)
 	if (error)
 		abort();
 
-	xfs_bmap_free_item_zone = kmem_cache_create("xfs_bmap_free_item",
+	xfs_extent_free_item_zone = kmem_cache_create("xfs_extent_free_item",
 			sizeof(struct xfs_extent_free_item), 0, 0, NULL);
 	xfs_trans_zone = kmem_cache_create("xfs_trans",
 			sizeof(struct xfs_trans), 0, 0, NULL);
@@ -287,7 +287,7 @@ destroy_kmem_caches(void)
 	kmem_cache_destroy(xfs_buf_item_zone);
 	kmem_cache_destroy(xfs_da_state_zone);
 	xfs_btree_destroy_cursor_caches();
-	kmem_cache_destroy(xfs_bmap_free_item_zone);
+	kmem_cache_destroy(xfs_extent_free_item_zone);
 	kmem_cache_destroy(xfs_trans_zone);
 }
 
