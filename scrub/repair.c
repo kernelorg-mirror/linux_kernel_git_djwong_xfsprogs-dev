@@ -22,8 +22,8 @@
 
 static int repair_epilogue(struct scrub_ctx *ctx, struct descr *dsc,
 		struct scrub_item *sri, unsigned int repair_flags,
-		struct xfs_scrub_metadata *oldm,
-		struct xfs_scrub_metadata *meta, int error);
+		const struct xfs_scrub_vec *oldm,
+		const struct xfs_scrub_vec *meta);
 
 /* General repair routines. */
 
@@ -75,11 +75,10 @@ xfs_repair_metadata(
 	unsigned int			repair_flags)
 {
 	struct xfs_scrub_metadata	meta = { 0 };
-	struct xfs_scrub_metadata	oldm;
+	struct xfs_scrub_vec		oldm, vec;
 	DEFINE_DESCR(dsc, ctx, format_scrub_descr);
 	bool				freeze_allowed;
 	bool				repair_only;
-	int				error;
 
 	/*
 	 * If the caller boosted the priority of this scrub type on behalf of a
@@ -108,14 +107,15 @@ xfs_repair_metadata(
 		break;
 	}
 
-	if (!is_corrupt(&meta) && repair_only)
+	vec.sv_type = scrub_type;
+	vec.sv_flags = sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY;
+	memcpy(&oldm, &vec, sizeof(struct xfs_scrub_vec));
+	if (!is_corrupt(&vec) && repair_only)
 		return 0;
 
-	memcpy(&oldm, &meta, sizeof(oldm));
-	oldm.sm_flags = sri->sri_state[scrub_type] & SCRUB_ITEM_REPAIR_ANY;
-	descr_set(&dsc, &oldm);
+	descr_set(&dsc, &meta);
 
-	if (needs_repair(&oldm))
+	if (needs_repair(&vec))
 		str_info(ctx, descr_render(&dsc), _("Attempting repair."));
 	else if (debug || verbose)
 		str_info(ctx, descr_render(&dsc),
@@ -132,11 +132,11 @@ xfs_repair_metadata(
 		pthread_rwlock_wrlock(&ctx->repair_rwlock);
 	else
 		pthread_rwlock_rdlock(&ctx->repair_rwlock);
-	error = -xfrog_scrub_metadata(&ctx->mnt, &meta);
+	vec.sv_ret = xfrog_scrub_metadata(&ctx->mnt, &meta);
 	pthread_rwlock_unlock(&ctx->repair_rwlock);
+	vec.sv_flags = meta.sm_flags;
 
-	return repair_epilogue(ctx, &dsc, sri, repair_flags, &oldm, &meta,
-			error);
+	return repair_epilogue(ctx, &dsc, sri, repair_flags, &oldm, &vec);
 }
 
 static int
@@ -145,12 +145,12 @@ repair_epilogue(
 	struct descr			*dsc,
 	struct scrub_item		*sri,
 	unsigned int			repair_flags,
-	struct xfs_scrub_metadata	*oldm,
-	struct xfs_scrub_metadata	*meta,
-	int				error)
+	const struct xfs_scrub_vec	*oldm,
+	const struct xfs_scrub_vec	*meta)
 {
-	unsigned int			scrub_type = meta->sm_type;
+	unsigned int			scrub_type = meta->sv_type;
 	bool				freeze_allowed;
+	int				error = -meta->sv_ret;
 
 	freeze_allowed = sri->sri_state[scrub_type] & SCRUB_ITEM_FREEZE_OK;
 
@@ -264,7 +264,7 @@ _("Read-only filesystem; cannot make changes."));
 			return 0;
 		str_corrupt(ctx, descr_render(dsc),
 _("Repair unsuccessful; offline repair required."));
-	} else if (meta->sm_flags & XFS_SCRUB_OFLAG_NO_REPAIR_NEEDED) {
+	} else if (meta->sv_flags & XFS_SCRUB_OFLAG_NO_REPAIR_NEEDED) {
 		if (verbose)
 			str_info(ctx, descr_render(dsc),
 					_("No modification needed."));
