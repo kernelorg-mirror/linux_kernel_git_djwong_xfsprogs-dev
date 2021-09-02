@@ -2529,8 +2529,7 @@ xfs_defer_agfl_block(
 	new->xefi_oinfo = *oinfo;
 	new->xefi_skip_discard = false;
 
-	trace_xfs_agfl_free_defer(mp, agno, 0, agbno, 1);
-
+	trace_xfs_extent_free_defer(mp, XFS_FREE_EXTENT_AGFL, new);
 	xfs_defer_add(tp, XFS_DEFER_OPS_TYPE_AGFL_FREE, &new->xefi_list);
 }
 
@@ -2574,9 +2573,9 @@ xfs_free_extent_later(
 	else
 		new->xefi_oinfo = XFS_RMAP_OINFO_SKIP_UPDATE;
 	new->xefi_skip_discard = skip_discard;
-	trace_xfs_bmap_free_defer(tp->t_mountp,
-			XFS_FSB_TO_AGNO(tp->t_mountp, bno), 0,
-			XFS_FSB_TO_AGBNO(tp->t_mountp, bno), len);
+
+	trace_xfs_extent_free_defer(tp->t_mountp, XFS_FREE_EXTENT_REGULAR,
+			new);
 	xfs_defer_add(tp, XFS_DEFER_OPS_TYPE_FREE, &new->xefi_list);
 }
 
