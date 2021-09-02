@@ -35,7 +35,7 @@ bool can_scrub_dir(struct scrub_ctx *ctx);
 bool can_scrub_attr(struct scrub_ctx *ctx);
 bool can_scrub_symlink(struct scrub_ctx *ctx);
 bool can_scrub_parent(struct scrub_ctx *ctx);
-bool xfs_can_repair(struct scrub_ctx *ctx);
+bool can_repair(struct scrub_ctx *ctx);
 
 int scrub_inode_fields(struct scrub_ctx *ctx, uint64_t ino, uint32_t gen,
 		struct action_list *alist);
@@ -63,8 +63,5 @@ struct action_item {
 	__u32			gen;
 	__u32			agno;
 };
-
-enum check_outcome xfs_repair_metadata(struct scrub_ctx *ctx,
-		struct action_item *aitem, unsigned int repair_flags);
 
 #endif /* XFS_SCRUB_SCRUB_H_ */
