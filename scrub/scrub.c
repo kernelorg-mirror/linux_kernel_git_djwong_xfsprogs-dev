@@ -732,7 +732,6 @@ xfs_can_repair(
 enum check_outcome
 xfs_repair_metadata(
 	struct scrub_ctx		*ctx,
-	int				fd,
 	struct action_item		*aitem,
 	unsigned int			repair_flags)
 {

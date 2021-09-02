@@ -401,7 +401,7 @@ phase5_func(
 	ret = scrub_iscan(ctx, &alist);
 	if (ret)
 		return ret;
-	ret = action_list_process(ctx, ctx->mnt.fd, &alist,
+	ret = action_list_process(ctx, &alist,
 			ALP_COMPLAIN_IF_UNFIXED | ALP_NOPROGRESS);
 	if (ret)
 		return ret;
