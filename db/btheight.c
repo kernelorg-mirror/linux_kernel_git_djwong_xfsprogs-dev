@@ -26,6 +26,7 @@ struct btmap {
 	{"refcountbt",	XFS_BTNUM_REFC,		libxfs_refcountbt_maxrecs},
 	{"rmapbt",	XFS_BTNUM_RMAP,		libxfs_rmapbt_maxrecs},
 	{"rtrmapbt",	XFS_BTNUM_RTRMAP,	libxfs_rtrmapbt_maxrecs},
+	{"rtrefcbt",	XFS_BTNUM_RTREFC,	libxfs_rtrefcountbt_maxrecs},
 };
 
 static void
