@@ -388,6 +388,7 @@ int
 phase5_func(
 	struct scrub_ctx	*ctx)
 {
+	struct scrub_item	sri;
 	struct action_list	alist;
 	bool			aborted = false;
 	int			ret;
@@ -397,8 +398,9 @@ phase5_func(
 	 * after we've checked all inodes and repaired anything that could get
 	 * in the way of a scan.
 	 */
+	scrub_item_init_fs(&sri);
 	action_list_init(&alist);
-	ret = scrub_iscan(ctx, &alist);
+	ret = scrub_iscan(ctx, &alist, &sri);
 	if (ret)
 		return ret;
 	ret = action_list_process(ctx, &alist,
