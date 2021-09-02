@@ -805,9 +805,9 @@ compute_refcounts(
 	struct xfs_slab_cursor	*rmaps_cur;
 	struct xfs_rmap_irec	*array_cur;
 	struct xfs_rmap_irec	*rmap;
-	xfs_agblock_t		sbno;	/* first bno of this rmap set */
-	xfs_agblock_t		cbno;	/* first bno of this refcount set */
-	xfs_agblock_t		nbno;	/* next bno where rmap set changes */
+	xfs_fsblock_t		sbno;	/* first bno of this rmap set */
+	xfs_fsblock_t		cbno;	/* first bno of this refcount set */
+	xfs_fsblock_t		nbno;	/* next bno where rmap set changes */
 	size_t			n, idx;
 	size_t			old_stack_nr;
 	int			error;
@@ -846,7 +846,7 @@ compute_refcounts(
 		if (n < slab_count(rmaps) && array_cur)
 			nbno = array_cur->rm_startblock;
 		else
-			nbno = NULLAGBLOCK;
+			nbno = NULLFSBLOCK;
 		foreach_bag_ptr(stack_top, idx, rmap) {
 			nbno = min(nbno, RMAP_END(rmap));
 		}
@@ -900,7 +900,7 @@ compute_refcounts(
 			if (n < slab_count(rmaps))
 				nbno = array_cur->rm_startblock;
 			else
-				nbno = NULLAGBLOCK;
+				nbno = NULLFSBLOCK;
 			foreach_bag_ptr(stack_top, idx, rmap) {
 				nbno = min(nbno, RMAP_END(rmap));
 			}
@@ -1673,4 +1673,10 @@ forget_rtrefcount(void)
 {
 	rrefcountino = NULLFSINO;
 	refcount_avoid_check();
+}
+
+xfs_ino_t
+get_rtrefc_ino(void)
+{
+	return rrefcountino;
 }
