@@ -236,6 +236,11 @@ This can only be specified by the system administrator.
 .B XFS_SCRUB_IFLAG_RETAIN_INODES
 Tag scrubbed inodes as DONTCACHE so that we don't purge the inode
 caches.
+.TP
+.B XFS_SCRUB_IFLAG_FORCE_REBUILD
+Force the kernel to rebuild the specified piece of metadata, even if it's
+healthy.
+This can only be specified by the system administrator.
 .RE
 .PP
 For metadata checkers that operate on inodes or inode metadata, the fields
