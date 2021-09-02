@@ -724,6 +724,23 @@ xfs_agbtree_compute_maxlevels(
 	mp->m_agbtree_maxlevels = max(levels, mp->m_refc_maxlevels);
 }
 
+STATIC void
+libxfs_mountfs_imeta(
+	struct xfs_mount	*mp)
+{
+	int			error;
+
+	/* Ignore filesystems that are under construction. */
+	if (mp->m_sb.sb_inprogress)
+		return;
+
+	error = -xfs_imeta_mount(mp);
+	if (error)
+		fprintf(stderr,
+_("%s: metadata inode mounting failed, error %d\n"),
+			progname, error);
+}
+
 /*
  * Mount structure initialization, provides a filled-in xfs_mount_t
  * such that the numerous XFS_* macros can be used.  If dev is zero,
@@ -887,6 +904,8 @@ libxfs_mount(
 		exit(1);
 	}
 	xfs_set_perag_data_loaded(mp);
+
+	libxfs_mountfs_imeta(mp);
 
 	return mp;
 }
