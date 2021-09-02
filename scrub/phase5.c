@@ -398,7 +398,8 @@ phase5_func(
 	 * in the way of a scan.
 	 */
 	scrub_item_init_fs(&sri);
-	ret = scrub_iscan(ctx, &sri);
+	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_ISCAN);
+	ret = scrub_item_check(ctx, &sri);
 	if (ret)
 		return ret;
 	ret = repair_item_completely(ctx, &sri);
