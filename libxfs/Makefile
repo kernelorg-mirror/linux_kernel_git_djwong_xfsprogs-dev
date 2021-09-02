@@ -49,6 +49,7 @@ HFILES = \
 	xfs_quota_defs.h \
 	xfs_refcount.h \
 	xfs_refcount_btree.h \
+	xfs_rtrefcount_btree.h \
 	xfs_rmap.h \
 	xfs_rmap_btree.h \
 	xfs_rtrmap_btree.h \
@@ -100,6 +101,7 @@ CFILES = cache.c \
 	xfs_log_rlimit.c \
 	xfs_refcount.c \
 	xfs_refcount_btree.c \
+	xfs_rtrefcount_btree.c \
 	xfs_rmap.c \
 	xfs_rmap_btree.c \
 	xfs_rtbitmap.c \
