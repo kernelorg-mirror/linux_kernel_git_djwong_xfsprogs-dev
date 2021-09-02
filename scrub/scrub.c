@@ -254,7 +254,8 @@ scrub_meta_type(
 	struct scrub_ctx		*ctx,
 	unsigned int			type,
 	xfs_agnumber_t			agno,
-	struct action_list		*alist)
+	struct action_list		*alist,
+	struct scrub_item		*sri)
 {
 	struct xfs_scrub_metadata	meta = {
 		.sm_type		= type,
@@ -273,11 +274,13 @@ scrub_meta_type(
 	case CHECK_ABORT:
 		return ECANCELED;
 	case CHECK_REPAIR:
+		scrub_item_save_state(sri, type, meta.sm_flags);
 		ret = scrub_save_repair(ctx, alist, &meta);
 		if (ret)
 			return ret;
 		fallthrough;
 	case CHECK_DONE:
+		scrub_item_clean_state(sri, type);
 		return 0;
 	default:
 		/* CHECK_RETRY should never happen. */
@@ -295,7 +298,8 @@ scrub_group(
 	struct scrub_ctx		*ctx,
 	enum xfrog_scrub_group		group,
 	xfs_agnumber_t			agno,
-	struct action_list		*alist)
+	struct action_list		*alist,
+	struct scrub_item		*sri)
 {
 	const struct xfrog_scrub_descr	*sc;
 	unsigned int			type;
@@ -307,7 +311,7 @@ scrub_group(
 		if (sc->group != group)
 			continue;
 
-		ret = scrub_meta_type(ctx, type, agno, alist);
+		ret = scrub_meta_type(ctx, type, agno, alist, sri);
 		if (ret)
 			return ret;
 	}
@@ -320,9 +324,10 @@ int
 scrub_ag_headers(
 	struct scrub_ctx		*ctx,
 	xfs_agnumber_t			agno,
-	struct action_list		*alist)
+	struct action_list		*alist,
+	struct scrub_item		*sri)
 {
-	return scrub_group(ctx, XFROG_SCRUB_GROUP_AGHEADER, agno, alist);
+	return scrub_group(ctx, XFROG_SCRUB_GROUP_AGHEADER, agno, alist, sri);
 }
 
 /* Scrub each AG's metadata btrees. */
@@ -330,27 +335,30 @@ int
 scrub_ag_metadata(
 	struct scrub_ctx		*ctx,
 	xfs_agnumber_t			agno,
-	struct action_list		*alist)
+	struct action_list		*alist,
+	struct scrub_item		*sri)
 {
-	return scrub_group(ctx, XFROG_SCRUB_GROUP_PERAG, agno, alist);
+	return scrub_group(ctx, XFROG_SCRUB_GROUP_PERAG, agno, alist, sri);
 }
 
 /* Scrub whole-FS metadata btrees. */
 int
 scrub_fs_metadata(
 	struct scrub_ctx		*ctx,
-	struct action_list		*alist)
+	struct action_list		*alist,
+	struct scrub_item		*sri)
 {
-	return scrub_group(ctx, XFROG_SCRUB_GROUP_FS, 0, alist);
+	return scrub_group(ctx, XFROG_SCRUB_GROUP_FS, 0, alist, sri);
 }
 
 /* Scrub all FS summary metadata. */
 int
 scrub_summary(
 	struct scrub_ctx		*ctx,
-	struct action_list		*alist)
+	struct action_list		*alist,
+	struct scrub_item		*sri)
 {
-	return scrub_group(ctx, XFROG_SCRUB_GROUP_SUMMARY, 0, alist);
+	return scrub_group(ctx, XFROG_SCRUB_GROUP_SUMMARY, 0, alist, sri);
 }
 
 /* How many items do we have to check? */
@@ -411,7 +419,8 @@ scrub_file(
 	struct scrub_ctx		*ctx,
 	const struct xfs_bulkstat	*bstat,
 	unsigned int			type,
-	struct action_list		*alist)
+	struct action_list		*alist,
+	struct scrub_item		*sri)
 {
 	struct xfs_scrub_metadata	meta = {0};
 	enum check_outcome		fix;
@@ -427,10 +436,43 @@ scrub_file(
 	fix = xfs_check_metadata(ctx, &meta, true);
 	if (fix == CHECK_ABORT)
 		return ECANCELED;
-	if (fix == CHECK_DONE)
+	if (fix == CHECK_DONE) {
+		scrub_item_clean_state(sri, type);
 		return 0;
+	}
 
+	scrub_item_save_state(sri, type, meta.sm_flags);
 	return scrub_save_repair(ctx, alist, &meta);
+}
+
+/* Dump a scrub item for debugging purposes. */
+void
+scrub_item_dump(
+	struct scrub_item	*sri,
+	unsigned int		group_mask,
+	const char		*tag)
+{
+	unsigned int		i;
+
+	if (group_mask == 0)
+		group_mask = -1U;
+
+	printf("DUMP SCRUB ITEM FOR %s\n", tag);
+	if (sri->sri_ino != -1ULL)
+		printf("ino 0x%llx gen %u\n", (unsigned long long)sri->sri_ino,
+				sri->sri_gen);
+	if (sri->sri_agno != -1U)
+		printf("agno %u\n", sri->sri_agno);
+
+	foreach_scrub_type(i) {
+		unsigned int	g = 1U << xfrog_scrubbers[i].group;
+
+		if (g & group_mask)
+			printf("[%u]: type '%s' state 0x%x\n", i,
+					xfrog_scrubbers[i].name,
+					sri->sri_state[i]);
+	}
+	fflush(stdout);
 }
 
 /*
