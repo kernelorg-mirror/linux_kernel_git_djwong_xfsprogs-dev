@@ -389,7 +389,6 @@ phase5_func(
 	struct scrub_ctx	*ctx)
 {
 	struct scrub_item	sri;
-	struct action_list	alist;
 	bool			aborted = false;
 	int			ret;
 
@@ -399,12 +398,10 @@ phase5_func(
 	 * in the way of a scan.
 	 */
 	scrub_item_init_fs(&sri);
-	action_list_init(&alist);
-	ret = scrub_iscan(ctx, &alist, &sri);
+	ret = scrub_iscan(ctx, &sri);
 	if (ret)
 		return ret;
-	ret = action_list_process(ctx, &alist,
-			XRM_COMPLAIN_IF_UNFIXED | XRM_NOPROGRESS);
+	ret = repair_item_completely(ctx, &sri);
 	if (ret)
 		return ret;
 
