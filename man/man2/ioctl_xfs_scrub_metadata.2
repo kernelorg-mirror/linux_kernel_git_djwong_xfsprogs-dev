@@ -232,6 +232,10 @@ However, the records were not obviously corrupt.
 Set this to allow the kernel to freeze the filesystem to perform more
 intensive metadata checks.
 This can only be specified by the system administrator.
+.TP
+.B XFS_SCRUB_IFLAG_RETAIN_INODES
+Tag scrubbed inodes as DONTCACHE so that we don't purge the inode
+caches.
 .RE
 .PP
 For metadata checkers that operate on inodes or inode metadata, the fields
