@@ -402,7 +402,7 @@ phase5_func(
 	if (ret)
 		return ret;
 	ret = action_list_process(ctx, &alist,
-			ALP_COMPLAIN_IF_UNFIXED | ALP_NOPROGRESS);
+			XRM_COMPLAIN_IF_UNFIXED | XRM_NOPROGRESS);
 	if (ret)
 		return ret;
 
