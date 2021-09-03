@@ -36,6 +36,10 @@
 #define FALLOC_FL_MAP_FREE_SPACE 0x8000
 #endif
 
+#ifndef FALLOC_FL_ZEROINIT_RANGE
+#define FALLOC_FL_ZEROINIT_RANGE 0x80
+#endif
+
 static cmdinfo_t allocsp_cmd;
 static cmdinfo_t freesp_cmd;
 static cmdinfo_t resvsp_cmd;
@@ -49,6 +53,7 @@ static cmdinfo_t finsert_cmd;
 static cmdinfo_t fzero_cmd;
 static cmdinfo_t funshare_cmd;
 static cmdinfo_t fmapfree_cmd;
+static cmdinfo_t fzeroinit_cmd;
 #endif
 
 static int
@@ -346,6 +351,28 @@ fzero_f(
 }
 
 static int
+fzeroinit_f(
+	int		argc,
+	char		**argv)
+{
+	xfs_flock64_t	segment;
+	int		mode = FALLOC_FL_ZEROINIT_RANGE | FALLOC_FL_KEEP_SIZE;
+	int		index = 1;
+
+	if (!offset_length(argv[index], argv[index + 1], &segment)) {
+		exitcode = 1;
+		return 0;
+	}
+
+	if (fallocate(file->fd, mode, segment.l_start, segment.l_len)) {
+		perror("fallocate");
+		exitcode = 1;
+		return 0;
+	}
+	return 0;
+}
+
+static int
 funshare_f(
 	int		argc,
 	char		**argv)
@@ -502,6 +529,16 @@ prealloc_init(void)
 	fzero_cmd.oneline =
 	_("zeroes space and eliminates holes by preallocating");
 	add_command(&fzero_cmd);
+
+	fzeroinit_cmd.name = "fzeroinit";
+	fzeroinit_cmd.cfunc = fzeroinit_f;
+	fzeroinit_cmd.argmin = 2;
+	fzeroinit_cmd.argmax = 2;
+	fzeroinit_cmd.flags = CMD_NOMAP_OK | CMD_FOREIGN_OK;
+	fzeroinit_cmd.args = _("off len");
+	fzeroinit_cmd.oneline =
+	_("zero-initializes allocated space");
+	add_command(&fzeroinit_cmd);
 
 	funshare_cmd.name = "funshare";
 	funshare_cmd.cfunc = funshare_f;
