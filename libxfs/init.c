@@ -268,9 +268,6 @@ init_zones(void)
 	if (error)
 		abort();
 
-	xfs_btree_cur_zone = kmem_zone_init(
-			xfs_btree_cur_sizeof(XFS_BTREE_CUR_ZONE_MAXLEVELS),
-			"xfs_btree_cur");
 	xfs_bmap_free_item_zone = kmem_zone_init(
 			sizeof(struct xfs_extent_free_item),
 			"xfs_bmap_free_item");
@@ -289,7 +286,7 @@ destroy_zones(void)
 	leaked += kmem_zone_destroy(xfs_ifork_zone);
 	leaked += kmem_zone_destroy(xfs_buf_item_zone);
 	leaked += kmem_zone_destroy(xfs_da_state_zone);
-	leaked += kmem_zone_destroy(xfs_btree_cur_zone);
+	xfs_btree_destroy_cursor_caches();
 	leaked += kmem_zone_destroy(xfs_bmap_free_item_zone);
 	leaked += kmem_zone_destroy(xfs_trans_zone);
 
