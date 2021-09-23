@@ -5329,7 +5329,6 @@ xfs_btree_alloc_cursor(
 	cur->bc_tp = tp;
 	cur->bc_mp = mp;
 	cur->bc_btnum = btnum;
-	cur->bc_blocklog = mp->m_sb.sb_blocklog;
 	cur->bc_maxlevels = maxlevels;
 
 	return cur;
