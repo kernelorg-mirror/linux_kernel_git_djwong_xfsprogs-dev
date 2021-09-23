@@ -14,16 +14,17 @@
 
 struct btmap {
 	const char	*tag;
+	xfs_btnum_t	btnum;
 	unsigned int	(*maxrecs)(struct xfs_mount *mp, unsigned int blocklen,
 				   bool leaf);
 } maps[] = {
-	{"bnobt", libxfs_allocbt_maxrecs},
-	{"cntbt", libxfs_allocbt_maxrecs},
-	{"inobt", libxfs_inobt_maxrecs},
-	{"finobt", libxfs_inobt_maxrecs},
-	{"bmapbt", libxfs_bmbt_maxrecs},
-	{"refcountbt", libxfs_refcountbt_maxrecs},
-	{"rmapbt", libxfs_rmapbt_maxrecs},
+	{"bnobt",	XFS_BTNUM_BNO,		libxfs_allocbt_maxrecs},
+	{"cntbt",	XFS_BTNUM_CNT,		libxfs_allocbt_maxrecs},
+	{"inobt",	XFS_BTNUM_INO,		libxfs_inobt_maxrecs},
+	{"finobt",	XFS_BTNUM_FINO,		libxfs_inobt_maxrecs},
+	{"bmapbt",	XFS_BTNUM_BMAP,		libxfs_bmbt_maxrecs},
+	{"refcountbt",	XFS_BTNUM_REFC,		libxfs_refcountbt_maxrecs},
+	{"rmapbt",	XFS_BTNUM_RMAP,		libxfs_rmapbt_maxrecs},
 };
 
 static void
@@ -45,6 +46,7 @@ btheight_help(void)
 "   -n -- Number of records we want to store.\n"
 "   -w max -- Show only the best case scenario.\n"
 "   -w min -- Show only the worst case scenario.\n"
+"   -w absmax -- Print the maximum possible btree height for all filesystems.\n"
 "\n"
 " Supported btree types:\n"
 "   all "
@@ -222,6 +224,23 @@ out:
 #define REPORT_DEFAULT	(-1U)
 #define REPORT_MAX	(1 << 0)
 #define REPORT_MIN	(1 << 1)
+#define REPORT_ABSMAX	(1 << 2)
+
+static void
+report_absmax(const char *tag)
+{
+	struct btmap	*m;
+	int		i;
+
+	for (i = 0, m = maps; i < ARRAY_SIZE(maps); i++, m++) {
+		if (!strcmp(m->tag, tag)) {
+			printf("%s: %u\n", tag,
+					libxfs_btree_absolute_maxlevels(m->btnum));
+			return;
+		}
+	}
+	printf(_("%s: Don't know how to report max height.\n"), tag);
+}
 
 static void
 report(
@@ -232,6 +251,11 @@ report(
 {
 	unsigned int		records_per_block[2];
 	int			ret;
+
+	if (report_what == REPORT_ABSMAX) {
+		report_absmax(tag);
+		return;
+	}
 
 	ret = construct_records_per_block(tag, blocksize, records_per_block);
 	if (ret)
@@ -334,6 +358,8 @@ btheight_f(
 				report_what = REPORT_MIN;
 			else if (!strcmp(optarg, "max"))
 				report_what = REPORT_MAX;
+			else if (!strcmp(optarg, "absmax"))
+				report_what = REPORT_ABSMAX;
 			else {
 				btheight_help();
 				return 0;
@@ -345,20 +371,20 @@ btheight_f(
 		}
 	}
 
-	if (nr_records == 0) {
+	if (report_what != REPORT_ABSMAX && nr_records == 0) {
 		fprintf(stderr,
 _("Number of records must be greater than zero.\n"));
 		return 0;
 	}
 
-	if (blocksize > INT_MAX) {
+	if (report_what != REPORT_ABSMAX && blocksize > INT_MAX) {
 		fprintf(stderr,
 _("The largest block size this command will consider is %u bytes.\n"),
 			INT_MAX);
 		return 0;
 	}
 
-	if (blocksize < 128) {
+	if (report_what != REPORT_ABSMAX && blocksize < 128) {
 		fprintf(stderr,
 _("The smallest block size this command will consider is 128 bytes.\n"));
 		return 0;
