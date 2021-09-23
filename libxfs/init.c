@@ -221,12 +221,38 @@ check_open(char *path, int flags, char **rawfile, char **blockfile)
 	return 1;
 }
 
+STATIC int __init
+init_btree_caches(void)
+{
+	int				error;
+
+	error = xfs_allocbt_create_cursor_cache();
+	if (error)
+		return error;
+	error = xfs_inobt_create_cursor_cache();
+	if (error)
+		return error;
+	error = xfs_bmbt_create_cursor_cache();
+	if (error)
+		return error;
+	error = xfs_rmapbt_create_cursor_cache();
+	if (error)
+		return error;
+	error = xfs_refcountbt_create_cursor_cache();
+	if (error)
+		return error;
+
+	return 0;
+}
+
 /*
  * Initialize/destroy all of the zone allocators we use.
  */
 static void
 init_zones(void)
 {
+	int		error;
+
 	/* initialise zone allocation */
 	xfs_buf_zone = kmem_zone_init(sizeof(struct xfs_buf), "xfs_buffer");
 	xfs_inode_zone = kmem_zone_init(sizeof(struct xfs_inode), "xfs_inode");
@@ -237,6 +263,10 @@ init_zones(void)
 			sizeof(struct xfs_buf_log_item), "xfs_buf_log_item");
 	xfs_da_state_zone = kmem_zone_init(
 			sizeof(struct xfs_da_state), "xfs_da_state");
+
+	error = init_btree_caches();
+	if (error)
+		abort();
 
 	xfs_btree_cur_zone = kmem_zone_init(
 			xfs_btree_cur_sizeof(XFS_BTREE_CUR_ZONE_MAXLEVELS),
