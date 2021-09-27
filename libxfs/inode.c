@@ -145,8 +145,8 @@ libxfs_iflush_int(
  * Inode cache stubs.
  */
 
-kmem_zone_t		*xfs_inode_zone;
-extern kmem_zone_t	*xfs_ili_zone;
+struct kmem_cache		*xfs_inode_zone;
+extern struct kmem_cache	*xfs_ili_zone;
 
 int
 libxfs_iget(
