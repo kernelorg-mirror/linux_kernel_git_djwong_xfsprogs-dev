@@ -6,6 +6,12 @@
 #ifndef __TRACE_H__
 #define __TRACE_H__
 
+#define trace_xfbtree_create_root_buf(...)	((void) 0)
+#define trace_xfbtree_alloc_block(...)		((void) 0)
+#define trace_xfbtree_free_block(...)		((void) 0)
+#define trace_xfbtree_trans_cancel_buf(...)	((void) 0)
+#define trace_xfbtree_trans_commit_buf(...)	((void) 0)
+
 #define trace_xfs_ag_clear_noalloc(a)		((void) 0)
 #define trace_xfs_ag_set_noalloc(a)		((void) 0)
 #define trace_xfs_agfl_free_defer(...)		((void) 0)
