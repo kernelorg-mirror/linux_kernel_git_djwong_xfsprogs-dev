@@ -27,7 +27,7 @@ extern bool rmaps_are_mergeable(struct xfs_rmap_irec *r1, struct xfs_rmap_irec *
 extern int rmap_add_fixed_ag_rec(struct xfs_mount *, xfs_agnumber_t);
 extern int rmap_store_ag_btree_rec(struct xfs_mount *, xfs_agnumber_t);
 
-extern size_t rmap_record_count(struct xfs_mount *, xfs_agnumber_t);
+extern uint64_t rmap_record_count(struct xfs_mount *, xfs_agnumber_t);
 extern int rmap_init_cursor(xfs_agnumber_t, struct xfs_slab_cursor **);
 extern void rmap_avoid_check(void);
 void rmaps_verify_btree(struct xfs_mount *mp, xfs_agnumber_t agno);
@@ -63,5 +63,16 @@ extern bool is_rtrefcount_ino(xfs_ino_t ino);
 extern void forget_rtrefcount(void);
 extern xfs_ino_t get_rtrefc_ino(void);
 extern int populate_realtime_refcbt(struct xfs_mount *mp);
+
+struct rmap_mem_cur {
+	struct xfs_btree_cur	*mcur;
+	struct xfs_buf		*mhead_bp;
+};
+
+int rmap_init_mem_cursor(struct xfs_mount *mp, struct xfs_trans *tp,
+		xfs_agnumber_t agno, struct rmap_mem_cur *rmcur);
+void rmap_free_mem_cursor(struct xfs_trans *tp, struct rmap_mem_cur *rmcur,
+		int error);
+int rmap_get_mem_rec(struct rmap_mem_cur *rmcur, struct xfs_rmap_irec *irec);
 
 #endif /* RMAP_H_ */

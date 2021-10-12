@@ -13,6 +13,8 @@
 #include "slab.h"
 #include "rmap.h"
 #include "libfrog/bitmap.h"
+#include "libxfs/xfile.h"
+#include "libxfs/xfbtree.h"
 
 #undef RMAP_DEBUG
 
@@ -24,6 +26,7 @@
 
 /* per-AG rmap object anchor */
 struct xfs_ag_rmap {
+	struct xfbtree	*ar_xfbtree;		/* rmap observations */
 	struct xfs_slab	*ar_rmaps;		/* rmap observations, p4 */
 	struct xfs_slab	*ar_raw_rmaps;		/* unmerged rmaps */
 	int		ar_flcount;		/* agfl entries from leftover */
@@ -96,6 +99,8 @@ rmaps_init(
 	if (!rmap_needs_work(mp))
 		return;
 
+	mp->m_rtrmap_maxlevels = libxfs_rtrmapbt_maxlevels_ondisk();
+
 	libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &rrmapino);
 	libxfs_imeta_lookup(mp, &XFS_IMETA_RTREFCOUNTBT, &rrefcountino);
 
@@ -105,6 +110,13 @@ rmaps_init(
 		do_error(_("couldn't allocate per-AG reverse map roots\n"));
 
 	for (i = 0; i < mp->m_sb.sb_agcount + 1; i++) {
+		if (i == 0) {
+			error = -libxfs_rtrmapbt_mem_create(mp, "rtrmap btree",
+					&ag_rmaps[i].ar_xfbtree);
+			if (error)
+				do_error(
+_("Insufficient memory while allocating realtime reverse mapping btree."));
+		}
 		error = init_slab(&ag_rmaps[i].ar_rmaps,
 				sizeof(struct xfs_rmap_irec));
 		if (error)
@@ -139,6 +151,8 @@ rmaps_free(
 
 	ag_rmaps--;
 	for (i = 0; i < mp->m_sb.sb_agcount + 1; i++) {
+		if (i == 0)
+			xfbtree_destroy(ag_rmaps[i].ar_xfbtree);
 		free_slab(&ag_rmaps[i].ar_rmaps);
 		free_slab(&ag_rmaps[i].ar_raw_rmaps);
 		free_slab(&ag_rmaps[i].ar_refcount_items);
@@ -170,6 +184,115 @@ rmaps_are_mergeable(
 	if (r1->rm_flags & XFS_RMAP_BMBT_BLOCK)
 		return true;
 	return r1->rm_offset + r1->rm_blockcount == r2->rm_offset;
+}
+
+int
+rmap_init_mem_cursor(
+	struct xfs_mount	*mp,
+	struct xfs_trans	*tp,
+	xfs_agnumber_t		agno,
+	struct rmap_mem_cur	*rmcur)
+{
+	struct xfbtree		*xfbt;
+	int			error;
+
+	if (agno != NULLAGNUMBER) {
+		rmcur->mcur = NULL;
+		return 0;
+	}
+
+	xfbt = rmap_for_ag(agno)->ar_xfbtree;
+	error = -xfbtree_head_read_buf(xfbt, tp, &rmcur->mhead_bp);
+	if (error)
+		return error;
+
+	rmcur->mcur = libxfs_rtrmapbt_mem_cursor(mp, tp, rmcur->mhead_bp,
+			xfbt);
+
+	error = -libxfs_btree_goto_left_edge(rmcur->mcur);
+	if (error) {
+		rmap_free_mem_cursor(tp, rmcur, error);
+		return error;
+	}
+
+	return 0;
+}
+
+void
+rmap_free_mem_cursor(
+	struct xfs_trans	*tp,
+	struct rmap_mem_cur	*rmcur,
+	int			error)
+{
+	if (rmcur->mcur == NULL)
+		return;
+	libxfs_btree_del_cursor(rmcur->mcur, error);
+	libxfs_trans_brelse(tp, rmcur->mhead_bp);
+	rmcur->mcur = NULL;
+	rmcur->mhead_bp = NULL;
+}
+
+/*
+ * Retrieve the next record from the in-memory rmap btree.  Returns 1 if irec
+ * has been filled out, 0 if there aren't any more records, or a negative errno
+ * value if an error happened.
+ */
+int
+rmap_get_mem_rec(
+	struct rmap_mem_cur	*rmcur,
+	struct xfs_rmap_irec	*irec)
+{
+	int			stat = 0;
+	int			error;
+
+	error = -libxfs_btree_increment(rmcur->mcur, 0, &stat);
+	if (error)
+		return -error;
+	if (!stat)
+		return 0;
+
+	error = -libxfs_rmap_get_rec(rmcur->mcur, irec, &stat);
+	if (error)
+		return -error;
+
+	return stat;
+}
+
+static void
+rmap_add_mem_rec(
+	struct xfs_mount	*mp,
+	xfs_agnumber_t		agno,
+	struct xfs_rmap_irec	*rmap)
+{
+	struct rmap_mem_cur	rmcur;
+	struct xfbtree		*xfbt;
+	struct xfs_trans	*tp;
+	int			error;
+
+	if (agno != NULLAGNUMBER)
+		return;
+
+	xfbt = rmap_for_ag(agno)->ar_xfbtree;
+	error = -libxfs_trans_alloc_empty(mp, &tp);
+	if (error)
+		do_error(_("allocating tx for in-memory rmap update\n"));
+
+	error = rmap_init_mem_cursor(mp, tp, agno, &rmcur);
+	if (error)
+		do_error(_("reading in-memory rmap btree head\n"));
+
+	error = -libxfs_rmap_map_raw(rmcur.mcur, rmap);
+	if (error) {
+		xfile_dump(xfbt->xfile);
+		do_error(_("adding rmap to in-memory btree\n"));
+	}
+	rmap_free_mem_cursor(tp, &rmcur, 0);
+
+	error = xfbtree_trans_commit(xfbt, tp);
+	if (error)
+		do_error(_("committing in-memory rmap record\n"));
+
+	libxfs_trans_cancel(tp);
 }
 
 /*
@@ -218,6 +341,9 @@ rmap_add_rec(
 	rmap.rm_blockcount = irec->br_blockcount;
 	if (irec->br_state == XFS_EXT_UNWRITTEN)
 		rmap.rm_flags |= XFS_RMAP_UNWRITTEN;
+
+	rmap_add_mem_rec(mp, agno, &rmap);
+
 	last_rmap = &ag_rmap->ar_last_rmap;
 	if (last_rmap->rm_owner == XFS_RMAP_OWN_UNKNOWN)
 		*last_rmap = rmap;
@@ -269,6 +395,8 @@ __rmap_add_raw_rec(
 		rmap.rm_flags |= XFS_RMAP_BMBT_BLOCK;
 	rmap.rm_startblock = agbno;
 	rmap.rm_blockcount = len;
+
+	rmap_add_mem_rec(mp, agno, &rmap);
 	return slab_add(rmap_for_ag(agno)->ar_raw_rmaps, &rmap);
 }
 
@@ -920,12 +1048,35 @@ err:
 /*
  * Return the number of rmap objects for an AG.
  */
-size_t
+uint64_t
 rmap_record_count(
-	struct xfs_mount		*mp,
+	struct xfs_mount	*mp,
 	xfs_agnumber_t		agno)
 {
-	return slab_count(rmap_for_ag(agno)->ar_rmaps);
+	struct rmap_mem_cur	rmcur;
+	uint64_t		nr = 0;
+	int			stat;
+	int			error;
+
+	if (agno != NULLAGNUMBER)
+		return slab_count(rmap_for_ag(agno)->ar_rmaps);
+
+	error = rmap_init_mem_cursor(mp, NULL, agno, &rmcur);
+	if (error)
+		do_error(_("%s while reading in-memory rmap btree\n"),
+				strerror(error));
+
+	while ((error = -libxfs_btree_increment(rmcur.mcur, 0, &stat)) == 0) {
+		if (!stat)
+			break;
+		nr++;
+	}
+	if (error)
+		do_error(_("%s while counting in-memory rmap records\n"),
+				strerror(error));
+
+	rmap_free_mem_cursor(NULL, &rmcur, 0);
+	return nr;
 }
 
 /*

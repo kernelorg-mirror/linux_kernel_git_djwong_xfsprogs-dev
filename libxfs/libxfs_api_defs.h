@@ -58,7 +58,10 @@
 #define xfs_btree_bload_compute_geometry libxfs_btree_bload_compute_geometry
 #define xfs_btree_compute_maxlevels	libxfs_btree_compute_maxlevels
 #define xfs_btree_del_cursor		libxfs_btree_del_cursor
+#define xfs_btree_goto_left_edge	libxfs_btree_goto_left_edge
+#define xfs_btree_increment		libxfs_btree_increment
 #define xfs_btree_init_block		libxfs_btree_init_block
+#define xfs_btree_mem_head_read_buf	libxfs_btree_mem_head_read_buf
 #define xfs_buf_delwri_submit		libxfs_buf_delwri_submit
 #define xfs_buf_get			libxfs_buf_get
 #define xfs_buf_get_uncached		libxfs_buf_get_uncached
@@ -196,6 +199,8 @@
 #define xfs_rmapbt_init_cursor		libxfs_rmapbt_init_cursor
 #define xfs_rmapbt_maxlevels_ondisk	libxfs_rmapbt_maxlevels_ondisk
 #define xfs_rmapbt_maxrecs		libxfs_rmapbt_maxrecs
+#define xfs_rmapbt_mem_create		libxfs_rmapbt_mem_create
+#define xfs_rmapbt_mem_cursor		libxfs_rmapbt_mem_cursor
 #define xfs_rmapbt_stage_cursor		libxfs_rmapbt_stage_cursor
 #define xfs_rmap_compare		libxfs_rmap_compare
 #define xfs_rmap_get_rec		libxfs_rmap_get_rec
@@ -205,6 +210,7 @@
 #define xfs_rmap_lookup_le		libxfs_rmap_lookup_le
 #define xfs_rmap_lookup_le_range	libxfs_rmap_lookup_le_range
 #define xfs_rmap_map_extent		libxfs_rmap_map_extent
+#define xfs_rmap_map_raw		libxfs_rmap_map_raw
 #define xfs_rmap_query_all		libxfs_rmap_query_all
 #define xfs_rmap_query_range		libxfs_rmap_query_range
 
@@ -227,6 +233,8 @@
 #define xfs_rtrmapbt_maxlevels_ondisk	libxfs_rtrmapbt_maxlevels_ondisk
 #define xfs_rtrmapbt_init_cursor	libxfs_rtrmapbt_init_cursor
 #define xfs_rtrmapbt_maxrecs		libxfs_rtrmapbt_maxrecs
+#define xfs_rtrmapbt_mem_create		libxfs_rtrmapbt_mem_create
+#define xfs_rtrmapbt_mem_cursor		libxfs_rtrmapbt_mem_cursor
 #define xfs_rtrmapbt_stage_cursor	libxfs_rtrmapbt_stage_cursor
 
 #define xfs_sb_from_disk		libxfs_sb_from_disk
