@@ -24,8 +24,7 @@
  * incore fork, then recreate the btree.
  */
 struct xrep_rtrmap {
-	/* rtrmapbt slab cursor */
-	struct xfs_slab_cursor	*slab_cursor;
+	struct rmap_mem_cur	btree_cursor;
 
 	/* New fork. */
 	struct bulkload		new_fork_info;
@@ -34,17 +33,21 @@ struct xrep_rtrmap {
 	struct repair_ctx	*sc;
 };
 
-/* Retrieve rtrmap data for bulk load. */
+/* Retrieve rtrmapbt data for bulk load. */
 STATIC int
 xrep_rtrmap_get_record(
 	struct xfs_btree_cur	*cur,
 	void			*priv)
 {
-	struct xfs_rmap_irec	*rec;
 	struct xrep_rtrmap	*rr = priv;
+	int			ret;
 
-	rec = pop_slab_cursor(rr->slab_cursor);
-	memcpy(&cur->bc_rec.r, rec, sizeof(struct xfs_rmap_irec));
+	ret = rmap_get_mem_rec(&rr->btree_cursor, &cur->bc_rec.r);
+	if (ret < 0)
+		return ret;
+	if (ret == 0)
+		do_error(
+ _("ran out of records while rebuilding rt rmap btree\n"));
 	return 0;
 }
 
@@ -113,11 +116,12 @@ xrep_rtrmap_btree_load(
 		return error;
 
 	/* Add all observed rtrmap records. */
-	error = rmap_init_cursor(NULLAGNUMBER, &rr->slab_cursor);
+	error = rmap_init_mem_cursor(rr->sc->mp, sc->tp, NULLAGNUMBER,
+			&rr->btree_cursor);
 	if (error)
 		return error;
 	error = -libxfs_btree_bload(rtrmap_cur, &rr->rtrmap_bload, rr);
-	free_slab_cursor(&rr->slab_cursor);
+	rmap_free_mem_cursor(sc->tp, &rr->btree_cursor, error);
 	return error;
 }
 
