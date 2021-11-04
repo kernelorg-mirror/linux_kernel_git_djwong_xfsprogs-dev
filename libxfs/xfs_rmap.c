@@ -2750,6 +2750,7 @@ xfs_rmap_record_exists(
 struct xfs_rmap_key_state {
 	uint64_t			owner;
 	uint64_t			offset;
+	uint64_t			len;
 	unsigned int			flags;
 };
 
@@ -2762,10 +2763,20 @@ xfs_rmap_has_other_keys_helper(
 {
 	struct xfs_rmap_key_state	*rks = priv;
 
-	if (rks->owner == rec->rm_owner && rks->offset == rec->rm_offset &&
-	    ((rks->flags & rec->rm_flags) & XFS_RMAP_KEY_FLAGS) == rks->flags)
+	if (rks->owner != rec->rm_owner)
+		return -ECANCELED;
+	if (((rks->flags & rec->rm_flags) & XFS_RMAP_KEY_FLAGS) != rks->flags)
+		return -ECANCELED;
+
+	if (XFS_RMAP_NON_INODE_OWNER(rec->rm_owner) ||
+	    (rec->rm_flags & XFS_RMAP_BMBT_BLOCK))
 		return 0;
-	return -ECANCELED;
+
+	if (rec->rm_offset + rec->rm_blockcount <= rks->offset)
+		return -ECANCELED;
+	if (rks->offset + rks->len <= rec->rm_offset)
+		return -ECANCELED;
+	return 0;
 }
 
 /*
@@ -2782,7 +2793,7 @@ xfs_rmap_has_other_keys(
 {
 	struct xfs_rmap_irec		low = {0};
 	struct xfs_rmap_irec		high;
-	struct xfs_rmap_key_state	rks;
+	struct xfs_rmap_key_state	rks = { .len = len };
 	int				error;
 
 	xfs_owner_info_unpack(oinfo, &rks.owner, &rks.offset, &rks.flags);
