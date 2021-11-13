@@ -404,7 +404,7 @@ xfbtree_create(
 		return -ENOMEM;
 
 	/* Create our memory file and the free space bitmap. */
-	error = xfile_create(mp, cfg->description, &xfbt->xfile);
+	error = xfile_create(mp, cfg->maxrange, cfg->description, &xfbt->xfile);
 	if (error)
 		goto err_xfbt;
 
