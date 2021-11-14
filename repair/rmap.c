@@ -110,13 +110,15 @@ rmaps_init(
 		do_error(_("couldn't allocate per-AG reverse map roots\n"));
 
 	for (i = 0; i < mp->m_sb.sb_agcount + 1; i++) {
-		if (i == 0) {
+		if (i == 0)
 			error = -libxfs_rtrmapbt_mem_create(mp, "rtrmap btree",
 					&ag_rmaps[i].ar_xfbtree);
-			if (error)
-				do_error(
+		else
+			error = -libxfs_rmapbt_mem_create(mp, i - 1,
+					"rmap btree", &ag_rmaps[i].ar_xfbtree);
+		if (error)
+			do_error(
 _("Insufficient memory while allocating realtime reverse mapping btree."));
-		}
 		error = init_slab(&ag_rmaps[i].ar_rmaps,
 				sizeof(struct xfs_rmap_irec));
 		if (error)
@@ -151,8 +153,7 @@ rmaps_free(
 
 	ag_rmaps--;
 	for (i = 0; i < mp->m_sb.sb_agcount + 1; i++) {
-		if (i == 0)
-			xfbtree_destroy(ag_rmaps[i].ar_xfbtree);
+		xfbtree_destroy(ag_rmaps[i].ar_xfbtree);
 		free_slab(&ag_rmaps[i].ar_rmaps);
 		free_slab(&ag_rmaps[i].ar_raw_rmaps);
 		free_slab(&ag_rmaps[i].ar_refcount_items);
@@ -196,18 +197,17 @@ rmap_init_mem_cursor(
 	struct xfbtree		*xfbt;
 	int			error;
 
-	if (agno != NULLAGNUMBER) {
-		rmcur->mcur = NULL;
-		return 0;
-	}
-
 	xfbt = rmap_for_ag(agno)->ar_xfbtree;
 	error = -xfbtree_head_read_buf(xfbt, tp, &rmcur->mhead_bp);
 	if (error)
 		return error;
 
-	rmcur->mcur = libxfs_rtrmapbt_mem_cursor(mp, tp, rmcur->mhead_bp,
-			xfbt);
+	if (agno == NULLAGNUMBER)
+		rmcur->mcur = libxfs_rtrmapbt_mem_cursor(mp, tp,
+				rmcur->mhead_bp, xfbt);
+	else
+		rmcur->mcur = libxfs_rmapbt_mem_cursor(mp, tp, rmcur->mhead_bp,
+				xfbt);
 
 	error = -libxfs_btree_goto_left_edge(rmcur->mcur);
 	if (error) {
@@ -224,8 +224,6 @@ rmap_free_mem_cursor(
 	struct rmap_mem_cur	*rmcur,
 	int			error)
 {
-	if (rmcur->mcur == NULL)
-		return;
 	libxfs_btree_del_cursor(rmcur->mcur, error);
 	libxfs_trans_brelse(tp, rmcur->mhead_bp);
 	rmcur->mcur = NULL;
@@ -268,9 +266,6 @@ rmap_add_mem_rec(
 	struct xfbtree		*xfbt;
 	struct xfs_trans	*tp;
 	int			error;
-
-	if (agno != NULLAGNUMBER)
-		return;
 
 	xfbt = rmap_for_ag(agno)->ar_xfbtree;
 	error = -libxfs_trans_alloc_empty(mp, &tp);
@@ -448,6 +443,33 @@ rmap_add_ag_rec(
 }
 
 /*
+ * Add a reverse mapping for a per-AG btree extent.  These are /not/ tracked
+ * in the in-memory rmap btree because they can only be added to the rmap
+ * data after the in-memory btrees have been written to disk.
+ */
+int
+rmap_add_agbtree_mapping(
+	struct xfs_mount	*mp,
+	xfs_agnumber_t		agno,
+	xfs_agblock_t		agbno,
+	xfs_extlen_t		len,
+	uint64_t		owner)
+{
+	struct xfs_rmap_irec	rmap = {
+		.rm_owner	= owner,
+		.rm_startblock	= agbno,
+		.rm_blockcount	= len,
+	};
+
+	if (!rmap_needs_work(mp))
+		return 0;
+
+	assert(libxfs_verify_agbext(mp, agno, agbno, len));
+
+	return slab_add(rmap_for_ag(agno)->ar_raw_rmaps, &rmap);
+}
+
+/*
  * Merge adjacent raw rmaps and add them to the main rmap list.
  */
 int
@@ -620,7 +642,7 @@ out:
  * the rmapbt, after which it is fully regenerated.
  */
 int
-rmap_store_ag_btree_rec(
+rmap_commit_agbtree_mappings(
 	struct xfs_mount	*mp,
 	xfs_agnumber_t		agno)
 {
@@ -715,7 +737,7 @@ rmap_store_ag_btree_rec(
 	if (error)
 		goto err;
 
-	/* Create cursors to refcount structures */
+	/* Create cursors to rmap structures */
 	error = init_slab_cursor(ag_rmap->ar_rmaps, rmap_compare, &rm_cur);
 	if (error)
 		goto err;
@@ -1057,9 +1079,6 @@ rmap_record_count(
 	uint64_t		nr = 0;
 	int			stat;
 	int			error;
-
-	if (agno != NULLAGNUMBER)
-		return slab_count(rmap_for_ag(agno)->ar_rmaps);
 
 	error = rmap_init_mem_cursor(mp, NULL, agno, &rmcur);
 	if (error)
