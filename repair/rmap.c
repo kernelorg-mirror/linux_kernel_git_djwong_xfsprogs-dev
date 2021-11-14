@@ -1191,11 +1191,11 @@ rmaps_verify_btree(
 	struct xfs_mount	*mp,
 	xfs_agnumber_t		agno)
 {
+	struct rmap_mem_cur	rm_cur;
+	struct xfs_rmap_irec	rm_rec;
 	struct xfs_rmap_irec	tmp;
-	struct xfs_slab_cursor	*rm_cur;
 	struct xfs_btree_cur	*bt_cur = NULL;
 	struct xfs_buf		*agbp = NULL;
-	struct xfs_rmap_irec	*rm_rec;
 	struct xfs_perag	*pag = NULL;
 	struct xfs_inode	*ip = NULL;
 	int			have;
@@ -1215,7 +1215,7 @@ rmaps_verify_btree(
 	}
 
 	/* Create cursors to rmap structures */
-	error = rmap_init_cursor(agno, &rm_cur);
+	error = rmap_init_mem_cursor(mp, NULL, agno, &rm_cur);
 	if (error) {
 		do_warn(_("Not enough memory to check reverse mappings.\n"));
 		return;
@@ -1263,14 +1263,13 @@ _("Could not read AGF %u to check rmap btree.\n"),
 		goto err;
 	}
 
-	rm_rec = pop_slab_cursor(rm_cur);
-	while (rm_rec) {
-		error = rmap_lookup(bt_cur, rm_rec, &tmp, &have);
+	while ((error = rmap_get_mem_rec(&rm_cur, &rm_rec)) == 1) {
+		error = rmap_lookup(bt_cur, &rm_rec, &tmp, &have);
 		if (error) {
 			do_warn(
 _("Could not read reverse-mapping record for (%u/%llu).\n"),
 					agno,
-					(unsigned long long)rm_rec->rm_startblock);
+					(unsigned long long)rm_rec.rm_startblock);
 			goto err;
 		}
 
@@ -1280,14 +1279,14 @@ _("Could not read reverse-mapping record for (%u/%llu).\n"),
 		 * match the observed rmap.
 		 */
 		if (xfs_has_reflink(bt_cur->bc_mp) &&
-				(!have || !rmap_is_good(rm_rec, &tmp))) {
-			error = rmap_lookup_overlapped(bt_cur, rm_rec,
+				(!have || !rmap_is_good(&rm_rec, &tmp))) {
+			error = rmap_lookup_overlapped(bt_cur, &rm_rec,
 					&tmp, &have);
 			if (error) {
 				do_warn(
 _("Could not read reverse-mapping record for (%u/%llu).\n"),
 						agno,
-						(unsigned long long)rm_rec->rm_startblock);
+						(unsigned long long)rm_rec.rm_startblock);
 				goto err;
 			}
 		}
@@ -1295,21 +1294,21 @@ _("Could not read reverse-mapping record for (%u/%llu).\n"),
 			do_warn(
 _("Missing reverse-mapping record for (%u/%llu) %slen %llu owner %"PRId64" \
 %s%soff %"PRIu64"\n"),
-				agno, (unsigned long long)rm_rec->rm_startblock,
-				(rm_rec->rm_flags & XFS_RMAP_UNWRITTEN) ?
+				agno, (unsigned long long)rm_rec.rm_startblock,
+				(rm_rec.rm_flags & XFS_RMAP_UNWRITTEN) ?
 					_("unwritten ") : "",
-				(unsigned long long)rm_rec->rm_blockcount,
-				rm_rec->rm_owner,
-				(rm_rec->rm_flags & XFS_RMAP_ATTR_FORK) ?
+				(unsigned long long)rm_rec.rm_blockcount,
+				rm_rec.rm_owner,
+				(rm_rec.rm_flags & XFS_RMAP_ATTR_FORK) ?
 					_("attr ") : "",
-				(rm_rec->rm_flags & XFS_RMAP_BMBT_BLOCK) ?
+				(rm_rec.rm_flags & XFS_RMAP_BMBT_BLOCK) ?
 					_("bmbt ") : "",
-				rm_rec->rm_offset);
-			goto next_loop;
+				rm_rec.rm_offset);
+			continue;
 		}
 
 		/* Compare each refcount observation against the btree's */
-		if (!rmap_is_good(rm_rec, &tmp)) {
+		if (!rmap_is_good(&rm_rec, &tmp)) {
 			do_warn(
 _("Incorrect reverse-mapping: saw (%u/%llu) %slen %llu owner %"PRId64" %s%soff \
 %"PRIu64"; should be (%u/%llu) %slen %llu owner %"PRId64" %s%soff %"PRIu64"\n"),
@@ -1323,25 +1322,22 @@ _("Incorrect reverse-mapping: saw (%u/%llu) %slen %llu owner %"PRId64" %s%soff \
 				(tmp.rm_flags & XFS_RMAP_BMBT_BLOCK) ?
 					_("bmbt ") : "",
 				tmp.rm_offset,
-				agno, (unsigned long long)rm_rec->rm_startblock,
-				(rm_rec->rm_flags & XFS_RMAP_UNWRITTEN) ?
+				agno, (unsigned long long)rm_rec.rm_startblock,
+				(rm_rec.rm_flags & XFS_RMAP_UNWRITTEN) ?
 					_("unwritten ") : "",
-				(unsigned long long)rm_rec->rm_blockcount,
-				rm_rec->rm_owner,
-				(rm_rec->rm_flags & XFS_RMAP_ATTR_FORK) ?
+				(unsigned long long)rm_rec.rm_blockcount,
+				rm_rec.rm_owner,
+				(rm_rec.rm_flags & XFS_RMAP_ATTR_FORK) ?
 					_("attr ") : "",
-				(rm_rec->rm_flags & XFS_RMAP_BMBT_BLOCK) ?
+				(rm_rec.rm_flags & XFS_RMAP_BMBT_BLOCK) ?
 					_("bmbt ") : "",
-				rm_rec->rm_offset);
-			goto next_loop;
+				rm_rec.rm_offset);
 		}
-next_loop:
-		rm_rec = pop_slab_cursor(rm_cur);
 	}
 
 err:
 	if (bt_cur)
-		libxfs_btree_del_cursor(bt_cur, XFS_BTREE_NOERROR);
+		libxfs_btree_del_cursor(bt_cur, error);
 	if (pag)
 		libxfs_perag_put(pag);
 	if (agbp)
@@ -1350,7 +1346,7 @@ err:
 		libxfs_imeta_irele(mp->m_rrmapip);
 		mp->m_rrmapip = NULL;
 	}
-	free_slab_cursor(&rm_cur);
+	rmap_free_mem_cursor(NULL, &rm_cur, error);
 }
 
 /*
