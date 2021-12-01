@@ -427,10 +427,8 @@ _("inode %" PRIu64 " - bad rt extent overflows - start %" PRIu64 ", "
 	*tot += irec->br_blockcount;
 
 	/* Record mapping data for the realtime rmap. */
-	if (collect_rmaps && !zap_metadata && !check_dups) {
-		if (rmap_add_rec(mp, ino, XFS_DATA_FORK, irec, true))
-			do_error(_("couldn't add reverse mapping\n"));
-	}
+	if (collect_rmaps && !zap_metadata && !check_dups)
+		rmap_add_rec(mp, ino, XFS_DATA_FORK, irec, true);
 
 	return 0;
 }
@@ -744,13 +742,8 @@ _("illegal state %d in block map %" PRIu64 "\n"),
 				break;
 			}
 		}
-		if (collect_rmaps && !zap_metadata) { /* && !check_dups */
-			error = rmap_add_rec(mp, ino, whichfork, &irec, false);
-			if (error)
-				do_error(
-_("couldn't add reverse mapping\n")
-					);
-		}
+		if (collect_rmaps && !zap_metadata) /* && !check_dups */
+			rmap_add_rec(mp, ino, whichfork, &irec, false);
 		*tot += irec.br_blockcount;
 	}
 	error = 0;
