@@ -43,25 +43,6 @@ static const unsigned int repair_deps[XFS_SCRUB_TYPE_NR] = {
 };
 #undef DEP
 
-/*
- * Decide if this repair item should be run one at a time.  The only types
- * requiring serialization are the ones that need to freeze the filesystem
- * and the ones that have to use trylocking to avoid ABBA deadlocks.
- */
-static inline bool
-repair_needs_excl(unsigned int scrub_type)
-{
-	switch (scrub_type) {
-	case XFS_SCRUB_TYPE_PARENT:
-	case XFS_SCRUB_TYPE_RMAPBT:
-	case XFS_SCRUB_TYPE_RTRMAPBT:
-	case XFS_SCRUB_TYPE_NLINKS:
-		return true;
-	}
-
-	return false;
-}
-
 static inline void
 restore_oldvec(
 	struct xfs_scrub_vec	*oldvec,
@@ -297,7 +278,6 @@ repair_call_kernel(
 	struct xfs_scrub_vec		*v;
 	struct xfs_fd			*xfdp = &ctx->mnt;
 	unsigned int			scrub_type;
-	bool				serial_repair = false;
 	bool				need_barrier = false;
 	int				error;
 
@@ -320,7 +300,6 @@ repair_call_kernel(
 		}
 
 		scrub_vhead_add(&bh, sri, scrub_type, true);
-		serial_repair |= repair_needs_excl(scrub_type);
 
 		if (sri->sri_state[scrub_type] & SCRUB_ITEM_NEEDSREPAIR)
 			str_info(ctx, descr_render(&dsc),
@@ -352,12 +331,7 @@ repair_call_kernel(
 	 * exclusive lock to serialize the repair functions that require it,
 	 * and a shared lock for those that can run concurrently.
 	 */
-	if (serial_repair)
-		pthread_rwlock_wrlock(&ctx->repair_rwlock);
-	else
-		pthread_rwlock_rdlock(&ctx->repair_rwlock);
 	error = -xfrog_scrubv_metadata(xfdp, &bh.head);
-	pthread_rwlock_unlock(&ctx->repair_rwlock);
 	if (error)
 		return error;
 
