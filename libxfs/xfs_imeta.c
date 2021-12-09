@@ -1151,7 +1151,6 @@ xfs_imeta_resv_free_extent(
 	ip->i_nblocks -= len;
 	xfs_trans_mod_dquot_byino(tp, ip, XFS_TRANS_DQ_BCOUNT, -len);
 
-
 	/*
 	 * Add the freed blocks back into the inode's delalloc reservation
 	 * until it reaches the maximum size.  Update the ondisk fdblocks only.
