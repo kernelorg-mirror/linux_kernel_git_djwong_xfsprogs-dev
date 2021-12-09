@@ -16,8 +16,7 @@ static char *getstr(char **pp);
 static void fail(char *msg, int i);
 static struct xfs_trans * getres(struct xfs_mount *mp, uint blocks);
 static void rsvfile(xfs_mount_t *mp, xfs_inode_t *ip, long long len);
-static int newfile(xfs_trans_t *tp, xfs_inode_t *ip, int symlink, int logit,
-			char *buf, int len);
+static int newfile(xfs_trans_t *tp, xfs_inode_t *ip, char *buf, int len);
 static char *newregfile(char **pp, int *len);
 static int metadir_init(struct xfs_mount *mp);
 static void rtinit(xfs_mount_t *mp);
@@ -219,11 +218,30 @@ rsvfile(
 }
 
 static int
+newsymlink(
+	struct xfs_trans	*tp,
+	struct xfs_inode	*ip,
+	char			*buf,
+	int			len)
+{
+	struct xfs_mount	*mp = tp->t_mountp;
+	xfs_extlen_t		nb = XFS_B_TO_FSB(mp, len);
+	int			error;
+
+	error = -libxfs_symlink_write_target(tp, ip, buf, len, nb, nb);
+	if (error) {
+		fprintf(stderr,
+	_("%s: error %d creating symlink to '%s'.\n"), progname, error, buf);
+		exit(1);
+	}
+
+	return 0;
+}
+
+static int
 newfile(
 	struct xfs_trans	*tp,
 	struct xfs_inode	*ip,
-	int			symlink,
-	int			logit,
 	char			*buf,
 	int			len)
 {
@@ -236,11 +254,7 @@ newfile(
 
 	flags = 0;
 	mp = ip->i_mount;
-	if (symlink && len <= XFS_IFORK_DSIZE(ip)) {
-		libxfs_init_local_fork(ip, XFS_DATA_FORK, buf, len);
-		ip->i_df.if_format = XFS_DINODE_FMT_LOCAL;
-		flags = XFS_ILOG_DDATA;
-	} else if (len > 0) {
+	if (len > 0) {
 		nb = XFS_B_TO_FSB(mp, len);
 		nmap = 1;
 		error = -libxfs_bmapi_write(tp, ip, 0, nb, 0, nb, &map, &nmap);
@@ -259,7 +273,7 @@ newfile(
 			exit(1);
 		}
 
-		error = -libxfs_file_write(tp, ip, buf, len, logit);
+		error = -libxfs_file_write(tp, ip, buf, len, false);
 		if (error)
 			fail(_("error writing file"), error);
 	}
@@ -488,7 +502,7 @@ parseproto(
 				fsxp, &ip);
 		if (error)
 			fail(_("Inode allocation failed"), error);
-		flags |= newfile(tp, ip, 0, 0, buf, len);
+		flags |= newfile(tp, ip, buf, len);
 		if (buf)
 			free(buf);
 		libxfs_trans_ijoin(tp, pip, 0);
@@ -572,7 +586,7 @@ parseproto(
 				fsxp, &ip);
 		if (error)
 			fail(_("Inode allocation failed"), error);
-		flags |= newfile(tp, ip, 1, 1, buf, len);
+		flags |= newsymlink(tp, ip, buf, len);
 		libxfs_trans_ijoin(tp, pip, 0);
 		xname.type = XFS_DIR3_FT_SYMLINK;
 		newdirent(mp, tp, pip, &xname, ip->i_ino);
