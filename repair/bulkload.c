@@ -144,8 +144,8 @@ bulkload_destroy_reservation(
 	if (resv->len == 0)
 		return 0;
 
-	__xfs_free_extent_later(sc->tp, resv->fsbno, resv->len, &bkl->oinfo,
-			true);
+	libxfs_free_extent_later(sc->tp, resv->fsbno, resv->len, &bkl->oinfo,
+			XFS_FREE_EXTENT_SKIP_DISCARD);
 
 	return 0;
 }
