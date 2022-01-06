@@ -13,6 +13,12 @@ struct xfs_da_geometry;
 
 typedef void (*buf_writeback_fn)(struct xfs_buf *bp);
 
+/* Stubbed-out functionality from the kernel. */
+struct xfs_hook_chain {
+};
+#define xfs_hook_init(chain)		((void)0)
+#define xfs_hook_call(chain, val, priv)	(0)
+
 /*
  * Define a user-level mount structure with all we need
  * in order to make use of the numerous XFS_* macros.
