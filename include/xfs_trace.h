@@ -341,6 +341,13 @@
 #define trace_xfs_perag_get_tag(a,b,c,d)	((c) = (c))
 #define trace_xfs_perag_put(a,b,c,d)		((c) = (c))
 
+#define trace_xfs_imeta_end_update(...)		((void) 0)
+#define trace_xfs_imeta_sb_link(...)		((void) 0)
+#define trace_xfs_imeta_sb_lookup(...)		((void) 0)
+#define trace_xfs_imeta_sb_create(...)		((void) 0)
+#define trace_xfs_imeta_sb_unlink(...)		((void) 0)
+#define trace_xfs_imeta_start_update(...)	((void) 0)
+
 #define trace_xfs_iunlink_update_bucket(...)	((void) 0)
 #define trace_xfs_iunlink_update_dinode(...)	((void) 0)
 #define trace_xfs_iunlink(...)			((void) 0)
