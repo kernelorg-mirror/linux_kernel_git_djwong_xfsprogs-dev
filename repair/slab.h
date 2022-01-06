@@ -14,7 +14,7 @@ extern void free_slab(struct xfs_slab **);
 
 extern int slab_add(struct xfs_slab *, void *);
 extern void qsort_slab(struct xfs_slab *, int (*)(const void *, const void *));
-extern size_t slab_count(struct xfs_slab *);
+uint64_t slab_count(struct xfs_slab *slab);
 
 extern int init_slab_cursor(struct xfs_slab *,
 	int (*)(const void *, const void *), struct xfs_slab_cursor **);
@@ -29,9 +29,9 @@ struct xfs_bag;
 extern int init_bag(struct xfs_bag **bagp, size_t recsize);
 extern void free_bag(struct xfs_bag **);
 extern int bag_add(struct xfs_bag *, void *);
-extern int bag_remove(struct xfs_bag *, size_t);
-extern size_t bag_count(struct xfs_bag *);
-extern void *bag_item(struct xfs_bag *, size_t);
+int bag_remove(struct xfs_bag *ba, uint64_t idx);
+uint64_t bag_count(struct xfs_bag *bag);
+void *bag_item(struct xfs_bag *bag, uint64_t nr);
 
 #define foreach_bag_ptr(bag, idx, ptr) \
 	for ((idx) = 0, (ptr) = bag_item((bag), (idx)); \
