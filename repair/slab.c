@@ -78,16 +78,25 @@ struct xfs_slab_cursor {
 };
 
 /*
- * Bags -- each bag is an array of pointers items; when a bag fills up, we
- * resize it.
+ * Bags -- each bag is an array of records; when a bag fills up, we resize it.
  */
 #define MIN_BAG_SIZE	4096
 struct xfs_bag {
-	size_t			bg_nr;		/* number of pointers */
-	size_t			bg_inuse;	/* number of slots in use */
-	void			**bg_ptrs;	/* pointers */
+	uint64_t		bg_nr;		/* number of pointers */
+	uint64_t		bg_inuse;	/* number of slots in use */
+	char			*bg_recs;	/* pointers */
+	size_t			bg_recsize;	/* size of each record */
 };
-#define BAG_END(bag)	(&(bag)->bg_ptrs[(bag)->bg_nr])
+
+static inline void *bag_ptr(struct xfs_bag *bag, size_t idx)
+{
+	return &bag->bg_recs[bag->bg_recsize * idx];
+}
+
+static inline void *bag_end(struct xfs_bag *bag)
+{
+	return bag_ptr(bag, bag->bg_nr);
+}
 
 /*
  * Create a slab to hold some objects of a particular size.
@@ -382,15 +391,17 @@ slab_count(
  */
 int
 init_bag(
-	struct xfs_bag	**bag)
+	struct xfs_bag	**bag,
+	size_t		recsize)
 {
 	struct xfs_bag	*ptr;
 
 	ptr = calloc(1, sizeof(struct xfs_bag));
 	if (!ptr)
 		return -ENOMEM;
-	ptr->bg_ptrs = calloc(MIN_BAG_SIZE, sizeof(void *));
-	if (!ptr->bg_ptrs) {
+	ptr->bg_recsize = recsize;
+	ptr->bg_recs = calloc(MIN_BAG_SIZE, recsize);
+	if (!ptr->bg_recs) {
 		free(ptr);
 		return -ENOMEM;
 	}
@@ -411,7 +422,7 @@ free_bag(
 	ptr = *bag;
 	if (!ptr)
 		return;
-	free(ptr->bg_ptrs);
+	free(ptr->bg_recs);
 	free(ptr);
 	*bag = NULL;
 }
@@ -424,22 +435,23 @@ bag_add(
 	struct xfs_bag	*bag,
 	void		*ptr)
 {
-	void		**p, **x;
+	void		*p, *x;
 
-	p = &bag->bg_ptrs[bag->bg_inuse];
-	if (p == BAG_END(bag)) {
+	p = bag_ptr(bag, bag->bg_inuse);
+	if (p == bag_end(bag)) {
 		/* No free space, alloc more pointers */
 		size_t nr;
 
 		nr = bag->bg_nr * 2;
-		x = realloc(bag->bg_ptrs, nr * sizeof(void *));
+		x = realloc(bag->bg_recs, nr * bag->bg_recsize);
 		if (!x)
 			return -ENOMEM;
-		bag->bg_ptrs = x;
-		memset(BAG_END(bag), 0, bag->bg_nr * sizeof(void *));
+		bag->bg_recs = x;
+		memset(bag_end(bag), 0, bag->bg_nr * bag->bg_recsize);
 		bag->bg_nr = nr;
+		p = bag_ptr(bag, bag->bg_inuse);
 	}
-	bag->bg_ptrs[bag->bg_inuse] = ptr;
+	memcpy(p, ptr, bag->bg_recsize);
 	bag->bg_inuse++;
 	return 0;
 }
@@ -453,8 +465,8 @@ bag_remove(
 	size_t		nr)
 {
 	ASSERT(nr < bag->bg_inuse);
-	memmove(&bag->bg_ptrs[nr], &bag->bg_ptrs[nr + 1],
-		(bag->bg_inuse - nr - 1) * sizeof(void *));
+	memmove(bag_ptr(bag, nr), bag_ptr(bag, nr + 1),
+		(bag->bg_inuse - nr - 1) * bag->bg_recsize);
 	bag->bg_inuse--;
 	return 0;
 }
@@ -479,5 +491,5 @@ bag_item(
 {
 	if (nr >= bag->bg_inuse)
 		return NULL;
-	return bag->bg_ptrs[nr];
+	return bag_ptr(bag, nr);
 }
