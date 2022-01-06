@@ -53,40 +53,25 @@ report_close_error(
  * Defer all the repairs until phase 4, being careful about locking since the
  * inode scrub threads are not per-AG.
  */
-static void
-iscrub_action_list_defer(
-	struct scrub_ctx		*ctx,
-	struct scrub_inode_ctx		*ictx,
-	xfs_agnumber_t			agno,
-	struct action_list		*alist)
-{
-	if (alist->nr == 0)
-		return;
-
-	pthread_mutex_lock(&ictx->locks[agno]);
-	action_list_defer(ctx, agno, alist);
-	pthread_mutex_unlock(&ictx->locks[agno]);
-}
-
-/* Run actions now and defer unfinished items for later. */
 static int
-iscrub_action_list_process_or_defer(
+iscrub_repair_item_defer(
 	struct scrub_ctx		*ctx,
 	struct scrub_inode_ctx		*ictx,
-	xfs_agnumber_t			agno,
-	struct action_list		*alist)
+	const struct xfs_bulkstat	*bstat,
+	struct scrub_item		*sri)
 {
-	int				ret;
+	struct action_item		*aitem = NULL;
+	xfs_agnumber_t			agno;
+	int				error;
 
-	if (alist->nr == 0)
-		return 0;
+	error = repair_item_to_action_item(ctx, sri, &aitem);
+	if (error || !aitem)
+		return error;
 
-	ret = action_list_process(ctx, ctx->mnt.fd, alist,
-			ALP_REPAIR_ONLY | ALP_NOPROGRESS);
-	if (ret)
-		return ret;
-
-	iscrub_action_list_defer(ctx, ictx, agno, alist);
+	agno = cvt_ino_to_agno(&ctx->mnt, bstat->bs_ino);
+	pthread_mutex_lock(&ictx->locks[agno]);
+	action_list_add(&ctx->action_lists[agno], aitem);
+	pthread_mutex_unlock(&ictx->locks[agno]);
 	return 0;
 }
 
@@ -102,13 +87,11 @@ scrub_inode(
 	struct scrub_item	sri;
 	struct scrub_inode_ctx	*ictx = arg;
 	struct ptcounter	*icount = ictx->icount;
-	xfs_agnumber_t		agno;
 	int			fd = -1;
 	int			error;
 
 	scrub_item_init_file(&sri, bstat);
 	action_list_init(&alist);
-	agno = cvt_ino_to_agno(&ctx->mnt, bstat->bs_ino);
 	background_sleep();
 
 	/*
@@ -141,7 +124,7 @@ scrub_inode(
 	if (error)
 		goto out;
 
-	error = iscrub_action_list_process_or_defer(ctx, ictx, agno, &alist);
+	error = repair_file_corruption(ctx, &sri, fd);
 	if (error)
 		goto out;
 
@@ -156,7 +139,7 @@ scrub_inode(
 	if (error)
 		goto out;
 
-	error = iscrub_action_list_process_or_defer(ctx, ictx, agno, &alist);
+	error = repair_file_corruption(ctx, &sri, fd);
 	if (error)
 		goto out;
 
@@ -188,8 +171,7 @@ scrub_inode(
 	 * file repairs until phase 4 as well.
 	 */
 	if (!ictx->always_defer_repairs) {
-		error = iscrub_action_list_process_or_defer(ctx, ictx, agno,
-				&alist);
+		error = repair_file_corruption(ctx, &sri, fd);
 		if (error)
 			goto out;
 	}
@@ -205,7 +187,9 @@ out:
 		ictx->aborted = true;
 	}
 	progress_add(1);
-	iscrub_action_list_defer(ctx, ictx, agno, &alist);
+	error = iscrub_repair_item_defer(ctx, ictx, bstat, &sri);
+	if (error)
+		return error;
 	if (fd >= 0) {
 		int	err2;
 
