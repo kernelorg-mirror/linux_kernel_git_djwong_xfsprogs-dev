@@ -260,7 +260,7 @@ action_list_process(
 		fix = xfs_repair_metadata(ctx, aitem, repair_flags);
 		switch (fix) {
 		case CHECK_DONE:
-			if (!(repair_flags & ALP_NOPROGRESS))
+			if (!(repair_flags & XRM_NOPROGRESS))
 				progress_add(1);
 			alist->nr--;
 			list_del(&aitem->list);
@@ -302,7 +302,7 @@ action_list_process_or_defer(
 	int				ret;
 
 	ret = action_list_process(ctx, alist,
-			ALP_REPAIR_ONLY | ALP_NOPROGRESS);
+			XRM_REPAIR_ONLY | XRM_NOPROGRESS);
 	if (ret)
 		return ret;
 
