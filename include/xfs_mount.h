@@ -213,8 +213,7 @@ __XFS_HAS_FEAT(atomicswap, ATOMIC_SWAP)
  */
 static inline bool xfs_can_logswap(struct xfs_mount *mp)
 {
-	return (xfs_has_reflink(mp) || xfs_has_rmapbt(mp)) &&
-	       !xfs_has_realtime(mp);
+	return xfs_has_reflink(mp) || xfs_has_rmapbt(mp);
 }
 
 /* Kernel mount features that we don't support */
