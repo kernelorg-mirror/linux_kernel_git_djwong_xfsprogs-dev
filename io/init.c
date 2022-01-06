@@ -58,6 +58,7 @@ init_commands(void)
 	flink_init();
 	freeze_init();
 	fsmap_init();
+	fsrefcounts_init();
 	fsync_init();
 	getrusage_init();
 	help_init();
