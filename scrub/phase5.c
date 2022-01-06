@@ -421,7 +421,7 @@ iscan_worker(
 	}
 
 	ret = action_list_process(ctx, ctx->mnt.fd, &item->alist,
-			ALP_COMPLAIN_IF_UNFIXED | ALP_NOPROGRESS);
+			XRM_FINAL_WARNING | XRM_NOPROGRESS);
 	if (ret) {
 		str_liberror(ctx, ret, _("repairing iscan metadata"));
 		*item->abortedp = true;
