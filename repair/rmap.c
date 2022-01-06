@@ -1858,3 +1858,9 @@ forget_rtrmap(void)
 	rrmapino = NULLFSINO;
 	rmap_avoid_check();
 }
+
+xfs_ino_t
+get_rtrmap_ino(void)
+{
+	return rrmapino;
+}
