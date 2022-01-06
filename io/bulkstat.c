@@ -106,11 +106,12 @@ bulkstat_f(
 	bool			has_agno = false;
 	bool			debug = false;
 	bool			metadir = false;
+	bool			retain = false;
 	unsigned int		i;
 	int			c;
 	int			ret;
 
-	while ((c = getopt(argc, argv, "a:de:mn:s:v:")) != -1) {
+	while ((c = getopt(argc, argv, "a:de:mn:s:v:z")) != -1) {
 		switch (c) {
 		case 'a':
 			agno = cvt_u32(optarg, 10);
@@ -158,6 +159,9 @@ bulkstat_f(
 				return 1;
 			}
 			break;
+		case 'z':
+			retain = true;
+			break;
 		default:
 			bulkstat_help();
 			return 0;
@@ -186,6 +190,8 @@ bulkstat_f(
 		xfrog_bulkstat_set_ag(breq, agno);
 	if (metadir)
 		breq->hdr.flags |= XFS_BULK_IREQ_METADIR;
+	if (retain)
+		breq->hdr.flags |= XFS_BULK_IREQ_RETAIN_INODES;
 
 	set_xfd_flags(&xfd, ver);
 
@@ -251,12 +257,13 @@ bulkstat_single_f(
 	struct xfs_bulkstat	bulkstat;
 	unsigned long		ver = 0;
 	unsigned int		i;
+	bool			retain = false;
 	bool			debug = false;
 	bool			metadir = false;
 	int			c;
 	int			ret;
 
-	while ((c = getopt(argc, argv, "dv:")) != -1) {
+	while ((c = getopt(argc, argv, "dv:z")) != -1) {
 		switch (c) {
 		case 'd':
 			debug = true;
@@ -275,6 +282,9 @@ bulkstat_single_f(
 				fprintf(stderr, "version must be 1 or 5.\n");
 				return 1;
 			}
+			break;
+		case 'z':
+			retain = true;
 			break;
 		default:
 			bulkstat_single_help();
@@ -318,6 +328,8 @@ bulkstat_single_f(
 
 		if (metadir)
 			flags |= XFS_BULK_IREQ_METADIR;
+		if (retain)
+			flags |= XFS_BULK_IREQ_RETAIN_INODES;
 
 		ret = -xfrog_bulkstat_single(&xfd, ino, flags, &bulkstat);
 		if (ret) {

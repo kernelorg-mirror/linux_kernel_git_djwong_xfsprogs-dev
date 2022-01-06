@@ -65,7 +65,8 @@ scrub_ioctl(
 	int				fd,
 	int				type,
 	uint64_t			control,
-	uint32_t			control2)
+	uint32_t			control2,
+	uint32_t			flags)
 {
 	struct xfs_scrub_metadata	meta;
 	const struct xfrog_scrub_descr	*sc;
@@ -90,7 +91,7 @@ scrub_ioctl(
 		/* no control parameters */
 		break;
 	}
-	meta.sm_flags = 0;
+	meta.sm_flags = flags;
 
 	error = ioctl(fd, XFS_IOC_SCRUB_METADATA, &meta);
 	if (error)
@@ -103,17 +104,21 @@ parse_args(
 	int				argc,
 	char				**argv,
 	struct cmdinfo			*cmdinfo,
-	void				(*fn)(int, int, uint64_t, uint32_t))
+	void				(*fn)(int, int, uint64_t, uint32_t, uint32_t))
 {
 	char				*p;
 	int				type = -1;
 	int				i, c;
 	uint64_t			control = 0;
+	uint32_t			flags = 0;
 	uint32_t			control2 = 0;
 	const struct xfrog_scrub_descr	*d = NULL;
 
-	while ((c = getopt(argc, argv, "")) != EOF) {
+	while ((c = getopt(argc, argv, "z")) != EOF) {
 		switch (c) {
+		case 'z':
+			flags |= XFS_SCRUB_IFLAG_RETAIN_INODES;
+			break;
 		default:
 			return command_usage(cmdinfo);
 		}
@@ -187,7 +192,7 @@ parse_args(
 		ASSERT(0);
 		break;
 	}
-	fn(file->fd, type, control, control2);
+	fn(file->fd, type, control, control2, flags);
 
 	return 0;
 }
@@ -264,7 +269,8 @@ repair_ioctl(
 	int				fd,
 	int				type,
 	uint64_t			control,
-	uint32_t			control2)
+	uint32_t			control2,
+	uint32_t			flags)
 {
 	struct xfs_scrub_metadata	meta;
 	const struct xfrog_scrub_descr	*sc;
@@ -289,7 +295,7 @@ repair_ioctl(
 		/* no control parameters */
 		break;
 	}
-	meta.sm_flags = XFS_SCRUB_IFLAG_REPAIR;
+	meta.sm_flags = XFS_SCRUB_IFLAG_REPAIR | flags;
 
 	error = ioctl(fd, XFS_IOC_SCRUB_METADATA, &meta);
 	if (error)
@@ -405,7 +411,7 @@ scrubv_f(
 	int				c;
 	int				error;
 
-	while ((c = getopt(argc, argv, "b:dm:rv:w:")) != EOF) {
+	while ((c = getopt(argc, argv, "b:dm:rv:w:z")) != EOF) {
 		switch (c) {
 		case 'b':
 			barrier_interval = atoi(optarg);
@@ -437,6 +443,10 @@ scrubv_f(
 				printf(_("Rest time must be positive.\n"));
 				return 0;
 			}
+			break;
+		case 'z':
+			flags |= XFS_SCRUB_IFLAG_RETAIN_INODES;
+			vhead->svh_flags |= XFS_SCRUB_VEC_IFLAG_RETAIN_INODES;
 			break;
 		default:
 			scrubv_help();

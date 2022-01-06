@@ -256,6 +256,8 @@ scrub_item_to_vhead(
 		vhead->svh_ino = sri->sri_ino;
 		vhead->svh_gen = sri->sri_gen;
 	}
+	if (debug_tweak_on("XFS_SCRUB_RETAIN"))
+		vhead->svh_flags |= XFS_SCRUB_VEC_IFLAG_RETAIN_INODES;
 }
 
 /* Add a scrubber to the scrub vector. */
@@ -273,6 +275,8 @@ scrub_vhead_add(
 	v->sv_type = scrub_type;
 	if (repair)
 		v->sv_flags |= XFS_SCRUB_IFLAG_REPAIR;
+	if (debug_tweak_on("XFS_SCRUB_RETAIN"))
+		v->sv_flags |= XFS_SCRUB_IFLAG_RETAIN_INODES;
 	bighead->i = v - vhead->svh_vecs;
 }
 
