@@ -240,3 +240,31 @@ xfile_dump(
 
 	return execvp("od", argv);
 }
+
+/* Discard pages backing a range of the xfile. */
+void
+xfile_discard(
+	struct xfile	*xf,
+	loff_t		pos,
+	uint64_t	count)
+{
+	count = min(count, xfile_maxbytes(xf) - pos);
+	fallocate(xf->fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, pos,
+			count);
+}
+
+/* Ensure that there is storage backing the given range. */
+int
+xfile_prealloc(
+	struct xfile	*xf,
+	loff_t		pos,
+	uint64_t	count)
+{
+	int		error;
+
+	count = min(count, xfile_maxbytes(xf) - pos);
+	error = fallocate(xf->fd, 0, pos, count);
+	if (error)
+		return -errno;
+	return 0;
+}

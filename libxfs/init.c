@@ -621,6 +621,36 @@ libxfs_buftarg_alloc(
 	return btp;
 }
 
+int
+libxfs_alloc_memory_buftarg(
+	struct xfs_mount	*mp,
+	struct xfile		*xfile,
+	struct xfs_buftarg	**btpp)
+{
+	struct xfs_buftarg	*btp;
+	unsigned int		bcache_flags = 0;
+
+	btp = malloc(sizeof(*btp));
+	if (!btp)
+		return -ENOMEM;
+
+	btp->bt_mount = mp;
+	btp->bt_xfile = xfile;
+	btp->flags = XFS_BUFTARG_IN_MEMORY;
+	btp->writes_left = 0;
+	pthread_mutex_init(&btp->lock, NULL);
+
+	/*
+	 * Keep the bucket count small because the only anticipated caller is
+	 * per-AG in-memory btrees, for which we don't need to scale to handle
+	 * an entire filesystem.
+	 */
+	btp->bcache = cache_init(bcache_flags, 31, &libxfs_bcache_operations);
+
+	*btpp = btp;
+	return 0;
+}
+
 enum libxfs_write_failure_nums {
 	WF_DATA = 0,
 	WF_LOG,
@@ -1014,7 +1044,7 @@ libxfs_flush_mount(
 	return error;
 }
 
-static void
+void
 libxfs_buftarg_free(
 	struct xfs_buftarg	*btp)
 {
