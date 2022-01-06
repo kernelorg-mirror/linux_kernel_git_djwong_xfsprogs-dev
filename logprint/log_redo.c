@@ -113,8 +113,14 @@ xlog_print_trans_efi(
 
 	ex = f->efi_extents;
 	for (i=0; i < f->efi_nextents; i++) {
-		printf("(s: 0x%llx, l: %d) ",
-			(unsigned long long)ex->ext_start, ex->ext_len);
+		unsigned int	len;
+		int		rt;
+
+		rt = !!(ex->ext_len & XFS_EFI_EXTLEN_REALTIME_EXT);
+		len = ex->ext_len & ~XFS_EFI_EXTLEN_REALTIME_EXT;
+
+		printf("(s: 0x%llx, l: %u, rt? %d) ",
+			(unsigned long long)ex->ext_start, len, rt);
 		if (i % 4 == 3) printf("\n");
 		ex++;
 	}
@@ -160,8 +166,14 @@ xlog_recover_print_efi(
 	ex = f->efi_extents;
 	printf("	");
 	for (i=0; i< f->efi_nextents; i++) {
-		printf("(s: 0x%llx, l: %d) ",
-			(unsigned long long)ex->ext_start, ex->ext_len);
+		unsigned int	len;
+		int		rt;
+
+		rt = !!(ex->ext_len & XFS_EFI_EXTLEN_REALTIME_EXT);
+		len = ex->ext_len & ~XFS_EFI_EXTLEN_REALTIME_EXT;
+
+		printf("(s: 0x%llx, l: %u, rt? %d) ",
+			(unsigned long long)ex->ext_start, len, rt);
 		if (i % 4 == 3)
 			printf("\n");
 		ex++;
