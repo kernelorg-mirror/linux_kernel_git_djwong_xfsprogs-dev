@@ -167,8 +167,7 @@ phase4_func(
 	}
 
 	/* Repair counters before starting on the rest. */
-	ret = action_list_process(ctx, &alist,
-			XRM_REPAIR_ONLY | XRM_NOPROGRESS);
+	ret = repair_item_corruption(ctx, &sri);
 	if (ret)
 		return ret;
 	action_list_discard(&alist);

@@ -52,13 +52,11 @@ scrub_inode(
 	struct scrub_item	sri;
 	struct scrub_inode_ctx	*ictx = arg;
 	struct ptcounter	*icount = ictx->icount;
-	xfs_agnumber_t		agno;
 	int			fd = -1;
 	int			error;
 
 	scrub_item_init_file(&sri, bstat);
 	action_list_init(&alist);
-	agno = cvt_ino_to_agno(&ctx->mnt, bstat->bs_ino);
 	background_sleep();
 
 	/* Try to open the inode to pin it. */
@@ -74,7 +72,7 @@ scrub_inode(
 	if (error)
 		goto out;
 
-	error = action_list_process_or_defer(ctx, agno, &alist);
+	error = repair_item_corruption(ctx, &sri);
 	if (error)
 		goto out;
 
@@ -89,7 +87,7 @@ scrub_inode(
 	if (error)
 		goto out;
 
-	error = action_list_process_or_defer(ctx, agno, &alist);
+	error = repair_item_corruption(ctx, &sri);
 	if (error)
 		goto out;
 
@@ -116,7 +114,7 @@ scrub_inode(
 		goto out;
 
 	/* Try to repair the file while it's open. */
-	error = action_list_process_or_defer(ctx, agno, &alist);
+	error = repair_item_corruption(ctx, &sri);
 	if (error)
 		goto out;
 
@@ -131,7 +129,9 @@ out:
 		ictx->aborted = true;
 	}
 	progress_add(1);
-	action_list_defer(ctx, agno, &alist);
+	error = repair_item_defer(ctx, &sri);
+	if (error)
+		return error;
 	if (fd >= 0) {
 		int	err2;
 
