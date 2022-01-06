@@ -244,7 +244,6 @@ action_list_splice(
 int
 action_list_process(
 	struct scrub_ctx		*ctx,
-	int				fd,
 	struct action_list		*alist,
 	unsigned int			repair_flags)
 {
@@ -258,7 +257,7 @@ action_list_process(
 	}
 
 	list_for_each_entry_safe(aitem, n, &alist->list, list) {
-		fix = xfs_repair_metadata(ctx, fd, aitem, repair_flags);
+		fix = xfs_repair_metadata(ctx, aitem, repair_flags);
 		switch (fix) {
 		case CHECK_DONE:
 			if (!(repair_flags & ALP_NOPROGRESS))
@@ -302,7 +301,7 @@ action_list_process_or_defer(
 {
 	int				ret;
 
-	ret = action_list_process(ctx, ctx->mnt.fd, alist,
+	ret = action_list_process(ctx, alist,
 			ALP_REPAIR_ONLY | ALP_NOPROGRESS);
 	if (ret)
 		return ret;
