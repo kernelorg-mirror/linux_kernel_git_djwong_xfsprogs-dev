@@ -979,11 +979,11 @@ next_refcount_edge(
 	struct xfs_bag		*stack_top,
 	struct xfs_rmap_irec	*next_rmap,
 	bool			next_valid,
-	xfs_agblock_t		*nbnop)
+	xfs_fsblock_t		*nbnop)
 {
 	struct xfs_rmap_irec	*rmap;
 	uint64_t		idx;
-	xfs_agblock_t		nbno = NULLAGBLOCK;
+	xfs_fsblock_t		nbno = NULLFSBLOCK;
 
 	if (next_valid)
 		nbno = next_rmap->rm_startblock;
@@ -997,7 +997,7 @@ next_refcount_edge(
 	 * there are other rmaps in rmap_bag contributing to the current
 	 * sharing count.  But if something is seriously wrong, bail out.
 	 */
-	if (nbno == NULLAGBLOCK)
+	if (nbno == NULLFSBLOCK)
 		return EFSCORRUPTED;
 
 	*nbnop = nbno;
@@ -1015,7 +1015,7 @@ refcount_push_rmaps_at(
 	struct rmap_mem_cur	*rmcur,
 	xfs_agnumber_t		agno,
 	struct xfs_bag		*stack_top,
-	xfs_agblock_t		bno,
+	xfs_fsblock_t		bno,
 	struct xfs_rmap_irec	*irec,
 	bool			*have,
 	const char		*tag)
@@ -1055,9 +1055,9 @@ compute_refcounts(
 	struct xfs_rmap_irec	irec;
 	struct xfs_bag		*stack_top = NULL;
 	struct xfs_rmap_irec	*rmap;
-	xfs_agblock_t		sbno;	/* first bno of this rmap set */
-	xfs_agblock_t		cbno;	/* first bno of this refcount set */
-	xfs_agblock_t		nbno;	/* next bno where rmap set changes */
+	xfs_fsblock_t		sbno;	/* first bno of this rmap set */
+	xfs_fsblock_t		cbno;	/* first bno of this refcount set */
+	xfs_fsblock_t		nbno;	/* next bno where rmap set changes */
 	uint64_t		idx;
 	uint64_t		old_stack_nr;
 	bool			have;
@@ -1960,4 +1960,10 @@ forget_rtrefcount(void)
 {
 	rrefcountino = NULLFSINO;
 	refcount_avoid_check();
+}
+
+xfs_ino_t
+get_rtrefc_ino(void)
+{
+	return rrefcountino;
 }

@@ -970,6 +970,95 @@ _("Couldn't commit new realtime rmapbt inode %llu, error %d\n"),
 	libxfs_imeta_end_update(mp, &upd, error);
 }
 
+static void
+reset_rtrefc(
+	struct xfs_mount	*mp)
+{
+	struct xfs_imeta_update	upd;
+	struct xfs_trans	*tp;
+	struct xfs_inode	*ip;
+	xfs_ino_t		ino = get_rtrefc_ino();
+	int			error;
+
+	if (!xfs_has_rtreflink(mp))
+		return;
+
+	if (no_modify) {
+		if (ino == NULLFSINO)
+			do_warn(_("would reset realtime refcount btree\n"));
+		return;
+	}
+
+	if (ino == NULLFSINO)
+		do_warn(_("resetting realtime refcount btree\n"));
+
+	error = ensure_imeta_dirpath(mp, &XFS_IMETA_RTREFCOUNTBT);
+	if (error)
+		do_error(
+_("Couldn't create realtime metadata directory, error %d\n"), error);
+
+	error = -libxfs_imeta_start_update(mp, &XFS_IMETA_RTREFCOUNTBT, &upd);
+	if (error)
+		do_error(
+_("Couldn't find realtime refcountbt parent, error %d\n"),
+				error);
+
+	/* Create a transaction for whatever work we end up doing. */
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+			libxfs_imeta_create_space_res(mp), 0, 0, &tp);
+	if (error)
+		do_error(
+_("Couldn't prepare to attach realtime refcountbt inode 0x%llx, error %d\n"),
+				(unsigned long long)ino, error);
+
+	if (ino != NULLFSINO) {
+		/*
+		 * We're still hanging on to our old inode, so try to grab it
+		 * so that we can reconnect it and reconnect it to the metadata
+		 * directory tree.
+		 */
+		error = -libxfs_imeta_iget(mp, ino, XFS_DIR3_FT_REG_FILE, &ip);
+		if (error) {
+			do_warn(
+_("Couldn't iget realtime refcountbt inode 0x%llx, error %d\n"),
+					(unsigned long long)ino, error);
+			goto zap;
+		}
+
+		error = -libxfs_imeta_link(tp, &XFS_IMETA_RTREFCOUNTBT, ip,
+				&upd);
+		if (error)
+			do_error(
+_("Failed to link realtime refcountbt inode 0x%llx, error %d\n"),
+					(unsigned long long)ino, error);
+
+		set_nlink(VFS_I(ip), 1);
+		ip->i_df.if_format = XFS_DINODE_FMT_REFCOUNT;
+		libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	} else {
+zap:
+		/* The rtrefc inode was bad or gone, so just make a new one. */
+		error = -libxfs_rtrefcountbt_create(&tp, &upd, &ip);
+		if (error)
+			do_error(
+_("Couldn't create realtime refcountbt inode, error %d\n"),
+					error);
+	}
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		do_error(
+_("Couldn't commit new realtime refcountbt inode %llu, error %d\n"),
+				(unsigned long long)ip->i_ino, error);
+
+	/* Mark the inode in use. */
+	mark_ino_inuse(mp, ip->i_ino, S_IFREG,
+			lookup_imeta_path_dirname(mp, &XFS_IMETA_RTREFCOUNTBT));
+	mark_ino_metadata(mp, ip->i_ino);
+	libxfs_irele(ip);
+	libxfs_imeta_end_update(mp, &upd, error);
+}
+
 /* Initialize a root directory. */
 static int
 init_fs_root_dir(
@@ -3719,6 +3808,7 @@ phase6(xfs_mount_t *mp)
 	}
 
 	reset_rtrmap(mp);
+	reset_rtrefc(mp);
 
 	if (!no_modify)  {
 		do_log(
@@ -3737,6 +3827,12 @@ _("        - resetting contents of realtime bitmap and summary inodes\n"));
 		if (error)
 			do_error(
 	_("Realtime reverse mapping btree could not be rebuilt, error=%d\n"),
+					error);
+
+		error = populate_realtime_refcbt(mp);
+		if (error)
+			do_error(
+	_("Realtime reference count btree could not be rebuilt, error=%d\n"),
 					error);
 	}
 
