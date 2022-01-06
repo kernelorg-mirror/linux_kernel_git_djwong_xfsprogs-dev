@@ -25,6 +25,7 @@ scan_ag_metadata(
 	void				*arg)
 {
 	struct scrub_item		sri;
+	struct scrub_item		fix_now;
 	struct scrub_ctx		*ctx = (struct scrub_ctx *)wq->wq_ctx;
 	bool				*aborted = arg;
 	struct action_list		alist;
@@ -51,7 +52,7 @@ scan_ag_metadata(
 		goto err;
 
 	/* Repair header damage. */
-	ret = action_list_process_or_defer(ctx, agno, &alist);
+	ret = repair_item_corruption(ctx, &sri);
 	if (ret)
 		goto err;
 
@@ -67,10 +68,8 @@ scan_ag_metadata(
 	 * the inobt from rmapbt data, but if the rmapbt is broken even
 	 * at this early phase then we are sunk.
 	 */
-	broken_secondaries = 0;
-	broken_primaries = 0;
-	action_list_find_mustfix(&alist, &immediate_alist,
-			&broken_primaries, &broken_secondaries);
+	repair_item_mustfix(&sri, &fix_now, &broken_primaries,
+			&broken_secondaries);
 	if (broken_secondaries && !debug_tweak_on("XFS_SCRUB_FORCE_REPAIR")) {
 		if (broken_primaries)
 			str_info(ctx, descr,
@@ -83,12 +82,14 @@ _("Filesystem might not be repairable."));
 	}
 
 	/* Repair (inode) btree damage. */
-	ret = action_list_process_or_defer(ctx, agno, &immediate_alist);
+	ret = repair_item_corruption(ctx, &fix_now);
 	if (ret)
 		goto err;
 
 	/* Everything else gets fixed during phase 4. */
-	action_list_defer(ctx, agno, &alist);
+	ret = repair_item_defer(ctx, &sri);
+	if (ret)
+		goto err;
 	return;
 err:
 	*aborted = true;
@@ -118,7 +119,11 @@ scan_fs_metadata(
 		return;
 	}
 
-	action_list_defer(ctx, agno, &alist);
+	ret = repair_item_defer(ctx, &sri);
+	if (ret) {
+		*aborted = true;
+		return;
+	}
 }
 
 /* Scan all filesystem metadata. */
@@ -151,8 +156,7 @@ phase2_func(
 	ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_SB, 0, &alist, &sri);
 	if (ret)
 		goto out;
-	ret = action_list_process(ctx, &alist,
-			XRM_COMPLAIN_IF_UNFIXED | XRM_NOPROGRESS);
+	ret = repair_item_completely(ctx, &sri);
 	if (ret)
 		goto out;
 
