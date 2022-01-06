@@ -54,6 +54,7 @@ HFILES = \
 	xfs_rmap_btree.h \
 	xfs_sb.h \
 	xfs_shared.h \
+	xfs_swapext.h \
 	xfs_trans_resv.h \
 	xfs_trans_space.h \
 	xfs_dir2_priv.h
@@ -102,6 +103,7 @@ CFILES = cache.c \
 	xfs_rmap_btree.c \
 	xfs_rtbitmap.c \
 	xfs_sb.c \
+	xfs_swapext.c \
 	xfs_symlink_remote.c \
 	xfs_trans_inode.c \
 	xfs_trans_resv.c \
