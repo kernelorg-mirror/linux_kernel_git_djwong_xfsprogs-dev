@@ -319,6 +319,26 @@ AC_DEFUN([AC_HAVE_GETFSMAP],
     AC_SUBST(have_getfsmap)
   ])
 
+#
+# Check if we have a FS_IOC_GETFSREFCOUNTS ioctl (Linux)
+#
+AC_DEFUN([AC_HAVE_GETFSREFCOUNTS],
+  [ AC_MSG_CHECKING([for GETFSREFCOUNTS])
+    AC_TRY_LINK([
+#define _GNU_SOURCE
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <linux/fs.h>
+#include <linux/fsrefcounts.h>
+    ], [
+         unsigned long x = FS_IOC_GETFSREFCOUNTS;
+         struct fsrefs_head fh;
+    ], have_getfsrefcounts=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_getfsrefcounts)
+  ])
+
 AC_DEFUN([AC_HAVE_STATFS_FLAGS],
   [
     AC_CHECK_TYPE(struct statfs,
