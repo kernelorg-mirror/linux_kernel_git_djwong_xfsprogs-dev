@@ -24,10 +24,6 @@ int scrub_ag_metadata(struct scrub_ctx *ctx, xfs_agnumber_t agno,
 int scrub_fs_metadata(struct scrub_ctx *ctx, struct action_list *alist);
 int scrub_iscan(struct scrub_ctx *ctx, struct action_list *alist);
 int scrub_summary(struct scrub_ctx *ctx, struct action_list *alist);
-int scrub_fs_counters(struct scrub_ctx *ctx, struct action_list *alist);
-int scrub_quotacheck(struct scrub_ctx *ctx, struct action_list *alist);
-int scrub_nlinks(struct scrub_ctx *ctx, struct action_list *alist);
-int scrub_clean_health(struct scrub_ctx *ctx, struct action_list *alist);
 int scrub_meta_type(struct scrub_ctx *ctx, unsigned int type,
 		xfs_agnumber_t agno, struct action_list *alist);
 
