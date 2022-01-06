@@ -51,6 +51,7 @@ scrub_inode(
 	struct scrub_item	sri;
 	struct scrub_inode_ctx	*ictx = arg;
 	struct ptcounter	*icount = ictx->icount;
+	unsigned int		to_check;
 	int			fd = -1;
 	int			error;
 
@@ -67,25 +68,11 @@ scrub_inode(
 
 	/* Scrub the inode. */
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_INODE);
-	error = scrub_item_check_file(ctx, &sri, fd);
-	if (error)
-		goto out;
-
-	error = repair_item_corruption(ctx, &sri);
-	if (error)
-		goto out;
 
 	/* Scrub all block mappings. */
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_BMBTD);
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_BMBTA);
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_BMBTC);
-	error = scrub_item_check_file(ctx, &sri, fd);
-	if (error)
-		goto out;
-
-	error = repair_item_corruption(ctx, &sri);
-	if (error)
-		goto out;
 
 	/* Check everything accessible via file mapping. */
 	if (S_ISLNK(bstat->bs_mode))
@@ -95,14 +82,42 @@ scrub_inode(
 
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_XATTR);
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_PARENT);
+
+	/*
+	 * Try to check all of the metadata items that we just scheduled.  If
+	 * we return with some types still needing a check, try repairing any
+	 * damaged metadata that we've found so far, and try again.  Abort if
+	 * we stop making forward progress.
+	 */
 	error = scrub_item_check_file(ctx, &sri, fd);
 	if (error)
 		goto out;
 
-	/* Try to repair the file while it's open. */
-	error = repair_item_corruption(ctx, &sri);
-	if (error)
-		goto out;
+	to_check = scrub_item_count_needscheck(&sri);
+	while (to_check > 0) {
+		unsigned int	nr;
+
+		error = repair_item_corruption(ctx, &sri);
+		if (error)
+			goto out;
+
+		error = scrub_item_check_file(ctx, &sri, fd);
+		if (error)
+			goto out;
+
+		nr = scrub_item_count_needscheck(&sri);
+		if (nr == to_check) {
+			char	descr[DESCR_BUFSZ];
+
+			scrub_render_ino_descr(ctx, descr, DESCR_BUFSZ,
+					bstat->bs_ino, bstat->bs_gen, NULL);
+			str_corrupt(ctx, descr,
+	_("Unable to make forward checking progress."));
+			ictx->aborted = true;
+			goto out;
+		}
+		to_check = nr;
+	}
 
 out:
 	if (error)
