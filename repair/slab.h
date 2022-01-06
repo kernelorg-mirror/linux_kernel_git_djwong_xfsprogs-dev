@@ -26,7 +26,7 @@ extern void *pop_slab_cursor(struct xfs_slab_cursor *);
 
 struct xfs_bag;
 
-extern int init_bag(struct xfs_bag **);
+extern int init_bag(struct xfs_bag **bagp, size_t recsize);
 extern void free_bag(struct xfs_bag **);
 extern int bag_add(struct xfs_bag *, void *);
 extern int bag_remove(struct xfs_bag *, size_t);
