@@ -70,5 +70,7 @@ extern int populate_realtime_rmapbt(struct xfs_mount *mp);
 
 extern bool is_rtrefcount_ino(xfs_ino_t ino);
 extern void forget_rtrefcount(void);
+extern xfs_ino_t get_rtrefc_ino(void);
+extern int populate_realtime_refcbt(struct xfs_mount *mp);
 
 #endif /* RMAP_H_ */
