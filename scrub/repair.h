@@ -31,8 +31,8 @@ void action_list_find_mustfix(struct action_list *actions,
 #define ALP_COMPLAIN_IF_UNFIXED	(XRM_COMPLAIN_IF_UNFIXED)
 #define ALP_NOPROGRESS		(1U << 31)
 
-int action_list_process(struct scrub_ctx *ctx, int fd,
-		struct action_list *alist, unsigned int repair_flags);
+int action_list_process(struct scrub_ctx *ctx, struct action_list *alist,
+		unsigned int repair_flags);
 void action_list_defer(struct scrub_ctx *ctx, xfs_agnumber_t agno,
 		struct action_list *alist);
 int action_list_process_or_defer(struct scrub_ctx *ctx, xfs_agnumber_t agno,
