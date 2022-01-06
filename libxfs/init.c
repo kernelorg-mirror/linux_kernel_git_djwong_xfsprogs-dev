@@ -471,7 +471,7 @@ rtmount_init(
 		(uint)sizeof(xfs_suminfo_t) * mp->m_rsumlevels *
 		mp->m_sb.sb_rbmblocks;
 	mp->m_rsumsize = roundup(mp->m_rsumsize, mp->m_sb.sb_blocksize);
-	mp->m_rbmip = mp->m_rsumip = NULL;
+	mp->m_rbmip = mp->m_rsumip = mp->m_rrmapip = NULL;
 
 	/*
 	 * Allow debugger to be run without the realtime device present.
@@ -1007,11 +1007,13 @@ out_da:
 void
 libxfs_rtmount_destroy(xfs_mount_t *mp)
 {
+	if (mp->m_rrmapip)
+		libxfs_imeta_irele(mp->m_rrmapip);
 	if (mp->m_rsumip)
 		libxfs_imeta_irele(mp->m_rsumip);
 	if (mp->m_rbmip)
 		libxfs_imeta_irele(mp->m_rbmip);
-	mp->m_rsumip = mp->m_rbmip = NULL;
+	mp->m_rsumip = mp->m_rbmip = mp->m_rrmapip = NULL;
 }
 
 /* Flush a device and report on writes that didn't make it to stable storage. */
