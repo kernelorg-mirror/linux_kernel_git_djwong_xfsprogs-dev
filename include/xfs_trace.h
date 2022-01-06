@@ -13,8 +13,8 @@
 #define trace_xfbtree_trans_cancel_buf(...)	((void) 0)
 #define trace_xfbtree_trans_commit_buf(...)	((void) 0)
 
+#define trace_xfs_agfl_free_defer(...)		((void) 0)
 #define trace_xfs_agfl_reset(a,b,c,d)		((void) 0)
-#define trace_xfs_agfl_free_defer(a,b,c,d,e)	((void) 0)
 #define trace_xfs_alloc_cur_check(a,b,c,d,e,f)	((void) 0)
 #define trace_xfs_alloc_cur(a)			((void) 0)
 #define trace_xfs_alloc_cur_left(a)		((void) 0)
@@ -223,8 +223,7 @@
 #define trace_xfs_defer_cancel_list(a,b)	((void) 0)
 #define trace_xfs_defer_create_intent(a,b)	((void) 0)
 
-#define trace_xfs_bmap_free_defer(...)		((void) 0)
-#define trace_xfs_bmap_free_deferred(...)	((void) 0)
+#define trace_xfs_extent_free_defer(...)	((void) 0)
 
 #define trace_xfs_rmap_map(...)			((void) 0)
 #define trace_xfs_rmap_map_error(...)		((void) 0)
