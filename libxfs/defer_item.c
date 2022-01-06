@@ -23,6 +23,14 @@
 
 /* Dummy defer item ops, since we don't do logging. */
 
+/* Dummy add item function. */
+static void
+xfs_dummy_add_item(
+	struct xfs_mount		*mp,
+	const struct list_head		*item)
+{
+}
+
 /* Extent Freeing */
 
 /* Sort bmap items by AG. */
@@ -101,6 +109,7 @@ xfs_extent_free_abort_intent(
 /* Cancel a free extent. */
 STATIC void
 xfs_extent_free_cancel_item(
+	struct xfs_mount		*mp,
 	struct list_head		*item)
 {
 	struct xfs_extent_free_item	*free;
@@ -115,6 +124,7 @@ const struct xfs_defer_op_type xfs_extent_free_defer_type = {
 	.create_done	= xfs_extent_free_create_done,
 	.finish_item	= xfs_extent_free_finish_item,
 	.cancel_item	= xfs_extent_free_cancel_item,
+	.add_item	= xfs_dummy_add_item,
 };
 
 /*
@@ -156,6 +166,7 @@ const struct xfs_defer_op_type xfs_agfl_free_defer_type = {
 	.create_done	= xfs_extent_free_create_done,
 	.finish_item	= xfs_agfl_free_finish_item,
 	.cancel_item	= xfs_extent_free_cancel_item,
+	.add_item	= xfs_dummy_add_item,
 };
 
 /* Reverse Mapping */
@@ -236,6 +247,7 @@ xfs_rmap_update_abort_intent(
 /* Cancel a deferred rmap update. */
 STATIC void
 xfs_rmap_update_cancel_item(
+	struct xfs_mount		*mp,
 	struct list_head		*item)
 {
 	struct xfs_rmap_intent		*rmap;
@@ -251,6 +263,7 @@ const struct xfs_defer_op_type xfs_rmap_update_defer_type = {
 	.finish_item	= xfs_rmap_update_finish_item,
 	.finish_cleanup = xfs_rmap_finish_one_cleanup,
 	.cancel_item	= xfs_rmap_update_cancel_item,
+	.add_item	= xfs_dummy_add_item,
 };
 
 /* Reference Counting */
@@ -339,6 +352,7 @@ xfs_refcount_update_abort_intent(
 /* Cancel a deferred refcount update. */
 STATIC void
 xfs_refcount_update_cancel_item(
+	struct xfs_mount		*mp,
 	struct list_head		*item)
 {
 	struct xfs_refcount_intent	*refc;
@@ -354,6 +368,7 @@ const struct xfs_defer_op_type xfs_refcount_update_defer_type = {
 	.finish_item	= xfs_refcount_update_finish_item,
 	.finish_cleanup = xfs_refcount_finish_one_cleanup,
 	.cancel_item	= xfs_refcount_update_cancel_item,
+	.add_item	= xfs_dummy_add_item,
 };
 
 /* Inode Block Mapping */
@@ -438,6 +453,7 @@ xfs_bmap_update_abort_intent(
 /* Cancel a deferred rmap update. */
 STATIC void
 xfs_bmap_update_cancel_item(
+	struct xfs_mount		*mp,
 	struct list_head		*item)
 {
 	struct xfs_bmap_intent		*bmap;
@@ -452,4 +468,5 @@ const struct xfs_defer_op_type xfs_bmap_update_defer_type = {
 	.create_done	= xfs_bmap_update_create_done,
 	.finish_item	= xfs_bmap_update_finish_item,
 	.cancel_item	= xfs_bmap_update_cancel_item,
+	.add_item	= xfs_dummy_add_item,
 };
