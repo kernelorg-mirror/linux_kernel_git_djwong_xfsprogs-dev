@@ -452,3 +452,81 @@ void xfs_dirattr_mark_sick(struct xfs_inode *ip, int whichfork) { }
 void xfs_da_mark_sick(struct xfs_da_args *args) { }
 void xfs_inode_mark_sick(struct xfs_inode *ip, unsigned int mask) { }
 void xfs_rt_mark_sick(struct xfs_mount *mp, unsigned int mask) { }
+
+/* Create a metadata for the last component of the path. */
+STATIC int
+libxfs_imeta_mkdir(
+	struct xfs_mount		*mp,
+	const struct xfs_imeta_path	*path)
+{
+	struct xfs_imeta_update		upd;
+	struct xfs_inode		*ip = NULL;
+	struct xfs_trans		*tp = NULL;
+	uint				resblks;
+	int				error;
+
+	/* Try to place metadata directories in AG 0. */
+	mp->m_agirotor = 0;
+
+	error = xfs_imeta_start_update(mp, path, &upd);
+	if (error)
+		return error;
+
+	/* Allocate a transaction to create the last directory. */
+	resblks = libxfs_imeta_create_space_res(mp);
+	error = libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create, resblks,
+			0, 0, &tp);
+	if (error)
+		goto out_end;
+
+	/* Create the subdirectory. */
+	error = libxfs_imeta_create(&tp, path, S_IFDIR, 0, &ip, &upd);
+	if (error)
+		goto out_trans_cancel;
+
+	error = libxfs_trans_commit(tp);
+
+	/*
+	 * We don't pass the directory we just created to the caller, so finish
+	 * setting up the inode, then release the dir.
+	 */
+	goto out_irele;
+
+out_trans_cancel:
+	libxfs_trans_cancel(tp);
+out_irele:
+	if (ip)
+		libxfs_irele(ip);
+out_end:
+	libxfs_imeta_end_update(mp, &upd, error);
+	return error;
+}
+
+/*
+ * Make sure that every metadata directory path component exists and is a
+ * directory.
+ */
+int
+libxfs_imeta_ensure_dirpath(
+	struct xfs_mount		*mp,
+	const struct xfs_imeta_path	*path)
+{
+	struct xfs_imeta_path		temp_path = {
+		.im_path		= path->im_path,
+		.im_depth		= 1,
+		.im_ftype		= XFS_DIR3_FT_DIR,
+	};
+	unsigned int			i;
+	int				error = 0;
+
+	if (!xfs_has_metadir(mp))
+		return 0;
+
+	for (i = 0; i < path->im_depth - 1; i++, temp_path.im_depth++) {
+		error = libxfs_imeta_mkdir(mp, &temp_path);
+		if (error && error != -EEXIST)
+			break;
+	}
+
+	return error == -EEXIST ? 0 : error;
+}
