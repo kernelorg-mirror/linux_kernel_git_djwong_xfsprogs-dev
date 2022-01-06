@@ -67,6 +67,7 @@ scrub_ioctl(
 	case XFROG_SCRUB_GROUP_NONE:
 	case XFROG_SCRUB_GROUP_FS:
 	case XFROG_SCRUB_GROUP_SUMMARY:
+	case XFROG_SCRUB_GROUP_ISCAN:
 		/* no control parameters */
 		break;
 	}
@@ -165,6 +166,7 @@ parse_args(
 	case XFROG_SCRUB_GROUP_FS:
 	case XFROG_SCRUB_GROUP_NONE:
 	case XFROG_SCRUB_GROUP_SUMMARY:
+	case XFROG_SCRUB_GROUP_ISCAN:
 		if (optind != argc) {
 			fprintf(stderr,
 				_("No parameters allowed.\n"));
@@ -254,6 +256,7 @@ repair_ioctl(
 	case XFROG_SCRUB_GROUP_NONE:
 	case XFROG_SCRUB_GROUP_FS:
 	case XFROG_SCRUB_GROUP_SUMMARY:
+	case XFROG_SCRUB_GROUP_ISCAN:
 		/* no control parameters */
 		break;
 	}
