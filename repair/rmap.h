@@ -15,7 +15,7 @@ extern void rmaps_init(struct xfs_mount *);
 extern void rmaps_free(struct xfs_mount *);
 
 void rmap_add_rec(struct xfs_mount *mp, xfs_ino_t ino, int whichfork,
-		struct xfs_bmbt_irec *irec);
+		struct xfs_bmbt_irec *irec, bool realtime);
 void rmap_add_bmbt_rec(struct xfs_mount *mp, xfs_ino_t ino, int whichfork,
 		xfs_fsblock_t fsbno);
 bool rmaps_are_mergeable(struct xfs_rmap_irec *r1, struct xfs_rmap_irec *r2);
@@ -58,5 +58,9 @@ int rmap_init_mem_cursor(struct xfs_mount *mp, struct xfs_trans *tp,
 void rmap_free_mem_cursor(struct xfs_trans *tp, struct rmap_mem_cur *rmcur,
 		int error);
 int rmap_get_mem_rec(struct rmap_mem_cur *rmcur, struct xfs_rmap_irec *irec);
+
+#define for_each_rmap_group(mp, agno) \
+	for ((agno) = NULLAGNUMBER; (agno) == NULLAGNUMBER || \
+	(agno) < (mp)->m_sb.sb_agcount; (agno)++)
 
 #endif /* RMAP_H_ */
