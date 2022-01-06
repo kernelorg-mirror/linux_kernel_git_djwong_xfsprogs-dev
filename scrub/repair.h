@@ -8,8 +8,6 @@
 
 struct action_list {
 	struct list_head	list;
-	size_t			nr;
-	bool			sorted;
 };
 
 struct action_item;
