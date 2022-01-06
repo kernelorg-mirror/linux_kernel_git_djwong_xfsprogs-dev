@@ -69,6 +69,7 @@ bulkstat_help(void)
 "   -d         Print debugging output.\n"
 "   -q         Be quiet, no output.\n"
 "   -e <ino>   Stop after this inode.\n"
+"   -m         Include metadata directories.\n"
 "   -n <nr>    Ask for this many results at once.\n"
 "   -s <ino>   Inode to start with.\n"
 "   -v <ver>   Use this version of the ioctl (1 or 5).\n"));
@@ -106,11 +107,12 @@ bulkstat_f(
 	bool			has_agno = false;
 	bool			debug = false;
 	bool			quiet = false;
+	bool			metadir = false;
 	unsigned int		i;
 	int			c;
 	int			ret;
 
-	while ((c = getopt(argc, argv, "a:de:n:qs:v:")) != -1) {
+	while ((c = getopt(argc, argv, "a:de:mn:qs:v:")) != -1) {
 		switch (c) {
 		case 'a':
 			agno = cvt_u32(optarg, 10);
@@ -129,6 +131,9 @@ bulkstat_f(
 				perror(optarg);
 				return 1;
 			}
+			break;
+		case 'm':
+			metadir = true;
 			break;
 		case 'n':
 			batch_size = cvt_u32(optarg, 10);
@@ -184,6 +189,8 @@ bulkstat_f(
 
 	if (has_agno)
 		xfrog_bulkstat_set_ag(breq, agno);
+	if (metadir)
+		breq->hdr.flags |= XFS_BULK_IREQ_METADIR;
 
 	set_xfd_flags(&xfd, ver);
 
@@ -252,6 +259,7 @@ bulkstat_single_f(
 	unsigned long		ver = 0;
 	unsigned int		i;
 	bool			debug = false;
+	bool			metadir = false;
 	int			c;
 	int			ret;
 
@@ -259,6 +267,9 @@ bulkstat_single_f(
 		switch (c) {
 		case 'd':
 			debug = true;
+			break;
+		case 'm':
+			metadir = true;
 			break;
 		case 'v':
 			errno = 0;
@@ -311,6 +322,9 @@ bulkstat_single_f(
 				return 0;
 			}
 		}
+
+		if (metadir)
+			flags |= XFS_BULK_IREQ_METADIR;
 
 		ret = -xfrog_bulkstat_single(&xfd, ino, flags, &bulkstat);
 		if (ret) {
