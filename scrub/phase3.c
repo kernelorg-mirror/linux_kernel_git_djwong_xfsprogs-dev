@@ -80,7 +80,7 @@ inode_action_list_process_or_defer(
 	int			ret;
 
 	ret = action_list_process(ctx, fd, alist,
-			ALP_REPAIR_ONLY | ALP_NOPROGRESS);
+			XRM_REPAIR_ONLY | XRM_NOPROGRESS);
 	if (ret)
 		return ret;
 
