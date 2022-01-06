@@ -27,6 +27,7 @@ int scrub_quota_metadata(struct scrub_ctx *ctx, struct action_list *alist);
 int scrub_iscan(struct scrub_ctx *ctx, struct action_list *alist);
 int scrub_summary(struct scrub_ctx *ctx, struct action_list *alist);
 int scrub_fs_counters(struct scrub_ctx *ctx, struct action_list *alist);
+int scrub_quotacheck(struct scrub_ctx *ctx, struct action_list *alist);
 
 bool can_scrub_fs_metadata(struct scrub_ctx *ctx);
 bool can_scrub_inode(struct scrub_ctx *ctx);
