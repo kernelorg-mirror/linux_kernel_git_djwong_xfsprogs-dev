@@ -33,6 +33,7 @@ struct xfs_ag_rmap {
 	struct xfs_slab	*ar_refcount_items;	/* refcount items, p4-5 */
 };
 
+/* One ag_rmap per AG, and one more for the realtime device. */
 static struct xfs_ag_rmap *ag_rmaps;
 bool rmapbt_suspect;
 static bool refcbt_suspect;
@@ -40,6 +41,17 @@ static bool refcbt_suspect;
 static inline int rmap_compare(const void *a, const void *b)
 {
 	return libxfs_rmap_compare(a, b);
+}
+
+/*
+ * Return the ag_rmap for a given AG.
+ * Note that NULLAGNUMBER (-1) is the realtime device.
+ */
+static struct xfs_ag_rmap*
+rmap_for_ag(
+	xfs_agnumber_t		agno)
+{
+	return &ag_rmaps[(signed)agno];
 }
 
 /*
@@ -75,6 +87,37 @@ rmaps_destroy(
 	xfbtree_destroy(ag_rmap->ar_xfbtree);
 	libxfs_buftarg_free(target);
 	xfile_destroy(xfile);
+}
+
+/* Initialize the in-memory rmap btree for collecting realtime rmap records. */
+STATIC void
+rmaps_init_rt(
+	struct xfs_mount	*mp,
+	struct xfs_ag_rmap	*ag_rmap)
+{
+	struct xfile		*xfile;
+	struct xfs_buftarg	*target;
+	int			error;
+
+	if (!xfs_has_realtime(mp))
+		return;
+
+	error = xfile_create(mp, 0, "rtrmapbt repair", &xfile);
+	if (error)
+		goto nomem;
+
+	error = -libxfs_alloc_memory_buftarg(mp, xfile, &target);
+	if (error)
+		goto nomem;
+
+	error = -libxfs_rtrmapbt_mem_create(mp, target, &ag_rmap->ar_xfbtree);
+	if (error)
+		goto nomem;
+
+	return;
+nomem:
+	do_error(
+_("Insufficient memory while allocating realtime reverse mapping btree."));
 }
 
 /* Initialize the in-memory rmap btree for collecting per-AG rmap records. */
@@ -131,9 +174,14 @@ rmaps_init(
 	if (!rmap_needs_work(mp))
 		return;
 
-	ag_rmaps = calloc(mp->m_sb.sb_agcount, sizeof(struct xfs_ag_rmap));
+	/* One ag_rmap per AG, and one more for the realtime device. */
+	ag_rmaps = calloc(mp->m_sb.sb_agcount + 1, sizeof(struct xfs_ag_rmap));
 	if (!ag_rmaps)
 		do_error(_("couldn't allocate per-AG reverse map roots\n"));
+
+	/* Initialize RT rmap data, then make it the -1st array element. */
+	rmaps_init_rt(mp, &ag_rmaps[0]);
+	ag_rmaps++;
 
 	for (i = 0; i < mp->m_sb.sb_agcount; i++)
 		rmaps_init_ag(mp, i, &ag_rmaps[i]);
@@ -153,6 +201,11 @@ rmaps_free(
 
 	for (i = 0; i < mp->m_sb.sb_agcount; i++)
 		rmaps_destroy(mp, &ag_rmaps[i]);
+
+	/* Unhide the rt rmap data and free it. */
+	ag_rmaps--;
+	rmaps_destroy(mp, &ag_rmaps[0]);
+
 	free(ag_rmaps);
 	ag_rmaps = NULL;
 }
@@ -192,12 +245,17 @@ rmap_init_mem_cursor(
 	struct xfbtree		*xfbt;
 	int			error;
 
-	xfbt = ag_rmaps[agno].ar_xfbtree;
+	xfbt = rmap_for_ag(agno)->ar_xfbtree;
 	error = -xfbtree_head_read_buf(xfbt, tp, &rmcur->mhead_bp);
 	if (error)
 		return error;
 
-	rmcur->mcur = libxfs_rmapbt_mem_cursor(mp, tp, rmcur->mhead_bp, xfbt);
+	if (agno == NULLAGNUMBER)
+		rmcur->mcur = libxfs_rtrmapbt_mem_cursor(mp, tp,
+				rmcur->mhead_bp, xfbt);
+	else
+		rmcur->mcur = libxfs_rmapbt_mem_cursor(mp, tp, rmcur->mhead_bp,
+				xfbt);
 
 	error = -libxfs_btree_goto_left_edge(rmcur->mcur);
 	if (error) {
@@ -257,7 +315,7 @@ rmap_add_mem_rec(
 	struct xfs_trans	*tp;
 	int			error;
 
-	xfbt = ag_rmaps[agno].ar_xfbtree;
+	xfbt = rmap_for_ag(agno)->ar_xfbtree;
 	error = -libxfs_trans_alloc_empty(mp, &tp);
 	if (error)
 		do_error(_("allocating tx for in-memory rmap update\n"));
@@ -289,20 +347,27 @@ rmap_add_rec(
 	struct xfs_mount	*mp,
 	xfs_ino_t		ino,
 	int			whichfork,
-	struct xfs_bmbt_irec	*irec)
+	struct xfs_bmbt_irec	*irec,
+	bool			realtime)
 {
 	struct xfs_rmap_irec	rmap;
 	xfs_agnumber_t		agno;
-	xfs_agblock_t		agbno;
+	xfs_fsblock_t		agbno;
 
 	if (!rmap_needs_work(mp))
 		return;
 
-	agno = XFS_FSB_TO_AGNO(mp, irec->br_startblock);
-	agbno = XFS_FSB_TO_AGBNO(mp, irec->br_startblock);
-	ASSERT(agno != NULLAGNUMBER);
-	ASSERT(agno < mp->m_sb.sb_agcount);
-	ASSERT(agbno + irec->br_blockcount <= mp->m_sb.sb_agblocks);
+	if (realtime) {
+		agno = NULLAGNUMBER;
+		agbno = irec->br_startblock;
+		ASSERT(agbno + irec->br_blockcount <= mp->m_sb.sb_rblocks);
+	} else {
+		agno = XFS_FSB_TO_AGNO(mp, irec->br_startblock);
+		agbno = XFS_FSB_TO_AGBNO(mp, irec->br_startblock);
+		ASSERT(agno != NULLAGNUMBER);
+		ASSERT(agno < mp->m_sb.sb_agcount);
+		ASSERT(agbno + irec->br_blockcount <= mp->m_sb.sb_agblocks);
+	}
 	ASSERT(ino != NULLFSINO);
 	ASSERT(whichfork == XFS_DATA_FORK || whichfork == XFS_ATTR_FORK);
 
@@ -417,7 +482,7 @@ rmap_add_agbtree_mapping(
 
 	assert(libxfs_verify_agbext(mp, agno, agbno, len));
 
-	return slab_add(ag_rmaps[agno].ar_agbtree_rmaps, &rmap);
+	return slab_add(rmap_for_ag(agno)->ar_agbtree_rmaps, &rmap);
 }
 
 static int
@@ -468,6 +533,12 @@ rmap_add_fixed_ag_rec(
 
 	if (!rmap_needs_work(mp))
 		return;
+
+	/* Should never get called for the rt device. */
+	if (agno == NULLAGNUMBER) {
+		ASSERT(0);
+		return;
+	}
 
 	/* sb/agi/agf/agfl headers */
 	rmap_add_ag_rec(mp, agno, 0, XFS_BNO_BLOCK(mp), XFS_RMAP_OWN_FS);
@@ -533,7 +604,7 @@ rmap_commit_agbtree_mappings(
 	struct xfs_buf		*agflbp = NULL;
 	struct xfs_trans	*tp;
 	__be32			*agfl_bno, *b;
-	struct xfs_ag_rmap	*ag_rmap = &ag_rmaps[agno];
+	struct xfs_ag_rmap	*ag_rmap = rmap_for_ag(agno);
 	struct bitmap		*own_ag_bitmap = NULL;
 	int			error = 0;
 
@@ -797,7 +868,7 @@ refcount_emit(
 	int			error;
 	struct xfs_slab		*rlslab;
 
-	rlslab = ag_rmaps[agno].ar_refcount_items;
+	rlslab = rmap_for_ag(agno)->ar_refcount_items;
 	ASSERT(nr_rmaps > 0);
 
 	dbg_printf("REFL: agno=%u pblk=%u, len=%u -> refcount=%zu\n",
@@ -951,7 +1022,7 @@ refcount_push_rmaps_at(
  */
 int
 compute_refcounts(
-	struct xfs_mount		*mp,
+	struct xfs_mount	*mp,
 	xfs_agnumber_t		agno)
 {
 	struct rmap_mem_cur	rmcur;
@@ -968,7 +1039,7 @@ compute_refcounts(
 
 	if (!xfs_has_reflink(mp))
 		return 0;
-	if (ag_rmaps[agno].ar_xfbtree == NULL)
+	if (rmap_for_ag(agno)->ar_xfbtree == NULL)
 		return 0;
 
 	error = rmap_init_mem_cursor(mp, NULL, agno, &rmcur);
@@ -1082,7 +1153,7 @@ rmap_record_count(
 	int			stat;
 	int			error;
 
-	if (ag_rmaps[agno].ar_xfbtree == NULL)
+	if (rmap_for_ag(agno)->ar_xfbtree == NULL)
 		return 0;
 
 	error = rmap_init_mem_cursor(mp, NULL, agno, &rmcur);
@@ -1527,7 +1598,7 @@ refcount_record_count(
 	struct xfs_mount	*mp,
 	xfs_agnumber_t		agno)
 {
-	return slab_count(ag_rmaps[agno].ar_refcount_items);
+	return slab_count(rmap_for_ag(agno)->ar_refcount_items);
 }
 
 /*
@@ -1538,7 +1609,7 @@ init_refcount_cursor(
 	xfs_agnumber_t		agno,
 	struct xfs_slab_cursor	**cur)
 {
-	return init_slab_cursor(ag_rmaps[agno].ar_refcount_items, NULL, cur);
+	return init_slab_cursor(rmap_for_ag(agno)->ar_refcount_items, NULL, cur);
 }
 
 /*
@@ -1733,5 +1804,5 @@ rmap_store_agflcount(
 	if (!rmap_needs_work(mp))
 		return;
 
-	ag_rmaps[agno].ar_flcount = count;
+	rmap_for_ag(agno)->ar_flcount = count;
 }
