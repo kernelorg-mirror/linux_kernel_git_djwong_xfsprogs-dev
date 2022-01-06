@@ -140,6 +140,7 @@ phase3_func(
 {
 	struct scrub_inode_ctx	ictx = { NULL };
 	uint64_t		val;
+	unsigned int		scan_flags = 0;
 	int			err;
 
 	err = ptcounter_alloc(scrub_nproc(ctx), &ictx.icount);
@@ -148,7 +149,10 @@ phase3_func(
 		return err;
 	}
 
-	err = scrub_scan_all_inodes(ctx, scrub_inode, &ictx);
+	if (ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_METADIR)
+		scan_flags |= SCRUB_SCAN_METADIR;
+
+	err = scrub_scan_all_inodes(ctx, scrub_inode, scan_flags, &ictx);
 	if (!err && ictx.aborted)
 		err = ECANCELED;
 	if (err)
