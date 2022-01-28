@@ -99,6 +99,14 @@ try_inode_repair(
 	return repair_file_corruption(ictx->ctx, sri, fd);
 }
 
+/* Is this a realtime file? */
+static inline bool
+is_rtfile(
+	const struct xfs_bulkstat	*bs)
+{
+	return S_ISREG(bs->bs_mode) && (bs->bs_xflags & FS_XFLAG_REALTIME);
+}
+
 /* Verify the contents, xattrs, and extent maps of an inode. */
 static int
 scrub_inode(
@@ -107,6 +115,7 @@ scrub_inode(
 	struct xfs_bulkstat	*bstat,
 	void			*arg)
 {
+	static pthread_mutex_t  rtxlock = PTHREAD_MUTEX_INITIALIZER;
 	struct scrub_item	sri;
 	struct scrub_inode_ctx	*ictx = arg;
 	struct ptcounter	*icount = ictx->icount;
@@ -168,7 +177,15 @@ scrub_inode(
 	 * file metadata that we've found so far, and try checking the file
 	 * again.  Worst case, defer the repairs and the checks to phase 4 if
 	 * we can't make any progress on anything.
+	 *
+	 * Note: The realtime volume does not shard its metadata, which means
+	 * that is is pointless to run multiple threads to scan the data fork
+	 * mappings of realtime files.  Serialize scrub requests to reduce
+	 * lock contention in the kernel, which reduces runtime by ~15% on
+	 * the author's computer.
 	 */
+	if (is_rtfile(bstat))
+		pthread_mutex_lock(&rtxlock);
 	error = scrub_item_check_file(ctx, &sri, fd);
 	if (error)
 		goto out;
@@ -213,6 +230,8 @@ scrub_inode(
 		goto out;
 
 out:
+	if (is_rtfile(bstat))
+		pthread_mutex_unlock(&rtxlock);
 	if (error)
 		ictx->aborted = true;
 
