@@ -520,6 +520,14 @@ directories.
 By default,
 .B mkfs.xfs
 will not enable DAX mode.
+.TP
+.BI concurrency= value
+Create enough allocation groups to handle the desired level of concurrency
+without threads contending for allocation groups.
+This options is not compatible with the agcount or agsize options.
+The magic value
+.I auto
+will set this parameter to the number of active processors in the system.
 .RE
 .TP
 .B \-f

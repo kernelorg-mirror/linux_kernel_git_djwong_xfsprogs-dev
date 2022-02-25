@@ -68,6 +68,7 @@ enum {
 	D_EXTSZINHERIT,
 	D_COWEXTSIZE,
 	D_DAXINHERIT,
+	D_CONCURRENCY,
 	D_MAX_OPTS,
 };
 
@@ -299,6 +300,7 @@ static struct opt_params dopts = {
 		[D_EXTSZINHERIT] = "extszinherit",
 		[D_COWEXTSIZE] = "cowextsize",
 		[D_DAXINHERIT] = "daxinherit",
+		[D_CONCURRENCY] = "concurrency",
 	},
 	.subopt_params = {
 		{ .index = D_AGCOUNT,
@@ -419,6 +421,14 @@ static struct opt_params dopts = {
 		  .minval = 0,
 		  .maxval = 1,
 		  .defaultval = 1,
+		},
+		{ .index = D_CONCURRENCY,
+		  .conflicts = { { &dopts, D_AGCOUNT },
+				 { &dopts, D_AGSIZE },
+				 { NULL, LAST_CONFLICT } },
+		  .minval = 1,
+		  .maxval = UINT_MAX,
+		  .defaultval = 0,
 		},
 	},
 };
@@ -865,6 +875,7 @@ struct cli_params {
 
 	/* parameters where 0 is not a valid CLI value but is a valid value */
 	unsigned int	log_concurrency;
+	unsigned int	data_concurrency;
 
 	/* feature flags that are set */
 	struct sb_feat_args	sb_feat;
@@ -1586,6 +1597,12 @@ data_opts_parser(
 			cli->fsx.fsx_xflags |= FS_XFLAG_DAX;
 		else
 			cli->fsx.fsx_xflags &= ~FS_XFLAG_DAX;
+		break;
+	case D_CONCURRENCY:
+		if (!strcmp(value, "auto"))
+			cli->data_concurrency = sysconf(_SC_NPROCESSORS_ONLN);
+		else
+			cli->data_concurrency = getnum(value, opts, subopt);
 		break;
 	default:
 		return -EINVAL;
@@ -3009,7 +3026,20 @@ calculate_initial_ag_geometry(
 	struct mkfs_params	*cfg,
 	struct cli_params	*cli)
 {
-	if (cli->agsize) {		/* User-specified AG size */
+	if (cli->data_concurrency) {
+		unsigned long long	agblocks;
+
+		/*
+		 * Create enough allocation groups so that each writer thread
+		 * can (in theory) allocate space from its own allocation
+		 * group.
+		 */
+		agblocks = cfg->dblocks / cli->data_concurrency;
+		agblocks = min(agblocks, XFS_AG_MAX_BLOCKS(cfg->blocklog));
+		agblocks = max(agblocks, XFS_AG_MIN_BLOCKS(cfg->blocklog));
+		cfg->agsize = agblocks;
+		cfg->agcount = howmany(cfg->dblocks, cfg->agsize);
+	} else if (cli->agsize) {	/* User-specified AG size */
 		cfg->agsize = getnum(cli->agsize, &dopts, D_AGSIZE);
 
 		/*
