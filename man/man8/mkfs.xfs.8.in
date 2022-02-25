@@ -780,6 +780,15 @@ if you want to disable this feature for older kernels which don't support
 it.
 .IP
 This option is only tunable on the deprecated V4 format.
+.TP
+.BI concurrency= value
+Allocate a log that is estimated to be large enough to handle the desired level
+of concurrency without userspace program threads contending for log space.
+This options is only valid for internal logs and is not compatible with the
+size option.
+The magic value
+.I auto
+will set this parameter to the number of active processors in the system.
 .RE
 .PP
 .PD 0
