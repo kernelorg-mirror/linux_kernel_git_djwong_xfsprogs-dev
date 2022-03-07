@@ -1,0 +1,11 @@
+[Unit]
+Description=Online XFS Metadata and Media Check Failure Reporting for %I
+Documentation=man:xfs_scrub(8)
+
+[Service]
+Type=oneshot
+Environment=EMAIL_ADDR=root
+ExecStart=@pkg_lib_dir@/@pkg_name@/xfs_scrub_fail "${EMAIL_ADDR}" xfs_scrub_media %I
+User=mail
+Group=mail
+SupplementaryGroups=systemd-journal
