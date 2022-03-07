@@ -1,0 +1,14 @@
+[Unit]
+Description=Periodic XFS Online Metadata and Media Check for All Filesystems
+
+[Timer]
+# Run on the second Sunday at 3:10am, to avoid running afoul of DST changes
+# and the regular metadata scrubber.  If you do not want to run media scans,
+# run "systemctl disable xfs_scrub_all_media.timer" and see xfs_scrub_all.timer
+# for details on running it every Sunday.
+OnCalendar=Sun *-*-8..14 03:10:00
+RandomizedDelaySec=60
+Persistent=true
+
+[Install]
+WantedBy=timers.target

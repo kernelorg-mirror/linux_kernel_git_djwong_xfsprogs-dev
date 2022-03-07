@@ -21,7 +21,9 @@ xfs_scrub@.service \
 xfs_scrub_all.service \
 xfs_scrub_all.timer \
 xfs_scrub_media_fail@.service \
-xfs_scrub_media@.service
+xfs_scrub_media@.service \
+xfs_scrub_all_media.service \
+xfs_scrub_all_media.timer
 OPTIONAL_TARGETS += $(SYSTEMD_SERVICES)
 endif
 ifeq ($(HAVE_CROND),yes)
