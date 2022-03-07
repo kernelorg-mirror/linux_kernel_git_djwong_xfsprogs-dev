@@ -15,7 +15,13 @@ XFS_SCRUB_ALL_PROG = xfs_scrub_all
 XFS_SCRUB_ARGS = -b -n
 ifeq ($(HAVE_SYSTEMD),yes)
 INSTALL_SCRUB += install-systemd
-SYSTEMD_SERVICES = xfs_scrub@.service xfs_scrub_all.service xfs_scrub_all.timer xfs_scrub_fail@.service
+SYSTEMD_SERVICES = \
+xfs_scrub_fail@.service \
+xfs_scrub@.service \
+xfs_scrub_all.service \
+xfs_scrub_all.timer \
+xfs_scrub_media_fail@.service \
+xfs_scrub_media@.service
 OPTIONAL_TARGETS += $(SYSTEMD_SERVICES)
 endif
 ifeq ($(HAVE_CROND),yes)
