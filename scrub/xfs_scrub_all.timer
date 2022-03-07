@@ -2,8 +2,11 @@
 Description=Periodic XFS Online Metadata Check for All Filesystems
 
 [Timer]
-# Run on Sunday at 3:10am, to avoid running afoul of DST changes
-OnCalendar=Sun *-*-* 03:10:00
+# Run on the first, third, fourth, or fifth Sunday at 3:10am, to avoid running
+# afoul of DST changes and the metadata+media scrubber.  If you disable the
+# xfs_scrub_all_media timer, change the "1..7,15..31" below to "*" to run the
+# metadata scanner every Sunday.
+OnCalendar=Sun *-*-1..7,15..31 03:10:00
 RandomizedDelaySec=60
 Persistent=true
 
