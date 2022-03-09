@@ -20,44 +20,111 @@
 
 /* Phase 4: Repair filesystem. */
 
-/* Fix all the problems in our per-AG list. */
+struct repair_worker_ctx {
+	/* Count of metadata repairs queued in ctx->repair_list */
+	unsigned long long		unfixed;
+
+	/* Action items that did not resolve. */
+	struct action_list		failed_list;
+
+	/* If true, a fatal error occurred, and all threads should stop. */
+	bool				aborted;
+
+	/*
+	 * If true, we failed to make any progress on repairs, so break out of
+	 * the threaded context and single-step the repairs.
+	 */
+	bool				single_step;
+};
+
+/* Try to repair as many things on our list as we can. */
 static void
-repair_ag(
+repair_worker(
 	struct workqueue		*wq,
 	xfs_agnumber_t			agno,
 	void				*priv)
 {
 	struct scrub_ctx		*ctx = (struct scrub_ctx *)wq->wq_ctx;
-	bool				*aborted = priv;
-	struct action_list		*alist;
-	unsigned long long		unfixed;
-	unsigned long long		new_unfixed;
-	unsigned int			flags = 0;
+	struct repair_worker_ctx	*rwc = priv;
 	int				ret;
 
-	alist = &ctx->action_lists[agno];
-	unfixed = action_list_length(alist);
+	while (!rwc->aborted) {
+		struct action_item	*aitem;
+		bool			ok_now;
 
-	/* Repair anything broken until we fail to make progress. */
-	do {
-		ret = action_list_process(ctx, alist, flags);
-		if (ret) {
-			*aborted = true;
+		pthread_mutex_lock(&ctx->lock);
+
+		/*
+		 * If somebody decided to fall back to single-step repair mode,
+		 * we might as well exit.
+		 */
+		if (rwc->single_step) {
+			pthread_mutex_unlock(&ctx->lock);
 			return;
 		}
-		new_unfixed = action_list_length(alist);
-		if (new_unfixed == unfixed)
-			break;
-		unfixed = new_unfixed;
-		if (*aborted)
-			return;
-	} while (unfixed > 0);
 
-	/* Try once more, but this time complain if we can't fix things. */
-	flags |= XRM_COMPLAIN_IF_UNFIXED;
-	ret = action_list_process(ctx, alist, flags);
-	if (ret)
-		*aborted = true;
+		/*
+		 * If there's nothing in the main repair list, we've finished a
+		 * round of repair.  What happens next depends on the list of
+		 * repairs that failed...
+		 */
+		if (action_list_empty(ctx->repair_list)) {
+			unsigned long long	still_unfixed;
+
+			/*
+			 * ... if we didn't requeue a repair, then we're just
+			 * plain done.
+			 */
+			still_unfixed = action_list_length(&rwc->failed_list);
+			if (still_unfixed == 0) {
+				pthread_mutex_unlock(&ctx->lock);
+				return;
+			}
+
+			action_list_append(ctx->repair_list, &rwc->failed_list);
+
+			/*
+			 * ...if we didn't make any progress on repairs, then
+			 * we want all the threads to exit so that we can run
+			 * the repairs one more time in single-step mode.
+			 */
+			if (rwc->unfixed == still_unfixed) {
+				rwc->single_step = true;
+				pthread_mutex_unlock(&ctx->lock);
+				return;
+			}
+
+			/*
+			 * ...otherwise, we just refilled the main repair list.
+			 * Remember the number of repairs that we think we're
+			 * going to do in this round.
+			 */
+			rwc->unfixed = still_unfixed;
+		}
+
+		/* Grab the first repair item and unlock. */
+		aitem = action_list_pop(ctx->repair_list);
+		pthread_mutex_unlock(&ctx->lock);
+
+		ret = action_item_try_repair(ctx, aitem, &ok_now);
+		if (ret) {
+			rwc->aborted = true;
+			break;
+		}
+
+		/*
+		 * If this filesystem object still requires repairs, requeue
+		 * the item to the failed repair list and move down the list.
+		 * If it's repaired now, delete the action item.
+		 */
+		if (ok_now) {
+			free(aitem);
+		} else {
+			pthread_mutex_lock(&ctx->lock);
+			action_list_push(&rwc->failed_list, aitem);
+			pthread_mutex_unlock(&ctx->lock);
+		}
+	}
 }
 
 /* Process all the action items. */
@@ -66,9 +133,12 @@ repair_everything(
 	struct scrub_ctx		*ctx)
 {
 	struct workqueue		wq;
+	struct repair_worker_ctx	rwc = { };
 	xfs_agnumber_t			agno;
-	bool				aborted = false;
 	int				ret;
+
+	rwc.unfixed = action_list_length(ctx->repair_list);
+	action_list_init(&rwc.failed_list);
 
 	ret = -workqueue_create(&wq, (struct xfs_mount *)ctx,
 			scrub_nproc_workqueue(ctx));
@@ -76,11 +146,9 @@ repair_everything(
 		str_liberror(ctx, ret, _("creating repair workqueue"));
 		return ret;
 	}
-	for (agno = 0; !aborted && agno < ctx->mnt.fsgeom.agcount; agno++) {
-		if (action_list_length(&ctx->action_lists[agno]) == 0)
-			continue;
 
-		ret = -workqueue_add(&wq, repair_ag, agno, &aborted);
+	for (agno = 0; !rwc.aborted && agno < ctx->mnt.fsgeom.agcount; agno++) {
+		ret = -workqueue_add(&wq, repair_worker, 0, &rwc);
 		if (ret) {
 			str_liberror(ctx, ret, _("queueing repair work"));
 			break;
@@ -92,25 +160,11 @@ repair_everything(
 		str_liberror(ctx, ret, _("finishing repair work"));
 	workqueue_destroy(&wq);
 
-	if (aborted)
+	if (rwc.aborted)
 		return ECANCELED;
 
-	return 0;
-}
-
-/* Decide if we have any repair work to do. */
-static inline bool
-have_action_items(
-	struct scrub_ctx	*ctx)
-{
-	xfs_agnumber_t		agno;
-
-	for (agno = 0; agno < ctx->mnt.fsgeom.agcount; agno++) {
-		if (action_list_length(&ctx->action_lists[agno]) > 0)
-			return true;
-	}
-
-	return false;
+	/* Try once more, but this time complain if we can't fix things. */
+	return action_list_process(ctx, ctx->repair_list, XRM_COMPLAIN_IF_UNFIXED);
 }
 
 /* Trim the unused areas of the filesystem if the caller asked us to. */
@@ -132,7 +186,7 @@ phase4_func(
 	struct scrub_item	sri;
 	int			ret;
 
-	if (!have_action_items(ctx))
+	if (action_list_empty(ctx->repair_list))
 		goto maybe_trim;
 
 	/*
@@ -190,12 +244,12 @@ phase4_estimate(
 	unsigned int		*nr_threads,
 	int			*rshift)
 {
-	xfs_agnumber_t		agno;
-	unsigned long long	need_fixing = 0;
+	unsigned long long	need_fixing;
 
-	for (agno = 0; agno < ctx->mnt.fsgeom.agcount; agno++)
-		need_fixing += action_list_length(&ctx->action_lists[agno]);
+	/* Everything on the repair list plus FSTRIM. */
+	need_fixing = action_list_length(ctx->repair_list);
 	need_fixing++;
+
 	*items = need_fixing;
 	*nr_threads = scrub_nproc(ctx) + 1;
 	*rshift = 0;
