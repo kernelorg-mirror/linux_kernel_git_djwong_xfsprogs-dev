@@ -356,34 +356,28 @@ repair_item_mustfix(
 	}
 }
 
-/*
- * Allocate a certain number of repair lists for the scrub context.  Returns
- * zero or a positive error number.
- */
+/* Create a new repair action list. */
 int
-action_lists_alloc(
-	size_t				nr,
-	struct action_list		**listsp)
+action_list_alloc(
+	struct action_list		**listp)
 {
-	struct action_list		*lists;
-	xfs_agnumber_t			agno;
+	struct action_list		*alist;
 
-	lists = calloc(nr, sizeof(struct action_list));
-	if (!lists)
+	alist = malloc(sizeof(struct action_list));
+	if (!alist)
 		return errno;
 
-	for (agno = 0; agno < nr; agno++)
-		action_list_init(&lists[agno]);
-	*listsp = lists;
-
+	action_list_init(alist);
+	*listp = alist;
 	return 0;
 }
 
-/* Discard repair list contents. */
+/* Free the repair lists. */
 void
-action_list_discard(
-	struct action_list		*alist)
+action_list_free(
+	struct action_list		**listp)
 {
+	struct action_list		*alist = *listp;
 	struct action_item		*aitem;
 	struct action_item		*n;
 
@@ -391,23 +385,9 @@ action_list_discard(
 		list_del(&aitem->list);
 		free(aitem);
 	}
-}
 
-/* Free the repair lists. */
-void
-action_lists_free(
-	struct action_list		**listsp)
-{
-	free(*listsp);
-	*listsp = NULL;
-}
-
-/* Initialize repair list */
-void
-action_list_init(
-	struct action_list		*alist)
-{
-	INIT_LIST_HEAD(&alist->list);
+	free(alist);
+	*listp = NULL;
 }
 
 /* Number of pending repairs in this list. */
@@ -416,20 +396,52 @@ action_list_length(
 	struct action_list		*alist)
 {
 	struct action_item		*aitem;
-	size_t				ret = 0;
+	unsigned long long		ret = 0;
 
 	list_for_each_entry(aitem, &alist->list, list)
 		ret += repair_item_count_needsrepair(&aitem->sri);
 	return ret;
 }
 
-/* Add to the list of repairs. */
+/* Remove the first action item from the action list. */
+struct action_item *
+action_list_pop(
+	struct action_list		*alist)
+{
+	struct action_item		*aitem;
+
+	aitem = list_first_entry(&alist->list, struct action_item, list);
+	list_del_init(&aitem->list);
+	return aitem;
+}
+
+/* Add an action item to the end of a list. */
 void
-action_list_add(
+action_list_push(
 	struct action_list		*alist,
 	struct action_item		*aitem)
 {
 	list_add_tail(&aitem->list, &alist->list);
+}
+
+/*
+ * Try to repair the item.  Don't complain if the repair was unsuccessful,
+ * since we retry once more after we detect a lack of progress.
+ */
+int
+action_item_try_repair(
+	struct scrub_ctx		*ctx,
+	struct action_item		*aitem,
+	bool				*ok_now)
+{
+	int				ret;
+
+	ret = repair_item(ctx, &aitem->sri, 0);
+	if (ret)
+		return ret;
+
+	*ok_now = repair_item_count_needsrepair(&aitem->sri) == 0;
+	return 0;
 }
 
 /* Repair everything on this list. */
@@ -610,7 +622,7 @@ repair_item(
 }
 
 /* Create an action item around a scrub item that needs repairs. */
-int
+static int
 repair_item_to_action_item(
 	struct scrub_ctx	*ctx,
 	const struct scrub_item	*sri,
@@ -636,28 +648,39 @@ repair_item_to_action_item(
 	return 0;
 }
 
-/* Defer all the repairs until phase 4. */
+/* Add a scrub item that needs more work to main repair list. */
 int
-repair_item_defer(
+repair_list_defer(
 	struct scrub_ctx	*ctx,
 	const struct scrub_item	*sri)
 {
 	struct action_item	*aitem = NULL;
-	unsigned int		agno;
 	int			error;
 
 	error = repair_item_to_action_item(ctx, sri, &aitem);
 	if (error || !aitem)
 		return error;
 
-	if (sri->sri_agno != -1U)
-		agno = sri->sri_agno;
-	else if (sri->sri_ino != -1ULL && sri->sri_gen != -1U)
-		agno = cvt_ino_to_agno(&ctx->mnt, sri->sri_ino);
-	else
-		agno = 0;
-	ASSERT(agno < ctx->mnt.fsgeom.agcount);
+	pthread_mutex_lock(&ctx->lock);
+	list_add_tail(&aitem->list, &ctx->repair_list->list);
+	pthread_mutex_unlock(&ctx->lock);
+	return 0;
+}
 
-	action_list_add(&ctx->action_lists[agno], aitem);
+/* Copy this repair item to an action list. */
+int
+action_list_defer(
+	struct scrub_ctx	*ctx,
+	struct action_list	*alist,
+	const struct scrub_item	*sri)
+{
+	struct action_item	*aitem = NULL;
+	int			error;
+
+	error = repair_item_to_action_item(ctx, sri, &aitem);
+	if (error || !aitem)
+		return error;
+
+	list_add_tail(&aitem->list, &alist->list);
 	return 0;
 }
