@@ -87,7 +87,7 @@ _("Filesystem might not be repairable."));
 		goto err;
 
 	/* Everything else gets fixed during phase 4. */
-	ret = repair_item_defer(ctx, &sri);
+	ret = repair_list_defer(ctx, &sri);
 	if (ret)
 		goto err;
 	return;
@@ -118,7 +118,7 @@ scan_fs_metadata(
 		return;
 	}
 
-	ret = repair_item_defer(ctx, &sri);
+	ret = repair_list_defer(ctx, &sri);
 	if (ret) {
 		*aborted = true;
 		return;
