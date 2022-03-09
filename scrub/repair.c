@@ -358,34 +358,28 @@ repair_item_mustfix(
 	}
 }
 
-/*
- * Allocate a certain number of repair lists for the scrub context.  Returns
- * zero or a positive error number.
- */
+/* Create a new repair action list. */
 int
-action_lists_alloc(
-	size_t				nr,
-	struct action_list		**listsp)
+action_list_alloc(
+	struct action_list		**listp)
 {
-	struct action_list		*lists;
-	xfs_agnumber_t			agno;
+	struct action_list		*alist;
 
-	lists = calloc(nr, sizeof(struct action_list));
-	if (!lists)
+	alist = malloc(sizeof(struct action_list));
+	if (!alist)
 		return errno;
 
-	for (agno = 0; agno < nr; agno++)
-		action_list_init(&lists[agno]);
-	*listsp = lists;
-
+	action_list_init(alist);
+	*listp = alist;
 	return 0;
 }
 
-/* Discard repair list contents. */
+/* Free the repair lists. */
 void
-action_list_discard(
-	struct action_list		*alist)
+action_list_free(
+	struct action_list		**listp)
 {
+	struct action_list		*alist = *listp;
 	struct action_item		*aitem;
 	struct action_item		*n;
 
@@ -393,23 +387,9 @@ action_list_discard(
 		list_del(&aitem->list);
 		free(aitem);
 	}
-}
 
-/* Free the repair lists. */
-void
-action_lists_free(
-	struct action_list		**listsp)
-{
-	free(*listsp);
-	*listsp = NULL;
-}
-
-/* Initialize repair list */
-void
-action_list_init(
-	struct action_list		*alist)
-{
-	INIT_LIST_HEAD(&alist->list);
+	free(alist);
+	*listp = NULL;
 }
 
 /* Number of pending repairs in this list. */
@@ -426,13 +406,70 @@ action_list_length(
 	return ret;
 }
 
-/* Add to the list of repairs. */
+/* Remove the first action item from the action list. */
+struct action_item *
+action_list_pop(
+	struct action_list		*alist)
+{
+	struct action_item		*aitem;
+
+	aitem = list_first_entry_or_null(&alist->list, struct action_item,
+			list);
+	if (!aitem)
+		return NULL;
+
+	list_del_init(&aitem->list);
+	return aitem;
+}
+
+/* Add an action item to the end of a list. */
 void
 action_list_add(
 	struct action_list		*alist,
 	struct action_item		*aitem)
 {
 	list_add_tail(&aitem->list, &alist->list);
+}
+
+/*
+ * Try to repair the item.  Don't complain if the repair was unsuccessful,
+ * since we retry once more after we detect a lack of progress.
+ *
+ * There are three possible outcomes:
+ *
+ *  * If an error occurs, consume the action item and return the error.
+ *  * If we fixed everything, we consume the action item, set made_progress,
+ *    and return 0.
+ *  * Set made_progress to whether or not we fixed anything and return 0.
+ */
+int
+action_item_try_repair(
+	struct scrub_ctx		*ctx,
+	struct action_item		**aitemp,
+	bool				*made_progress)
+{
+	struct action_item		*aitem = *aitemp;
+	unsigned int			before, after;
+	int				ret;
+
+	before = repair_item_count_needsrepair(&aitem->sri);
+
+	ret = repair_item(ctx, &aitem->sri, 0);
+	if (ret)
+		goto free;
+
+	after = repair_item_count_needsrepair(&aitem->sri);
+	if (after == 0) {
+		*made_progress = true;
+		goto free;
+	}
+
+	*made_progress = before != after;
+	return 0;
+free:
+	free(aitem);
+	*aitemp = NULL;
+	return ret;
 }
 
 /* Repair everything on this list. */
@@ -636,31 +673,5 @@ repair_item_to_action_item(
 	memcpy(&aitem->sri, sri, sizeof(struct scrub_item));
 
 	*aitemp = aitem;
-	return 0;
-}
-
-/* Defer all the repairs until phase 4. */
-int
-repair_item_defer(
-	struct scrub_ctx	*ctx,
-	const struct scrub_item	*sri)
-{
-	struct action_item	*aitem = NULL;
-	unsigned int		agno;
-	int			error;
-
-	error = repair_item_to_action_item(ctx, sri, &aitem);
-	if (error || !aitem)
-		return error;
-
-	if (sri->sri_agno != -1U)
-		agno = sri->sri_agno;
-	else if (sri->sri_ino != -1ULL && sri->sri_gen != -1U)
-		agno = cvt_ino_to_agno(&ctx->mnt, sri->sri_ino);
-	else
-		agno = 0;
-	ASSERT(agno < ctx->mnt.fsgeom.agcount);
-
-	action_list_add(&ctx->action_lists[agno], aitem);
 	return 0;
 }
