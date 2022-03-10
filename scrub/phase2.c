@@ -33,6 +33,7 @@ scan_ag_metadata(
 	unsigned long long		broken_primaries;
 	unsigned long long		broken_secondaries;
 	char				descr[DESCR_BUFSZ];
+	unsigned int			to_check;
 	int				ret;
 
 	if (*aborted)
@@ -48,9 +49,44 @@ scan_ag_metadata(
 	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_AGHEADER);
 	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_PERAG);
 
+	/*
+	 * Try to check all of the AG metadata items that we just scheduled.
+	 * If we return with some types still needing a check, try repairing
+	 * any damaged metadata that we've found so far, and try again.  Abort
+	 * if we stop making forward progress.
+	 */
 	ret = scrub_item_check(ctx, &sri);
 	if (ret)
 		goto err;
+
+	to_check = scrub_item_count_needscheck(&sri);
+	while (to_check > 0 && ctx->mode >= SCRUB_MODE_REPAIR) {
+		unsigned int	nr;
+
+		ret = repair_item_corruption(ctx, &sri);
+		if (ret)
+			goto err;
+
+		ret = scrub_item_check(ctx, &sri);
+		if (ret)
+			goto err;
+
+		nr = scrub_item_count_needscheck(&sri);
+		if (nr == to_check) {
+			/*
+			 * We cannot make forward scanning progress with this
+			 * AG, so defer the rest until phase 4.
+			 */
+			if (ctx->mode < SCRUB_MODE_REPAIR)
+				str_corrupt(ctx, descr,
+	_("Unable to make forward checking progress."));
+			else
+				str_info(ctx, descr,
+	_("Unable to make forward checking progress; will try again in phase 4."));
+			goto defer;
+		}
+		to_check = nr;
+	}
 
 	/*
 	 * Figure out if we need to perform early fixing.  The only
@@ -77,6 +113,7 @@ _("Filesystem might not be repairable."));
 	if (ret)
 		goto err;
 
+defer:
 	/* Everything else gets fixed during phase 4. */
 	ret = repair_list_defer(ctx, &sri);
 	if (ret)
@@ -94,26 +131,64 @@ scan_fs_metadata(
 	void				*arg)
 {
 	struct scrub_item		sri;
+	char				descr[DESCR_BUFSZ];
 	struct scrub_ctx		*ctx = (struct scrub_ctx *)wq->wq_ctx;
 	bool				*aborted = arg;
+	unsigned int			to_check;
 	int				ret;
 
 	if (*aborted)
 		return;
 
+	/*
+	 * Try to check all of the fs-wide metadata items that we just
+	 * scheduled.  If we return with some types still needing a check, try
+	 * repairing any damaged metadata that we've found so far, and try
+	 * again.  Abort if we stop making forward progress.
+	 */
+
 	scrub_item_init_fs(&sri);
 	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_FS);
 	ret = scrub_item_check(ctx, &sri);
-	if (ret) {
-		*aborted = true;
-		return;
+	if (ret)
+		goto err;
+
+	to_check = scrub_item_count_needscheck(&sri);
+	while (to_check > 0 && ctx->mode >= SCRUB_MODE_REPAIR) {
+		unsigned int	nr;
+
+		ret = repair_item_corruption(ctx, &sri);
+		if (ret)
+			goto err;
+
+		ret = scrub_item_check(ctx, &sri);
+		if (ret)
+			goto err;
+
+		nr = scrub_item_count_needscheck(&sri);
+		if (nr == to_check) {
+			/*
+			 * We cannot make forward scanning progress with this
+			 * whole-fs metadata, so defer the rest until phase 4.
+			 */
+			snprintf(descr, DESCR_BUFSZ, _("FS metadata"));
+			if (ctx->mode < SCRUB_MODE_REPAIR)
+				str_corrupt(ctx, descr,
+	_("Unable to make forward checking progress."));
+			else
+				str_info(ctx, descr,
+	_("Unable to make forward checking progress; will try again in phase 4."));
+			break;
+		}
+		to_check = nr;
 	}
 
 	ret = repair_list_defer(ctx, &sri);
-	if (ret) {
-		*aborted = true;
-		return;
-	}
+	if (ret)
+		goto err;
+	return;
+err:
+	*aborted = true;
 }
 
 /* Scan all filesystem metadata. */
