@@ -77,8 +77,11 @@ scrub_inode(
 	 *    match.
 	 *  - The file itself is corrupt and cannot be loaded.  In this case,
 	 *    we fall back to scrub-by-handle.
+	 *  - Reconnection of the file/directory parent failed due to
+	 *    corruption in a parent directory.  In that case, we still want to
+	 *    check /this/ file.
 	 */
-	if (S_ISREG(bstat->bs_mode))
+	if (S_ISREG(bstat->bs_mode) || S_ISDIR(bstat->bs_mode))
 		fd = scrub_open_handle(handle);
 
 	/* Scrub the inode. */
