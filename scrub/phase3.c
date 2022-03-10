@@ -110,6 +110,7 @@ scrub_inode(
 	struct scrub_item	sri;
 	struct scrub_inode_ctx	*ictx = arg;
 	struct ptcounter	*icount = ictx->icount;
+	unsigned int		to_check = 0;
 	int			fd = -1;
 	int			error;
 
@@ -160,11 +161,53 @@ scrub_inode(
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_XATTR);
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_PARENT);
 
-	/* Try to check and repair the file while it's open. */
+	/*
+	 * Try to check all of the metadata items that we just scheduled.  If
+	 * we return with some types still needing a check and the space
+	 * metadata isn't also in need of repairs, try repairing any damaged
+	 * file metadata that we've found so far, and try checking the file
+	 * again.  Worst case, defer the repairs and the checks to phase 4 if
+	 * we can't make any progress on anything.
+	 */
 	error = scrub_item_check_file(ctx, &sri, fd);
 	if (error)
 		goto out;
 
+	if (!ictx->always_defer_repairs)
+		to_check = scrub_item_count_needscheck(&sri);
+	while (to_check > 0 && ctx->mode >= SCRUB_MODE_REPAIR) {
+		unsigned int	nr;
+
+		error = repair_file_corruption(ctx, &sri, fd);
+		if (error)
+			goto out;
+
+		error = scrub_item_check_file(ctx, &sri, fd);
+		if (error)
+			goto out;
+
+		nr = scrub_item_count_needscheck(&sri);
+		if (nr == to_check) {
+			char	descr[DESCR_BUFSZ];
+
+			/*
+			 * We cannot make forward scanning progress with this
+			 * inode, so defer the rest until phase 4.
+			 */
+			scrub_render_ino_descr(ctx, descr, DESCR_BUFSZ,
+					bstat->bs_ino, bstat->bs_gen, NULL);
+			if (ctx->mode < SCRUB_MODE_REPAIR)
+				str_corrupt(ctx, descr,
+ _("Unable to make forward checking progress."));
+			else
+				str_info(ctx, descr,
+ _("Unable to make forward checking progress; will try again in phase 4."));
+			goto out;
+		}
+		to_check = nr;
+	}
+
+	/* Try to repair the file while it's open. */
 	error = try_inode_repair(ictx, &sri, fd);
 	if (error)
 		goto out;
