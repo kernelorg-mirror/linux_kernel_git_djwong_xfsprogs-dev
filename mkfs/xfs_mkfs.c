@@ -830,6 +830,7 @@ struct cli_params {
 	int64_t	logagno;
 	int	loginternal;
 	int	lsunit;
+	int	has_warranty;
 
 	/* parameters where 0 is not a valid value */
 	int64_t	agcount;
@@ -2455,6 +2456,53 @@ _("illegal CoW extent size hint %lld, must be less than %u.\n"),
 	}
 }
 
+/* Validate the minimum log size and AG count. */
+static void
+validate_minimum_size(
+	struct xfs_mount	*mp,
+	struct cli_params	*cli)
+{
+	/* Undocumented option to enable unsupported tiny filesystems. */
+	if (!cli->has_warranty) {
+		printf(
+ _("Filesystems formatted with --yes-i-know-what-i-am-doing are not supported!!\n"));
+		return;
+	}
+
+	/*
+	 * Avoid breaking fstests by ignore the minimums if TEST_DIR and
+	 * TEST_DEV, and QA_CHECK_FS are all set.
+	 */
+	if (getenv("TEST_DIR") && getenv("TEST_DEV") && getenv("QA_CHECK_FS"))
+		return;
+
+	/*
+	 * For best performance, we don't allow logs smaller than 64MB.
+	 * See the comment in calculate_log_size.
+	 */
+	if (mp->m_sb.sb_logblocks < XFS_B_TO_FSB(mp, 64 * 1048576)) {
+		fprintf(stderr, _("Log size must be at least 64MB.\n"));
+		usage();
+	}
+
+	/*
+	 * Filesystems should not have fewer than two AGs, because we need to
+	 * have redundant superblocks.
+	 */
+	if (mp->m_sb.sb_agcount < 2) {
+		fprintf(stderr, _("Filesystem must have at least 2 AGs.\n"));
+		usage();
+	}
+
+	/*
+	 * We don't support filesystems smaller than 128MB anymore.
+	 */
+	if (mp->m_sb.sb_dblocks < XFS_B_TO_FSB(mp, 128 * 1048576)) {
+		fprintf(stderr, _("Filesystem must be larger than 128MB.\n"));
+		usage();
+	}
+}
+
 /*
  * Validate the configured stripe geometry, or is none is specified, pull
  * the configuration from the underlying device.
@@ -3844,8 +3892,20 @@ main(
 	struct cli_params	cli = {
 		.xi = &xi,
 		.loginternal = 1,
+		.has_warranty	= 1,
 	};
 	struct mkfs_params	cfg = {};
+
+	struct option		long_options[] = {
+	{
+		.name		= "yes-i-know-what-i-am-doing",
+		.has_arg	= no_argument,
+		.flag		= &cli.has_warranty,
+		.val		= 0,
+	},
+	{NULL, 0, NULL, 0 },
+	};
+	int			option_index = 0;
 
 	/* build time defaults */
 	struct mkfs_default_params	dft = {
@@ -3905,8 +3965,11 @@ main(
 	memcpy(&cli.sb_feat, &dft.sb_feat, sizeof(cli.sb_feat));
 	memcpy(&cli.fsx, &dft.fsx, sizeof(cli.fsx));
 
-	while ((c = getopt(argc, argv, "b:c:d:i:l:L:m:n:KNp:qr:s:CfV")) != EOF) {
+	while ((c = getopt_long(argc, argv, "b:c:d:i:l:L:m:n:KNp:qr:s:CfV",
+					long_options, &option_index)) != EOF) {
 		switch (c) {
+		case 0:
+			break;
 		case 'C':
 		case 'f':
 			force_overwrite = 1;
@@ -4043,6 +4106,8 @@ main(
 	/* Validate the extent size hints now that @mp is fully set up. */
 	validate_extsize_hint(mp, &cli);
 	validate_cowextsize_hint(mp, &cli);
+
+	validate_minimum_size(mp, &cli);
 
 	/* Print the intended geometry of the fs. */
 	if (!quiet || dry_run) {
