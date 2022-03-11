@@ -3331,6 +3331,16 @@ _("external log device size %lld blocks too small, must be at least %lld blocks\
 			cfg->logblocks = cfg->logblocks >> cfg->blocklog;
 		}
 
+		/*
+		 * Ensure that the chosen size is at least 64MB, if possible.
+		 * Studies by the kernel maintainer in early 2022 have shown a
+		 * dramatic reduction in long tail latency of the xlog grant
+		 * head waitqueue when running a heavy metadata update workload
+		 * when the log size is at least 64MB.
+		 */
+		cfg->logblocks = max(cfg->logblocks,
+				(64 * 1048576) >> cfg->blocklog);
+
 		/* Ensure the chosen size meets minimum log size requirements */
 		cfg->logblocks = max(min_logblocks, cfg->logblocks);
 
