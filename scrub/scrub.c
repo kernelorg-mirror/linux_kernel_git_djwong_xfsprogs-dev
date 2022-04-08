@@ -45,7 +45,8 @@ format_scrub_descr(
 				meta->sm_ino, meta->sm_gen, "%s",
 				_(sc->descr));
 		break;
-	case XFROG_SCRUB_GROUP_FS:
+	case XFROG_SCRUB_GROUP_RT:
+	case XFROG_SCRUB_GROUP_QUOTA:
 	case XFROG_SCRUB_GROUP_SUMMARY:
 	case XFROG_SCRUB_GROUP_ISCAN:
 		return snprintf(buf, buflen, _("%s"), _(sc->descr));
@@ -401,13 +402,22 @@ scrub_ag_metadata(
 	return scrub_group(ctx, XFROG_SCRUB_GROUP_PERAG, agno, alist);
 }
 
-/* Scrub whole-FS metadata btrees. */
+/* Scrub realtime metadata. */
 int
-scrub_fs_metadata(
+scrub_rt_metadata(
 	struct scrub_ctx		*ctx,
 	struct action_list		*alist)
 {
-	return scrub_group(ctx, XFROG_SCRUB_GROUP_FS, 0, alist);
+	return scrub_group(ctx, XFROG_SCRUB_GROUP_RT, 0, alist);
+}
+
+/* Scrub quota metadata. */
+int
+scrub_quota_metadata(
+	struct scrub_ctx		*ctx,
+	struct action_list		*alist)
+{
+	return scrub_group(ctx, XFROG_SCRUB_GROUP_QUOTA, 0, alist);
 }
 
 /* Scrub all FS summary metadata. */
@@ -453,7 +463,8 @@ scrub_estimate_ag_work(
 		case XFROG_SCRUB_GROUP_PERAG:
 			estimate += ctx->mnt.fsgeom.agcount;
 			break;
-		case XFROG_SCRUB_GROUP_FS:
+		case XFROG_SCRUB_GROUP_QUOTA:
+		case XFROG_SCRUB_GROUP_RT:
 			estimate++;
 			break;
 		default:
