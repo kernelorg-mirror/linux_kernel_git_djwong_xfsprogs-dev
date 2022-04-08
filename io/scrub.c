@@ -66,7 +66,8 @@ scrub_ioctl(
 		meta.sm_gen = control2;
 		break;
 	case XFROG_SCRUB_GROUP_NONE:
-	case XFROG_SCRUB_GROUP_FS:
+	case XFROG_SCRUB_GROUP_RT:
+	case XFROG_SCRUB_GROUP_QUOTA:
 	case XFROG_SCRUB_GROUP_SUMMARY:
 	case XFROG_SCRUB_GROUP_ISCAN:
 		/* no control parameters */
@@ -168,7 +169,8 @@ parse_args(
 			return 0;
 		}
 		break;
-	case XFROG_SCRUB_GROUP_FS:
+	case XFROG_SCRUB_GROUP_RT:
+	case XFROG_SCRUB_GROUP_QUOTA:
 	case XFROG_SCRUB_GROUP_NONE:
 	case XFROG_SCRUB_GROUP_SUMMARY:
 	case XFROG_SCRUB_GROUP_ISCAN:
@@ -262,7 +264,8 @@ repair_ioctl(
 		meta.sm_gen = control2;
 		break;
 	case XFROG_SCRUB_GROUP_NONE:
-	case XFROG_SCRUB_GROUP_FS:
+	case XFROG_SCRUB_GROUP_RT:
+	case XFROG_SCRUB_GROUP_QUOTA:
 	case XFROG_SCRUB_GROUP_SUMMARY:
 	case XFROG_SCRUB_GROUP_ISCAN:
 		/* no control parameters */
