@@ -17,6 +17,25 @@
 
 /* Phase 2: Check internal metadata. */
 
+/* Warn about the types of mutual inconsistencies that may make repairs hard. */
+static inline void
+warn_repair_difficulties(
+	struct scrub_ctx	*ctx,
+	unsigned int		difficulty,
+	const char		*descr)
+{
+	if (!(difficulty & REPAIR_DIFFICULTY_SECONDARY))
+		return;
+	if (debug_tweak_on("XFS_SCRUB_FORCE_REPAIR"))
+		return;
+
+	if (difficulty & REPAIR_DIFFICULTY_PRIMARY)
+		str_info(ctx, descr, _("Corrupt primary and secondary metadata."));
+	else
+		str_info(ctx, descr, _("Corrupt secondary metadata."));
+	str_info(ctx, descr, _("Filesystem might not be repairable."));
+}
+
 /* Scrub each AG's metadata btrees. */
 static void
 scan_ag_metadata(
@@ -66,18 +85,7 @@ scan_ag_metadata(
 	 */
 	difficulty = action_list_difficulty(&alist);
 	action_list_find_mustfix(&alist, &immediate_alist);
-
-	if ((difficulty & REPAIR_DIFFICULTY_SECONDARY) &&
-	    !debug_tweak_on("XFS_SCRUB_FORCE_REPAIR")) {
-		if (difficulty & REPAIR_DIFFICULTY_PRIMARY)
-			str_info(ctx, descr,
-_("Corrupt primary and secondary block mapping metadata."));
-		else
-			str_info(ctx, descr,
-_("Corrupt secondary block mapping metadata."));
-		str_info(ctx, descr,
-_("Filesystem might not be repairable."));
-	}
+	warn_repair_difficulties(ctx, difficulty, descr);
 
 	/* Repair (inode) btree damage. */
 	ret = action_list_process_or_defer(ctx, agno, &immediate_alist);
@@ -97,9 +105,11 @@ scan_fs_metadata(
 	struct scrub_ctx	*ctx,
 	int			(*fn)(struct scrub_ctx *ctx,
 				      struct action_list *alist),
+	const char		*descr,
 	bool			*aborted)
 {
 	struct action_list	alist;
+	unsigned int		difficulty;
 	int			ret;
 
 	if (*aborted)
@@ -112,6 +122,10 @@ scan_fs_metadata(
 		return;
 	}
 
+	/* Complain about metadata corruptions that might not be fixable. */
+	difficulty = action_list_difficulty(&alist);
+	warn_repair_difficulties(ctx, difficulty, descr);
+
 	action_list_defer(ctx, 0, &alist);
 }
 
@@ -122,7 +136,8 @@ scan_quota_metadata(
 	xfs_agnumber_t		agno,
 	void			*arg)
 {
-	scan_fs_metadata(wq->wq_ctx, scrub_quota_metadata, arg);
+	scan_fs_metadata(wq->wq_ctx, scrub_quota_metadata, _("Quota metadata"),
+			arg);
 }
 
 /* Scrub realtime metadata. */
@@ -132,7 +147,8 @@ scan_rt_metadata(
 	xfs_agnumber_t		agno,
 	void			*arg)
 {
-	scan_fs_metadata(wq->wq_ctx, scrub_rt_metadata, arg);
+	scan_fs_metadata(wq->wq_ctx, scrub_rt_metadata, _("RT metadata"),
+			arg);
 }
 
 /* Scan all filesystem metadata. */
