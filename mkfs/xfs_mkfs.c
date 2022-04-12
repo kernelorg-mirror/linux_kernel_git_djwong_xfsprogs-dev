@@ -3239,9 +3239,8 @@ _("Due to stripe alignment, the internal log start (%lld) cannot be aligned\n"
 	 * reduce logblocks by a stripe unit to try to get it back under EOAG.
 	 */
 	if (!libxfs_verify_fsbext(mp, cfg->logstart, cfg->logblocks) &&
-	    cfg->logblocks > sunit) {
+	    cfg->logblocks > sunit)
 		cfg->logblocks -= sunit;
-	}
 
 	/* check the aligned log still starts and ends in the same AG. */
 	if (!libxfs_verify_fsbext(mp, cfg->logstart, cfg->logblocks)) {
