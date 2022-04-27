@@ -193,6 +193,7 @@
 #define trace_xfs_trans_getsb(a)		((void) 0)
 #define trace_xfs_trans_read_buf_recur(a)	((void) 0)
 #define trace_xfs_trans_read_buf(a)		((void) 0)
+#define trace_xfs_trans_resv_calc_minlogsize(...) ((void) 0)
 #define trace_xfs_trans_commit(a,b)		((void) 0)
 
 #define trace_xfs_defer_cancel(a,b)		((void) 0)
