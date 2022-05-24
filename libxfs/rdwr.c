@@ -377,6 +377,42 @@ libxfs_getbufr_map(struct xfs_buftarg *btp, xfs_daddr_t blkno, int bblen,
 }
 
 static int
+__xfs_buf_lock(
+	struct xfs_buf	*bp,
+	unsigned int	flags)
+{
+	int		ret;
+
+	ret = pthread_mutex_trylock(&bp->b_lock);
+	if (ret) {
+		ASSERT(ret == EAGAIN);
+		if (flags & LIBXFS_GETBUF_TRYLOCK)
+			return -EAGAIN;
+
+		if (pthread_equal(bp->b_holder, pthread_self())) {
+			fprintf(stderr,
+_("Warning: recursive buffer locking at block %" PRIu64 " detected\n"),
+				xfs_buf_daddr(bp));
+			bp->b_recur++;
+			return 0;
+		} else {
+			pthread_mutex_lock(&bp->b_lock);
+		}
+	}
+
+	bp->b_holder = pthread_self();
+	return 0;
+}
+
+int
+xfs_buf_lock(
+	struct xfs_buf	*bp)
+{
+	ASSERT(bp->b_node.cn_count > 0);
+	return __xfs_buf_lock(bp, 0);
+}
+
+static int
 __cache_lookup(
 	struct xfs_bufkey	*key,
 	unsigned int		flags,
@@ -393,29 +429,12 @@ __cache_lookup(
 	bp = container_of(cn, struct xfs_buf, b_node);
 
 	if (use_xfs_buf_lock) {
-		int		ret;
+		int		ret = __xfs_buf_lock(bp, flags);
 
-		ret = pthread_mutex_trylock(&bp->b_lock);
 		if (ret) {
-			ASSERT(ret == EAGAIN);
-			if (flags & LIBXFS_GETBUF_TRYLOCK) {
-				cache_node_put(libxfs_bcache, cn);
-				return -EAGAIN;
-			}
-
-			if (pthread_equal(bp->b_holder, pthread_self())) {
-				fprintf(stderr,
-	_("Warning: recursive buffer locking at block %" PRIu64 " detected\n"),
-					key->blkno);
-				bp->b_recur++;
-				*bpp = bp;
-				return 0;
-			} else {
-				pthread_mutex_lock(&bp->b_lock);
-			}
+			cache_node_put(libxfs_bcache, cn);
+			return ret;
 		}
-
-		bp->b_holder = pthread_self();
 	}
 
 	cache_node_set_priority(libxfs_bcache, cn,
