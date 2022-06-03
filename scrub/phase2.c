@@ -57,6 +57,54 @@ defer_fs_repair(
 	return 0;
 }
 
+/*
+ * If we couldn't check all the scheduled metadata items, try performing spot
+ * repairs until we check everything or stop making forward progress.
+ */
+static int
+repair_and_scrub_loop(
+	struct scrub_ctx	*ctx,
+	struct scrub_item	*sri,
+	const char		*descr,
+	bool			*defer)
+{
+	unsigned int		to_check;
+	int			ret;
+
+	*defer = false;
+	to_check = scrub_item_count_needscheck(sri);
+	while (to_check > 0 && ctx->mode >= SCRUB_MODE_REPAIR) {
+		unsigned int	nr;
+
+		ret = repair_item_corruption(ctx, sri);
+		if (ret)
+			return ret;
+
+		ret = scrub_item_check(ctx, sri);
+		if (ret)
+			return ret;
+
+		nr = scrub_item_count_needscheck(sri);
+		if (nr == to_check) {
+			/*
+			 * We cannot make forward scanning progress with this
+			 * metadata, so defer the rest until phase 4.
+			 */
+			if (ctx->mode < SCRUB_MODE_REPAIR)
+				str_corrupt(ctx, descr,
+	_("Unable to make forward checking progress."));
+			else
+				str_info(ctx, descr,
+	_("Unable to make forward checking progress; will try again in phase 4."));
+			*defer = true;
+			return 0;
+		}
+		to_check = nr;
+	}
+
+	return 0;
+}
+
 /* Scrub each AG's metadata btrees. */
 static void
 scan_ag_metadata(
@@ -70,6 +118,7 @@ scan_ag_metadata(
 	bool				*aborted = arg;
 	char				descr[DESCR_BUFSZ];
 	unsigned int			difficulty;
+	bool				defer_repairs;
 	int				ret;
 
 	if (*aborted)
@@ -85,9 +134,21 @@ scan_ag_metadata(
 	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_AGHEADER);
 	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_PERAG);
 
+	/*
+	 * Try to check all of the AG metadata items that we just scheduled.
+	 * If we return with some types still needing a check, try repairing
+	 * any damaged metadata that we've found so far, and try again.  Abort
+	 * if we stop making forward progress.
+	 */
 	ret = scrub_item_check(ctx, &sri);
 	if (ret)
 		goto err;
+
+	ret = repair_and_scrub_loop(ctx, &sri, descr, &defer_repairs);
+	if (ret)
+		goto err;
+	if (defer_repairs)
+		goto defer;
 
 	/*
 	 * Figure out if we need to perform early fixing.  The only
@@ -105,6 +166,7 @@ scan_ag_metadata(
 	if (ret)
 		goto err;
 
+defer:
 	/* Everything else gets fixed during phase 4. */
 	ret = defer_fs_repair(ctx, &sri);
 	if (ret)
@@ -124,28 +186,42 @@ scan_fs_metadata(
 {
 	struct scrub_item	sri;
 	unsigned int		difficulty;
+	bool			defer_repairs;
 	int			ret;
 
 	if (*aborted)
 		return;
 
+	/*
+	 * Try to check all of the fs-wide metadata items that we just
+	 * scheduled.  If we return with some types still needing a check, try
+	 * repairing any damaged metadata that we've found so far, and try
+	 * again.  Abort if we stop making forward progress.
+	 */
+
 	scrub_item_init_fs(&sri);
 	scrub_item_schedule_group(&sri, group);
 	ret = scrub_item_check(ctx, &sri);
-	if (ret) {
-		*aborted = true;
-		return;
-	}
+	if (ret)
+		goto err;
+
+	ret = repair_and_scrub_loop(ctx, &sri, descr, &defer_repairs);
+	if (ret)
+		goto err;
+	if (defer_repairs)
+		goto defer;
 
 	/* Complain about metadata corruptions that might not be fixable. */
 	difficulty = repair_item_difficulty(&sri);
 	warn_repair_difficulties(ctx, difficulty, descr);
 
+defer:
 	ret = defer_fs_repair(ctx, &sri);
-	if (ret) {
-		*aborted = true;
-		return;
-	}
+	if (ret)
+		goto err;
+	return;
+err:
+	*aborted = true;
 }
 
 /* Scrub quota metadata. */
