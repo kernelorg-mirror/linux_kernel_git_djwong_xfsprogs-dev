@@ -22,5 +22,7 @@ bool bitmap_test(struct bitmap *bmap, uint64_t start,
 		uint64_t len);
 bool bitmap_empty(struct bitmap *bmap);
 void bitmap_dump(struct bitmap *bmap);
+int bitmap_take_first_set(struct bitmap *bmap, uint64_t start, uint64_t last,
+		uint64_t *valp);
 
 #endif /* __LIBFROG_BITMAP_H__ */
