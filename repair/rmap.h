@@ -65,5 +65,7 @@ int rmap_get_mem_rec(struct rmap_mem_cur *rmcur, struct xfs_rmap_irec *irec);
 
 extern bool is_rtrmap_ino(xfs_ino_t ino);
 extern void forget_rtrmap(void);
+extern xfs_ino_t get_rtrmap_ino(void);
+extern int populate_realtime_rmapbt(struct xfs_mount *mp);
 
 #endif /* RMAP_H_ */
