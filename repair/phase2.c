@@ -264,12 +264,6 @@ set_rmapbt(
 		exit(0);
 	}
 
-	if (xfs_has_realtime(mp)) {
-		printf(
-	_("Reverse mapping btree feature not supported with realtime.\n"));
-		exit(0);
-	}
-
 	if (xfs_has_reflink(mp)) {
 		printf(
 	_("Reverse mapping btrees cannot be added when reflink is enabled.\n"));
@@ -284,6 +278,8 @@ set_rmapbt(
 	printf(_("Adding reverse mapping btrees to filesystem.\n"));
 	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_RMAPBT;
 	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+	if (xfs_has_realtime(mp))
+		quotacheck_skip();
 	return true;
 }
 
@@ -401,8 +397,10 @@ install_new_geometry(
 	struct xfs_sb		*new_sb)
 {
 	struct check_state	old;
+	struct xfs_inode	fake_rrmapip = {.i_mount = mp};
 	struct xfs_perag	*pag;
 	xfs_ino_t		rootino;
+	xfs_filblks_t		ask;
 	xfs_agnumber_t		agno;
 	int			min_logblocks;
 	int			error;
@@ -509,14 +507,30 @@ install_new_geometry(
 		libxfs_trans_cancel(tp);
 	}
 
+	/* Realtime rmap btree inode */
+	ask = libxfs_rtrmapbt_calc_reserves(mp);
+	error = -libxfs_imeta_resv_init_inode(&fake_rrmapip, ask);
+	if (error == ENOSPC) {
+		printf(
+	_("Not enough free space would remain for rtrmapbt metadata.\n"));
+		exit(0);
+	}
+	if (error)
+		do_error(
+	_("Error %d while checking rtrmapbt space reservation.\n"),
+				error);
+
 	/*
 	 * Would we have at least 10% free space in the data device after all
-	 * the upgrades?
+	 * the upgrades and reserving rt metadata inode blocks?
 	 */
 	if (mp->m_sb.sb_fdblocks < mp->m_sb.sb_dblocks / 10) {
 		printf(_("Filesystem will be low on space after upgrade.\n"));
 		exit(1);
 	}
+
+	/* Unreserve the realtime metadata reservations. */
+	libxfs_imeta_resv_free_inode(&fake_rrmapip);
 
 	/*
 	 * Release the per-AG reservations and mark the per-AG structure as
