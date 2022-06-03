@@ -20,6 +20,61 @@ BUILD_CFLAGS = @BUILD_CFLAGS@ -D_FILE_OFFSET_BITS=64
 # only use what we calculate from the configured options above.
 LDFLAGS =
 
+# Generate more debugging info
+WARNINGS += -femit-struct-debug-detailed=any
+WARNINGS += -fstack-usage
+
+# Base warnings(?)
+WARNINGS += -Wall
+WARNINGS += -Wno-pointer-sign		# dont trip on atomic64 cmpxchg
+WARNINGS += -Wuninitialized
+#WARNINGS += -Wno-error=format=		# dont trip on trace_printk
+
+# Fedora wants to modernize C...
+WARNINGS += -Wimplicit-int
+WARNINGS += -Wimplicit-function-declaration
+WARNINGS += -Wint-conversion
+WARNINGS += -Wstrict-prototypes
+WARNINGS += -Wold-style-definition
+
+# W=e
+WARNINGS += -Werror
+
+# W=1
+WARNINGS += -Wextra -Wunused -Wno-unused-parameter
+WARNINGS += -Wmissing-declarations
+WARNINGS += -Wmissing-format-attribute
+WARNINGS += -Wmissing-prototypes
+WARNINGS += -Wold-style-definition
+WARNINGS += -Wmissing-include-dirs
+WARNINGS += -Wunused-but-set-variable
+WARNINGS += -Wunused-const-variable
+WARNINGS += -Wpacked-not-aligned
+WARNINGS += -Wstringop-truncation
+# The following turn off the warnings enabled by -Wextra
+WARNINGS += -Wno-missing-field-initializers
+WARNINGS += -Wno-sign-compare
+WARNINGS += -Wno-type-limits
+WARNINGS += -Wno-shift-negative-value
+
+# W=2
+WARNINGS += -Wdisabled-optimization
+WARNINGS += -Wshadow
+WARNINGS += -Wlogical-op
+WARNINGS += -Wmissing-field-initializers
+WARNINGS += -Wtype-limits
+WARNINGS += -Wmaybe-uninitialized
+#WARNINGS += -Wunused-macros			# dont care about extra macros
+
+# Stuff we need to fix in xfsprogs
+WARNINGS += -Wno-suggest-attribute=format	# dont care about printf crap
+WARNINGS += -Wno-shadow				# many programs have global variables
+WARNINGS += -Wno-missing-field-initializers	# why is this even a problem?
+
+# Comment out for release builds
+CFLAGS += $(WARNINGS)
+BUILD_CFLAGS += $(WARNINGS)
+
 LIBRT = @librt@
 LIBUUID = @libuuid@
 LIBURCU = @liburcu@
@@ -128,7 +183,7 @@ HAVE_CROND = @have_crond@
 CROND_DIR = @crond_dir@
 HAVE_LIBURCU_ATOMIC64 = @have_liburcu_atomic64@
 
-GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall
+GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall -Werror -Wextra -Wno-unused-parameter
 #	   -Wbitwise -Wno-transparent-union -Wno-old-initializer -Wno-decl
 
 # _LGPL_SOURCE is for liburcu to work correctly with GPL/LGPL programs
