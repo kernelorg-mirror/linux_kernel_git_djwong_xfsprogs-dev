@@ -829,6 +829,42 @@ rtrmapbt_create(
 	libxfs_imeta_end_update(mp, &upd, 0);
 }
 
+/* Create the realtime refcount btree inode. */
+static void
+rtrefcountbt_create(
+	struct xfs_mount	*mp)
+{
+	struct xfs_imeta_update	upd;
+	struct xfs_trans	*tp;
+	int			error;
+
+	error = -libxfs_imeta_ensure_dirpath(mp, &XFS_IMETA_RTREFCOUNTBT);
+	if (error)
+		fail(_("Realtime refcountbt directory allocation failed"),
+				error);
+
+	error = -libxfs_imeta_start_update(mp, &XFS_IMETA_RTREFCOUNTBT, &upd);
+	if (error)
+		res_failed(error);
+
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+			libxfs_imeta_create_space_res(mp), 0, 0, &tp);
+	if (error)
+		res_failed(error);
+
+	error = -libxfs_rtrefcountbt_create(&tp, &upd, &mp->m_rrefcountip);
+	if (error)
+		fail(_("Completion of the realtime refcountbt failed"),
+				error);
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		fail(_("Completion of the realtime refcountbt inode failed"),
+				error);
+
+	libxfs_imeta_end_update(mp, &upd, 0);
+}
+
 /* Zero the realtime bitmap. */
 static void
 rtbitmap_init(
@@ -907,6 +943,9 @@ rtinit(
 
 	if (xfs_has_rtrmapbt(mp))
 		rtrmapbt_create(mp);
+
+	if (xfs_has_rtreflink(mp))
+		rtrefcountbt_create(mp);
 
 	if (mp->m_sb.sb_rbmblocks) {
 		rtbitmap_init(mp);
