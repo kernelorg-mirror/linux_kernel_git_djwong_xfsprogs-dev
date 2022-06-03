@@ -809,6 +809,42 @@ rtsummary_create(
 	libxfs_imeta_end_update(mp, &upd, 0);
 }
 
+/* Create the realtime rmap btree inode. */
+static void
+rtrmapbt_create(
+	struct xfs_mount	*mp)
+{
+	struct xfs_imeta_update	upd;
+	struct xfs_trans	*tp;
+	int			error;
+
+	error = -libxfs_imeta_ensure_dirpath(mp, &XFS_IMETA_RTRMAPBT);
+	if (error)
+		fail(_("Realtime rmapbt directory allocation failed"),
+				error);
+
+	error = -libxfs_imeta_start_update(mp, &XFS_IMETA_RTRMAPBT, &upd);
+	if (error)
+		res_failed(error);
+
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+			libxfs_imeta_create_space_res(mp), 0, 0, &tp);
+	if (error)
+		res_failed(error);
+
+	error = -libxfs_rtrmapbt_create(&tp, &upd, &mp->m_rrmapip);
+	if (error)
+		fail(_("Completion of the realtime rmapbt failed"),
+				error);
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		fail(_("Completion of the realtime rmapbt inode failed"),
+				error);
+
+	libxfs_imeta_end_update(mp, &upd, 0);
+}
+
 /* Zero the realtime bitmap. */
 static void
 rtbitmap_init(
@@ -944,6 +980,9 @@ rtinit(
 {
 	rtbitmap_create(mp);
 	rtsummary_create(mp);
+
+	if (xfs_has_rtrmapbt(mp))
+		rtrmapbt_create(mp);
 
 	rtbitmap_init(mp);
 	rtsummary_init(mp);
