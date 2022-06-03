@@ -1740,30 +1740,34 @@ check_refcounts(
 				rl_rec->rc_startblock, &have);
 		if (error) {
 			do_warn(
-_("Could not read reference count record for (%u/%u).\n"),
-					agno, rl_rec->rc_startblock);
+_("Could not read reference count record for (%u/%llu).\n"),
+				agno,
+				(unsigned long long)rl_rec->rc_startblock);
 			goto err;
 		}
 		if (!have) {
 			do_warn(
-_("Missing reference count record for (%u/%u) len %u count %u\n"),
-				agno, rl_rec->rc_startblock,
-				rl_rec->rc_blockcount, rl_rec->rc_refcount);
+_("Missing reference count record for (%u/%llu) len %llu nlinks %u\n"),
+				agno, (unsigned long long)rl_rec->rc_startblock,
+				(unsigned long long)rl_rec->rc_blockcount,
+				rl_rec->rc_refcount);
 			goto next_loop;
 		}
 
 		error = -libxfs_refcount_get_rec(bt_cur, &tmp, &i);
 		if (error) {
 			do_warn(
-_("Could not read reference count record for (%u/%u).\n"),
-					agno, rl_rec->rc_startblock);
+_("Could not read reference count record for (%u/%llu).\n"),
+				agno,
+				(unsigned long long)rl_rec->rc_startblock);
 			goto err;
 		}
 		if (!i) {
 			do_warn(
-_("Missing reference count record for (%u/%u) len %u count %u\n"),
-				agno, rl_rec->rc_startblock,
-				rl_rec->rc_blockcount, rl_rec->rc_refcount);
+_("Missing reference count record for (%u/%llu) len %llu nlinks %u\n"),
+				agno, (unsigned long long)rl_rec->rc_startblock,
+				(unsigned long long)rl_rec->rc_blockcount,
+				rl_rec->rc_refcount);
 			goto next_loop;
 		}
 
@@ -1772,10 +1776,13 @@ _("Missing reference count record for (%u/%u) len %u count %u\n"),
 		    tmp.rc_blockcount != rl_rec->rc_blockcount ||
 		    tmp.rc_refcount != rl_rec->rc_refcount)
 			do_warn(
-_("Incorrect reference count: saw (%u/%u) len %u nlinks %u; should be (%u/%u) len %u nlinks %u\n"),
-				agno, tmp.rc_startblock, tmp.rc_blockcount,
-				tmp.rc_refcount, agno, rl_rec->rc_startblock,
-				rl_rec->rc_blockcount, rl_rec->rc_refcount);
+_("Incorrect reference count: saw (%u/%llu) len %llu nlinks %u; should be (%u/%llu) len %llu nlinks %u\n"),
+				agno, (unsigned long long)tmp.rc_startblock,
+				(unsigned long long)tmp.rc_blockcount,
+				tmp.rc_refcount, agno,
+				(unsigned long long)rl_rec->rc_startblock,
+				(unsigned long long)rl_rec->rc_blockcount,
+				rl_rec->rc_refcount);
 next_loop:
 		rl_rec = pop_slab_cursor(rl_cur);
 	}
