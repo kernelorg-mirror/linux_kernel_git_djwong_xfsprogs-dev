@@ -1447,7 +1447,7 @@ xfs_attr_node_try_addname(
 	blk = &state->path.blk[state->path.active-1];
 	ASSERT(blk->magic == XFS_ATTR_LEAF_MAGIC);
 
-	error = xfs_attr3_leaf_add(blk->bp, args);
+	error = xfs_attr3_leaf_add(blk->bp, state->args);
 	if (error == -ENOSPC) {
 		if (state->path.active == 1) {
 			/*
