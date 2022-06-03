@@ -10,6 +10,8 @@
 #include "list.h"
 #include "libfrog/paths.h"
 #include "libfrog/workqueue.h"
+#include "libfrog/fsgeom.h"
+#include "libfrog/scrub.h"
 #include "xfs_scrub.h"
 #include "common.h"
 #include "scrub.h"
@@ -61,7 +63,8 @@ scan_ag_metadata(
 	 * First we scrub and fix the AG headers, because we need
 	 * them to work well enough to check the AG btrees.
 	 */
-	ret = scrub_ag_headers(ctx, &sri);
+	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_AGHEADER);
+	ret = scrub_item_check(ctx, &sri);
 	if (ret)
 		goto err;
 
@@ -71,7 +74,8 @@ scan_ag_metadata(
 		goto err;
 
 	/* Now scrub the AG btrees. */
-	ret = scrub_ag_metadata(ctx, &sri);
+	scrub_item_schedule_group(&sri, XFROG_SCRUB_GROUP_PERAG);
+	ret = scrub_item_check(ctx, &sri);
 	if (ret)
 		goto err;
 
@@ -104,8 +108,7 @@ err:
 static void
 scan_fs_metadata(
 	struct scrub_ctx	*ctx,
-	int			(*fn)(struct scrub_ctx *ctx,
-				      struct scrub_item *sri),
+	enum xfrog_scrub_group	group,
 	const char		*descr,
 	bool			*aborted)
 {
@@ -117,7 +120,8 @@ scan_fs_metadata(
 		return;
 
 	scrub_item_init_fs(&sri);
-	ret = fn(ctx, &sri);
+	scrub_item_schedule_group(&sri, group);
+	ret = scrub_item_check(ctx, &sri);
 	if (ret) {
 		*aborted = true;
 		return;
@@ -141,8 +145,8 @@ scan_quota_metadata(
 	xfs_agnumber_t		agno,
 	void			*arg)
 {
-	scan_fs_metadata(wq->wq_ctx, scrub_quota_metadata, _("Quota metadata"),
-			arg);
+	scan_fs_metadata(wq->wq_ctx, XFROG_SCRUB_GROUP_QUOTA,
+			_("Quota metadata"), arg);
 }
 
 /* Scrub realtime metadata. */
@@ -152,8 +156,8 @@ scan_rt_metadata(
 	xfs_agnumber_t		agno,
 	void			*arg)
 {
-	scan_fs_metadata(wq->wq_ctx, scrub_rt_metadata, _("RT metadata"),
-			arg);
+	scan_fs_metadata(wq->wq_ctx, XFROG_SCRUB_GROUP_RT,
+			_("RT metadata"), arg);
 }
 
 /* Scan all filesystem metadata. */
@@ -181,7 +185,8 @@ phase2_func(
 	 * If errors occur, this function will log them and return nonzero.
 	 */
 	scrub_item_init_ag(&sri, 0);
-	ret = scrub_meta_type(ctx, XFS_SCRUB_TYPE_SB, &sri);
+	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_SB);
+	ret = scrub_item_check(ctx, &sri);
 	if (ret)
 		goto out;
 	ret = repair_item_completely(ctx, &sri);
