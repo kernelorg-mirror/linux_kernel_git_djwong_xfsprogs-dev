@@ -8,6 +8,7 @@
 #include "xfs_shared.h"
 #include "xfs_format.h"
 #include "xfs_log_format.h"
+#include "xfs_da_format.h"
 #include "xfs_trans_resv.h"
 #include "xfs_bit.h"
 #include "xfs_sb.h"
@@ -20,6 +21,8 @@
 #include "xfs_refcount.h"
 #include "xfs_bmap.h"
 #include "xfs_inode.h"
+#include "xfs_da_btree.h"
+#include "xfs_attr.h"
 
 /* Dummy defer item ops, since we don't do logging. */
 
@@ -452,4 +455,100 @@ const struct xfs_defer_op_type xfs_bmap_update_defer_type = {
 	.create_done	= xfs_bmap_update_create_done,
 	.finish_item	= xfs_bmap_update_finish_item,
 	.cancel_item	= xfs_bmap_update_cancel_item,
+};
+
+/* Get an ATTRI. */
+static struct xfs_log_item *
+xfs_attr_create_intent(
+	struct xfs_trans	*tp,
+	struct list_head	*items,
+	unsigned int		count,
+	bool			sort)
+{
+	return NULL;
+}
+
+/* Abort all pending ATTRs. */
+static void
+xfs_attr_abort_intent(
+	struct xfs_log_item	*intent)
+{
+}
+
+/* Get an ATTRD so we can process all the attrs. */
+static struct xfs_log_item *
+xfs_attr_create_done(
+	struct xfs_trans	*tp,
+	struct xfs_log_item	*intent,
+	unsigned int		count)
+{
+	return NULL;
+}
+
+static void
+xfs_attr_free_intent(
+	struct xfs_attr_intent	*attr)
+{
+	if (attr->xattri_da_state)
+		xfs_da_state_free(attr->xattri_da_state);
+	if (attr->xattri_da_args->op_flags & XFS_DA_OP_RECOVERY)
+		kmem_free(attr);
+	else
+		kmem_cache_free(xfs_attr_intent_cache, attr);
+}
+
+/* Process an attr. */
+static int
+xfs_attr_finish_item(
+	struct xfs_trans	*tp,
+	struct xfs_log_item	*done,
+	struct list_head	*item,
+	struct xfs_btree_cur	**state)
+{
+	struct xfs_attr_intent	*attr;
+	struct xfs_da_args	*args;
+	int			error;
+
+	attr = container_of(item, struct xfs_attr_intent, xattri_list);
+	args = attr->xattri_da_args;
+
+	/*
+	 * Always reset trans after EAGAIN cycle
+	 * since the transaction is new
+	 */
+	args->trans = tp;
+
+	if (XFS_TEST_ERROR(false, args->dp->i_mount, XFS_ERRTAG_LARP)) {
+		error = -EIO;
+		goto out;
+	}
+
+	error = xfs_attr_set_iter(attr);
+	if (!error && attr->xattri_dela_state != XFS_DAS_DONE)
+		error = -EAGAIN;
+out:
+	if (error != -EAGAIN)
+		xfs_attr_free_intent(attr);
+
+	return error;
+}
+
+/* Cancel an attr */
+static void
+xfs_attr_cancel_item(
+	struct list_head	*item)
+{
+	struct xfs_attr_intent	*attr;
+
+	attr = container_of(item, struct xfs_attr_intent, xattri_list);
+	xfs_attr_free_intent(attr);
+}
+
+const struct xfs_defer_op_type xfs_attr_defer_type = {
+	.max_items	= 1,
+	.create_intent	= xfs_attr_create_intent,
+	.abort_intent	= xfs_attr_abort_intent,
+	.create_done	= xfs_attr_create_done,
+	.finish_item	= xfs_attr_finish_item,
+	.cancel_item	= xfs_attr_cancel_item,
 };

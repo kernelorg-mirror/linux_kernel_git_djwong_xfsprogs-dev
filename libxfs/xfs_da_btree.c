@@ -19,6 +19,7 @@
 #include "xfs_bmap.h"
 #include "xfs_attr_leaf.h"
 #include "xfs_trace.h"
+#include "xfs_errortag.h"
 
 /*
  * xfs_da_btree.c
@@ -111,6 +112,17 @@ xfs_da_state_free(xfs_da_state_t *state)
 	memset((char *)state, 0, sizeof(*state));
 #endif /* DEBUG */
 	kmem_cache_free(xfs_da_state_cache, state);
+}
+
+void
+xfs_da_state_reset(
+	struct xfs_da_state	*state,
+	struct xfs_da_args	*args)
+{
+	xfs_da_state_kill_altpath(state);
+	memset(state, 0, sizeof(struct xfs_da_state));
+	state->args = args;
+	state->mp = state->args->dp->i_mount;
 }
 
 static inline int xfs_dabuf_nfsb(struct xfs_mount *mp, int whichfork)
@@ -478,6 +490,9 @@ xfs_da3_split(
 	int			i;
 
 	trace_xfs_da_split(state->args);
+
+	if (XFS_TEST_ERROR(false, state->mp, XFS_ERRTAG_DA_LEAF_SPLIT))
+		return -EIO;
 
 	/*
 	 * Walk back up the tree splitting/inserting/adjusting as necessary.

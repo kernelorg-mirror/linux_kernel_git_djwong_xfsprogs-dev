@@ -49,6 +49,7 @@
 #include "libfrog/radix-tree.h"
 #include "atomic.h"
 #include "spinlock.h"
+#include "linux-err.h"
 
 #include "xfs_types.h"
 #include "xfs_arch.h"
@@ -594,6 +595,7 @@ struct xfs_rtalloc_rec {
 };
 
 typedef int (*xfs_rtalloc_query_range_fn)(
+	struct xfs_mount		*mp,
 	struct xfs_trans		*tp,
 	const struct xfs_rtalloc_rec	*rec,
 	void				*priv);
@@ -601,10 +603,12 @@ typedef int (*xfs_rtalloc_query_range_fn)(
 int libxfs_zero_extent(struct xfs_inode *ip, xfs_fsblock_t start_fsb,
                         xfs_off_t count_fsb);
 
-
+/* xfs_log.c */
 bool xfs_log_check_lsn(struct xfs_mount *, xfs_lsn_t);
 void xfs_log_item_init(struct xfs_mount *, struct xfs_log_item *, int);
-#define xfs_log_in_recovery(mp)	(false)
+#define xfs_attr_use_log_assist(mp)	(0)
+#define xlog_drop_incompat_feat(log)	do { } while (0)
+#define xfs_log_in_recovery(mp)		(false)
 
 /* xfs_icache.c */
 #define xfs_inode_set_cowblocks_tag(ip)	do { } while (0)
@@ -689,12 +693,12 @@ int xfs_rtmodify_summary(struct xfs_mount *mp, struct xfs_trans *tp, int log,
 int xfs_rtfree_range(struct xfs_mount *mp, struct xfs_trans *tp,
 		     xfs_rtblock_t start, xfs_extlen_t len,
 		     struct xfs_buf **rbpp, xfs_fsblock_t *rsb);
-int xfs_rtalloc_query_range(struct xfs_trans *tp,
+int xfs_rtalloc_query_range(struct xfs_mount *mp, struct xfs_trans *tp,
 			    const struct xfs_rtalloc_rec *low_rec,
 			    const struct xfs_rtalloc_rec *high_rec,
 			    xfs_rtalloc_query_range_fn fn,
 			    void *priv);
-int xfs_rtalloc_query_all(struct xfs_trans *tp,
+int xfs_rtalloc_query_all(struct xfs_mount *mp, struct xfs_trans *tp,
 			  xfs_rtalloc_query_range_fn fn,
 			  void *priv);
 bool xfs_verify_rtbno(struct xfs_mount *mp, xfs_rtblock_t rtbno);

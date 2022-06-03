@@ -264,7 +264,7 @@ process_exinode(
 	xfs_bmbt_rec_t		*rp;
 
 	rp = (xfs_bmbt_rec_t *)XFS_DFORK_PTR(dip, whichfork);
-	process_bmbt_reclist(rp, XFS_DFORK_NEXTENTS(dip, whichfork), extmapp);
+	process_bmbt_reclist(rp, xfs_dfork_nextents(dip, whichfork), extmapp);
 }
 
 static void
@@ -273,9 +273,9 @@ process_fork(
 	int			whichfork)
 {
 	extmap_t		*extmap;
-	int			nex;
+	xfs_extnum_t		nex;
 
-	nex = XFS_DFORK_NEXTENTS(dip, whichfork);
+	nex = xfs_dfork_nextents(dip, whichfork);
 	if (!nex)
 		return;
 	extmap = extmap_alloc(nex);

@@ -33,18 +33,32 @@ int
 xfs_rmap_lookup_le(
 	struct xfs_btree_cur	*cur,
 	xfs_agblock_t		bno,
-	xfs_extlen_t		len,
 	uint64_t		owner,
 	uint64_t		offset,
 	unsigned int		flags,
+	struct xfs_rmap_irec	*irec,
 	int			*stat)
 {
+	int			get_stat = 0;
+	int			error;
+
 	cur->bc_rec.r.rm_startblock = bno;
-	cur->bc_rec.r.rm_blockcount = len;
+	cur->bc_rec.r.rm_blockcount = 0;
 	cur->bc_rec.r.rm_owner = owner;
 	cur->bc_rec.r.rm_offset = offset;
 	cur->bc_rec.r.rm_flags = flags;
-	return xfs_btree_lookup(cur, XFS_LOOKUP_LE, stat);
+
+	error = xfs_btree_lookup(cur, XFS_LOOKUP_LE, stat);
+	if (error || !(*stat) || !irec)
+		return error;
+
+	error = xfs_rmap_get_rec(cur, irec, &get_stat);
+	if (error)
+		return error;
+	if (!get_stat)
+		return -EFSCORRUPTED;
+
+	return 0;
 }
 
 /*
@@ -250,7 +264,6 @@ out_bad_rec:
 struct xfs_find_left_neighbor_info {
 	struct xfs_rmap_irec	high;
 	struct xfs_rmap_irec	*irec;
-	int			*stat;
 };
 
 /* For each rmap given, figure out if it matches the key we want. */
@@ -275,7 +288,6 @@ xfs_rmap_find_left_neighbor_helper(
 		return 0;
 
 	*info->irec = *rec;
-	*info->stat = 1;
 	return -ECANCELED;
 }
 
@@ -284,7 +296,7 @@ xfs_rmap_find_left_neighbor_helper(
  * return a match with the same owner and adjacent physical and logical
  * block ranges.
  */
-int
+STATIC int
 xfs_rmap_find_left_neighbor(
 	struct xfs_btree_cur	*cur,
 	xfs_agblock_t		bno,
@@ -295,6 +307,7 @@ xfs_rmap_find_left_neighbor(
 	int			*stat)
 {
 	struct xfs_find_left_neighbor_info	info;
+	int			found = 0;
 	int			error;
 
 	*stat = 0;
@@ -312,21 +325,44 @@ xfs_rmap_find_left_neighbor(
 	info.high.rm_flags = flags;
 	info.high.rm_blockcount = 0;
 	info.irec = irec;
-	info.stat = stat;
 
 	trace_xfs_rmap_find_left_neighbor_query(cur->bc_mp,
 			cur->bc_ag.pag->pag_agno, bno, 0, owner, offset, flags);
 
-	error = xfs_rmap_query_range(cur, &info.high, &info.high,
-			xfs_rmap_find_left_neighbor_helper, &info);
-	if (error == -ECANCELED)
-		error = 0;
-	if (*stat)
-		trace_xfs_rmap_find_left_neighbor_result(cur->bc_mp,
-				cur->bc_ag.pag->pag_agno, irec->rm_startblock,
-				irec->rm_blockcount, irec->rm_owner,
-				irec->rm_offset, irec->rm_flags);
-	return error;
+	/*
+	 * Historically, we always used the range query to walk every reverse
+	 * mapping that could possibly overlap the key that the caller asked
+	 * for, and filter out the ones that don't.  That is very slow when
+	 * there are a lot of records.
+	 *
+	 * However, there are two scenarios where the classic btree search can
+	 * produce correct results -- if the index contains a record that is an
+	 * exact match for the lookup key; and if there are no other records
+	 * between the record we want and the key we supplied.
+	 *
+	 * As an optimization, try a non-overlapped lookup first.  This makes
+	 * extent conversion and remap operations run a bit faster if the
+	 * physical extents aren't being shared.  If we don't find what we
+	 * want, we fall back to the overlapped query.
+	 */
+	error = xfs_rmap_lookup_le(cur, bno, owner, offset, flags, irec,
+			&found);
+	if (error)
+		return error;
+	if (found)
+		error = xfs_rmap_find_left_neighbor_helper(cur, irec, &info);
+	if (!error)
+		error = xfs_rmap_query_range(cur, &info.high, &info.high,
+				xfs_rmap_find_left_neighbor_helper, &info);
+	if (error != -ECANCELED)
+		return error;
+
+	*stat = 1;
+	trace_xfs_rmap_find_left_neighbor_result(cur->bc_mp,
+			cur->bc_ag.pag->pag_agno, irec->rm_startblock,
+			irec->rm_blockcount, irec->rm_owner, irec->rm_offset,
+			irec->rm_flags);
+	return 0;
 }
 
 /* For each rmap given, figure out if it matches the key we want. */
@@ -352,7 +388,6 @@ xfs_rmap_lookup_le_range_helper(
 		return 0;
 
 	*info->irec = *rec;
-	*info->stat = 1;
 	return -ECANCELED;
 }
 
@@ -373,6 +408,7 @@ xfs_rmap_lookup_le_range(
 	int			*stat)
 {
 	struct xfs_find_left_neighbor_info	info;
+	int			found = 0;
 	int			error;
 
 	info.high.rm_startblock = bno;
@@ -385,20 +421,44 @@ xfs_rmap_lookup_le_range(
 	info.high.rm_blockcount = 0;
 	*stat = 0;
 	info.irec = irec;
-	info.stat = stat;
 
-	trace_xfs_rmap_lookup_le_range(cur->bc_mp,
-			cur->bc_ag.pag->pag_agno, bno, 0, owner, offset, flags);
-	error = xfs_rmap_query_range(cur, &info.high, &info.high,
-			xfs_rmap_lookup_le_range_helper, &info);
-	if (error == -ECANCELED)
-		error = 0;
-	if (*stat)
-		trace_xfs_rmap_lookup_le_range_result(cur->bc_mp,
-				cur->bc_ag.pag->pag_agno, irec->rm_startblock,
-				irec->rm_blockcount, irec->rm_owner,
-				irec->rm_offset, irec->rm_flags);
-	return error;
+	trace_xfs_rmap_lookup_le_range(cur->bc_mp, cur->bc_ag.pag->pag_agno,
+			bno, 0, owner, offset, flags);
+
+	/*
+	 * Historically, we always used the range query to walk every reverse
+	 * mapping that could possibly overlap the key that the caller asked
+	 * for, and filter out the ones that don't.  That is very slow when
+	 * there are a lot of records.
+	 *
+	 * However, there are two scenarios where the classic btree search can
+	 * produce correct results -- if the index contains a record that is an
+	 * exact match for the lookup key; and if there are no other records
+	 * between the record we want and the key we supplied.
+	 *
+	 * As an optimization, try a non-overlapped lookup first.  This makes
+	 * scrub run much faster on most filesystems because bmbt records are
+	 * usually an exact match for rmap records.  If we don't find what we
+	 * want, we fall back to the overlapped query.
+	 */
+	error = xfs_rmap_lookup_le(cur, bno, owner, offset, flags, irec,
+			&found);
+	if (error)
+		return error;
+	if (found)
+		error = xfs_rmap_lookup_le_range_helper(cur, irec, &info);
+	if (!error)
+		error = xfs_rmap_query_range(cur, &info.high, &info.high,
+				xfs_rmap_lookup_le_range_helper, &info);
+	if (error != -ECANCELED)
+		return error;
+
+	*stat = 1;
+	trace_xfs_rmap_lookup_le_range_result(cur->bc_mp,
+			cur->bc_ag.pag->pag_agno, irec->rm_startblock,
+			irec->rm_blockcount, irec->rm_owner, irec->rm_offset,
+			irec->rm_flags);
+	return 0;
 }
 
 /*
@@ -509,7 +569,7 @@ xfs_rmap_unmap(
 	 * for the AG headers at rm_startblock == 0 created by mkfs/growfs that
 	 * will not ever be removed from the tree.
 	 */
-	error = xfs_rmap_lookup_le(cur, bno, len, owner, offset, flags, &i);
+	error = xfs_rmap_lookup_le(cur, bno, owner, offset, flags, &ltrec, &i);
 	if (error)
 		goto out_error;
 	if (XFS_IS_CORRUPT(mp, i != 1)) {
@@ -517,13 +577,6 @@ xfs_rmap_unmap(
 		goto out_error;
 	}
 
-	error = xfs_rmap_get_rec(cur, &ltrec, &i);
-	if (error)
-		goto out_error;
-	if (XFS_IS_CORRUPT(mp, i != 1)) {
-		error = -EFSCORRUPTED;
-		goto out_error;
-	}
 	trace_xfs_rmap_lookup_le_range_result(cur->bc_mp,
 			cur->bc_ag.pag->pag_agno, ltrec.rm_startblock,
 			ltrec.rm_blockcount, ltrec.rm_owner,
@@ -785,18 +838,11 @@ xfs_rmap_map(
 	 * record for our insertion point. This will also give us the record for
 	 * start block contiguity tests.
 	 */
-	error = xfs_rmap_lookup_le(cur, bno, len, owner, offset, flags,
+	error = xfs_rmap_lookup_le(cur, bno, owner, offset, flags, &ltrec,
 			&have_lt);
 	if (error)
 		goto out_error;
 	if (have_lt) {
-		error = xfs_rmap_get_rec(cur, &ltrec, &have_lt);
-		if (error)
-			goto out_error;
-		if (XFS_IS_CORRUPT(mp, have_lt != 1)) {
-			error = -EFSCORRUPTED;
-			goto out_error;
-		}
 		trace_xfs_rmap_lookup_le_range_result(cur->bc_mp,
 				cur->bc_ag.pag->pag_agno, ltrec.rm_startblock,
 				ltrec.rm_blockcount, ltrec.rm_owner,
@@ -1021,7 +1067,7 @@ xfs_rmap_convert(
 	 * record for our insertion point. This will also give us the record for
 	 * start block contiguity tests.
 	 */
-	error = xfs_rmap_lookup_le(cur, bno, len, owner, offset, oldext, &i);
+	error = xfs_rmap_lookup_le(cur, bno, owner, offset, oldext, &PREV, &i);
 	if (error)
 		goto done;
 	if (XFS_IS_CORRUPT(mp, i != 1)) {
@@ -1029,13 +1075,6 @@ xfs_rmap_convert(
 		goto done;
 	}
 
-	error = xfs_rmap_get_rec(cur, &PREV, &i);
-	if (error)
-		goto done;
-	if (XFS_IS_CORRUPT(mp, i != 1)) {
-		error = -EFSCORRUPTED;
-		goto done;
-	}
 	trace_xfs_rmap_lookup_le_range_result(cur->bc_mp,
 			cur->bc_ag.pag->pag_agno, PREV.rm_startblock,
 			PREV.rm_blockcount, PREV.rm_owner,
@@ -1139,7 +1178,7 @@ xfs_rmap_convert(
 			_RET_IP_);
 
 	/* reset the cursor back to PREV */
-	error = xfs_rmap_lookup_le(cur, bno, len, owner, offset, oldext, &i);
+	error = xfs_rmap_lookup_le(cur, bno, owner, offset, oldext, NULL, &i);
 	if (error)
 		goto done;
 	if (XFS_IS_CORRUPT(mp, i != 1)) {
@@ -2676,16 +2715,8 @@ xfs_rmap_record_exists(
 	ASSERT(XFS_RMAP_NON_INODE_OWNER(owner) ||
 	       (flags & XFS_RMAP_BMBT_BLOCK));
 
-	error = xfs_rmap_lookup_le(cur, bno, len, owner, offset, flags,
+	error = xfs_rmap_lookup_le(cur, bno, owner, offset, flags, &irec,
 			&has_record);
-	if (error)
-		return error;
-	if (!has_record) {
-		*has_rmap = false;
-		return 0;
-	}
-
-	error = xfs_rmap_get_rec(cur, &irec, &has_record);
 	if (error)
 		return error;
 	if (!has_record) {
