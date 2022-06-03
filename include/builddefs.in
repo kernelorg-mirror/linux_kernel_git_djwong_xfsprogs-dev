@@ -20,6 +20,16 @@ BUILD_CFLAGS = @BUILD_CFLAGS@ -D_FILE_OFFSET_BITS=64
 # only use what we calculate from the configured options above.
 LDFLAGS =
 
+WARNINGS = -femit-struct-debug-detailed=any -Wno-error=unused-but-set-variable \
+-Wuninitialized -Wno-pointer-sign -Wall -Wextra -Wno-unused-parameter \
+-fstack-usage -Werror -Wno-sign-compare -Wno-missing-field-initializers \
+-Wmaybe-uninitialized -Wno-error=unused-function -Wno-error=unused-variable \
+-Wno-error=maybe-uninitialized
+
+# Comment out for release builds
+CFLAGS += $(WARNINGS)
+BUILD_CFLAGS += $(WARNINGS)
+
 LIBRT = @librt@
 LIBUUID = @libuuid@
 LIBURCU = @liburcu@
@@ -128,7 +138,7 @@ HAVE_CROND = @have_crond@
 CROND_DIR = @crond_dir@
 HAVE_LIBURCU_ATOMIC64 = @have_liburcu_atomic64@
 
-GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall
+GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall -Werror -Wextra -Wno-unused-parameter
 #	   -Wbitwise -Wno-transparent-union -Wno-old-initializer -Wno-decl
 
 # _LGPL_SOURCE is for liburcu to work correctly with GPL/LGPL programs
