@@ -242,14 +242,11 @@ set_reflink(
 		exit(0);
 	}
 
-	if (xfs_has_realtime(mp)) {
-		printf(_("Reflink feature not supported with realtime.\n"));
-		exit(0);
-	}
-
 	printf(_("Adding reflink support to filesystem.\n"));
 	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_REFLINK;
 	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+	if (xfs_has_realtime(mp))
+		quotacheck_skip();
 	return true;
 }
 
@@ -412,6 +409,7 @@ check_fs_free_space(
 	struct xfs_sb			*new_sb)
 {
 	struct xfs_inode		fake_rrmapip = {.i_mount = mp};
+	struct xfs_inode		fake_rrefcountip = {.i_mount = mp};
 	struct xfs_perag		*pag;
 	xfs_filblks_t			ask;
 	xfs_agnumber_t			agno;
@@ -505,6 +503,19 @@ check_fs_free_space(
 	_("Error %d while checking rtrmapbt space reservation.\n"),
 				error);
 
+	/* Realtime reference count btree inode */
+	ask = libxfs_rtrefcountbt_calc_reserves(mp);
+	error = -libxfs_imeta_resv_init_inode(&fake_rrefcountip, ask);
+	if (error == ENOSPC) {
+		printf(
+	_("Not enough free space would remain for rtrefcountbt metadata.\n"));
+		exit(0);
+	}
+	if (error)
+		do_error(
+	_("Error %d while checking rtrefcountbt space reservation.\n"),
+				error);
+
 	/*
 	 * Would the post-upgrade filesystem have enough free space on the data
 	 * device after making per-AG reservations and reserving rt metadata
@@ -516,6 +527,7 @@ check_fs_free_space(
 	}
 
 	/* Unreserve the realtime metadata reservations. */
+	libxfs_imeta_resv_free_inode(&fake_rrefcountip);
 	libxfs_imeta_resv_free_inode(&fake_rrmapip);
 
 	/*
