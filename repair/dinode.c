@@ -2691,6 +2691,25 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 			}
 		}
 
+		if (xfs_dinode_has_large_extent_counts(dino) &&
+		    !xfs_has_large_extent_counts(mp)) {
+			if (!uncertain) {
+				do_warn(
+	_("inode %" PRIu64 " is marked large extent counts but file system does not support large extent counts\n"),
+					lino);
+			}
+			flags2 &= ~XFS_DIFLAG2_NREXT64;
+
+			if (no_modify) {
+				do_warn(_("would zero extent counts.\n"));
+			} else {
+				do_warn(_("zeroing extent counts.\n"));
+				dino->di_nextents = 0;
+				dino->di_anextents = 0;
+				*dirty = 1;
+			}
+		}
+
 		if (!verify_mode && flags2 != be64_to_cpu(dino->di_flags2)) {
 			if (!no_modify) {
 				do_warn(_("fixing bad flags2.\n"));
