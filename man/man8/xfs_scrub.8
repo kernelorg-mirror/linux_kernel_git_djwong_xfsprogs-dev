@@ -47,6 +47,17 @@ If this is the case, the filesystem must be unmounted and
 run on the filesystem to fix the problems.
 .SH OPTIONS
 .TP
+.BI \-A " path"
+The actual VFS path to the filesystem to check.
+Normally, the
+.I mount-point
+argument is used to open the filesystem and for reporting errors.
+However, if scrub is running in a sandbox where the filesystem to check has
+been bind mounted at a well known path, then this argument should be used to
+supply the well known path, and the
+.I mount-point
+will be used only for error reporting.
+.TP
 .BI \-a " errors"
 Abort if more than this many errors are found on the filesystem.
 .TP
