@@ -141,7 +141,7 @@ enum {
 };
 
 /* Just define the max options array size manually right now */
-#define MAX_SUBOPTS	D_MAX_OPTS
+#define MAX_SUBOPTS	(D_MAX_OPTS + 1)
 
 #define SUBOPT_NEEDS_VAL	(-1LL)
 #define MAX_CONFLICTS	8
