@@ -271,4 +271,13 @@ struct xfs_dquot {
 	int		q_type;
 };
 
+/* Dummy xfs_drain so that libxfs compiles. */
+struct xfs_drain { /* empty */ };
+
+static inline void xfs_perag_bump_intents(struct xfs_perag *pag) { }
+static inline void xfs_perag_drop_intents(struct xfs_perag *pag) { }
+
+#define xfs_drain_free(dr)		((void)0)
+#define xfs_drain_init(dr)		((void)0)
+
 #endif	/* __XFS_MOUNT_H__ */
