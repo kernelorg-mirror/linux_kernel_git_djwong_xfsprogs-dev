@@ -61,6 +61,7 @@ error_tag(char *name)
 		{ XFS_ERRTAG_LARP,			"larp" },
 		{ XFS_ERRTAG_DA_LEAF_SPLIT,		"da_leaf_split" },
 		{ XFS_ERRTAG_ATTR_LEAF_TO_NODE,		"attr_leaf_to_node" },
+		{ XFS_ERRTAG_SWAPEXT_FINISH_ONE,	"swapext_finish_one" },
 		{ XFS_ERRTAG_MAX,			NULL }
 	};
 	int	count;
