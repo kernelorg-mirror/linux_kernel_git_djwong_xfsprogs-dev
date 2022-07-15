@@ -1138,6 +1138,25 @@ Print the timestamps in the current locale's date and time format instead of
 raw seconds since the Unix epoch.
 .RE
 .TP
+.BI "unlinked [-a " agno " ] [-b " bucket " ] [-q] [-v]"
+Dump the contents of unlinked buckets.
+
+Options include:
+.RS 1.0i
+.TP 0.4i
+.B \-a
+Print only this AG's unlinked buckets.
+.TP 0.4i
+.B \-b
+Print only this bucket within each AGI.
+.TP 0.4i
+.B \-q
+Only print the essentials.
+.TP 0.4i
+.B \-v
+Print resource usage of each file on the unlinked lists.
+.RE
+.TP
 .BI "uuid [" uuid " | " generate " | " rewrite " | " restore ]
 Set the filesystem universally unique identifier (UUID).
 The filesystem UUID can be used by
