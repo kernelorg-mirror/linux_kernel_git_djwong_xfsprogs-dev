@@ -25,6 +25,7 @@
 #include "xfs_attr.h"
 #include "xfs_ag.h"
 #include "xfs_swapext.h"
+#include "xfs_rtgroup.h"
 
 /* Dummy defer item ops, since we don't do logging. */
 
@@ -179,11 +180,27 @@ xfs_rmap_update_diff_items(
 	struct xfs_mount		*mp = priv;
 	struct xfs_rmap_intent		*ra;
 	struct xfs_rmap_intent		*rb;
+	unsigned long long		a_ag, b_ag;
 
 	ra = container_of(a, struct xfs_rmap_intent, ri_list);
 	rb = container_of(b, struct xfs_rmap_intent, ri_list);
-	return  XFS_FSB_TO_AGNO(mp, ra->ri_bmap.br_startblock) -
-		XFS_FSB_TO_AGNO(mp, rb->ri_bmap.br_startblock);
+	if (ra->ri_realtime) {
+		a_ag = xfs_rtb_to_rgno(mp, ra->ri_bmap.br_startblock);
+		a_ag |= (1ULL << 63);
+	} else {
+		a_ag = XFS_FSB_TO_AGNO(mp, ra->ri_bmap.br_startblock);
+	}
+	if (rb->ri_realtime) {
+		b_ag = xfs_rtb_to_rgno(mp, rb->ri_bmap.br_startblock);
+		b_ag |= (1ULL << 63);
+	} else {
+		b_ag = XFS_FSB_TO_AGNO(mp, rb->ri_bmap.br_startblock);
+	}
+	if (a_ag > b_ag)
+		return 1;
+	if (a_ag < b_ag)
+		return -1;
+	return 0;
 }
 
 /* Get an RUI. */
