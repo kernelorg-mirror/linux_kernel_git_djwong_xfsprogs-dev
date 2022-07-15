@@ -18,7 +18,7 @@
 #include "xfs_inode.h"
 #include "xfs_trans.h"
 #include "libfrog/platform.h"
-
+#include "libxfs/xfile.h"
 #include "libxfs.h"
 
 static void libxfs_brelse(struct cache_node *node);
@@ -67,6 +67,9 @@ libxfs_device_zero(struct xfs_buftarg *btp, xfs_daddr_t start, uint len)
 	size_t		len_bytes;
 	char		*z;
 	int		error, fd;
+
+	if (btp->flags & XFS_BUFTARG_XFILE)
+		return -EOPNOTSUPP;
 
 	fd = libxfs_device_to_fd(btp->bt_bdev);
 	start_offset = LIBXFS_BBTOOFF64(start);
@@ -578,6 +581,31 @@ libxfs_balloc(
 	return &bp->b_node;
 }
 
+static inline int
+libxfs_buf_ioapply_in_memory(
+	struct xfs_buf		*bp,
+	bool			is_write)
+{
+	struct xfile		*xfile = bp->b_target->bt_xfile;
+	loff_t			pos = BBTOB(xfs_buf_daddr(bp));
+	size_t			size = BBTOB(bp->b_length);
+	int			error;
+
+	if (bp->b_nmaps > 1) {
+		/* We don't need or support multi-map buffers. */
+		ASSERT(0);
+		error = -EIO;
+	} else if (is_write) {
+		error = xfile_obj_store(xfile, bp->b_addr, size, pos);
+	} else {
+		error = xfile_obj_load(xfile, bp->b_addr, size, pos);
+	}
+	if (error)
+		bp->b_error = error;
+	else if (!is_write)
+		bp->b_flags |= LIBXFS_B_UPTODATE;
+	return error;
+}
 
 static int
 __read_buf(int fd, void *buf, int len, off64_t offset, int flags)
@@ -602,12 +630,16 @@ int
 libxfs_readbufr(struct xfs_buftarg *btp, xfs_daddr_t blkno, struct xfs_buf *bp,
 		int len, int flags)
 {
-	int	fd = libxfs_device_to_fd(btp->bt_bdev);
+	int	fd;
 	int	bytes = BBTOB(len);
 	int	error;
 
 	ASSERT(len <= bp->b_length);
 
+	if (bp->b_target->flags & XFS_BUFTARG_XFILE)
+		return libxfs_buf_ioapply_in_memory(bp, false);
+
+	fd = libxfs_device_to_fd(btp->bt_bdev);
 	error = __read_buf(fd, bp->b_addr, bytes, LIBXFS_BBTOOFF64(blkno), flags);
 	if (!error &&
 	    bp->b_target->bt_bdev == btp->bt_bdev &&
@@ -639,6 +671,9 @@ libxfs_readbufr_map(struct xfs_buftarg *btp, struct xfs_buf *bp, int flags)
 	int	error = 0;
 	void	*buf;
 	int	i;
+
+	if (bp->b_target->flags & XFS_BUFTARG_XFILE)
+		return libxfs_buf_ioapply_in_memory(bp, false);
 
 	fd = libxfs_device_to_fd(btp->bt_bdev);
 	buf = bp->b_addr;
@@ -824,7 +859,7 @@ int
 libxfs_bwrite(
 	struct xfs_buf	*bp)
 {
-	int		fd = libxfs_device_to_fd(bp->b_target->bt_bdev);
+	int		fd;
 
 	/*
 	 * we never write buffers that are marked stale. This indicates they
@@ -859,7 +894,10 @@ libxfs_bwrite(
 		}
 	}
 
-	if (!(bp->b_flags & LIBXFS_B_DISCONTIG)) {
+	if (bp->b_target->flags & XFS_BUFTARG_XFILE) {
+		libxfs_buf_ioapply_in_memory(bp, true);
+	} else if (!(bp->b_flags & LIBXFS_B_DISCONTIG)) {
+		fd = libxfs_device_to_fd(bp->b_target->bt_bdev);
 		bp->b_error = __write_buf(fd, bp->b_addr, BBTOB(bp->b_length),
 				    LIBXFS_BBTOOFF64(xfs_buf_daddr(bp)),
 				    bp->b_flags);
@@ -867,6 +905,7 @@ libxfs_bwrite(
 		int	i;
 		void	*buf = bp->b_addr;
 
+		fd = libxfs_device_to_fd(bp->b_target->bt_bdev);
 		for (i = 0; i < bp->b_nmaps; i++) {
 			off64_t	offset = LIBXFS_BBTOOFF64(bp->b_maps[i].bm_bn);
 			int len = BBTOB(bp->b_maps[i].bm_len);
