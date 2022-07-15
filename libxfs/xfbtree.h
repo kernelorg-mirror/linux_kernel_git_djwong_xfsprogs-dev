@@ -51,6 +51,7 @@ int xfbtree_head_read_buf(struct xfbtree *xfbt, struct xfs_trans *tp,
 void xfbtree_destroy(struct xfbtree *xfbt);
 int xfbtree_trans_commit(struct xfbtree *xfbt, struct xfs_trans *tp);
 void xfbtree_trans_cancel(struct xfbtree *xfbt, struct xfs_trans *tp);
+unsigned long long xfbtree_bytes(struct xfbtree *xfbt);
 
 #endif /* CONFIG_XFS_BTREE_IN_XFILE */
 
