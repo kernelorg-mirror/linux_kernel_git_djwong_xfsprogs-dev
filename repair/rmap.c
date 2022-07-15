@@ -759,14 +759,14 @@ rmap_dump(
  */
 static void
 mark_inode_rl(
-	struct xfs_mount		*mp,
+	struct xfs_mount	*mp,
 	struct xfs_bag		*rmaps)
 {
 	xfs_agnumber_t		iagno;
 	struct xfs_rmap_irec	*rmap;
 	struct ino_tree_node	*irec;
+	uint64_t		idx;
 	int			off;
-	size_t			idx;
 	xfs_agino_t		ino;
 
 	if (bag_count(rmaps) < 2)
@@ -1527,9 +1527,9 @@ _("Unable to fix reflink flag on inode %"PRIu64".\n"),
 /*
  * Return the number of refcount objects for an AG.
  */
-size_t
+uint64_t
 refcount_record_count(
-	struct xfs_mount		*mp,
+	struct xfs_mount	*mp,
 	xfs_agnumber_t		agno)
 {
 	return slab_count(ag_rmaps[agno].ar_refcount_items);
