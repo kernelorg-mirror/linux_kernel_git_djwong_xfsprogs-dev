@@ -11,7 +11,8 @@ enum xfrog_scrub_group {
 	XFROG_SCRUB_GROUP_NONE,		/* not metadata */
 	XFROG_SCRUB_GROUP_AGHEADER,	/* per-AG header */
 	XFROG_SCRUB_GROUP_PERAG,	/* per-AG metadata */
-	XFROG_SCRUB_GROUP_FS,		/* per-FS metadata */
+	XFROG_SCRUB_GROUP_RT,		/* realtime metadata */
+	XFROG_SCRUB_GROUP_QUOTA,	/* quota metadata */
 	XFROG_SCRUB_GROUP_INODE,	/* per-inode metadata */
 	XFROG_SCRUB_GROUP_ISCAN,	/* metadata requiring full inode scan */
 	XFROG_SCRUB_GROUP_SUMMARY,	/* summary metadata */
