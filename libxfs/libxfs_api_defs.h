@@ -54,6 +54,7 @@
 
 #define xfs_btree_bload			libxfs_btree_bload
 #define xfs_btree_bload_compute_geometry libxfs_btree_bload_compute_geometry
+#define xfs_btree_compute_maxlevels	libxfs_btree_compute_maxlevels
 #define xfs_btree_decrement		libxfs_btree_decrement
 #define xfs_btree_del_cursor		libxfs_btree_del_cursor
 #define xfs_btree_goto_left_edge	libxfs_btree_goto_left_edge
@@ -160,6 +161,8 @@
 #define xfs_imeta_link			libxfs_imeta_link
 #define xfs_imeta_lookup		libxfs_imeta_lookup
 #define xfs_imeta_mount			libxfs_imeta_mount
+#define xfs_imeta_resv_free_inode	libxfs_imeta_resv_free_inode
+#define xfs_imeta_resv_init_inode	libxfs_imeta_resv_init_inode
 #define xfs_imeta_set_metaflag		libxfs_imeta_set_metaflag
 #define xfs_imeta_start_update		libxfs_imeta_start_update
 #define xfs_imeta_unlink		libxfs_imeta_unlink
@@ -227,6 +230,7 @@
 #define xfs_rtgroup_put			libxfs_rtgroup_put
 #define xfs_rtgroup_update_secondary_sbs	libxfs_rtgroup_update_secondary_sbs
 #define xfs_rtgroup_update_super	libxfs_rtgroup_update_super
+#define xfs_rtrmapbt_calc_reserves	libxfs_rtrmapbt_calc_reserves
 #define xfs_rtrmapbt_commit_staged_btree	libxfs_rtrmapbt_commit_staged_btree
 #define xfs_rtrmapbt_create		libxfs_rtrmapbt_create
 #define xfs_rtrmapbt_create_path	libxfs_rtrmapbt_create_path
