@@ -20,6 +20,8 @@ if [ ! -x "${mailer}" ]; then
 	exit 1
 fi
 
+mntpoint_esc="$(systemd-escape --path "${mntpoint}")"
+
 (cat << ENDL
 To: $1
 From: <xfs_scrub@${hostname}>
@@ -29,4 +31,4 @@ So sorry, the automatic xfs_scrub of ${mntpoint} on ${hostname} failed.
 
 A log of what happened follows:
 ENDL
-systemctl status --full --lines 4294967295 "xfs_scrub@${mntpoint}") | "${mailer}" -t -i
+systemctl status --full --lines 4294967295 "xfs_scrub@${mntpoint_esc}") | "${mailer}" -t -i
