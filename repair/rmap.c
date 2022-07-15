@@ -1268,6 +1268,8 @@ rmaps_verify_btree(
 	struct xfs_btree_cur	*bt_cur = NULL;
 	struct xfs_buf		*agbp = NULL;
 	struct xfs_perag	*pag = NULL;
+	struct xfs_inode	*ip = NULL;
+	xfs_ino_t		ino;
 	int			have;
 	int			error;
 
@@ -1278,6 +1280,11 @@ rmaps_verify_btree(
 			do_warn(_("would rebuild corrupt rmap btrees.\n"));
 		return;
 	}
+	if (agno == NULLAGNUMBER && mp->m_sb.sb_rblocks == 0) {
+		if (rmap_record_count(mp, NULLAGNUMBER) != 0)
+			do_error(_("realtime rmaps but no rtdev?\n"));
+		return;
+	}
 
 	/* Create cursors to rmap structures */
 	error = rmap_init_mem_cursor(mp, NULL, agno, &rm_cur);
@@ -1286,18 +1293,56 @@ rmaps_verify_btree(
 		return;
 	}
 
-	pag = libxfs_perag_get(mp, agno);
-	error = -libxfs_alloc_read_agf(pag, NULL, 0, &agbp);
-	if (error) {
-		do_warn(_("Could not read AGF %u to check rmap btree.\n"),
-				agno);
-		goto err;
+	if (agno == NULLAGNUMBER) {
+		error = -libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &ino);
+		if (error || ino == NULLFSINO) {
+			do_warn(
+_("Cannot find realtime rmap file, not checking realtime reverse mappings.\n"));
+			goto err;
+		}
+
+		error = -libxfs_imeta_iget(mp, ino, XFS_DIR3_FT_REG_FILE, &ip);
+		if (error) {
+			do_warn(
+_("Cannot iget realtime rmap inode 0x%llx, error %d.\n"),
+				 (unsigned long long)ino, error);
+			goto err;
+		}
+		mp->m_rrmapip = ip;
+
+		if (ip->i_df.if_format != XFS_DINODE_FMT_RMAP) {
+			do_warn(
+_("Realtime rmap inode has wrong format 0x%x, expected 0x%x\n"),
+					ip->i_df.if_format,
+					XFS_DINODE_FMT_RMAP);
+			goto err;
+		}
+
+		if (xfs_inode_has_attr_fork(ip)) {
+			do_warn(
+_("Realtime rmap inode should not have extended attributes\n"));
+			goto err;
+		}
+
+		bt_cur = libxfs_rtrmapbt_init_cursor(mp, NULL, ip);
+	} else {
+		pag = libxfs_perag_get(mp, agno);
+		error = -libxfs_alloc_read_agf(pag, NULL, 0, &agbp);
+		if (error) {
+			do_warn(
+_("Could not read AGF %u to check rmap btree.\n"),
+					agno);
+			goto err;
+		}
+
+		/*
+		 * Leave the per-ag data "uninitialized" since we rewrite it
+		 * later
+		 */
+		pag->pagf_init = 0;
+
+		bt_cur = libxfs_rmapbt_init_cursor(mp, NULL, agbp, pag);
 	}
-
-	/* Leave the per-ag data "uninitialized" since we rewrite it later */
-	pag->pagf_init = 0;
-
-	bt_cur = libxfs_rmapbt_init_cursor(mp, NULL, agbp, pag);
 	if (!bt_cur) {
 		do_warn(_("Not enough memory to check reverse mappings.\n"));
 		goto err;
@@ -1382,6 +1427,10 @@ err:
 		libxfs_perag_put(pag);
 	if (agbp)
 		libxfs_buf_relse(agbp);
+	if (ip) {
+		libxfs_imeta_irele(mp->m_rrmapip);
+		mp->m_rrmapip = NULL;
+	}
 	rmap_free_mem_cursor(NULL, &rm_cur, error);
 }
 
