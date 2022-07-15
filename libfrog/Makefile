@@ -61,6 +61,12 @@ ifeq ($(HAVE_FIEXCHANGE),yes)
 LCFLAGS += -DHAVE_FIEXCHANGE
 endif
 
+ifeq ($(HAVE_GETFSMAP),yes)
+CFILES+=clearspace.c
+HFILES+=clearspace.h
+endif
+
+
 LDIRT = gen_crc32table crc32table.h crc32selftest
 
 default: crc32selftest ltdepend $(LTLIBRARY)
