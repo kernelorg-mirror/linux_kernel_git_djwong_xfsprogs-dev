@@ -115,10 +115,8 @@ xfs_initialize_rtgroups(
 #ifdef __KERNEL__
 		/* Place kernel structure only init below this point. */
 		spin_lock_init(&rtg->rtg_state_lock);
-		error = xfs_drain_init(&rtg->rtg_intents);
-		if (error)
-			goto out_remove_rtg;
-
+		xfs_drain_init(&rtg->rtg_intents);
+		xfs_hooks_init(&rtg->rtg_rmap_update_hooks);
 #endif /* __KERNEL__ */
 
 		/* first new rtg is fully initialized */
@@ -128,11 +126,6 @@ xfs_initialize_rtgroups(
 
 	return 0;
 
-#ifdef __KERNEL__
-out_remove_rtg:
-	xfs_drain_free(&rtg->rtg_intents);
-	radix_tree_delete(&mp->m_rtgroup_tree, index);
-#endif /* __KERNEL__ */
 out_free_rtg:
 	kmem_free(rtg);
 out_unwind_new_rtgs:
