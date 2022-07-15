@@ -1047,6 +1047,7 @@ xfs_dialloc_ag_inobt(
 
 	ASSERT(pag->pagi_init);
 	ASSERT(pag->pagi_inodeok);
+	ASSERT(!pag->pagf_noalloc);
 	ASSERT(pag->pagi_freecount > 0);
 
  restart_pagno:
@@ -1673,7 +1674,7 @@ xfs_dialloc_good_ag(
 	int			needspace;
 	int			error;
 
-	if (!pag->pagi_inodeok)
+	if (!pag->pagi_inodeok || pag->pagf_noalloc)
 		return false;
 
 	if (!pag->pagi_init) {
