@@ -314,8 +314,8 @@ static inline void libxfs_buftarg_drain(struct xfs_buftarg *btp)
 }
 void libxfs_buftarg_free(struct xfs_buftarg *btp);
 
-int xfile_alloc_buftarg(struct xfs_mount *mp, const char *descr,
-		struct xfs_buftarg **btpp);
+int xfile_alloc_buftarg(struct xfs_mount *mp, unsigned long long maxrange,
+		const char *descr, struct xfs_buftarg **btpp);
 void xfile_free_buftarg(struct xfs_buftarg *btp);
 
 #endif	/* __XFS_MOUNT_H__ */

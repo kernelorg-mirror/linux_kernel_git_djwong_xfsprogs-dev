@@ -635,6 +635,7 @@ libxfs_buftarg_alloc(
 int
 xfile_alloc_buftarg(
 	struct xfs_mount	*mp,
+	unsigned long long	maxrange,
 	const char		*descr,
 	struct xfs_buftarg	**btpp)
 {
@@ -642,7 +643,7 @@ xfile_alloc_buftarg(
 	struct xfile		*xfile;
 	int			error;
 
-	error = xfile_create(mp, descr, &xfile);
+	error = xfile_create(mp, maxrange, descr, &xfile);
 	if (error)
 		return error;
 
