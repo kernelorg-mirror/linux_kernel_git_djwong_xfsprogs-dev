@@ -222,6 +222,7 @@
 #define xfs_rmap_query_range		libxfs_rmap_query_range
 
 #define xfs_rtfree_extent		libxfs_rtfree_extent
+#define xfs_rtgroup_get			libxfs_rtgroup_get
 #define xfs_rtgroup_put			libxfs_rtgroup_put
 #define xfs_rtgroup_update_secondary_sbs	libxfs_rtgroup_update_secondary_sbs
 #define xfs_rtgroup_update_super	libxfs_rtgroup_update_super
