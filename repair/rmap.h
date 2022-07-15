@@ -63,4 +63,7 @@ int rmap_get_mem_rec(struct rmap_mem_cur *rmcur, struct xfs_rmap_irec *irec);
 	for ((agno) = NULLAGNUMBER; (agno) == NULLAGNUMBER || \
 	(agno) < (mp)->m_sb.sb_agcount; (agno)++)
 
+extern bool is_rtrmap_ino(xfs_ino_t ino);
+extern void forget_rtrmap(void);
+
 #endif /* RMAP_H_ */
