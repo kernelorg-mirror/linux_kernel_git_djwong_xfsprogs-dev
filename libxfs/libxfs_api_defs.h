@@ -222,6 +222,10 @@
 #define xfs_rmap_query_range		libxfs_rmap_query_range
 
 #define xfs_rtfree_extent		libxfs_rtfree_extent
+
+#define xfs_rtrefcountbt_droot_maxrecs	libxfs_rtrefcountbt_droot_maxrecs
+#define xfs_rtrefcountbt_maxrecs	libxfs_rtrefcountbt_maxrecs
+
 #define xfs_rtrmapbt_calc_reserves	libxfs_rtrmapbt_calc_reserves
 #define xfs_rtrmapbt_commit_staged_btree	libxfs_rtrmapbt_commit_staged_btree
 #define xfs_rtrmapbt_create		libxfs_rtrmapbt_create
