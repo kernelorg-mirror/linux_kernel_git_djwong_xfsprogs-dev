@@ -179,25 +179,23 @@ libxfs_mod_incore_sb(
  */
 int
 libxfs_alloc_file_space(
-	xfs_inode_t	*ip,
-	xfs_off_t	offset,
-	xfs_off_t	len,
-	int		alloc_type,
-	int		attr_flags)
+	struct xfs_inode	*ip,
+	xfs_off_t		offset,
+	xfs_off_t		len,
+	int			alloc_type)
 {
-	xfs_mount_t	*mp;
-	xfs_off_t	count;
-	xfs_filblks_t	datablocks;
-	xfs_filblks_t	allocated_fsb;
-	xfs_filblks_t	allocatesize_fsb;
-	xfs_bmbt_irec_t *imapp;
-	xfs_bmbt_irec_t imaps[1];
-	int		reccount;
-	uint		resblks;
-	xfs_fileoff_t	startoffset_fsb;
-	xfs_trans_t	*tp;
-	int		xfs_bmapi_flags;
-	int		error;
+	struct xfs_bmbt_irec	imaps[1];
+	struct xfs_bmbt_irec	*imapp;
+	struct xfs_mount	*mp;
+	struct xfs_trans	*tp;
+	xfs_off_t		count;
+	xfs_filblks_t		datablocks;
+	xfs_filblks_t		allocated_fsb;
+	xfs_filblks_t		allocatesize_fsb;
+	int			reccount;
+	uint			resblks;
+	xfs_fileoff_t		startoffset_fsb;
+	int			error;
 
 	if (len <= 0)
 		return -EINVAL;
@@ -206,7 +204,6 @@ libxfs_alloc_file_space(
 	error = 0;
 	imapp = &imaps[0];
 	reccount = 1;
-	xfs_bmapi_flags = alloc_type ? XFS_BMAPI_PREALLOC : 0;
 	mp = ip->i_mount;
 	startoffset_fsb = XFS_B_TO_FSBT(mp, offset);
 	allocatesize_fsb = XFS_B_TO_FSB(mp, count);
@@ -227,8 +224,9 @@ libxfs_alloc_file_space(
 		}
 		xfs_trans_ijoin(tp, ip, 0);
 
-		error = xfs_bmapi_write(tp, ip, startoffset_fsb, allocatesize_fsb,
-				xfs_bmapi_flags, 0, imapp, &reccount);
+		error = xfs_bmapi_write(tp, ip, startoffset_fsb,
+				allocatesize_fsb, alloc_type, resblks,
+				imapp, &reccount);
 
 		if (error)
 			goto error0;
