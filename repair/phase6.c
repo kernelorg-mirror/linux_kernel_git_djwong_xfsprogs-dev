@@ -995,6 +995,120 @@ _("rtgroup %u rmap btree could not be rebuilt, error %d\n"),
 	libxfs_imeta_irele(ip);
 }
 
+static void
+ensure_rtgroup_refcountbt(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	struct xfs_trans	*tp;
+	struct xfs_imeta_path	*path;
+	struct xfs_inode	*ip;
+	struct xfs_imeta_update	upd;
+	xfs_ino_t		ino;
+	int			error;
+
+	if (!xfs_has_rtreflink(mp))
+		return;
+
+	ino = rtgroup_refcount_ino(rtg);
+	if (no_modify) {
+		if (ino == NULLFSINO)
+			do_warn(_("would reset rtgroup %u refcount btree\n"),
+					rtg->rtg_rgno);
+		return;
+	}
+
+	if (ino == NULLFSINO)
+		do_warn(_("resetting rtgroup %u refcount btree\n"),
+				rtg->rtg_rgno);
+
+	error = -libxfs_rtrefcountbt_create_path(mp, rtg->rtg_rgno, &path);
+	if (error)
+		do_error(
+_("Couldn't create rtgroup %u refcount file path, err %d\n"),
+				rtg->rtg_rgno, error);
+
+	error = ensure_imeta_dirpath(mp, path);
+	if (error)
+		do_error(
+_("Couldn't create rtgroup %u metadata directory, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	error = -libxfs_imeta_start_update(mp, path, &upd);
+	if (error)
+		do_error(
+_("Couldn't find rtgroup %u refcountbt parent, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	/* Create a transaction for whatever work we end up doing. */
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+			libxfs_imeta_create_space_res(mp), 0, 0, &tp);
+	if (error)
+		do_error(
+_("Couldn't prepare to attach rtgroup %u refcountbt inode, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	if (ino != NULLFSINO) {
+		/*
+		 * We're still hanging on to our old inode, so try to grab it
+		 * so that we can reconnect it and reconnect it to the metadata
+		 * directory tree.
+		 */
+		error = -libxfs_imeta_iget(mp, ino, XFS_DIR3_FT_REG_FILE, &ip);
+		if (error) {
+			do_warn(
+_("Couldn't iget rtgroup %u refcountbt inode 0x%llx, error %d\n"),
+					rtg->rtg_rgno, (unsigned long long)ino,
+					error);
+			goto zap;
+		}
+
+		error = -libxfs_imeta_link(tp, path, ip, &upd);
+		if (error)
+			do_error(
+_("Failed to link rtgroup %u refcountbt inode 0x%llx, error %d\n"),
+					rtg->rtg_rgno, (unsigned long long)ino,
+					error);
+
+		set_nlink(VFS_I(ip), 1);
+		ip->i_df.if_format = XFS_DINODE_FMT_REFCOUNT;
+		libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	} else {
+zap:
+		/*
+		 * The rtrefcount inode was bad or gone, so just make a new one
+		 * and give our reference to the rtgroup structure.
+		 */
+		error = -libxfs_rtrefcountbt_create(&tp, path, &upd, &ip);
+		if (error)
+			do_error(
+_("Couldn't create rtgroup %u refcountbt inode, error %d\n"),
+					rtg->rtg_rgno, error);
+	}
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		do_error(
+_("Couldn't commit new rtgroup %u refcountbt inode %llu, error %d\n"),
+				rtg->rtg_rgno, (unsigned long long)ip->i_ino,
+				error);
+
+	/* Mark the inode in use. */
+	mark_ino_inuse(mp, ip->i_ino, S_IFREG, upd.dp->i_ino);
+	mark_ino_metadata(mp, ip->i_ino);
+	libxfs_imeta_end_update(mp, &upd, error);
+
+	/* Copy our incore refcount data to the ondisk refcount inode. */
+	error = populate_rtgroup_refcountbt(rtg, ip);
+	if (error)
+		do_error(
+_("rtgroup %u refcount btree could not be rebuilt, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	libxfs_imeta_free_path(path);
+	libxfs_imeta_irele(ip);
+}
+
 /* Initialize a root directory. */
 static int
 init_fs_root_dir(
@@ -3648,6 +3762,7 @@ reset_rt_metadata_inodes(
 
 	for_each_rtgroup(mp, rgno, rtg) {
 		ensure_rtgroup_rmapbt(rtg);
+		ensure_rtgroup_refcountbt(rtg);
 	}
 }
 
