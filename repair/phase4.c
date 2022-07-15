@@ -151,7 +151,12 @@ check_rmap_btrees(
 	xfs_agnumber_t	agno,
 	void		*arg)
 {
-	rmap_add_fixed_ag_rec(wq->wq_ctx, agno);
+	/*
+	 * We get called with NULLAGNUMBER to check the realtime rmap records.
+	 * RT devices don't have fixed AG records, so skip that part.
+	 */
+	if (agno != NULLAGNUMBER)
+		rmap_add_fixed_ag_rec(wq->wq_ctx, agno);
 	rmaps_verify_btree(wq->wq_ctx, agno);
 }
 
@@ -199,28 +204,29 @@ process_rmap_data(
 	struct xfs_mount	*mp)
 {
 	struct workqueue	wq;
-	xfs_agnumber_t		i;
+	struct xfs_perag	*pag;
+	xfs_agnumber_t		agno;
 
 	if (!rmap_needs_work(mp))
 		return;
 
 	create_work_queue(&wq, mp, platform_nproc());
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)
-		queue_work(&wq, check_rmap_btrees, i, NULL);
+	for_each_rmap_group(mp, agno)
+		queue_work(&wq, check_rmap_btrees, agno, NULL);
 	destroy_work_queue(&wq);
 
 	if (!xfs_has_reflink(mp))
 		return;
 
 	create_work_queue(&wq, mp, platform_nproc());
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)
-		queue_work(&wq, compute_ag_refcounts, i, NULL);
+	for_each_perag(mp, agno, pag)
+		queue_work(&wq, compute_ag_refcounts, agno, NULL);
 	destroy_work_queue(&wq);
 
 	create_work_queue(&wq, mp, platform_nproc());
-	for (i = 0; i < mp->m_sb.sb_agcount; i++) {
-		queue_work(&wq, process_inode_reflink_flags, i, NULL);
-		queue_work(&wq, check_refcount_btrees, i, NULL);
+	for_each_perag(mp, agno, pag) {
+		queue_work(&wq, process_inode_reflink_flags, agno, NULL);
+		queue_work(&wq, check_refcount_btrees, agno, NULL);
 	}
 	destroy_work_queue(&wq);
 }
