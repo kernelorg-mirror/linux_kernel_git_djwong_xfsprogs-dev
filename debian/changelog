@@ -1,3 +1,35 @@
+xfsprogs (6.1.0-rc0~WIP-2022-10-19-1djwong1) jammy-experimental; urgency=low
+
+  * Base off for-next on 2022-08-30 (5.19.0+)
+  * Support bmbt repairs in xfs_repair.
+  * Support realtime rmap btree.
+  * Metadata directories.
+  * Support atomic file range swaps.
+  * AG status and noalloc.
+  * Realtime reflink.
+  * Better balanced repair workers for scrub.
+  * Scrub repair dependencies.
+  * reflink/rmapbt/finobt/metadir upgrades.
+  * Vectorized scrub experiment.
+  * Support for cowextsize on rtreflink files.
+  * GETFSREFCOUNTS ioctl and xfs_io utility.
+  * Static checking is clean enough (2021-07-15).
+  * Prototype free space defragmentation.
+  * In-memory reverse mapping btrees for repair.
+  * Atomic symlink swapext.
+  * Sample mkfs configuration files.
+  * Faster xfs_scrub phase5.
+  * Scrub file data once per month without a bunch of competing timers.
+  * Larger minimum log size and drop support for small filesystems.
+  * Multiarch support for libhandle.
+  * Better security for xfs_scrub background services.
+  * Improve xfs_scrub_all resiliency when systemd gets re-exec'd.
+  * Realtime allocation groups.
+  * Fixed CPU usage resource control for xfs_scrub processes.
+  * Intent items take perag/rtgroup references.
+
+ -- Darrick J. Wong <djwong@djwong.org>  Wed, 19 Oct 2022 11:18:00 -0700
+
 xfsprogs (5.19.0-1) unstable; urgency=medium
 
   * New upstream release
