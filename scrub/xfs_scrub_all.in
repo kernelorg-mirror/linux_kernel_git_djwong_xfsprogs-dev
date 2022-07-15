@@ -18,6 +18,7 @@ from io import TextIOWrapper
 
 retcode = 0
 terminate = False
+scrub_media = False
 
 def DEVNULL():
 	'''Return /dev/null in subprocess writable format.'''
@@ -111,6 +112,17 @@ def systemd_escape(path):
 	except:
 		return path
 
+def scrub_unitname(mnt):
+	'''Return the systemd service name.'''
+	global scrub_media
+
+	if mnt != '*':
+		mnt = systemd_escape(mnt)
+
+	if scrub_media:
+		return 'xfs_scrub_media@%s' % mnt
+	return 'xfs_scrub@%s' % mnt
+
 def systemctl_stop(unitname):
 	'''Stop a systemd unit.'''
 	cmd = ['systemctl', 'stop', unitname]
@@ -163,7 +175,7 @@ def systemctl_start(unitname, killfuncs):
 
 def run_scrub(mnt, cond, running_devs, mntdevs, killfuncs):
 	'''Run a scrub process.'''
-	global retcode, terminate
+	global retcode, terminate, scrub_media
 
 	print("Scrubbing %s..." % mnt)
 	sys.stdout.flush()
@@ -173,7 +185,7 @@ def run_scrub(mnt, cond, running_devs, mntdevs, killfuncs):
 			return
 
 		# Try it the systemd way
-		unitname = 'xfs_scrub@%s' % systemd_escape(mnt)
+		unitname = scrub_unitname(mnt)
 		ret = systemctl_start(unitname, killfuncs)
 		if ret == 0 or ret == 1:
 			print("Scrubbing %s done, (err=%d)" % (mnt, ret))
@@ -187,6 +199,8 @@ def run_scrub(mnt, cond, running_devs, mntdevs, killfuncs):
 		# Invoke xfs_scrub manually
 		cmd = ['@sbindir@/xfs_scrub']
 		cmd += '@scrub_args@'.split()
+		if scrub_media:
+			cmd += '-x'
 		cmd += [mnt]
 		ret = run_killable(cmd, None, killfuncs, \
 				lambda proc: proc.terminate())
@@ -213,11 +227,13 @@ def main():
 		a = (mnt, cond, running_devs, devs, killfuncs)
 		thr = threading.Thread(target = run_scrub, args = a)
 		thr.start()
-	global retcode, terminate
+	global retcode, terminate, scrub_media
 
 	parser = argparse.ArgumentParser( \
 			description = "Scrub all mounted XFS filesystems.")
 	parser.add_argument("-V", help = "Report version and exit.", \
+			action = "store_true")
+	parser.add_argument("-x", help = "Scrub file data after filesystem metadata.", \
 			action = "store_true")
 	args = parser.parse_args()
 
@@ -225,14 +241,17 @@ def main():
 		print("xfs_scrub_all version @pkg_version@")
 		sys.exit(0)
 
+	scrub_media = args.x
+
 	fs = find_mounts()
 
 	# Tail the journal if we ourselves aren't a service...
 	journalthread = None
 	if 'SERVICE_MODE' not in os.environ:
 		try:
+			unitname = scrub_unitname('*')
 			cmd=['journalctl', '--no-pager', '-q', '-S', 'now', \
-					'-f', '-u', 'xfs_scrub@*', '-o', \
+					'-f', '-u', unitname, '-o', \
 					'cat']
 			journalthread = subprocess.Popen(cmd)
 		except:
