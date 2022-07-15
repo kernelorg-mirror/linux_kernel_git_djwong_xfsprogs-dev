@@ -27,3 +27,4 @@ So sorry, the automatic xfs_scrub of ${mntpoint} on ${hostname} failed.
 A log of what happened follows:
 ENDL
 systemctl status --full --lines 4294967295 "xfs_scrub@${mntpoint_esc}") | "${mailer}" -t -i
+exit "${PIPESTATUS[1]}"
