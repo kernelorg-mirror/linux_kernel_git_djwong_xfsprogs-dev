@@ -683,6 +683,10 @@ rtbitmap_create(
 	struct xfs_inode	*rbmip;
 	int			error;
 
+	error = -libxfs_imeta_ensure_dirpath(mp, &XFS_IMETA_RTBITMAP);
+	if (error)
+		fail(_("Realtime bitmap directory allocation failed"), error);
+
 	error = -libxfs_imeta_start_update(mp, &XFS_IMETA_RTBITMAP, &upd);
 	if (error)
 		res_failed(error);
@@ -718,6 +722,10 @@ rtsummary_create(
 	struct xfs_trans	*tp;
 	struct xfs_inode	*rsumip;
 	int			error;
+
+	error = -libxfs_imeta_ensure_dirpath(mp, &XFS_IMETA_RTSUMMARY);
+	if (error)
+		fail(_("Realtime summary directory allocation failed"), error);
 
 	error = -libxfs_imeta_start_update(mp, &XFS_IMETA_RTSUMMARY, &upd);
 	if (error)
