@@ -9,22 +9,19 @@
 #include <linux/fiemap.h>
 #include "libfrog/fsgeom.h"
 #include "libfrog/radix-tree.h"
-#include "command.h"
-#include "init.h"
 #include "libfrog/paths.h"
 #include <linux/fsmap.h>
+#include "command.h"
+#include "init.h"
 #include "space.h"
 #include "input.h"
+#include "relocation.h"
 
 static cmdinfo_t find_owner_cmd;
 static cmdinfo_t resolve_owner_cmd;
 
 #define NR_EXTENTS 128
 
-static RADIX_TREE(inode_tree, 0);
-#define MOVE_INODE	0
-#define MOVE_BLOCKS	1
-#define INODE_PATH	2
 int inode_count;
 int inode_paths;
 
@@ -48,12 +45,12 @@ track_inode_chunks(
 			(unsigned long long)length);
 
 	for (i = 0; i < num_inodes; i++) {
-		if (!radix_tree_lookup(&inode_tree, first_ino + i)) {
-			radix_tree_insert(&inode_tree, first_ino + i,
+		if (!radix_tree_lookup(&relocation_data, first_ino + i)) {
+			radix_tree_insert(&relocation_data, first_ino + i,
 					(void *)first_ino + i);
 			inode_count++;
 		}
-		radix_tree_tag_set(&inode_tree, first_ino + i, MOVE_INODE);
+		radix_tree_tag_set(&relocation_data, first_ino + i, MOVE_INODE);
 	}
 }
 
@@ -65,7 +62,7 @@ track_inode(
 	uint64_t	physaddr,
 	uint64_t	length)
 {
-	if (radix_tree_tag_get(&inode_tree, owner, MOVE_BLOCKS))
+	if (radix_tree_tag_get(&relocation_data, owner, MOVE_BLOCKS))
 		return;
 
 	printf(_("AG %d\tInode 0x%llx: blocks to move to move: 0x%llx - 0x%llx\n"),
@@ -73,15 +70,15 @@ track_inode(
 			(unsigned long long)owner,
 			(unsigned long long)physaddr,
 			(unsigned long long)physaddr + length - 1);
-	if (!radix_tree_lookup(&inode_tree, owner)) {
-		radix_tree_insert(&inode_tree, owner, (void *)owner);
+	if (!radix_tree_lookup(&relocation_data, owner)) {
+		radix_tree_insert(&relocation_data, owner, (void *)owner);
 		inode_count++;
 	}
-	radix_tree_tag_set(&inode_tree, owner, MOVE_BLOCKS);
+	radix_tree_tag_set(&relocation_data, owner, MOVE_BLOCKS);
 }
 
-static void
-scan_ag(
+int
+find_relocation_targets(
 	xfs_agnumber_t		agno)
 {
 	struct fsmap_head	*fsmap;
@@ -95,8 +92,7 @@ scan_ag(
 	fsmap = malloc(fsmap_sizeof(NR_EXTENTS));
 	if (!fsmap) {
 		fprintf(stderr, _("%s: fsmap malloc failed.\n"), progname);
-		exitcode = 1;
-		return;
+		return -ENOMEM;
 	}
 
 	memset(fsmap, 0, sizeof(*fsmap));
@@ -117,8 +113,7 @@ scan_ag(
 			fprintf(stderr, _("%s: FS_IOC_GETFSMAP [\"%s\"]: %s\n"),
 				progname, file->name, strerror(errno));
 			free(fsmap);
-			exitcode = 1;
-			return;
+			return -errno;
 		}
 
 		/* No more extents to map, exit */
@@ -163,6 +158,7 @@ scan_ag(
 	}
 
 	free(fsmap);
+	return 0;
 }
 
 /*
@@ -174,6 +170,7 @@ find_owner_f(
 	char			**argv)
 {
 	xfs_agnumber_t		agno = -1;
+	int			ret;
 	int			c;
 
 	while ((c = getopt(argc, argv, "a:")) != EOF) {
@@ -213,7 +210,9 @@ _("Filesystem at %s does not have reverse mapping enabled. Aborting.\n"),
 		return 0;
 	}
 
-	scan_ag(agno);
+	ret = find_relocation_targets(agno);
+	if (ret)
+		exitcode = 1;
 	return 0;
 }
 
@@ -245,18 +244,6 @@ find_owner_init(void)
 	add_command(&find_owner_cmd);
 }
 
-/*
- * for each dirent we get returned, look up the inode tree to see if it is an
- * inode we need to process. If it is, then replace the entry in the tree with
- * a structure containing the current path and mark the entry as resolved.
- */
-struct inode_path {
-	uint64_t		ino;
-	struct list_head	path_list;
-	uint32_t		link_count;
-	char			path[1];
-};
-
 static int
 resolve_owner_cb(
 	const char		*path,
@@ -272,7 +259,7 @@ resolve_owner_cb(
 	 * Lookup the slot rather than the entry so we can replace the contents
 	 * without another lookup later on.
 	 */
-	slot = radix_tree_lookup_slot(&inode_tree, stat->st_ino);
+	slot = radix_tree_lookup_slot(&relocation_data, stat->st_ino);
 	if (!slot || *slot == NULL)
 		return 0;
 
@@ -306,7 +293,7 @@ _("Aborting: Storing path %s for inode 0x%lx failed: %s\n"),
 	if (stat->st_ino == (uint64_t)*slot) {
 		ipath->link_count = 1;
 		*slot = ipath;
-		radix_tree_tag_set(&inode_tree, stat->st_ino, INODE_PATH);
+		radix_tree_tag_set(&relocation_data, stat->st_ino, INODE_PATH);
 		inode_paths++;
 		return 0;
 	}
@@ -327,8 +314,8 @@ _("Aborting: Storing path %s for inode 0x%lx failed: %s\n"),
  * This should be parallelised - pass subdirs off to a work queue, have the
  * work queue processes subdirs, queueing more subdirs to work on.
  */
-static int
-walk_mount(
+int
+resolve_target_paths(
 	const char	*mntpt)
 {
 	int		ret;
@@ -351,18 +338,18 @@ list_inode_paths(void)
 		bool		move_blocks;
 		bool		move_inode;
 
-		ret = radix_tree_gang_lookup_tag(&inode_tree, (void **)&ipath,
-						idx, 1, INODE_PATH);
+		ret = radix_tree_gang_lookup_tag(&relocation_data,
+					(void **)&ipath, idx, 1, INODE_PATH);
 		if (!ret)
 			break;
 		idx = ipath->ino + 1;
 
 		/* Grab status tags and remove from tree. */
-		move_blocks = radix_tree_tag_get(&inode_tree, ipath->ino,
+		move_blocks = radix_tree_tag_get(&relocation_data, ipath->ino,
 						MOVE_BLOCKS);
-		move_inode = radix_tree_tag_get(&inode_tree, ipath->ino,
+		move_inode = radix_tree_tag_get(&relocation_data, ipath->ino,
 						MOVE_INODE);
-		radix_tree_delete(&inode_tree, ipath->ino);
+		radix_tree_delete(&relocation_data, ipath->ino);
 
 		/* Print the initial path with inode number and state. */
 		printf("0x%.16llx\t%s\t%s\t%8d\t%s\n",
@@ -392,16 +379,17 @@ list_inode_paths(void)
 
 	/*
 	 * Any inodes remaining in the tree at this point indicate inodes whose
-	 * paths were not found. This will be unlinked but still open inodes or
-	 * lost inodes due to corruptions. Either way, a shrink will not succeed
-	 * until these inodes are removed from the filesystem.
+	 * paths were not found. This will be free inodes or unlinked but still
+	 * open inodes. Either way, a shrink will not succeed until these inodes
+	 * are removed from the filesystem.
 	 */
 	idx = 0;
 	do {
 		uint64_t	ino;
 
 
-		ret = radix_tree_gang_lookup(&inode_tree, (void **)&ino, idx, 1);
+		ret = radix_tree_gang_lookup(&relocation_data,
+						(void **)&ino, idx, 1);
 		if (!ret) {
 			if (idx != 0)
 				ret = -EBUSY;
@@ -410,7 +398,7 @@ list_inode_paths(void)
 		idx = ino + 1;
 		printf(_("No path found for inode 0x%llx!\n"),
 				(unsigned long long)ino);
-		radix_tree_delete(&inode_tree, ino);
+		radix_tree_delete(&relocation_data, ino);
 	} while (true);
 
 	return ret;
@@ -426,13 +414,13 @@ resolve_owner_f(
 {
 	int	ret;
 
-	if (!inode_tree.rnode) {
+	if (!relocation_data.rnode) {
 		fprintf(stderr,
 _("Inode list has not been populated. No inodes to resolve.\n"));
 		return 0;
 	}
 
-	ret = walk_mount(file->fs_path.fs_dir);
+	ret = resolve_target_paths(file->fs_path.fs_dir);
 	if (ret) {
 		fprintf(stderr,
 _("Failed to resolve all paths from mount point %s: %s\n"),
