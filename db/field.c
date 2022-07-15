@@ -152,8 +152,6 @@ const ftattr_t	ftattrtab[] = {
 	{ FLDT_CHARS, "chars", fp_num, "%c", SI(bitsz(char)), 0, NULL, NULL },
 	{ FLDT_REXTLEN, "rextlen", fp_num, "%u", SI(RMAPBT_BLOCKCOUNT_BITLEN),
 	  0, NULL, NULL },
-	{ FLDT_RGEXTLEN, "rgrextlen", fp_num, "%u", SI(bitsz(uint32_t)),
-	  0, NULL, NULL },
 	{ FLDT_RFILEOFFD, "rfileoffd", fp_num, "%llu", SI(RMAPBT_OFFSET_BITLEN),
 	  0, NULL, NULL },
 	{ FLDT_REXTFLG, "rextflag", fp_num, "%u", SI(RMAPBT_EXNTFLAG_BITLEN), 0,
