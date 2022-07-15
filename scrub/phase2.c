@@ -92,29 +92,48 @@ err:
 	*aborted = true;
 }
 
-/* Scrub whole-FS metadata btrees. */
+/* Scrub whole-FS metadata. */
 static void
 scan_fs_metadata(
-	struct workqueue		*wq,
-	xfs_agnumber_t			agno,
-	void				*arg)
+	struct scrub_ctx	*ctx,
+	int			(*fn)(struct scrub_ctx *ctx,
+				      struct action_list *alist),
+	bool			*aborted)
 {
-	struct scrub_ctx		*ctx = (struct scrub_ctx *)wq->wq_ctx;
-	bool				*aborted = arg;
-	struct action_list		alist;
-	int				ret;
+	struct action_list	alist;
+	int			ret;
 
 	if (*aborted)
 		return;
 
 	action_list_init(&alist);
-	ret = scrub_fs_metadata(ctx, &alist);
+	ret = fn(ctx, &alist);
 	if (ret) {
 		*aborted = true;
 		return;
 	}
 
-	action_list_defer(ctx, agno, &alist);
+	action_list_defer(ctx, 0, &alist);
+}
+
+/* Scrub quota metadata. */
+static void
+scan_quota_metadata(
+	struct workqueue	*wq,
+	xfs_agnumber_t		agno,
+	void			*arg)
+{
+	scan_fs_metadata(wq->wq_ctx, scrub_quota_metadata, arg);
+}
+
+/* Scrub realtime metadata. */
+static void
+scan_rt_metadata(
+	struct workqueue	*wq,
+	xfs_agnumber_t		agno,
+	void			*arg)
+{
+	scan_fs_metadata(wq->wq_ctx, scrub_rt_metadata, arg);
 }
 
 /* Scan all filesystem metadata. */
@@ -159,9 +178,18 @@ phase2_func(
 	if (aborted)
 		goto out;
 
-	ret = -workqueue_add(&wq, scan_fs_metadata, 0, &aborted);
+	ret = -workqueue_add(&wq, scan_rt_metadata, 0, &aborted);
 	if (ret) {
-		str_liberror(ctx, ret, _("queueing per-FS scrub work"));
+		str_liberror(ctx, ret, _("queueing RT scrub work"));
+		goto out;
+	}
+
+	if (aborted)
+		goto out;
+
+	ret = -workqueue_add(&wq, scan_quota_metadata, 0, &aborted);
+	if (ret) {
+		str_liberror(ctx, ret, _("queueing quota scrub work"));
 		goto out;
 	}
 
