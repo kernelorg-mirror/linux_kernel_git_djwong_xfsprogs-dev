@@ -809,6 +809,60 @@ rtsummary_create(
 	libxfs_imeta_end_update(mp, &upd, 0);
 }
 
+/* Create the realtime rmap btree inode. */
+static void
+rtrmapbt_create(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	struct xfs_imeta_update	upd;
+	struct xfs_rmap_irec	rmap = {
+		.rm_startblock	= 0,
+		.rm_blockcount	= mp->m_sb.sb_rextsize,
+		.rm_owner	= XFS_RMAP_OWN_FS,
+		.rm_offset	= 0,
+		.rm_flags	= 0,
+	};
+	struct xfs_imeta_path	*path;
+	struct xfs_trans	*tp;
+	struct xfs_btree_cur	*cur;
+	int			error;
+
+	error = -libxfs_rtrmapbt_create_path(mp, rtg->rtg_rgno, &path);
+	if (error)
+		fail( _("rtrmap inode path creation failed"), error);
+
+	error = -libxfs_imeta_ensure_dirpath(mp, path);
+	if (error)
+		fail(_("rtgroup directory allocation failed"), error);
+
+	error = -libxfs_imeta_start_update(mp, path, &upd);
+	if (error)
+		res_failed(error);
+
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+			libxfs_imeta_create_space_res(mp), 0, 0, &tp);
+	if (error)
+		res_failed(error);
+
+	error = -libxfs_rtrmapbt_create(&tp, path, &upd, &rtg->rtg_rmapip);
+	if (error)
+		fail(_("rtrmap inode creation failed"), error);
+
+	cur = libxfs_rtrmapbt_init_cursor(mp, tp, rtg, rtg->rtg_rmapip);
+	error = -libxfs_rmap_map_raw(cur, &rmap);
+	libxfs_btree_del_cursor(cur, error);
+	if (error)
+		fail(_("rtrmapbt initialization failed"), error);
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		fail(_("rtrmapbt commit failed"), error);
+
+	libxfs_imeta_end_update(mp, &upd, 0);
+	libxfs_imeta_free_path(path);
+}
+
 /* Zero the realtime bitmap. */
 static void
 rtbitmap_init(
@@ -983,8 +1037,16 @@ static void
 rtinit(
 	struct xfs_mount	*mp)
 {
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
 	rtbitmap_create(mp);
 	rtsummary_create(mp);
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		if (xfs_has_rtrmapbt(mp))
+			rtrmapbt_create(rtg);
+	}
 
 	rtbitmap_init(mp);
 	rtsummary_init(mp);
