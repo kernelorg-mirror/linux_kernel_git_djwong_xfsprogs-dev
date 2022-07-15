@@ -11,11 +11,15 @@ extern int bload_node_slack;
 
 struct repair_ctx {
 	struct xfs_mount	*mp;
+	struct xfs_inode	*ip;
+	struct xfs_trans	*tp;
 };
 
 struct bulkload_resv {
 	/* Link to list of extents that we've reserved. */
 	struct list_head	list;
+
+	struct xfs_perag	*pag;
 
 	/* FSB of the block we reserved. */
 	xfs_fsblock_t		fsbno;
@@ -34,13 +38,19 @@ struct bulkload {
 	struct list_head	resv_list;
 
 	/* Fake root for new btree. */
-	struct xbtree_afakeroot	afake;
+	union {
+		struct xbtree_afakeroot	afake;
+		struct xbtree_ifakeroot	ifake;
+	};
 
 	/* rmap owner of these blocks */
 	struct xfs_owner_info	oinfo;
 
 	/* The last reservation we allocated from. */
 	struct bulkload_resv	*last_resv;
+
+	/* Hint as to where we should allocate blocks. */
+	xfs_fsblock_t		alloc_hint;
 
 	/* Number of blocks reserved via resv_list. */
 	unsigned int		nr_reserved;
@@ -50,9 +60,12 @@ struct bulkload {
 	list_for_each_entry_safe((resv), (n), &(bkl)->resv_list, list)
 
 void bulkload_init_ag(struct bulkload *bkl, struct repair_ctx *sc,
-		const struct xfs_owner_info *oinfo);
+		const struct xfs_owner_info *oinfo, xfs_fsblock_t alloc_hint);
+void bulkload_init_inode(struct bulkload *bkl, struct repair_ctx *sc,
+		int whichfork, const struct xfs_owner_info *oinfo);
 int bulkload_add_blocks(struct bulkload *bkl, xfs_fsblock_t fsbno,
 		xfs_extlen_t len);
+int bulkload_alloc_blocks(struct bulkload *bkl, uint64_t nr_blocks);
 void bulkload_destroy(struct bulkload *bkl, int error);
 int bulkload_claim_block(struct xfs_btree_cur *cur, struct bulkload *bkl,
 		union xfs_btree_ptr *ptr);
