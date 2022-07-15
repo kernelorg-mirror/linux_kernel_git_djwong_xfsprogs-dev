@@ -14,12 +14,28 @@ void
 bulkload_init_ag(
 	struct bulkload			*bkl,
 	struct repair_ctx		*sc,
-	const struct xfs_owner_info	*oinfo)
+	const struct xfs_owner_info	*oinfo,
+	xfs_fsblock_t			alloc_hint)
 {
 	memset(bkl, 0, sizeof(struct bulkload));
 	bkl->sc = sc;
 	bkl->oinfo = *oinfo; /* structure copy */
+	bkl->alloc_hint = alloc_hint;
 	INIT_LIST_HEAD(&bkl->resv_list);
+}
+
+/* Initialize accounting resources for staging a new inode fork btree. */
+void
+bulkload_init_inode(
+	struct bulkload			*bkl,
+	struct repair_ctx		*sc,
+	int				whichfork,
+	const struct xfs_owner_info	*oinfo)
+{
+	bulkload_init_ag(bkl, sc, oinfo, XFS_INO_TO_FSB(sc->mp, sc->ip->i_ino));
+	bkl->ifake.if_fork = kmem_cache_zalloc(xfs_ifork_cache, 0);
+	bkl->ifake.if_fork_size = xfs_inode_fork_size(sc->ip, whichfork);
+	bkl->ifake.if_whichfork = whichfork;
 }
 
 /* Designate specific blocks to be used to build our new btree. */
@@ -30,6 +46,7 @@ bulkload_add_blocks(
 	xfs_extlen_t		len)
 {
 	struct bulkload_resv	*resv;
+	struct xfs_mount	*mp = bkl->sc->mp;
 
 	resv = kmem_alloc(sizeof(struct bulkload_resv), KM_MAYFAIL);
 	if (!resv)
@@ -39,10 +56,103 @@ bulkload_add_blocks(
 	resv->fsbno = fsbno;
 	resv->len = len;
 	resv->used = 0;
+	resv->pag = libxfs_perag_get(mp, XFS_FSB_TO_AGNO(mp, fsbno));
+
 	list_add_tail(&resv->list, &bkl->resv_list);
 	bkl->nr_reserved += len;
 
 	return 0;
+}
+
+/* Allocate disk space for our new file-based btree. */
+int
+bulkload_alloc_blocks(
+	struct bulkload		*bkl,
+	uint64_t		nr_blocks)
+{
+	struct repair_ctx	*sc = bkl->sc;
+	int			error = 0;
+
+	ASSERT(sc->ip != NULL);
+
+	while (nr_blocks > 0) {
+		struct xfs_alloc_arg	args = {
+			.tp		= sc->tp,
+			.mp		= sc->mp,
+			.oinfo		= bkl->oinfo,
+			.minlen		= 1,
+			.maxlen		= nr_blocks,
+			.prod		= 1,
+			.resv		= XFS_AG_RESV_NONE,
+		};
+
+		/* Don't let our allocation hint take us beyond EOFS. */
+		if (!xfs_verify_fsbno(sc->mp, bkl->alloc_hint))
+			bkl->alloc_hint = XFS_AGB_TO_FSB(sc->mp, 0,
+						XFS_AGFL_BLOCK(sc->mp) + 1);
+
+		error = -libxfs_alloc_vextent_start_ag(&args, bkl->alloc_hint);
+		if (error)
+			return error;
+		if (args.fsbno == NULLFSBLOCK)
+			return ENOSPC;
+
+		error = bulkload_add_blocks(bkl, args.fsbno, args.len);
+		if (error)
+			return error;
+
+		nr_blocks -= args.len;
+		bkl->alloc_hint = args.fsbno + args.len;
+
+		error = -libxfs_trans_roll_inode(&sc->tp, sc->ip);
+		if (error)
+			return error;
+	}
+
+	return 0;
+}
+
+/*
+ * Release blocks that were reserved for a btree repair.  If the repair
+ * succeeded then we log deferred frees for unused blocks.  Otherwise, we try
+ * to free the extents immediately to roll the filesystem back to where it was
+ * before we started.
+ */
+static inline int
+bulkload_destroy_reservation(
+	struct bulkload		*bkl,
+	struct bulkload_resv	*resv,
+	bool			cancel_repair)
+{
+	struct repair_ctx	*sc = bkl->sc;
+
+	if (cancel_repair) {
+		int		error;
+
+		/* Free the extent then roll the transaction. */
+		error = -libxfs_free_extent(sc->tp, resv->pag,
+				XFS_FSB_TO_AGBNO(sc->mp, resv->fsbno),
+				resv->len, &bkl->oinfo, XFS_AG_RESV_NONE);
+		if (error)
+			return error;
+
+		return -libxfs_trans_roll_inode(&sc->tp, sc->ip);
+	}
+
+	/*
+	 * Use the deferred freeing mechanism to schedule for deletion any
+	 * blocks we didn't use to rebuild the tree.  This enables us to log
+	 * them all in the same transaction as the root change.
+	 */
+	resv->fsbno += resv->used;
+	resv->len -= resv->used;
+	resv->used = 0;
+
+	if (resv->len == 0)
+		return 0;
+
+	return __xfs_free_extent_later(sc->tp, resv->fsbno, resv->len,
+			&bkl->oinfo, XFS_AG_RESV_NONE, true);
 }
 
 /* Free all the accounting info and disk space we reserved for a new btree. */
@@ -51,11 +161,35 @@ bulkload_destroy(
 	struct bulkload		*bkl,
 	int			error)
 {
+	struct repair_ctx	*sc = bkl->sc;
 	struct bulkload_resv	*resv, *n;
+	int			err2;
 
 	list_for_each_entry_safe(resv, n, &bkl->resv_list, list) {
+		err2 = bulkload_destroy_reservation(bkl, resv, error != 0);
+		if (err2)
+			goto junkit;
+
 		list_del(&resv->list);
+		libxfs_perag_put(resv->pag);
 		kmem_free(resv);
+	}
+
+junkit:
+	/*
+	 * If we still have reservations attached to @newbt, cleanup must have
+	 * failed and the filesystem is about to go down.  Clean up the incore
+	 * reservations.
+	 */
+	list_for_each_entry_safe(resv, n, &bkl->resv_list, list) {
+		list_del(&resv->list);
+		libxfs_perag_put(resv->pag);
+		kmem_free(resv);
+	}
+
+	if (sc->ip) {
+		kmem_cache_free(xfs_ifork_cache, bkl->ifake.if_fork);
+		bkl->ifake.if_fork = NULL;
 	}
 }
 
