@@ -219,6 +219,12 @@ static inline bool WARN_ON(bool expr) {
 	(inode)->i_version = (version);	\
 } while (0)
 
+struct inode;
+struct user_namespace;
+
+void inode_init_owner(struct user_namespace *mnt_userns, struct inode *inode,
+		      const struct inode *dir, umode_t mode);
+
 #define __must_check                    __attribute__((__warn_unused_result__))
 
 /*
