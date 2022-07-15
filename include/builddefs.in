@@ -140,6 +140,7 @@ HAVE_LIBURCU_ATOMIC64 = @have_liburcu_atomic64@
 HAVE_MEMFD_CLOEXEC = @have_memfd_cloexec@
 HAVE_O_TMPFILE = @have_o_tmpfile@
 HAVE_MKOSTEMP_CLOEXEC = @have_mkostemp_cloexec@
+HAVE_FIEXCHANGE = @have_fiexchange@
 
 GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall -Werror -Wextra -Wno-unused-parameter
 #	   -Wbitwise -Wno-transparent-union -Wno-old-initializer -Wno-decl
