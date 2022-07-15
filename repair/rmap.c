@@ -1914,9 +1914,10 @@ _("Unable to fix reflink flag on inode %"PRIu64".\n"),
 uint64_t
 refcount_record_count(
 	struct xfs_mount	*mp,
+	bool			isrt,
 	xfs_agnumber_t		agno)
 {
-	struct xfs_ag_rmap	*x = rmaps_for_group(false, agno);
+	struct xfs_ag_rmap	*x = rmaps_for_group(isrt, agno);
 
 	return slab_count(x->ar_refcount_items);
 }
@@ -2264,4 +2265,13 @@ rtgroup_rmap_ino(
 	struct xfs_ag_rmap	*ar = rmaps_for_group(true, rtg->rtg_rgno);
 
 	return ar->rg_rmap_ino;
+}
+
+xfs_ino_t
+rtgroup_refcount_ino(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_ag_rmap	*ar = rmaps_for_group(true, rtg->rtg_rgno);
+
+	return ar->rg_refcount_ino;
 }
