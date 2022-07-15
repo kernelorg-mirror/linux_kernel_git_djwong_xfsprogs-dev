@@ -19,6 +19,30 @@ static struct cmdinfo relocate_cmd;
 
 RADIX_TREE(relocation_data, 0);
 
+struct inode_path *
+ipath_alloc(
+	const char		*path,
+	const struct stat	*stat)
+{
+	struct inode_path	*ipath;
+	int			pathlen = strlen(path);
+
+	/* Allocate a new inode path and record the path in it. */
+	ipath = calloc(1, sizeof(*ipath) + pathlen + 1);
+	if (!ipath) {
+		fprintf(stderr,
+_("Failed to allocate ipath %s for inode 0x%llx failed: %s\n"),
+			path, (unsigned long long)stat->st_ino,
+			strerror(-errno));
+		return NULL;
+	}
+	INIT_LIST_HEAD(&ipath->path_list);
+	memcpy(&ipath->path[0], path, pathlen);
+	ipath->ino = stat->st_ino;
+
+	return ipath;
+}
+
 static int
 relocate_targets_to_ag(
 	const char		*mnt,
@@ -37,15 +61,6 @@ relocate_targets_to_ag(
 					(void **)&ipath, idx, 1, INODE_PATH);
 		if (!ret)
 			break;
-
-		/* XXX: don't handle hard link cases yet */
-		if (ipath->link_count > 1) {
-			fprintf(stderr,
-		"FIXME! Skipping hardlinked inode at path %s\n",
-				ipath->path);
-			goto next;
-		}
-
 
 		ret = stat(ipath->path, &st);
 		if (ret) {
@@ -69,7 +84,7 @@ relocate_targets_to_ag(
 		}
 
 		/* move to destination AG */
-		ret = relocate_file_to_ag(mnt, ipath->path, &xfd, dst_agno);
+		ret = relocate_file_to_ag(mnt, ipath, &xfd, dst_agno);
 		xfd_close(&xfd);
 
 		/*
