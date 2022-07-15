@@ -271,4 +271,11 @@ struct xfs_dquot {
 	int		q_type;
 };
 
+/* Dummy xfs_drain so that libxfs compiles. */
+struct xfs_drain {
+};
+
+#define xfs_drain_free(dr)		((void)0)
+#define xfs_drain_init(dr)		((void)0)
+
 #endif	/* __XFS_MOUNT_H__ */
