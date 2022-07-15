@@ -7,6 +7,8 @@
 #ifndef __LIBXFS_H__
 #define __LIBXFS_H__
 
+#define CONFIG_XFS_IN_MEMORY_BTREE
+
 #include "libxfs_api_defs.h"
 #include "platform_defs.h"
 #include "xfs.h"
