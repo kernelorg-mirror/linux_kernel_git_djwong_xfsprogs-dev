@@ -47,6 +47,9 @@ xfile_obj_store(struct xfile *xf, void *buf, size_t count, loff_t pos)
 	return 0;
 }
 
+void xfile_discard(struct xfile *xf, loff_t pos, uint64_t count);
+int xfile_prealloc(struct xfile *xf, loff_t pos, uint64_t count);
+
 struct xfile_stat {
 	loff_t			size;
 	unsigned long long	bytes;
