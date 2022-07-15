@@ -105,7 +105,7 @@ quota: libxcmd
 repair: libxlog libxcmd
 copy: libxlog
 mkfs: libxcmd
-spaceman: libxcmd
+spaceman: libhandle libxcmd
 scrub: libhandle libxcmd
 rtcp: libfrog
 
