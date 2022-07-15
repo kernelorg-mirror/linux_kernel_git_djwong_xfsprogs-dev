@@ -138,6 +138,7 @@
 #define xfs_finobt_calc_reserves	libxfs_finobt_calc_reserves
 #define xfs_fixed_inode_reset		libxfs_fixed_inode_reset
 #define xfs_free_extent			libxfs_free_extent
+#define xfs_free_extent_later		libxfs_free_extent_later
 #define xfs_free_perag			libxfs_free_perag
 #define xfs_free_rtgroups		libxfs_free_rtgroups
 #define xfs_fs_geometry			libxfs_fs_geometry
