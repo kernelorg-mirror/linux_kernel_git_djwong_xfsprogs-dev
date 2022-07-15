@@ -68,5 +68,6 @@ int rmap_get_mem_rec(struct rmap_mem_cur *rmcur, struct xfs_rmap_irec *irec);
 
 bool is_rtrmap_inode(xfs_ino_t ino);
 xfs_ino_t rtgroup_rmap_ino(struct xfs_rtgroup *rtg);
+int populate_rtgroup_rmapbt(struct xfs_rtgroup *rtg, struct xfs_inode *ip);
 
 #endif /* RMAP_H_ */
