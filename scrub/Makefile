@@ -18,6 +18,8 @@ INSTALL_SCRUB += install-systemd
 SYSTEMD_SERVICES=\
 	xfs_scrub@.service \
 	xfs_scrub_fail@.service \
+	xfs_scrub_media@.service \
+	xfs_scrub_media_fail@.service \
 	xfs_scrub_all.service \
 	xfs_scrub_all.timer \
 	system-xfs_scrub.slice
