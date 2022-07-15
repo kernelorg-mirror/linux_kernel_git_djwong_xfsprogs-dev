@@ -47,6 +47,7 @@ static int	inode_u_muuid_count(void *obj, int startoff);
 static int	inode_u_sfdir2_count(void *obj, int startoff);
 static int	inode_u_sfdir3_count(void *obj, int startoff);
 static int	inode_u_symlink_count(void *obj, int startoff);
+static int	inode_u_rtrmapbt_count(void *obj, int startoff);
 
 static const cmdinfo_t	inode_cmd =
 	{ "inode", NULL, inode_f, 0, 1, 1, "[inode#]",
@@ -230,6 +231,8 @@ const field_t	inode_u_flds[] = {
 	{ "sfdir3", FLDT_DIR3SF, NULL, inode_u_sfdir3_count, FLD_COUNT, TYP_NONE },
 	{ "symlink", FLDT_CHARNS, NULL, inode_u_symlink_count, FLD_COUNT,
 	  TYP_NONE },
+	{ "rtrmapbt", FLDT_RTRMAPROOT, NULL, inode_u_rtrmapbt_count, FLD_COUNT,
+	  TYP_NONE },
 	{ NULL }
 };
 
@@ -243,7 +246,7 @@ const field_t	inode_a_flds[] = {
 };
 
 static const char	*dinode_fmt_name[] =
-	{ "dev", "local", "extents", "btree", "uuid" };
+	{ "dev", "local", "extents", "btree", "uuid", "rtrmapbt" };
 static const int	dinode_fmt_name_size =
 	sizeof(dinode_fmt_name) / sizeof(dinode_fmt_name[0]);
 
@@ -636,6 +639,9 @@ inode_init(void)
 typnm_t
 inode_next_type(void)
 {
+	xfs_ino_t	ino;
+	int		error;
+
 	switch (iocur_top->mode & S_IFMT) {
 	case S_IFDIR:
 		return TYP_DIR2;
@@ -650,8 +656,12 @@ inode_next_type(void)
 			 iocur_top->ino == mp->m_sb.sb_gquotino ||
 			 iocur_top->ino == mp->m_sb.sb_pquotino)
 			return TYP_DQBLK;
-		else
-			return TYP_DATA;
+
+		error = -libxfs_imeta_lookup(mp, &XFS_IMETA_RTRMAPBT, &ino);
+		if (!error && iocur_top->ino == ino)
+			return TYP_RTRMAPBT;
+
+		return TYP_DATA;
 	default:
 		return TYP_NONE;
 	}
@@ -783,6 +793,20 @@ inode_u_sfdir3_count(
 	return dip->di_format == XFS_DINODE_FMT_LOCAL &&
 	       (be16_to_cpu(dip->di_mode) & S_IFMT) == S_IFDIR &&
 	       xfs_has_ftype(mp);
+}
+
+static int
+inode_u_rtrmapbt_count(
+	void			*obj,
+	int			startoff)
+{
+	struct xfs_dinode	*dip;
+
+	ASSERT(bitoffs(startoff) == 0);
+	ASSERT(obj == iocur_top->data);
+	dip = obj;
+	ASSERT((char *)XFS_DFORK_DPTR(dip) - (char *)dip == byteize(startoff));
+	return dip->di_format == XFS_DINODE_FMT_RMAP;
 }
 
 int
