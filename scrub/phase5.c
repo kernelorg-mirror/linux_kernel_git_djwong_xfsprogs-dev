@@ -420,7 +420,7 @@ iscan_worker(
 		goto out;
 	}
 
-	ret = action_list_process(ctx, ctx->mnt.fd, &item->alist,
+	ret = action_list_process(ctx, &item->alist,
 			XRM_FINAL_WARNING | XRM_NOPROGRESS);
 	if (ret) {
 		str_liberror(ctx, ret, _("repairing iscan metadata"));
