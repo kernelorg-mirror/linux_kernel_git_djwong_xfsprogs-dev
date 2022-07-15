@@ -383,12 +383,137 @@ out:
 	return error;
 }
 
+typedef int (*iscan_item_fn)(struct scrub_ctx *, struct action_list *);
+
+struct iscan_item {
+	struct action_list	alist;
+	bool			*abortedp;
+	iscan_item_fn		scrub_fn;
+};
+
+/* Run one inode-scan scrubber in this thread. */
+static void
+iscan_worker(
+	struct workqueue	*wq,
+	xfs_agnumber_t		nr,
+	void			*arg)
+{
+	struct timespec		tv;
+	struct iscan_item	*item = arg;
+	struct scrub_ctx	*ctx = wq->wq_ctx;
+	int			ret;
+
+	/*
+	 * Delay each successive iscan by a second so that the threads are less
+	 * likely to contend on the inode buffers.
+	 */
+	if (nr) {
+		tv.tv_sec = nr;
+		tv.tv_nsec = 0;
+		nanosleep(&tv, NULL);
+	}
+
+	ret = item->scrub_fn(ctx, &item->alist);
+	if (ret) {
+		str_liberror(ctx, ret, _("checking iscan metadata"));
+		*item->abortedp = true;
+		goto out;
+	}
+
+	ret = action_list_process(ctx, ctx->mnt.fd, &item->alist,
+			ALP_COMPLAIN_IF_UNFIXED | ALP_NOPROGRESS);
+	if (ret) {
+		str_liberror(ctx, ret, _("repairing iscan metadata"));
+		*item->abortedp = true;
+		goto out;
+	}
+
+out:
+	free(item);
+	return;
+}
+
+/* Queue one inode-scan scrubber. */
+static int
+queue_iscan(
+	struct workqueue	*wq,
+	bool			*abortedp,
+	xfs_agnumber_t		nr,
+	iscan_item_fn		scrub_fn)
+{
+	struct iscan_item	*item;
+	struct scrub_ctx	*ctx = wq->wq_ctx;
+	int			ret;
+
+	item = malloc(sizeof(struct iscan_item));
+	if (!item) {
+		ret = ENOMEM;
+		str_liberror(ctx, ret, _("setting up iscan"));
+		return ret;
+	}
+	action_list_init(&item->alist);
+	item->scrub_fn = scrub_fn;
+	item->abortedp = abortedp;
+
+	ret = -workqueue_add(wq, iscan_worker, nr, item);
+	if (ret)
+		str_liberror(ctx, ret, _("queuing iscan work"));
+
+	return ret;
+}
+
+/* Run multiple inode-scan scrubbers at the same time. */
+static int
+run_kernel_iscan_scrubbers(
+	struct scrub_ctx	*ctx)
+{
+	struct workqueue	wq_iscan;
+	unsigned int		nr_threads = scrub_nproc_workqueue(ctx);
+	xfs_agnumber_t		nr = 0;
+	bool			aborted = false;
+	int			ret, ret2;
+
+	ret = -workqueue_create(&wq_iscan, (struct xfs_mount *)ctx,
+			nr_threads);
+	if (ret) {
+		str_liberror(ctx, ret, _("setting up iscan workqueue"));
+		return ret;
+	}
+
+	/*
+	 * The nlinks scanner is much faster than quotacheck because it only
+	 * walks directories, so we start it first.
+	 */
+	ret = queue_iscan(&wq_iscan, &aborted, nr, scrub_nlinks);
+	if (ret)
+		goto wait;
+
+	if (nr_threads > 1)
+		nr++;
+
+	ret = queue_iscan(&wq_iscan, &aborted, nr, scrub_quotacheck);
+	if (ret)
+		goto wait;
+
+wait:
+	ret2 = -workqueue_terminate(&wq_iscan);
+	if (ret2) {
+		str_liberror(ctx, ret2, _("joining iscan workqueue"));
+		if (!ret)
+			ret = ret2;
+	}
+	if (aborted && !ret)
+		ret = ECANCELED;
+
+	workqueue_destroy(&wq_iscan);
+	return ret;
+}
+
 /* Check directory connectivity. */
 int
 phase5_func(
 	struct scrub_ctx	*ctx)
 {
-	struct action_list	alist;
 	bool			aborted = false;
 	int			ret;
 
@@ -397,12 +522,7 @@ phase5_func(
 	 * after we've checked all inodes and repaired anything that could get
 	 * in the way of a scan.
 	 */
-	action_list_init(&alist);
-	ret = scrub_iscan_metadata(ctx, &alist);
-	if (ret)
-		return ret;
-	ret = action_list_process(ctx, ctx->mnt.fd, &alist,
-			ALP_COMPLAIN_IF_UNFIXED | ALP_NOPROGRESS);
+	ret = run_kernel_iscan_scrubbers(ctx);
 	if (ret)
 		return ret;
 
@@ -435,7 +555,7 @@ phase5_estimate(
 	int			*rshift)
 {
 	*items = scrub_estimate_iscan_work(ctx);
-	*nr_threads = scrub_nproc(ctx);
+	*nr_threads = scrub_nproc(ctx) * 2;
 	*rshift = 0;
 	return 0;
 }
