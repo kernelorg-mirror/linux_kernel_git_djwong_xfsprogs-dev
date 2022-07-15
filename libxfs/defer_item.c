@@ -26,6 +26,7 @@
 #include "libxfs.h"
 #include "xfs_ag.h"
 #include "xfs_swapext.h"
+#include "xfs_rtgroup.h"
 
 /* Dummy defer item ops, since we don't do logging. */
 
@@ -228,6 +229,11 @@ xfs_rmap_update_diff_items(
 	ra = container_of(a, struct xfs_rmap_intent, ri_list);
 	rb = container_of(b, struct xfs_rmap_intent, ri_list);
 
+	ASSERT(ra->ri_realtime == rb->ri_realtime);
+
+	if (ra->ri_realtime)
+		return ra->ri_rtg->rtg_rgno - rb->ri_rtg->rtg_rgno;
+
 	return ra->ri_pag->pag_agno - rb->ri_pag->pag_agno;
 }
 
@@ -264,6 +270,14 @@ xfs_rmap_update_get_group(
 {
 	xfs_agnumber_t		agno;
 
+	if (ri->ri_realtime) {
+		xfs_rgnumber_t	rgno;
+
+		rgno = xfs_rtb_to_rgno(mp, ri->ri_bmap.br_startblock);
+		ri->ri_rtg = xfs_rtgroup_get(mp, rgno);
+		return;
+	}
+
 	agno = XFS_FSB_TO_AGNO(mp, ri->ri_bmap.br_startblock);
 	ri->ri_pag = xfs_perag_get(mp, agno);
 	xfs_perag_bump_intents(ri->ri_pag);
@@ -274,6 +288,11 @@ static inline void
 xfs_rmap_update_put_group(
 	struct xfs_rmap_intent	*ri)
 {
+	if (ri->ri_realtime) {
+		xfs_rtgroup_put(ri->ri_rtg);
+		return;
+	}
+
 	xfs_perag_drop_intents(ri->ri_pag);
 	xfs_perag_put(ri->ri_pag);
 }
