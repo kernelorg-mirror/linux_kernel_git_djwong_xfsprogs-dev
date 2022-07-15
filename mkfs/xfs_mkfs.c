@@ -4439,7 +4439,7 @@ main(
 			.nodalign = false,
 			.nortalign = false,
 			.bigtime = true,
-			.nrext64 = false,
+			.nrext64 = true,
 			/*
 			 * When we decide to enable a new feature by default,
 			 * please remember to update the mkfs conf files.
