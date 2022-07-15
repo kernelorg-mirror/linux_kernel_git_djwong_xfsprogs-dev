@@ -26,6 +26,7 @@
 #include "libxfs.h"
 #include "xfs_ag.h"
 #include "xfs_swapext.h"
+#include "xfs_rtgroup.h"
 
 /* Dummy defer item ops, since we don't do logging. */
 
@@ -222,11 +223,27 @@ xfs_rmap_update_diff_items(
 	struct xfs_mount		*mp = priv;
 	struct xfs_rmap_intent		*ra;
 	struct xfs_rmap_intent		*rb;
+	unsigned long long		a_ag, b_ag;
 
 	ra = container_of(a, struct xfs_rmap_intent, ri_list);
 	rb = container_of(b, struct xfs_rmap_intent, ri_list);
-	return  XFS_FSB_TO_AGNO(mp, ra->ri_bmap.br_startblock) -
-		XFS_FSB_TO_AGNO(mp, rb->ri_bmap.br_startblock);
+	if (ra->ri_realtime) {
+		a_ag = xfs_rtb_to_rgno(mp, ra->ri_bmap.br_startblock);
+		a_ag |= (1ULL << 63);
+	} else {
+		a_ag = XFS_FSB_TO_AGNO(mp, ra->ri_bmap.br_startblock);
+	}
+	if (rb->ri_realtime) {
+		b_ag = xfs_rtb_to_rgno(mp, rb->ri_bmap.br_startblock);
+		b_ag |= (1ULL << 63);
+	} else {
+		b_ag = XFS_FSB_TO_AGNO(mp, rb->ri_bmap.br_startblock);
+	}
+	if (a_ag > b_ag)
+		return 1;
+	if (a_ag < b_ag)
+		return -1;
+	return 0;
 }
 
 /* Get an RUI. */
@@ -262,6 +279,14 @@ xfs_rmap_update_get_group(
 {
 	xfs_agnumber_t		agno;
 
+	if (ri->ri_realtime) {
+		xfs_rgnumber_t	rgno;
+
+		rgno = xfs_rtb_to_rgno(mp, ri->ri_bmap.br_startblock);
+		ri->ri_rtg = xfs_rtgroup_get(mp, rgno);
+		return;
+	}
+
 	agno = XFS_FSB_TO_AGNO(mp, ri->ri_bmap.br_startblock);
 	ri->ri_pag = xfs_perag_get(mp, agno);
 	xfs_perag_bump_intents(ri->ri_pag);
@@ -272,6 +297,11 @@ static inline void
 xfs_rmap_update_put_group(
 	struct xfs_rmap_intent	*ri)
 {
+	if (ri->ri_realtime) {
+		xfs_rtgroup_put(ri->ri_rtg);
+		return;
+	}
+
 	xfs_perag_drop_intents(ri->ri_pag);
 	xfs_perag_put(ri->ri_pag);
 }
