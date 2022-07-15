@@ -371,11 +371,25 @@ xfs_refcount_update_diff_items(
 	struct xfs_mount		*mp = priv;
 	struct xfs_refcount_intent	*ra;
 	struct xfs_refcount_intent	*rb;
+	unsigned long long		a_ag, b_ag;
 
 	ra = container_of(a, struct xfs_refcount_intent, ri_list);
 	rb = container_of(b, struct xfs_refcount_intent, ri_list);
-	return  XFS_FSB_TO_AGNO(mp, ra->ri_startblock) -
-		XFS_FSB_TO_AGNO(mp, rb->ri_startblock);
+	if (ra->ri_realtime) {
+		a_ag = xfs_rtb_to_rgno(mp, ra->ri_startblock);
+		a_ag |= (1ULL << 63);
+	} else
+		a_ag = XFS_FSB_TO_AGNO(mp, ra->ri_startblock);
+	if (rb->ri_realtime) {
+		b_ag = xfs_rtb_to_rgno(mp, rb->ri_startblock);
+		b_ag |= (1ULL << 63);
+	} else
+		b_ag = XFS_FSB_TO_AGNO(mp, rb->ri_startblock);
+	if (a_ag > b_ag)
+		return 1;
+	if (a_ag < b_ag)
+		return -1;
+	return 0;
 }
 
 /* Get an CUI. */
@@ -411,6 +425,15 @@ xfs_refcount_update_get_group(
 {
 	xfs_agnumber_t			agno;
 
+	if (ri->ri_realtime) {
+		xfs_rgnumber_t	rgno;
+
+		rgno = xfs_rtb_to_rgno(mp, ri->ri_startblock);
+		ri->ri_rtg = xfs_rtgroup_get(mp, rgno);
+		xfs_rtgroup_bump_intents(ri->ri_rtg);
+		return;
+	}
+
 	agno = XFS_FSB_TO_AGNO(mp, ri->ri_startblock);
 	ri->ri_pag = xfs_perag_get(mp, agno);
 	xfs_ag_bump_intents(ri->ri_pag);
@@ -421,6 +444,12 @@ static inline void
 xfs_refcount_update_put_group(
 	struct xfs_refcount_intent	*ri)
 {
+	if (ri->ri_realtime) {
+		xfs_rtgroup_drop_intents(ri->ri_rtg);
+		xfs_rtgroup_put(ri->ri_rtg);
+		return;
+	}
+
 	xfs_ag_drop_intents(ri->ri_pag);
 	xfs_perag_put(ri->ri_pag);
 }
