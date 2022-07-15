@@ -41,18 +41,18 @@
 /* and cannot be larger than 128M */
 #define MAX_SLAB_SIZE		(128 * 1048576)
 struct xfs_slab_hdr {
-	size_t			sh_nr;
-	size_t			sh_inuse;	/* items in use */
+	unsigned int		sh_nr;
+	unsigned int		sh_inuse;	/* items in use */
 	struct xfs_slab_hdr	*sh_next;	/* next slab hdr */
 						/* objects follow */
 };
 
 struct xfs_slab {
-	size_t			s_item_sz;	/* item size */
-	size_t			s_nr_slabs;	/* # of slabs */
-	size_t			s_nr_items;	/* # of items */
+	uint64_t		s_nr_slabs;	/* # of slabs */
+	uint64_t		s_nr_items;	/* # of items */
 	struct xfs_slab_hdr	*s_first;	/* first slab header */
 	struct xfs_slab_hdr	*s_last;	/* last sh_next pointer */
+	size_t			s_item_sz;	/* item size */
 };
 
 /*
@@ -64,13 +64,13 @@ struct xfs_slab {
  */
 struct xfs_slab_hdr_cursor {
 	struct xfs_slab_hdr	*hdr;		/* a slab header */
-	size_t			loc;		/* where we are in the slab */
+	unsigned int		loc;		/* where we are in the slab */
 };
 
 typedef int (*xfs_slab_compare_fn)(const void *, const void *);
 
 struct xfs_slab_cursor {
-	size_t				nr;		/* # of per-slab cursors */
+	uint64_t			nr;		/* # of per-slab cursors */
 	struct xfs_slab			*slab;		/* pointer to the slab */
 	struct xfs_slab_hdr_cursor	*last_hcur;	/* last header we took from */
 	xfs_slab_compare_fn		compare_fn;	/* compare items */
@@ -146,7 +146,7 @@ static void *
 slab_ptr(
 	struct xfs_slab		*slab,
 	struct xfs_slab_hdr	*hdr,
-	size_t			idx)
+	unsigned int		idx)
 {
 	char			*p;
 
@@ -164,12 +164,12 @@ slab_add(
 	struct xfs_slab		*slab,
 	void			*item)
 {
-	struct xfs_slab_hdr		*hdr;
+	struct xfs_slab_hdr	*hdr;
 	void			*p;
 
 	hdr = slab->s_last;
 	if (!hdr || hdr->sh_inuse == hdr->sh_nr) {
-		size_t n;
+		unsigned int	n;
 
 		n = (hdr ? hdr->sh_nr * 2 : MIN_SLAB_NR);
 		if (n * slab->s_item_sz > MAX_SLAB_SIZE)
@@ -317,7 +317,7 @@ peek_slab_cursor(
 	struct xfs_slab_hdr_cursor	*hcur;
 	void			*p = NULL;
 	void			*q;
-	size_t			i;
+	uint64_t		i;
 
 	cur->last_hcur = NULL;
 
@@ -379,7 +379,7 @@ pop_slab_cursor(
 /*
  * Return the number of items in the slab.
  */
-size_t
+uint64_t
 slab_count(
 	struct xfs_slab	*slab)
 {
@@ -440,7 +440,7 @@ bag_add(
 	p = bag_ptr(bag, bag->bg_inuse);
 	if (p == bag_end(bag)) {
 		/* No free space, alloc more pointers */
-		size_t nr;
+		uint64_t	nr;
 
 		nr = bag->bg_nr * 2;
 		x = realloc(bag->bg_recs, nr * bag->bg_recsize);
@@ -462,7 +462,7 @@ bag_add(
 int
 bag_remove(
 	struct xfs_bag	*bag,
-	size_t		nr)
+	uint64_t	nr)
 {
 	ASSERT(nr < bag->bg_inuse);
 	memmove(bag_ptr(bag, nr), bag_ptr(bag, nr + 1),
@@ -474,7 +474,7 @@ bag_remove(
 /*
  * Return the number of items in a bag.
  */
-size_t
+uint64_t
 bag_count(
 	struct xfs_bag	*bag)
 {
@@ -487,7 +487,7 @@ bag_count(
 void *
 bag_item(
 	struct xfs_bag	*bag,
-	size_t		nr)
+	uint64_t	nr)
 {
 	if (nr >= bag->bg_inuse)
 		return NULL;
