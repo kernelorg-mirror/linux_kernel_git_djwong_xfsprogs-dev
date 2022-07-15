@@ -37,6 +37,12 @@ struct xfs_ag_rmap {
 	 * NULLFSINO to signal to phase 6 to link a new inode into the metadir.
 	 */
 	xfs_ino_t	rg_rmap_ino;
+
+	/*
+	 * inumber of the refcount btree for this rtgroup.  This can be set to
+	 * NULLFSINO to signal to phase 6 to link a new inode into the metadir.
+	 */
+	xfs_ino_t	rg_refcount_ino;
 };
 
 static struct xfs_ag_rmap *ag_rmaps;
@@ -46,6 +52,9 @@ static bool refcbt_suspect;
 
 /* Bitmap of rt group rmap inodes reachable via /realtime/$rgno.rmap. */
 static struct bitmap	*rmap_inodes;
+
+/* Bitmap of rt group refcount inodes reachable via /realtime/$rgno.refcount. */
+static struct bitmap	*refcount_inodes;
 
 static struct xfs_ag_rmap *rmaps_for_group(bool isrt, unsigned int group)
 {
@@ -128,6 +137,7 @@ rmaps_init_rt(
 		goto nomem;
 
 	ag_rmap->rg_rmap_ino = NULLFSINO;
+	ag_rmap->rg_refcount_ino = NULLFSINO;
 	return;
 nomem:
 	do_error(
@@ -209,6 +219,39 @@ set_rtgroup_rmap_inode(
 	return 0;
 }
 
+static inline int
+set_rtgroup_refcount_inode(
+	struct xfs_mount	*mp,
+	xfs_rgnumber_t		rgno)
+{
+	struct xfs_imeta_path	*path;
+	struct xfs_ag_rmap	*ar = rmaps_for_group(true, rgno);
+	xfs_ino_t		ino;
+	int			error;
+
+	if (!xfs_has_rtreflink(mp))
+		return 0;
+
+	error = -libxfs_rtrefcountbt_create_path(mp, rgno, &path);
+	if (error)
+		return error;
+
+	error = -libxfs_imeta_lookup(mp, path, &ino);
+	libxfs_imeta_free_path(path);
+	if (error)
+		return error;
+
+	if (ino == NULLFSINO || bitmap_test(refcount_inodes, ino, 1))
+		return EFSCORRUPTED;
+
+	error = bitmap_set(refcount_inodes, ino, 1);
+	if (error)
+		return error;
+
+	ar->rg_refcount_ino = ino;
+	return 0;
+}
+
 static void
 discover_rtgroup_inodes(
 	struct xfs_mount	*mp)
@@ -220,8 +263,18 @@ discover_rtgroup_inodes(
 	if (error)
 		goto out;
 
+	error = bitmap_alloc(&refcount_inodes);
+	if (error) {
+		bitmap_free(&rmap_inodes);
+		goto out;
+	}
+
 	for (rgno = 0; rgno < mp->m_sb.sb_rgcount; rgno++) {
 		int err2 = set_rtgroup_rmap_inode(mp, rgno);
+		if (err2 && !error)
+			error = err2;
+
+		err2 = set_rtgroup_refcount_inode(mp, rgno);
 		if (err2 && !error)
 			error = err2;
 	}
@@ -239,6 +292,7 @@ out:
 static inline void
 free_rtmeta_inode_bitmaps(void)
 {
+	bitmap_free(&refcount_inodes);
 	bitmap_free(&rmap_inodes);
 }
 
@@ -254,8 +308,26 @@ rtgroup_for_rtrefcount_inode(
 	struct xfs_mount	*mp,
 	xfs_ino_t		ino)
 {
-	/* This will be implemented later. */
+	xfs_rgnumber_t		rgno;
+
+	if (!refcount_inodes)
+		return NULLRGNUMBER;
+
+	for (rgno = 0; rgno < mp->m_sb.sb_rgcount; rgno++) {
+		if (rg_rmaps[rgno].rg_refcount_ino == ino)
+			return rgno;
+	}
+
 	return NULLRGNUMBER;
+}
+
+bool
+is_rtrefcount_ino(
+	xfs_ino_t		ino)
+{
+	if (!refcount_inodes)
+		return false;
+	return bitmap_test(refcount_inodes, ino, 1);
 }
 
 /*
@@ -1859,8 +1931,19 @@ init_refcount_cursor(
  * Disable the refcount btree check.
  */
 void
-refcount_avoid_check(void)
+refcount_avoid_check(
+	struct xfs_mount	*mp)
 {
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		struct xfs_ag_rmap *ar = rmaps_for_group(true, rtg->rtg_rgno);
+
+		ar->rg_refcount_ino = NULLFSINO;
+	}
+
+	bitmap_clear(refcount_inodes, 0, XFS_MAXINUMBER);
 	refcbt_suspect = true;
 }
 
