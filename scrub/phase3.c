@@ -145,25 +145,11 @@ scrub_inode(
 
 	/* Scrub the inode. */
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_INODE);
-	error = scrub_item_check_file(ctx, &sri, fd);
-	if (error)
-		goto out;
-
-	error = try_inode_repair(ictx, &sri, fd);
-	if (error)
-		goto out;
 
 	/* Scrub all block mappings. */
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_BMBTD);
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_BMBTA);
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_BMBTC);
-	error = scrub_item_check_file(ctx, &sri, fd);
-	if (error)
-		goto out;
-
-	error = try_inode_repair(ictx, &sri, fd);
-	if (error)
-		goto out;
 
 	/* Check everything accessible via file mapping. */
 	if (S_ISLNK(bstat->bs_mode))
@@ -173,11 +159,12 @@ scrub_inode(
 
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_XATTR);
 	scrub_item_schedule(&sri, XFS_SCRUB_TYPE_PARENT);
+
+	/* Try to check and repair the file while it's open. */
 	error = scrub_item_check_file(ctx, &sri, fd);
 	if (error)
 		goto out;
 
-	/* Try to repair the file while it's open. */
 	error = try_inode_repair(ictx, &sri, fd);
 	if (error)
 		goto out;
