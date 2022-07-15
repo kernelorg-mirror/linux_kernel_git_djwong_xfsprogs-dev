@@ -877,7 +877,7 @@ xfs_rmap_hook_del(
 # ifdef CONFIG_XFS_RT
 /* Call the specified function during a rt reverse mapping update. */
 int
-xfs_rgrmap_hook_add(
+xfs_rtrmap_hook_add(
 	struct xfs_rtgroup	*rtg,
 	struct xfs_rmap_hook	*hook)
 {
@@ -886,7 +886,7 @@ xfs_rgrmap_hook_add(
 
 /* Stop calling the specified function during a rt reverse mapping update. */
 void
-xfs_rgrmap_hook_del(
+xfs_rtrmap_hook_del(
 	struct xfs_rtgroup	*rtg,
 	struct xfs_rmap_hook	*hook)
 {
