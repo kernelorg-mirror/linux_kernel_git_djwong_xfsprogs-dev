@@ -71,5 +71,7 @@ int bulkload_claim_block(struct xfs_btree_cur *cur, struct bulkload *bkl,
 		union xfs_btree_ptr *ptr);
 void bulkload_estimate_ag_slack(struct repair_ctx *sc,
 		struct xfs_btree_bload *bload, unsigned int free);
+void bulkload_estimate_inode_slack(struct xfs_mount *mp,
+		struct xfs_btree_bload *bload, unsigned long long free);
 
 #endif /* __XFS_REPAIR_BULKLOAD_H__ */
