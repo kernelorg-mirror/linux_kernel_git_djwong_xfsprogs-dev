@@ -124,6 +124,7 @@ HAVE_MREMAP = @have_mremap@
 NEED_INTERNAL_FSXATTR = @need_internal_fsxattr@
 NEED_INTERNAL_FSCRYPT_ADD_KEY_ARG = @need_internal_fscrypt_add_key_arg@
 HAVE_GETFSMAP = @have_getfsmap@
+HAVE_GETFSREFCOUNTS = @have_getfsrefcounts@
 HAVE_STATFS_FLAGS = @have_statfs_flags@
 HAVE_MAP_SYNC = @have_map_sync@
 HAVE_DEVMAPPER = @have_devmapper@
@@ -174,6 +175,9 @@ PCFLAGS+= -DOVERRIDE_SYSTEM_FSCRYPT_ADD_KEY_ARG
 endif
 ifeq ($(HAVE_GETFSMAP),yes)
 PCFLAGS+= -DHAVE_GETFSMAP
+endif
+ifeq ($(HAVE_GETFSREFCOUNTS),yes)
+PCFLAGS+= -DHAVE_GETFSREFCOUNTS
 endif
 ifeq ($(HAVE_FALLOCATE),yes)
 PCFLAGS += -DHAVE_FALLOCATE
