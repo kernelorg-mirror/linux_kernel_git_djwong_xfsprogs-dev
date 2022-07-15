@@ -142,4 +142,5 @@ init_commands(void)
 	fuzz_init();
 	timelimit_init();
 	bmapinflate_init();
+	unlinked_init();
 }
