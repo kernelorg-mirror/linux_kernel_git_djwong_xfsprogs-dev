@@ -1075,7 +1075,8 @@ add_remap:
 
 static void
 process_sf_dir(
-	struct xfs_dinode	*dip)
+	struct xfs_dinode	*dip,
+	bool			is_meta)
 {
 	struct xfs_dir2_sf_hdr	*sfp;
 	xfs_dir2_sf_entry_t	*sfep;
@@ -1121,7 +1122,7 @@ process_sf_dir(
 					 (char *)sfp);
 		}
 
-		if (obfuscate)
+		if (obfuscate && !is_meta)
 			generate_obfuscated_name(
 					 libxfs_dir2_sf_get_ino(mp, sfp, sfep),
 					 namelen, &sfep->name[0]);
@@ -1323,7 +1324,8 @@ want_obfuscate_attr(
 
 static void
 process_sf_attr(
-	struct xfs_dinode		*dip)
+	struct xfs_dinode		*dip,
+	bool				is_meta)
 {
 	/*
 	 * with extended attributes, obfuscate the names and fill the actual
@@ -1369,8 +1371,10 @@ process_sf_attr(
 		name = &asfep->nameval[0];
 		value = &asfep->nameval[asfep->namelen];
 
-		if (want_obfuscate_pptr(asfep->flags, name, namelen, value,
-					asfep->valuelen)) {
+		if (is_meta) {
+			/* empty */
+		} else if (want_obfuscate_pptr(asfep->flags, name, namelen,
+					value, asfep->valuelen)) {
 			obfuscate_parent_pointer(name, value, asfep->valuelen);
 		} else if (want_obfuscate_attr(asfep->flags, name, namelen,
 					value, asfep->valuelen)) {
@@ -1474,7 +1478,8 @@ static void
 process_dir_data_block(
 	char		*block,
 	xfs_fileoff_t	offset,
-	int		is_block_format)
+	int		is_block_format,
+	bool		is_meta)
 {
 	/*
 	 * we have to rely on the fileoffset and signature of the block to
@@ -1581,7 +1586,7 @@ process_dir_data_block(
 				dir_offset)
 			return;
 
-		if (obfuscate)
+		if (obfuscate && !is_meta)
 			generate_obfuscated_name(be64_to_cpu(dep->inumber),
 					 dep->namelen, &dep->name[0]);
 		dir_offset += length;
@@ -1606,7 +1611,8 @@ process_symlink_block(
 	xfs_fsblock_t	s,
 	xfs_filblks_t	c,
 	typnm_t		btype,
-	xfs_fileoff_t	last)
+	xfs_fileoff_t	last,
+	bool		is_meta)
 {
 	struct bbmap	map;
 	char		*link;
@@ -1631,7 +1637,7 @@ process_symlink_block(
 	if (xfs_has_crc((mp)))
 		link += sizeof(struct xfs_dsymlink_hdr);
 
-	if (obfuscate)
+	if (obfuscate && !is_meta)
 		obfuscate_path_components(link, XFS_SYMLINK_BUF_SPACE(mp,
 							mp->m_sb.sb_blocksize));
 	if (zero_stale_data) {
@@ -1682,7 +1688,8 @@ add_remote_vals(
 static void
 process_attr_block(
 	char				*block,
-	xfs_fileoff_t			offset)
+	xfs_fileoff_t			offset,
+	bool				is_meta)
 {
 	struct xfs_attr_leafblock	*leaf;
 	struct xfs_attr3_icleaf_hdr	hdr;
@@ -1758,7 +1765,9 @@ process_attr_block(
 			value = &local->nameval[local->namelen];
 			valuelen = be16_to_cpu(local->valuelen);
 
-			if (want_obfuscate_pptr(entry->flags, name,
+			if (is_meta) {
+				/* empty */
+			} else if (want_obfuscate_pptr(entry->flags, name,
 						local->namelen, value,
 						valuelen)) {
 				obfuscate_parent_pointer(name, value, valuelen);
@@ -1786,7 +1795,7 @@ process_attr_block(
 						(long long)cur_ino);
 				break;
 			}
-			if (obfuscate) {
+			if (obfuscate && !is_meta) {
 				generate_obfuscated_name(0, remote->namelen,
 							 &remote->name[0]);
 				add_remote_vals(be32_to_cpu(remote->valueblk),
@@ -1819,7 +1828,8 @@ process_single_fsb_objects(
 	xfs_fsblock_t	s,
 	xfs_filblks_t	c,
 	typnm_t		btype,
-	xfs_fileoff_t	last)
+	xfs_fileoff_t	last,
+	bool		is_meta)
 {
 	int		rval = 1;
 	char		*dp;
@@ -1889,12 +1899,13 @@ process_single_fsb_objects(
 				process_dir_leaf_block(dp);
 			} else {
 				process_dir_data_block(dp, o,
-					 last == mp->m_dir_geo->fsbcount);
+					 last == mp->m_dir_geo->fsbcount,
+					 is_meta);
 			}
 			iocur_top->need_crc = 1;
 			break;
 		case TYP_ATTR:
-			process_attr_block(dp, o);
+			process_attr_block(dp, o, is_meta);
 			iocur_top->need_crc = 1;
 			break;
 		default:
@@ -1927,7 +1938,8 @@ process_multi_fsb_dir(
 	xfs_fsblock_t	s,
 	xfs_filblks_t	c,
 	typnm_t		btype,
-	xfs_fileoff_t	last)
+	xfs_fileoff_t	last,
+	bool		is_meta)
 {
 	char		*dp;
 	int		rval = 1;
@@ -1971,7 +1983,8 @@ process_multi_fsb_dir(
 				process_dir_leaf_block(dp);
 			} else {
 				process_dir_data_block(dp, o,
-					 last == mp->m_dir_geo->fsbcount);
+					 last == mp->m_dir_geo->fsbcount,
+					 is_meta);
 			}
 			iocur_top->need_crc = 1;
 write:
@@ -2008,13 +2021,14 @@ process_multi_fsb_objects(
 	xfs_fsblock_t	s,
 	xfs_filblks_t	c,
 	typnm_t		btype,
-	xfs_fileoff_t	last)
+	xfs_fileoff_t	last,
+	bool		is_meta)
 {
 	switch (btype) {
 	case TYP_DIR2:
-		return process_multi_fsb_dir(o, s, c, btype, last);
+		return process_multi_fsb_dir(o, s, c, btype, last, is_meta);
 	case TYP_SYMLINK:
-		return process_symlink_block(o, s, c, btype, last);
+		return process_symlink_block(o, s, c, btype, last, is_meta);
 	default:
 		print_warning("bad type for multi-fsb object %d", btype);
 		return 1;
@@ -2026,7 +2040,8 @@ static int
 process_bmbt_reclist(
 	xfs_bmbt_rec_t		*rp,
 	int			numrecs,
-	typnm_t			btype)
+	typnm_t			btype,
+	bool			is_meta)
 {
 	int			i;
 	xfs_fileoff_t		o, op = NULLFILEOFF;
@@ -2102,16 +2117,21 @@ process_bmbt_reclist(
 		/* multi-extent blocks require special handling */
 		if (is_multi_fsb)
 			rval = process_multi_fsb_objects(o, s, c, btype,
-					last);
+					last, is_meta);
 		else
 			rval = process_single_fsb_objects(o, s, c, btype,
-					last);
+					last, is_meta);
 		if (!rval)
 			break;
 	}
 
 	return rval;
 }
+
+struct scan_bmap {
+	enum typnm	typ;
+	bool		is_meta;
+};
 
 static int
 scanfunc_bmap(
@@ -2122,6 +2142,7 @@ scanfunc_bmap(
 	typnm_t			btype,
 	void			*arg)	/* ptr to itype */
 {
+	struct scan_bmap	*sbm = arg;
 	int			i;
 	xfs_bmbt_ptr_t		*pp;
 	int			nrecs;
@@ -2137,7 +2158,7 @@ scanfunc_bmap(
 			return 1;
 		}
 		return process_bmbt_reclist(XFS_BMBT_REC_ADDR(mp, block, 1),
-					    nrecs, *(typnm_t*)arg);
+					    nrecs, sbm->typ, sbm->is_meta);
 	}
 
 	if (nrecs > mp->m_bmap_dmxr[1]) {
@@ -2169,6 +2190,15 @@ scanfunc_bmap(
 	return 1;
 }
 
+static inline bool
+is_metadata_ino(
+	struct xfs_dinode	*dip)
+{
+	return xfs_has_metadir(mp) &&
+			dip->di_version >= 3 &&
+			(dip->di_flags2 & cpu_to_be64(XFS_DIFLAG2_METADIR));
+}
+
 static int
 process_btinode(
 	struct xfs_dinode 	*dip,
@@ -2182,6 +2212,7 @@ process_btinode(
 	int			maxrecs;
 	int			whichfork;
 	typnm_t			btype;
+	bool			is_meta = is_metadata_ino(dip);
 
 	whichfork = (itype == TYP_ATTR) ? XFS_ATTR_FORK : XFS_DATA_FORK;
 	btype = (itype == TYP_ATTR) ? TYP_BMAPBTA : TYP_BMAPBTD;
@@ -2200,7 +2231,7 @@ process_btinode(
 
 	if (level == 0) {
 		return process_bmbt_reclist(XFS_BMDR_REC_ADDR(dib, 1),
-					    nrecs, itype);
+					    nrecs, itype, is_meta);
 	}
 
 	maxrecs = libxfs_bmdr_maxrecs(XFS_DFORK_SIZE(dip, mp, whichfork), 0);
@@ -2227,6 +2258,10 @@ process_btinode(
 	}
 
 	for (i = 0; i < nrecs; i++) {
+		struct scan_bmap	sbm = {
+			.typ = itype,
+			.is_meta = is_meta,
+		};
 		xfs_agnumber_t	ag;
 		xfs_agblock_t	bno;
 
@@ -2243,7 +2278,7 @@ process_btinode(
 			continue;
 		}
 
-		if (!scan_btree(ag, bno, level, btype, &itype, scanfunc_bmap))
+		if (!scan_btree(ag, bno, level, btype, &sbm, scanfunc_bmap))
 			return 0;
 	}
 	return 1;
@@ -2257,6 +2292,7 @@ process_exinode(
 	int			whichfork;
 	int			used;
 	xfs_extnum_t		nex, max_nex;
+	bool			is_meta = is_metadata_ino(dip);
 
 	whichfork = (itype == TYP_ATTR) ? XFS_ATTR_FORK : XFS_DATA_FORK;
 
@@ -2279,7 +2315,7 @@ process_exinode(
 
 
 	return process_bmbt_reclist((xfs_bmbt_rec_t *)XFS_DFORK_PTR(dip,
-					whichfork), nex, itype);
+					whichfork), nex, itype, is_meta);
 }
 
 static int
@@ -2287,6 +2323,8 @@ process_inode_data(
 	struct xfs_dinode	*dip,
 	typnm_t			itype)
 {
+	bool			is_meta = is_metadata_ino(dip);
+
 	switch (dip->di_format) {
 		case XFS_DINODE_FMT_LOCAL:
 			if (!(obfuscate || zero_stale_data))
@@ -2307,7 +2345,7 @@ process_inode_data(
 
 			switch (itype) {
 				case TYP_DIR2:
-					process_sf_dir(dip);
+					process_sf_dir(dip, is_meta);
 					break;
 
 				case TYP_SYMLINK:
@@ -2425,12 +2463,14 @@ process_inode(
 
 	/* copy extended attributes if they exist and forkoff is valid */
 	if (XFS_DFORK_DSIZE(dip, mp) < XFS_LITINO(mp)) {
+		bool	is_meta = is_metadata_ino(dip);
+
 		attr_data.remote_val_count = 0;
 		switch (dip->di_aformat) {
 			case XFS_DINODE_FMT_LOCAL:
 				need_new_crc = 1;
 				if (obfuscate || zero_stale_data)
-					process_sf_attr(dip);
+					process_sf_attr(dip, is_meta);
 				break;
 
 			case XFS_DINODE_FMT_EXTENTS:
