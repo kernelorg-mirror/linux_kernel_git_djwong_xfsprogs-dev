@@ -119,6 +119,8 @@
  * Available even in non-debug mode:
  * SERVICE_MODE			-- compress all error codes to 1 for LSB
  *				   service action compliance
+ * SERVICE_MOUNTPOINT		-- actual path to open for issuing kernel
+ *				   scrub calls
  */
 
 /* Program name; needed for libfrog error reports. */
@@ -823,6 +825,9 @@ main(
 		usage();
 
 	ctx.mntpoint = argv[optind];
+	ctx.actual_mntpoint = getenv("SERVICE_MOUNTPOINT");
+	if (!ctx.actual_mntpoint)
+		ctx.actual_mntpoint = ctx.mntpoint;
 
 	stdout_isatty = isatty(STDOUT_FILENO);
 	stderr_isatty = isatty(STDERR_FILENO);
@@ -840,7 +845,7 @@ main(
 		return SCRUB_RET_OPERROR;
 
 	/* Find the mount record for the passed-in argument. */
-	if (stat(argv[optind], &ctx.mnt_sb) < 0) {
+	if (stat(ctx.actual_mntpoint, &ctx.mnt_sb) < 0) {
 		fprintf(stderr,
 			_("%s: could not stat: %s: %s\n"),
 			progname, argv[optind], strerror(errno));
@@ -863,7 +868,7 @@ main(
 	}
 
 	fs_table_initialise(0, NULL, 0, NULL);
-	fsp = fs_table_lookup_mount(ctx.mntpoint);
+	fsp = fs_table_lookup_mount(ctx.actual_mntpoint);
 	if (!fsp) {
 		fprintf(stderr, _("%s: Not a XFS mount point.\n"),
 				ctx.mntpoint);
