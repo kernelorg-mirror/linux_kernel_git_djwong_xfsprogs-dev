@@ -97,7 +97,6 @@ init(
 	else
 		x.dname = fsdevice;
 
-	x.bcache_flags = CACHE_MISCOMPARE_PURGE;
 	if (!libxfs_init(&x)) {
 		fputs(_("\nfatal error -- couldn't initialize XFS library\n"),
 			stderr);
@@ -109,7 +108,8 @@ init(
 	 * tool and so need to be able to mount busted filesystems.
 	 */
 	memset(&xmount, 0, sizeof(struct xfs_mount));
-	libxfs_buftarg_init(&xmount, x.ddev, x.logdev, x.rtdev);
+	libxfs_buftarg_init(&xmount, x.ddev, x.logdev, x.rtdev,
+			XFS_BUFTARG_MISCOMPARE_PURGE);
 	error = -libxfs_buf_read_uncached(xmount.m_ddev_targp, XFS_SB_DADDR,
 			1 << (XFS_MAX_SECTORSIZE_LOG - BBSHIFT), 0, &bp, NULL);
 	if (error) {
@@ -134,7 +134,8 @@ init(
 
 	agcount = sbp->sb_agcount;
 	mp = libxfs_mount(&xmount, sbp, x.ddev, x.logdev, x.rtdev,
-			  LIBXFS_MOUNT_DEBUGGER);
+			  LIBXFS_MOUNT_DEBUGGER |
+			  LIBXFS_MOUNT_CACHE_MISCOMPARE_PURGE);
 	if (!mp) {
 		fprintf(stderr,
 			_("%s: device %s unusable (not an XFS filesystem?)\n"),
