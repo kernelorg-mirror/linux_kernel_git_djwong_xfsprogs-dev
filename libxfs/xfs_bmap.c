@@ -31,6 +31,7 @@
 #include "xfs_refcount.h"
 #include "xfs_health.h"
 #include "xfs_symlink_remote.h"
+#include "xfs_inode_util.h"
 
 struct kmem_cache		*xfs_bmap_intent_cache;
 
