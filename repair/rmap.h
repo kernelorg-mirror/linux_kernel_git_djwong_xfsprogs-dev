@@ -28,7 +28,7 @@ int rmap_commit_agbtree_mappings(struct xfs_mount *mp, xfs_agnumber_t agno);
 
 extern uint64_t rmap_record_count(struct xfs_mount *mp, bool isrt,
 		xfs_agnumber_t agno);
-extern void rmap_avoid_check(void);
+extern void rmap_avoid_check(struct xfs_mount *mp);
 void rmaps_verify_btree(struct xfs_mount *mp, xfs_agnumber_t agno);
 
 extern int64_t rmap_diffkeys(struct xfs_rmap_irec *kp1,
@@ -63,5 +63,8 @@ int rmap_get_mem_rec(struct rmap_mem_cur *rmcur, struct xfs_rmap_irec *irec);
 #define for_each_rmap_group(mp, agno) \
 	for ((agno) = NULLAGNUMBER; (agno) == NULLAGNUMBER || \
 	(agno) < (mp)->m_sb.sb_agcount; (agno)++)
+
+bool is_rtrmap_inode(xfs_ino_t ino);
+xfs_ino_t rtgroup_rmap_ino(struct xfs_rtgroup *rtg);
 
 #endif /* RMAP_H_ */
