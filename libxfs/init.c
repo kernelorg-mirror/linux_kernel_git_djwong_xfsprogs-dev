@@ -31,7 +31,6 @@ pthread_mutex_t	atomic64_lock = PTHREAD_MUTEX_INITIALIZER;
 
 char *progname = "libxfs";	/* default, changed by each tool */
 
-struct cache *libxfs_bcache;	/* global buffer cache */
 int libxfs_bhash_size;		/* #buckets in bcache */
 
 int	use_xfs_buf_lock;	/* global flag: use xfs_buf locks for MT */
@@ -407,8 +406,6 @@ libxfs_init(libxfs_init_t *a)
 	}
 	if (!libxfs_bhash_size)
 		libxfs_bhash_size = LIBXFS_BHASHSIZE(sbp);
-	libxfs_bcache = cache_init(a->bcache_flags, libxfs_bhash_size,
-				   &libxfs_bcache_operations);
 	use_xfs_buf_lock = a->usebuflock;
 	xfs_dir_startup();
 	init_caches();
@@ -602,9 +599,14 @@ static struct xfs_buftarg *
 libxfs_buftarg_alloc(
 	struct xfs_mount	*mp,
 	dev_t			dev,
-	unsigned long		write_fails)
+	unsigned long		write_fails,
+	unsigned int		buftarg_flags)
 {
 	struct xfs_buftarg	*btp;
+	unsigned int		bcache_flags = 0;
+
+	if (!write_fails)
+		buftarg_flags &= ~XFS_BUFTARG_INJECT_WRITE_FAIL;
 
 	btp = malloc(sizeof(*btp));
 	if (!btp) {
@@ -614,12 +616,14 @@ libxfs_buftarg_alloc(
 	}
 	btp->bt_mount = mp;
 	btp->bt_bdev = dev;
-	btp->flags = 0;
-	if (write_fails) {
-		btp->writes_left = write_fails;
-		btp->flags |= XFS_BUFTARG_INJECT_WRITE_FAIL;
-	}
+	btp->flags = buftarg_flags;
+	btp->writes_left = write_fails;
+	if (btp->flags & XFS_BUFTARG_MISCOMPARE_PURGE)
+		bcache_flags |= CACHE_MISCOMPARE_PURGE;
 	pthread_mutex_init(&btp->lock, NULL);
+
+	btp->bcache = cache_init(bcache_flags, libxfs_bhash_size,
+			&libxfs_bcache_operations);
 
 	return btp;
 }
@@ -643,10 +647,12 @@ libxfs_buftarg_init(
 	struct xfs_mount	*mp,
 	dev_t			dev,
 	dev_t			logdev,
-	dev_t			rtdev)
+	dev_t			rtdev,
+	unsigned int		btflags)
 {
 	char			*p = getenv("LIBXFS_DEBUG_WRITE_CRASH");
 	unsigned long		dfail = 0, lfail = 0, rfail = 0;
+	unsigned int		dflags = 0, lflags = 0, rflags = 0;
 
 	/* Simulate utility crash after a certain number of writes. */
 	while (p && *p) {
@@ -660,6 +666,8 @@ libxfs_buftarg_init(
 				exit(1);
 			}
 			dfail = strtoul(val, NULL, 0);
+			if (dfail)
+				dflags |= XFS_BUFTARG_INJECT_WRITE_FAIL;
 			break;
 		case WF_LOG:
 			if (!val) {
@@ -668,6 +676,8 @@ libxfs_buftarg_init(
 				exit(1);
 			}
 			lfail = strtoul(val, NULL, 0);
+			if (lfail)
+				lflags |= XFS_BUFTARG_INJECT_WRITE_FAIL;
 			break;
 		case WF_RT:
 			if (!val) {
@@ -676,6 +686,8 @@ libxfs_buftarg_init(
 				exit(1);
 			}
 			rfail = strtoul(val, NULL, 0);
+			if (rfail)
+				rflags |= XFS_BUFTARG_INJECT_WRITE_FAIL;
 			break;
 		default:
 			fprintf(stderr, _("unknown write fail type %s\n"),
@@ -718,12 +730,15 @@ libxfs_buftarg_init(
 		return;
 	}
 
-	mp->m_ddev_targp = libxfs_buftarg_alloc(mp, dev, dfail);
+	mp->m_ddev_targp = libxfs_buftarg_alloc(mp, dev, dfail,
+			dflags | btflags);
 	if (!logdev || logdev == dev)
 		mp->m_logdev_targp = mp->m_ddev_targp;
 	else
-		mp->m_logdev_targp = libxfs_buftarg_alloc(mp, logdev, lfail);
-	mp->m_rtdev_targp = libxfs_buftarg_alloc(mp, rtdev, rfail);
+		mp->m_logdev_targp = libxfs_buftarg_alloc(mp, logdev, lfail,
+				lflags | btflags);
+	mp->m_rtdev_targp = libxfs_buftarg_alloc(mp, rtdev, rfail,
+			rflags | btflags);
 }
 
 /* Compute maximum possible height for per-AG btree types for this fs. */
@@ -786,14 +801,18 @@ libxfs_mount(
 	struct xfs_buf		*bp;
 	struct xfs_sb		*sbp;
 	xfs_daddr_t		d;
+	unsigned int		btflags = 0;
 	int			error;
+
 
 	mp->m_features = xfs_sb_version_to_features(sb);
 	if (flags & LIBXFS_MOUNT_DEBUGGER)
 		xfs_set_debugger(mp);
 	if (flags & LIBXFS_MOUNT_REPORT_CORRUPTION)
 		xfs_set_reporting_corruption(mp);
-	libxfs_buftarg_init(mp, dev, logdev, rtdev);
+	if (flags & LIBXFS_MOUNT_CACHE_MISCOMPARE_PURGE)
+		btflags |= XFS_BUFTARG_MISCOMPARE_PURGE;
+	libxfs_buftarg_init(mp, dev, logdev, rtdev, btflags);
 
 	mp->m_finobt_nores = true;
 	xfs_set_inode32(mp);
@@ -1003,7 +1022,7 @@ libxfs_flush_mount(
 	 * LOST_WRITE flag to be set in the buftarg.  Once that's done,
 	 * instruct the disks to persist their write caches.
 	 */
-	libxfs_bcache_flush();
+	libxfs_bcache_flush(mp);
 
 	/* Flush all kernel and disk write caches, and report failures. */
 	if (mp->m_ddev_targp) {
@@ -1029,6 +1048,14 @@ libxfs_flush_mount(
 	return error;
 }
 
+static void
+libxfs_buftarg_free(
+	struct xfs_buftarg	*btp)
+{
+	cache_destroy(btp->bcache);
+	kmem_free(btp);
+}
+
 /*
  * Release any resource obtained during a mount.
  */
@@ -1045,7 +1072,7 @@ libxfs_umount(
 	 * all incore buffers, then pick up the outcome when we tell the disks
 	 * to persist their write caches.
 	 */
-	libxfs_bcache_purge();
+	libxfs_bcache_purge(mp);
 	error = libxfs_flush_mount(mp);
 
 	/*
@@ -1056,10 +1083,10 @@ libxfs_umount(
 		libxfs_free_perag(mp);
 
 	xfs_da_unmount(mp);
-	kmem_free(mp->m_rtdev_targp);
+	libxfs_buftarg_free(mp->m_rtdev_targp);
 	if (mp->m_logdev_targp != mp->m_ddev_targp)
-		kmem_free(mp->m_logdev_targp);
-	kmem_free(mp->m_ddev_targp);
+		libxfs_buftarg_free(mp->m_logdev_targp);
+	libxfs_buftarg_free(mp->m_ddev_targp);
 
 	return error;
 }
@@ -1075,10 +1102,7 @@ libxfs_destroy(
 
 	libxfs_close_devices(li);
 
-	/* Free everything from the buffer cache before freeing buffer cache */
-	libxfs_bcache_purge();
 	libxfs_bcache_free();
-	cache_destroy(libxfs_bcache);
 	leaked = destroy_caches();
 	rcu_unregister_thread();
 	if (getenv("LIBXFS_LEAK_CHECK") && leaked)
@@ -1089,17 +1113,4 @@ int
 libxfs_device_alignment(void)
 {
 	return platform_align_blockdev();
-}
-
-void
-libxfs_report(FILE *fp)
-{
-	time_t t;
-	char *c;
-
-	cache_report(fp, "libxfs_bcache", libxfs_bcache);
-
-	t = time(NULL);
-	c = asctime(localtime(&t));
-	fprintf(fp, "%s", c);
 }
