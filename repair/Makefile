@@ -70,6 +70,7 @@ CFILES = \
 	rcbag.c \
 	rmap.c \
 	rt.c \
+	rtrefcount_repair.c \
 	rtrmap_repair.c \
 	sb.c \
 	scan.c \
