@@ -465,9 +465,6 @@ libxfs_imeta_mkdir(
 	uint				resblks;
 	int				error;
 
-	/* Try to place metadata directories in AG 0. */
-	mp->m_agirotor = 0;
-
 	error = xfs_imeta_start_update(mp, path, &upd);
 	if (error)
 		return error;
