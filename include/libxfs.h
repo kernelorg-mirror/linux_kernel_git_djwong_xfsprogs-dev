@@ -124,8 +124,6 @@ typedef struct libxfs_xinit {
 	int             dfd;            /* data subvolume file descriptor */
 	int             logfd;          /* log subvolume file descriptor */
 	int             rtfd;           /* realtime subvolume file descriptor */
-	int		icache_flags;	/* cache init flags */
-	int		bcache_flags;	/* cache init flags */
 } libxfs_init_t;
 
 #define LIBXFS_ISREADONLY	0x0002	/* disallow all mounted filesystems */
@@ -142,7 +140,6 @@ extern int	libxfs_device_to_fd (dev_t);
 extern dev_t	libxfs_device_open (char *, int, int, int);
 extern void	libxfs_device_close (dev_t);
 extern int	libxfs_device_alignment (void);
-extern void	libxfs_report(FILE *);
 
 /* check or write log footer: specify device, log size in blocks & uuid */
 typedef char	*(libxfs_get_block_t)(char *, int, void *);
