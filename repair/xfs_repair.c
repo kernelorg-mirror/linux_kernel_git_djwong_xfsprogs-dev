@@ -70,6 +70,7 @@ enum c_opt_nums {
 	CONVERT_NREXT64,
 	CONVERT_FINOBT,
 	CONVERT_REFLINK,
+	CONVERT_RMAPBT,
 	C_MAX_OPTS,
 };
 
@@ -80,6 +81,7 @@ static char *c_opts[] = {
 	[CONVERT_NREXT64]	= "nrext64",
 	[CONVERT_FINOBT]	= "finobt",
 	[CONVERT_REFLINK]	= "reflink",
+	[CONVERT_RMAPBT]	= "rmapbt",
 	[C_MAX_OPTS]		= NULL,
 };
 
@@ -356,6 +358,15 @@ process_args(int argc, char **argv)
 						do_abort(
 		_("-c reflink only supports upgrades\n"));
 					add_reflink = true;
+					break;
+				case CONVERT_RMAPBT:
+					if (!val)
+						do_abort(
+		_("-c rmapbt requires a parameter\n"));
+					if (strtol(val, NULL, 0) != 1)
+						do_abort(
+		_("-c rmapbt only supports upgrades\n"));
+					add_rmapbt = true;
 					break;
 				default:
 					unknown('c', val);
