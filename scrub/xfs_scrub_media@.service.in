@@ -4,34 +4,50 @@
 # Author: Darrick J. Wong <djwong@kernel.org>
 
 [Unit]
-Description=Online XFS Metadata Check Failure Reporting for %f
+Description=Online XFS Metadata and Media Check for %f
+OnFailure=xfs_scrub_media_fail@%i.service
 Documentation=man:xfs_scrub(8)
 
 [Service]
 Type=oneshot
-Environment=EMAIL_ADDR=root
-ExecStart=@pkg_lib_dir@/@pkg_name@/xfs_scrub_fail "${EMAIL_ADDR}" xfs_scrub %f
-User=mail
-Group=mail
-SupplementaryGroups=systemd-journal
+Environment=SERVICE_MODE=1
+Environment=SERVICE_MOUNTPOINT=/tmp/scrub
+ExecStart=@sbindir@/xfs_scrub @scrub_service_args@ @scrub_args@ -x %f
+SyslogIdentifier=%N
+
+# Run scrub with minimal CPU and IO priority so that nothing else will starve.
+IOSchedulingClass=idle
+CPUSchedulingPolicy=idle
+CPUAccounting=true
+Nice=19
 
 # Create the service underneath the scrub background service slice so that we
 # can control resource usage.
 Slice=system-xfs_scrub.slice
 
-# No realtime scheduling
+# No realtime CPU scheduling
 RestrictRealtime=true
+
+# Dynamically create a user that isn't root
+DynamicUser=true
 
 # Make the entire filesystem readonly and /home inaccessible, then bind mount
 # the filesystem we're supposed to be checking into our private /tmp dir.
-ProtectSystem=full
+# 'norbind' means that we don't bind anything under that original mount.
+ProtectSystem=strict
 ProtectHome=yes
 PrivateTmp=true
-RestrictSUIDSGID=true
+BindPaths=%f:/tmp/scrub:norbind
 
-# Emailing reports requires network access, but not the ability to change the
-# hostname.
+# Don't let scrub complain about paths in /etc/projects that have been hidden
+# by our sandboxing.  scrub doesn't care about project ids anyway.
+InaccessiblePaths=-/etc/projects
+
+# No network access
+PrivateNetwork=true
 ProtectHostname=true
+RestrictAddressFamilies=none
+IPAddressDeny=any
 
 # Don't let the program mess with the kernel configuration at all
 ProtectKernelLogs=true
@@ -41,9 +57,8 @@ ProtectControlGroups=true
 ProtectProc=invisible
 RestrictNamespaces=true
 
-# Can't hide /proc because journalctl needs it to find various pieces of log
-# information
-#ProcSubset=pid
+# Hide everything in /proc, even /proc/mounts
+ProcSubset=pid
 
 # Only allow the default personality Linux
 LockPersonality=true
@@ -62,15 +77,14 @@ SystemCallFilter=~@resources
 SystemCallFilter=~@mount
 
 # xfs_scrub needs these privileges to run, and no others
-CapabilityBoundingSet=
+CapabilityBoundingSet=CAP_SYS_ADMIN CAP_FOWNER CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_SYS_RAWIO
+AmbientCapabilities=CAP_SYS_ADMIN CAP_FOWNER CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_SYS_RAWIO
 NoNewPrivileges=true
 
-# Failure reporting shouldn't create world-readable files
-UMask=0077
+# xfs_scrub doesn't create files
+UMask=7777
 
-# Clean up any IPC objects when this unit stops
-RemoveIPC=true
-
-# No access to hardware device files
-PrivateDevices=true
+# No access to hardware /dev files except for block devices
 ProtectClock=true
+DevicePolicy=closed
+DeviceAllow=block-*
