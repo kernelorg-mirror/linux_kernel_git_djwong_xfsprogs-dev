@@ -1,16 +1,16 @@
 # SPDX-License-Identifier: GPL-2.0
 #
-# Copyright (C) 2018 Oracle.  All Rights Reserved.
+# Copyright (C) 2022 Oracle.  All Rights Reserved.
 # Author: Darrick J. Wong <djwong@kernel.org>
 
 [Unit]
-Description=Online XFS Metadata Check Failure Reporting for %I
+Description=Online XFS Metadata and Media Check Failure Reporting for %I
 Documentation=man:xfs_scrub(8)
 
 [Service]
 Type=oneshot
 Environment=EMAIL_ADDR=root
-ExecStart=@pkg_lib_dir@/@pkg_name@/xfs_scrub_fail "${EMAIL_ADDR}" xfs_scrub %I
+ExecStart=@pkg_lib_dir@/@pkg_name@/xfs_scrub_fail "${EMAIL_ADDR}" xfs_scrub_media %I
 User=mail
 Group=mail
 SupplementaryGroups=systemd-journal
