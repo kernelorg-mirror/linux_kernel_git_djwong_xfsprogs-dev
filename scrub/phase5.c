@@ -383,12 +383,10 @@ out:
 	return error;
 }
 
-typedef int (*iscan_item_fn)(struct scrub_ctx *, struct action_list *);
-
 struct iscan_item {
 	struct action_list	alist;
 	bool			*abortedp;
-	iscan_item_fn		scrub_fn;
+	unsigned int		scrub_type;
 };
 
 /* Run one inode-scan scrubber in this thread. */
@@ -413,7 +411,7 @@ iscan_worker(
 		nanosleep(&tv, NULL);
 	}
 
-	ret = item->scrub_fn(ctx, &item->alist);
+	ret = scrub_meta_type(ctx, item->scrub_type, 0, &item->alist);
 	if (ret) {
 		str_liberror(ctx, ret, _("checking iscan metadata"));
 		*item->abortedp = true;
@@ -439,7 +437,7 @@ queue_iscan(
 	struct workqueue	*wq,
 	bool			*abortedp,
 	xfs_agnumber_t		nr,
-	iscan_item_fn		scrub_fn)
+	unsigned int		scrub_type)
 {
 	struct iscan_item	*item;
 	struct scrub_ctx	*ctx = wq->wq_ctx;
@@ -452,7 +450,7 @@ queue_iscan(
 		return ret;
 	}
 	action_list_init(&item->alist);
-	item->scrub_fn = scrub_fn;
+	item->scrub_type = scrub_type;
 	item->abortedp = abortedp;
 
 	ret = -workqueue_add(wq, iscan_worker, nr, item);
@@ -484,14 +482,14 @@ run_kernel_iscan_scrubbers(
 	 * The nlinks scanner is much faster than quotacheck because it only
 	 * walks directories, so we start it first.
 	 */
-	ret = queue_iscan(&wq_iscan, &aborted, nr, scrub_nlinks);
+	ret = queue_iscan(&wq_iscan, &aborted, nr, XFS_SCRUB_TYPE_NLINKS);
 	if (ret)
 		goto wait;
 
 	if (nr_threads > 1)
 		nr++;
 
-	ret = queue_iscan(&wq_iscan, &aborted, nr, scrub_quotacheck);
+	ret = queue_iscan(&wq_iscan, &aborted, nr, XFS_SCRUB_TYPE_QUOTACHECK);
 	if (ret)
 		goto wait;
 
