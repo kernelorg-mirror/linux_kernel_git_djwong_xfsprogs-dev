@@ -285,11 +285,25 @@ xfs_refcount_update_diff_items(
 	struct xfs_mount		*mp = priv;
 	struct xfs_refcount_intent	*ra;
 	struct xfs_refcount_intent	*rb;
+	unsigned long long		a_ag, b_ag;
 
 	ra = container_of(a, struct xfs_refcount_intent, ri_list);
 	rb = container_of(b, struct xfs_refcount_intent, ri_list);
-	return  XFS_FSB_TO_AGNO(mp, ra->ri_startblock) -
-		XFS_FSB_TO_AGNO(mp, rb->ri_startblock);
+	if (ra->ri_realtime) {
+		a_ag = xfs_rtb_to_rgno(mp, ra->ri_startblock);
+		a_ag |= (1ULL << 63);
+	} else
+		a_ag = XFS_FSB_TO_AGNO(mp, ra->ri_startblock);
+	if (rb->ri_realtime) {
+		b_ag = xfs_rtb_to_rgno(mp, rb->ri_startblock);
+		b_ag |= (1ULL << 63);
+	} else
+		b_ag = XFS_FSB_TO_AGNO(mp, rb->ri_startblock);
+	if (a_ag > b_ag)
+		return 1;
+	if (a_ag < b_ag)
+		return -1;
+	return 0;
 }
 
 /* Get an CUI. */
