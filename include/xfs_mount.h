@@ -267,6 +267,8 @@ __XFS_UNSUPP_OPSTATE(shutdown)
 #define LIBXFS_MOUNT_DEBUGGER		(1U << 0)
 /* report metadata corruption to stdout */
 #define LIBXFS_MOUNT_REPORT_CORRUPTION	(1U << 1)
+/* purge buffer cache on miscompares */
+#define LIBXFS_MOUNT_CACHE_MISCOMPARE_PURGE	(1U << 2)
 
 #define LIBXFS_BHASHSIZE(sbp) 		(1<<10)
 
