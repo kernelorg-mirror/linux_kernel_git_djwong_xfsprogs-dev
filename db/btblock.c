@@ -147,6 +147,9 @@ block_to_bt(
 	case TYP_RMAPBT:
 		magic = crc ? XFS_RMAP_CRC_MAGIC : 0;
 		break;
+	case TYP_RTRMAPBT:
+		magic = crc ? XFS_RTRMAP_CRC_MAGIC : 0;
+		break;
 	case TYP_REFCBT:
 		magic = crc ? XFS_REFC_CRC_MAGIC : 0;
 		break;
@@ -826,7 +829,7 @@ const field_t	rtrmapbt_key_flds[] = {
 
 const field_t	rtrmapbt_rec_flds[] = {
 	{ "startblock", FLDT_RGBLOCK, OI(RTRMAPBT_STARTBLOCK_BITOFF), C1, 0, TYP_DATA },
-	{ "blockcount", FLDT_RGEXTLEN, OI(RTRMAPBT_BLOCKCOUNT_BITOFF), C1, 0, TYP_NONE },
+	{ "blockcount", FLDT_EXTLEN, OI(RTRMAPBT_BLOCKCOUNT_BITOFF), C1, 0, TYP_NONE },
 	{ "owner", FLDT_INT64D, OI(RTRMAPBT_OWNER_BITOFF), C1, 0, TYP_NONE },
 	{ "offset", FLDT_RFILEOFFD, OI(RTRMAPBT_OFFSET_BITOFF), C1, 0, TYP_NONE },
 	{ "extentflag", FLDT_REXTFLG, OI(RTRMAPBT_EXNTFLAG_BITOFF), C1, 0,
