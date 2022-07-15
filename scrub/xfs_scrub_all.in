@@ -58,10 +58,10 @@ def find_mounts():
 
 	return fs
 
-def kill_systemd(unit, proc):
+def kill_systemd(unitname, proc):
 	'''Kill systemd unit.'''
 	proc.terminate()
-	cmd=['systemctl', 'stop', unit]
+	cmd = ['systemctl', 'stop', unitname]
 	x = subprocess.Popen(cmd)
 	x.wait()
 
@@ -119,9 +119,10 @@ def run_scrub(mnt, cond, running_devs, mntdevs, killfuncs):
 			return
 
 		# Try it the systemd way
-		cmd=['systemctl', 'start', 'xfs_scrub@%s' % systemd_escape(mnt)]
+		unitname = 'xfs_scrub@%s' % systemd_escape(mnt)
+		cmd = ['systemctl', 'start', unitname]
 		ret = run_killable(cmd, DEVNULL(), killfuncs, \
-				lambda proc: kill_systemd('xfs_scrub@%s' % mnt, proc))
+				lambda proc: kill_systemd(unitname, proc))
 		if ret == 0 or ret == 1:
 			print("Scrubbing %s done, (err=%d)" % (mnt, ret))
 			sys.stdout.flush()
