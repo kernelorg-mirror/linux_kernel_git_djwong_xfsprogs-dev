@@ -18,6 +18,8 @@
 #include "dinode.h"
 #include "progress.h"
 #include "versions.h"
+#include "slab.h"
+#include "rmap.h"
 
 static xfs_ino_t		orphanage_ino;
 
@@ -1031,6 +1033,121 @@ _("Couldn't find realtime summary parent, error %d\n"),
 			error);
 	}
 	libxfs_irele(ip);
+}
+
+static void
+ensure_rtgroup_rmapbt(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	struct xfs_trans	*tp;
+	struct xfs_imeta_path	*path;
+	struct xfs_inode	*ip;
+	struct xfs_imeta_update	upd;
+	xfs_ino_t		ino;
+	int			error;
+
+	if (!xfs_has_rtrmapbt(mp))
+		return;
+
+	ino = rtgroup_rmap_ino(rtg);
+	if (no_modify) {
+		if (ino == NULLFSINO)
+			do_warn(_("would reset rtgroup %u rmap btree\n"),
+					rtg->rtg_rgno);
+		return;
+	}
+
+	if (ino == NULLFSINO)
+		do_warn(_("resetting rtgroup %u rmap btree\n"),
+				rtg->rtg_rgno);
+
+	error = -libxfs_rtrmapbt_create_path(mp, rtg->rtg_rgno, &path);
+	if (error)
+		do_error(
+_("Couldn't create rtgroup %u rmap file path, err %d\n"),
+				rtg->rtg_rgno, error);
+
+	error = ensure_imeta_dirpath(mp, path);
+	if (error)
+		do_error(
+_("Couldn't create rtgroup %u metadata directory, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	error = -libxfs_imeta_start_update(mp, path, &upd);
+	if (error)
+		do_error(
+_("Couldn't find rtgroup %u rmap inode parent, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	/* Create a transaction for whatever work we end up doing. */
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_imeta_create,
+			libxfs_imeta_create_space_res(mp), 0, 0, &tp);
+	if (error)
+		do_error(
+_("Couldn't prepare to attach rtgroup %u rmap inode, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	if (ino != NULLFSINO) {
+		/*
+		 * We're still hanging on to our old inode, so reconnect it to
+		 * the metadata directory tree.
+		 */
+		error = -libxfs_imeta_iget(mp, ino, XFS_DIR3_FT_REG_FILE, &ip);
+		if (error) {
+			do_warn(
+_("Couldn't iget rtgroup %u rmap inode 0x%llx, error %d\n"),
+					rtg->rtg_rgno, (unsigned long long)ino,
+					error);
+			goto zap;
+		}
+
+		error = -libxfs_imeta_link(tp, path, ip, &upd);
+		if (error)
+			do_error(
+_("Failed to link rtgroup %u rmapbt inode 0x%llx, error %d\n"),
+					rtg->rtg_rgno,
+					(unsigned long long)ip->i_ino,
+					error);
+
+		set_nlink(VFS_I(ip), 1);
+		ip->i_df.if_format = XFS_DINODE_FMT_RMAP;
+		libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+	} else {
+zap:
+		/*
+		 * The rtrmap inode was bad or gone, so just make a new one
+		 * and give our reference to the rtgroup structure.
+		 */
+		error = -libxfs_rtrmapbt_create(&tp, path, &upd, &ip);
+		if (error)
+			do_error(
+_("Couldn't create rtgroup %u rmap inode, error %d\n"),
+					rtg->rtg_rgno, error);
+	}
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		do_error(
+_("Couldn't commit new rtgroup %u rmap inode %llu, error %d\n"),
+				rtg->rtg_rgno,
+				(unsigned long long)ip->i_ino,
+				error);
+
+	/* Mark the inode in use. */
+	mark_ino_inuse(mp, ip->i_ino, S_IFREG, upd.dp->i_ino);
+	mark_ino_metadata(mp, ip->i_ino);
+	libxfs_imeta_end_update(mp, &upd, error);
+
+	/* Copy our incore rmap data to the ondisk rmap inode. */
+	error = populate_rtgroup_rmapbt(rtg, ip);
+	if (error)
+		do_error(
+_("rtgroup %u rmap btree could not be rebuilt, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	libxfs_imeta_free_path(path);
+	libxfs_imeta_irele(ip);
 }
 
 /* Initialize a root directory. */
@@ -3684,6 +3801,18 @@ traverse_ags(
 	do_inode_prefetch(mp, ag_stride, traverse_function, false, true);
 }
 
+static void
+reset_rt_metadata_inodes(
+	struct xfs_mount	*mp)
+{
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		ensure_rtgroup_rmapbt(rtg);
+	}
+}
+
 void
 phase6(xfs_mount_t *mp)
 {
@@ -3746,6 +3875,8 @@ phase6(xfs_mount_t *mp)
 			do_warn(_("would reinitialize realtime summary inode\n"));
 		}
 	}
+
+	reset_rt_metadata_inodes(mp);
 
 	if (!no_modify)  {
 		do_log(
