@@ -24,3 +24,5 @@ XFS_SCRUB_THREADS            -- start exactly this number of threads
 Available even in non-debug mode:
 SERVICE_MODE                 -- compress all error codes to 1 for LSB
                                 service action compliance
+SERVICE_MOUNTPOINT           -- actual path to open for issuing kernel
+                                scrub calls
