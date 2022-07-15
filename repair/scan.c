@@ -1353,8 +1353,16 @@ _("invalid length %llu in record %u of %s\n"),
 			continue;
 		}
 
-		/* We only store inode data in the rtrmap. */
-		if (XFS_RMAP_NON_INODE_OWNER(owner)) {
+		/* We only store file and COW data on the rt device. */
+		if (owner == XFS_RMAP_OWN_COW) {
+			if (!xfs_has_reflink(mp)) {
+				do_warn(
+_("invalid CoW staging extent in record %u of %s\n"),
+						i, name);
+				suspect++;
+				continue;
+			}
+		} else if (XFS_RMAP_NON_INODE_OWNER(owner)) {
 			do_warn(
 _("invalid owner %lld in record %u of %s\n"),
 				(long long int)owner, i, name);
