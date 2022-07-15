@@ -1236,8 +1236,9 @@ rmaps_verify_btree(
 		error = rmap_lookup(bt_cur, &rm_rec, &tmp, &have);
 		if (error) {
 			do_warn(
-_("Could not read reverse-mapping record for (%u/%u).\n"),
-					agno, rm_rec.rm_startblock);
+_("Could not read reverse-mapping record for (%u/%llu).\n"),
+					agno,
+					(unsigned long long)rm_rec.rm_startblock);
 			goto err;
 		}
 
@@ -1252,19 +1253,20 @@ _("Could not read reverse-mapping record for (%u/%u).\n"),
 					&tmp, &have);
 			if (error) {
 				do_warn(
-_("Could not read reverse-mapping record for (%u/%u).\n"),
-						agno, rm_rec.rm_startblock);
+_("Could not read reverse-mapping record for (%u/%llu).\n"),
+						agno,
+						(unsigned long long)rm_rec.rm_startblock);
 				goto err;
 			}
 		}
 		if (!have) {
 			do_warn(
-_("Missing reverse-mapping record for (%u/%u) %slen %u owner %"PRId64" \
+_("Missing reverse-mapping record for (%u/%llu) %slen %llu owner %"PRId64" \
 %s%soff %"PRIu64"\n"),
-				agno, rm_rec.rm_startblock,
+				agno, (unsigned long long)rm_rec.rm_startblock,
 				(rm_rec.rm_flags & XFS_RMAP_UNWRITTEN) ?
 					_("unwritten ") : "",
-				rm_rec.rm_blockcount,
+				(unsigned long long)rm_rec.rm_blockcount,
 				rm_rec.rm_owner,
 				(rm_rec.rm_flags & XFS_RMAP_ATTR_FORK) ?
 					_("attr ") : "",
@@ -1277,22 +1279,22 @@ _("Missing reverse-mapping record for (%u/%u) %slen %u owner %"PRId64" \
 		/* Compare each refcount observation against the btree's */
 		if (!rmap_is_good(&rm_rec, &tmp)) {
 			do_warn(
-_("Incorrect reverse-mapping: saw (%u/%u) %slen %u owner %"PRId64" %s%soff \
-%"PRIu64"; should be (%u/%u) %slen %u owner %"PRId64" %s%soff %"PRIu64"\n"),
-				agno, tmp.rm_startblock,
+_("Incorrect reverse-mapping: saw (%u/%llu) %slen %llu owner %"PRId64" %s%soff \
+%"PRIu64"; should be (%u/%llu) %slen %llu owner %"PRId64" %s%soff %"PRIu64"\n"),
+				agno, (unsigned long long)tmp.rm_startblock,
 				(tmp.rm_flags & XFS_RMAP_UNWRITTEN) ?
 					_("unwritten ") : "",
-				tmp.rm_blockcount,
+				(unsigned long long)tmp.rm_blockcount,
 				tmp.rm_owner,
 				(tmp.rm_flags & XFS_RMAP_ATTR_FORK) ?
 					_("attr ") : "",
 				(tmp.rm_flags & XFS_RMAP_BMBT_BLOCK) ?
 					_("bmbt ") : "",
 				tmp.rm_offset,
-				agno, rm_rec.rm_startblock,
+				agno, (unsigned long long)rm_rec.rm_startblock,
 				(rm_rec.rm_flags & XFS_RMAP_UNWRITTEN) ?
 					_("unwritten ") : "",
-				rm_rec.rm_blockcount,
+				(unsigned long long)rm_rec.rm_blockcount,
 				rm_rec.rm_owner,
 				(rm_rec.rm_flags & XFS_RMAP_ATTR_FORK) ?
 					_("attr ") : "",
@@ -1323,7 +1325,6 @@ rmap_diffkeys(
 {
 	__u64			oa;
 	__u64			ob;
-	int64_t			d;
 	struct xfs_rmap_irec	tmp;
 
 	tmp = *kp1;
@@ -1333,9 +1334,10 @@ rmap_diffkeys(
 	tmp.rm_flags &= ~XFS_RMAP_REC_FLAGS;
 	ob = libxfs_rmap_irec_offset_pack(&tmp);
 
-	d = (int64_t)kp1->rm_startblock - kp2->rm_startblock;
-	if (d)
-		return d;
+	if (kp1->rm_startblock > kp2->rm_startblock)
+		return 1;
+	else if (kp2->rm_startblock > kp1->rm_startblock)
+		return -1;
 
 	if (kp1->rm_owner > kp2->rm_owner)
 		return 1;
