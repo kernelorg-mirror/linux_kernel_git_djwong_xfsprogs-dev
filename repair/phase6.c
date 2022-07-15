@@ -3779,10 +3779,43 @@ reset_rt_metadata_inodes(
 	}
 }
 
+int
+reserve_ag_blocks(
+	struct xfs_mount	*mp)
+{
+	struct xfs_perag	*pag;
+	xfs_agnumber_t		agno;
+	int			error = 0;
+	int			err2;
+
+	mp->m_finobt_nores = false;
+
+	for_each_perag(mp, agno, pag) {
+		err2 = -libxfs_ag_resv_init(pag, NULL);
+		if (err2 && !error)
+			error = err2;
+	}
+
+	return error;
+}
+
+void
+unreserve_ag_blocks(
+	struct xfs_mount	*mp)
+{
+	struct xfs_perag	*pag;
+	xfs_agnumber_t		agno;
+
+	for_each_perag(mp, agno, pag)
+		libxfs_ag_resv_free(pag);
+}
+
 void
 phase6(xfs_mount_t *mp)
 {
 	ino_tree_node_t		*irec;
+	bool			reserve_perag;
+	int			error;
 	int			i;
 
 	orphanage_ino = 0;
@@ -3818,6 +3851,17 @@ phase6(xfs_mount_t *mp)
 		need_metadir_dotdot = 0;
 	} else if (need_metadir_inode) {
 		do_warn(_("would reinitialize metadata root directory\n"));
+	}
+
+	reserve_perag = xfs_has_realtime(mp) && !no_modify;
+	if (reserve_perag) {
+		error = reserve_ag_blocks(mp);
+		if (error) {
+			if (error != ENOSPC)
+				do_warn(
+	_("could not reserve per-AG space to rebuild realtime metadata"));
+			reserve_perag = false;
+		}
 	}
 
 	if (need_rbmino)  {
@@ -3857,6 +3901,9 @@ _("        - resetting contents of realtime bitmap and summary inodes\n"));
 			_("Warning:  realtime bitmap may be inconsistent\n"));
 		}
 	}
+
+	if (reserve_perag)
+		unreserve_ag_blocks(mp);
 
 	reattach_metadir_quota_inodes(mp);
 
