@@ -25,6 +25,7 @@
 #include "xfs_dir2.h"
 #include "xfs_dir2_priv.h"
 #include "xfs_ag.h"
+#include "xfs_health.h"
 
 /*
  * Metadata Inode Number Management
@@ -404,16 +405,22 @@ xfs_imeta_dir_lookup_component(
 
 	trace_xfs_imeta_dir_lookup_component(dp, xname, NULLFSINO);
 
-	if (!S_ISDIR(VFS_I(dp)->i_mode))
+	if (!S_ISDIR(VFS_I(dp)->i_mode)) {
+		xfs_fs_mark_sick(dp->i_mount, XFS_SICK_FS_METADIR);
 		return -EFSCORRUPTED;
+	}
 
 	error = xfs_imeta_dir_lookup(dp, xname, ino);
 	if (error)
 		return error;
-	if (!xfs_verify_ino(dp->i_mount, *ino))
+	if (!xfs_verify_ino(dp->i_mount, *ino)) {
+		xfs_fs_mark_sick(dp->i_mount, XFS_SICK_FS_METADIR);
 		return -EFSCORRUPTED;
-	if (type_wanted != XFS_DIR3_FT_UNKNOWN && xname->type != type_wanted)
+	}
+	if (type_wanted != XFS_DIR3_FT_UNKNOWN && xname->type != type_wanted) {
+		xfs_fs_mark_sick(dp->i_mount, XFS_SICK_FS_METADIR);
 		return -EFSCORRUPTED;
+	}
 
 	trace_xfs_imeta_dir_lookup_found(dp, xname, *ino);
 	return 0;
@@ -712,6 +719,7 @@ xfs_imeta_dir_unlink(
 	/* Metadata directory root cannot be unlinked. */
 	if (xfs_imeta_path_compare(path, &XFS_IMETA_METADIR)) {
 		ASSERT(0);
+		xfs_fs_mark_sick(mp, XFS_SICK_FS_METADIR);
 		return -EFSCORRUPTED;
 	}
 
@@ -727,6 +735,7 @@ xfs_imeta_dir_unlink(
 			error = -ENOENT;
 		break;
 	case -ENOENT:
+		xfs_fs_mark_sick(mp, XFS_SICK_FS_METADIR);
 		error = -EFSCORRUPTED;
 		break;
 	}
@@ -778,6 +787,7 @@ xfs_imeta_dir_link(
 	/* Metadata directory root cannot be linked. */
 	if (xfs_imeta_path_compare(path, &XFS_IMETA_METADIR)) {
 		ASSERT(0);
+		xfs_fs_mark_sick(mp, XFS_SICK_FS_METADIR);
 		return -EFSCORRUPTED;
 	}
 
@@ -855,16 +865,20 @@ xfs_imeta_lookup(
 
 	if (xfs_has_metadir(mp)) {
 		error = xfs_imeta_dir_lookup_int(mp, path, &ino);
-		if (error == -ENOENT)
+		if (error == -ENOENT) {
+			xfs_fs_mark_sick(mp, XFS_SICK_FS_METADIR);
 			return -EFSCORRUPTED;
+		}
 	} else {
 		error = xfs_imeta_sb_lookup(mp, path, &ino);
 	}
 	if (error)
 		return error;
 
-	if (!xfs_imeta_verify(mp, ino))
+	if (!xfs_imeta_verify(mp, ino)) {
+		xfs_fs_mark_sick(mp, XFS_SICK_FS_METADIR);
 		return -EFSCORRUPTED;
+	}
 
 	*inop = ino;
 	return 0;
@@ -1040,8 +1054,10 @@ xfs_imeta_start_update(
 	 * to exist.
 	 */
 	error = xfs_imeta_dir_parent(mp, path, &upd->dp);
-	if (error == -ENOENT)
+	if (error == -ENOENT) {
+		xfs_fs_mark_sick(mp, XFS_SICK_FS_METADIR);
 		return -EFSCORRUPTED;
+	}
 	if (error)
 		return error;
 
