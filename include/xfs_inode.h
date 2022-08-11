@@ -73,7 +73,9 @@ typedef struct xfs_inode {
 	struct xfs_mount	*i_mount;	/* fs mount struct ptr */
 	xfs_ino_t		i_ino;		/* inode number (agno/agino) */
 	struct xfs_imap		i_imap;		/* location for xfs_imap() */
+	xfs_agino_t		i_next_unlinked;
 	struct xfs_buftarg	i_dev;		/* dev for this inode */
+	xfs_agino_t		i_prev_unlinked;
 	struct xfs_ifork	*i_cowfp;	/* copy on write extents */
 	struct xfs_ifork	i_df;		/* data fork */
 	struct xfs_ifork	i_af;		/* attribute fork */
