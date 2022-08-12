@@ -18,5 +18,8 @@ generate_rtinfo(xfs_mount_t	*mp,
 
 void check_rtbitmap(struct xfs_mount *mp);
 void check_rtsummary(struct xfs_mount *mp);
+void check_rtsupers(struct xfs_mount *mp);
+
+void rewrite_primary_rt_super(struct xfs_mount *mp);
 
 #endif /* _XFS_REPAIR_RT_H_ */
