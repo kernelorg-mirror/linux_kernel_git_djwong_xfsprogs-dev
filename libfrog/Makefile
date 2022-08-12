@@ -41,6 +41,7 @@ crc32c.h \
 crc32cselftest.h \
 crc32defs.h \
 crc32table.h \
+div64.h \
 file_exchange.h \
 fsgeom.h \
 histogram.h \
