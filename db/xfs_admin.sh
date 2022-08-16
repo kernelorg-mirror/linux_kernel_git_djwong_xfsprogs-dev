@@ -6,6 +6,7 @@
 
 status=0
 DB_OPTS=""
+DB_DEV_OPTS=""
 REPAIR_OPTS=""
 REPAIR_DEV_OPTS=""
 LOG_OPTS=""
@@ -22,7 +23,7 @@ do
 	L)	DB_OPTS=$DB_OPTS" -c 'label "$OPTARG"'";;
 	O)	REPAIR_OPTS=$REPAIR_OPTS" -c $OPTARG";;
 	p)	DB_OPTS=$DB_OPTS" -c 'version projid32bit'";;
-	r)	REPAIR_DEV_OPTS=" -r '$OPTARG'";;
+	r)	REPAIR_DEV_OPTS=" -r '$OPTARG'"; DB_DEV_OPTS=" -R '$OPTARG'";;
 	u)	DB_OPTS=$DB_OPTS" -r -c uuid";;
 	U)	DB_OPTS=$DB_OPTS" -c 'uuid "$OPTARG"'";;
 	V)	xfs_db -p xfs_admin -V
@@ -45,7 +46,7 @@ case $# in
 
 		if [ -n "$DB_OPTS" ]
 		then
-			eval xfs_db -x -p xfs_admin $LOG_OPTS $DB_OPTS "$1"
+			eval xfs_db -x -p xfs_admin $LOG_OPTS $DB_DEV_OPTS $DB_OPTS "$1"
 			status=$?
 		fi
 		if [ -n "$REPAIR_OPTS" ]
