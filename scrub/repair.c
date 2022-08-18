@@ -75,6 +75,7 @@ xfs_repair_metadata(
 	switch (xfrog_scrubbers[scrub_type].group) {
 	case XFROG_SCRUB_GROUP_AGHEADER:
 	case XFROG_SCRUB_GROUP_PERAG:
+	case XFROG_SCRUB_GROUP_RTGROUP:
 		meta.sm_agno = sri->sri_agno;
 		break;
 	case XFROG_SCRUB_GROUP_INODE:
@@ -379,6 +380,7 @@ repair_item_difficulty(
 		case XFS_SCRUB_TYPE_REFCNTBT:
 		case XFS_SCRUB_TYPE_RTBITMAP:
 		case XFS_SCRUB_TYPE_RTSUM:
+		case XFS_SCRUB_TYPE_RGSUPER:
 			ret |= REPAIR_DIFFICULTY_PRIMARY;
 			break;
 		}
