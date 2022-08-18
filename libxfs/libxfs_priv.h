@@ -384,14 +384,6 @@ roundup_pow_of_two(uint v)
 }
 
 static inline uint64_t
-roundup_64(uint64_t x, uint32_t y)
-{
-	x += y - 1;
-	do_div(x, y);
-	return x * y;
-}
-
-static inline uint64_t
 howmany_64(uint64_t x, uint32_t y)
 {
 	x += y - 1;
