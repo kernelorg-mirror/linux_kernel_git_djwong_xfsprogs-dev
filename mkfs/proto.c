@@ -950,21 +950,22 @@ rtfreesp_init(
 	struct xfs_mount	*mp)
 {
 	struct xfs_trans	*tp;
-	xfs_fileoff_t		bno;
-	xfs_fileoff_t		ebno;
+	xfs_rtxnum_t		rtx;
+	xfs_rtxnum_t		ertx;
 	int			error;
 
-	for (bno = 0; bno < mp->m_sb.sb_rextents; bno = ebno) {
+	for (rtx = 0; rtx < mp->m_sb.sb_rextents; rtx = ertx) {
 		error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
 				0, 0, 0, &tp);
 		if (error)
 			res_failed(error);
 
 		libxfs_trans_ijoin(tp, mp->m_rbmip, 0);
-		ebno = XFS_RTMIN(mp->m_sb.sb_rextents,
-			bno + NBBY * mp->m_sb.sb_blocksize);
+		ertx = XFS_RTMIN(mp->m_sb.sb_rextents,
+			rtx + NBBY * mp->m_sb.sb_blocksize);
 
-		error = -libxfs_rtfree_extent(tp, bno, (xfs_extlen_t)(ebno-bno));
+		error = -libxfs_rtfree_extent(tp, rtx,
+				(xfs_rtxlen_t)(ertx - rtx));
 		if (error) {
 			fail(_("Error initializing the realtime space"),
 				error);
