@@ -66,4 +66,18 @@ div64_u64_rem(uint64_t dividend, uint64_t divisor, uint64_t *remainder)
 	return dividend / divisor;
 }
 
+static inline uint64_t rounddown_64(uint64_t x, uint32_t y)
+{
+	do_div(x, y);
+	return x * y;
+}
+
+static inline uint64_t
+roundup_64(uint64_t x, uint32_t y)
+{
+	x += y - 1;
+	do_div(x, y);
+	return x * y;
+}
+
 #endif /* LIBFROG_DIV64_H_ */
