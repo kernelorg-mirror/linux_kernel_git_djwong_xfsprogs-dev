@@ -45,7 +45,7 @@ format_scrub_descr(
 				meta->sm_ino, meta->sm_gen, "%s",
 				_(sc->descr));
 		break;
-	case XFROG_SCRUB_GROUP_FS:
+	case XFROG_SCRUB_GROUP_METAFILES:
 	case XFROG_SCRUB_GROUP_SUMMARY:
 		return snprintf(buf, buflen, _("%s"), _(sc->descr));
 		break;
@@ -406,7 +406,7 @@ scrub_fs_metadata(
 	struct scrub_ctx		*ctx,
 	struct action_list		*alist)
 {
-	return scrub_group(ctx, XFROG_SCRUB_GROUP_FS, 0, alist);
+	return scrub_group(ctx, XFROG_SCRUB_GROUP_METAFILES, 0, alist);
 }
 
 /* Scrub all FS summary metadata. */
@@ -443,7 +443,7 @@ scrub_estimate_ag_work(
 		case XFROG_SCRUB_GROUP_PERAG:
 			estimate += ctx->mnt.fsgeom.agcount;
 			break;
-		case XFROG_SCRUB_GROUP_FS:
+		case XFROG_SCRUB_GROUP_METAFILES:
 			estimate++;
 			break;
 		default:
