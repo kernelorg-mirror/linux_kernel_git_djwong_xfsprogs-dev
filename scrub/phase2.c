@@ -131,7 +131,7 @@ scan_metafile(
 		goto out;
 
 	scrub_item_init_fs(&sri);
-	ret = scrub_metadata_file(ctx, type, &sri);
+	ret = scrub_meta_type(ctx, type, &sri);
 	if (ret) {
 		sctl->aborted = true;
 		goto out;
