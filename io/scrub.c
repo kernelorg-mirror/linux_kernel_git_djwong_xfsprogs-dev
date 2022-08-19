@@ -66,7 +66,7 @@ scrub_ioctl(
 		meta.sm_gen = control2;
 		break;
 	case XFROG_SCRUB_GROUP_NONE:
-	case XFROG_SCRUB_GROUP_FS:
+	case XFROG_SCRUB_GROUP_METAFILES:
 	case XFROG_SCRUB_GROUP_SUMMARY:
 		/* no control parameters */
 		break;
@@ -167,7 +167,7 @@ parse_args(
 			return 0;
 		}
 		break;
-	case XFROG_SCRUB_GROUP_FS:
+	case XFROG_SCRUB_GROUP_METAFILES:
 	case XFROG_SCRUB_GROUP_NONE:
 	case XFROG_SCRUB_GROUP_SUMMARY:
 		if (optind != argc) {
@@ -260,7 +260,7 @@ repair_ioctl(
 		meta.sm_gen = control2;
 		break;
 	case XFROG_SCRUB_GROUP_NONE:
-	case XFROG_SCRUB_GROUP_FS:
+	case XFROG_SCRUB_GROUP_METAFILES:
 	case XFROG_SCRUB_GROUP_SUMMARY:
 		/* no control parameters */
 		break;
