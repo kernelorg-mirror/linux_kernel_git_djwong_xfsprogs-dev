@@ -620,6 +620,23 @@ set_rt_cur(
 	return 0;
 }
 
+int
+set_log_cur(
+	const typ_t	*type,
+	xfs_daddr_t	blknum,
+	int		len,
+	int		ring_flag,
+	bbmap_t		*bbmap)
+{
+	if (!mp->m_logdev_targp->bt_bdev) {
+		printf(_("external log device not loaded, use -l.\n"));
+		return ENODEV;
+	}
+
+	__set_cur(mp->m_logdev_targp, type, blknum, len, ring_flag, bbmap);
+	return 0;
+}
+
 void
 set_iocur_type(
 	const typ_t	*type)
