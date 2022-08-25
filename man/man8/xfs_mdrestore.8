@@ -5,12 +5,17 @@ xfs_mdrestore \- restores an XFS metadump image to a filesystem image
 .B xfs_mdrestore
 [
 .B \-gi
+] [
+.B \-l logdev
 ]
 .I source
 .I target
 .br
 .B xfs_mdrestore
 .B \-i
+[
+.B \-l logdev
+]
 .I source
 .br
 .B xfs_mdrestore \-V
@@ -42,6 +47,9 @@ can be destroyed.
 .TP
 .B \-g
 Shows restore progress on stdout.
+.TP
+.B \-l
+Restore log contents to this external log device.
 .TP
 .B \-i
 Shows metadump information on stdout.  If no
