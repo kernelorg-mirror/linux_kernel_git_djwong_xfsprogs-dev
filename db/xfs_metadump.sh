@@ -6,9 +6,9 @@
 
 OPTS=" "
 DBOPTS=" "
-USAGE="Usage: xfs_metadump [-aefFogwV] [-m max_extents] [-l logdev] source target"
+USAGE="Usage: xfs_metadump [-aefFgoVwx] [-m max_extents] [-l logdev] source target"
 
-while getopts "aefgl:m:owFV" c
+while getopts "aefgl:m:owFVx" c
 do
 	case $c in
 	a)	OPTS=$OPTS"-a ";;
@@ -24,6 +24,7 @@ do
 		status=$?
 		exit $status
 		;;
+	x)	OPTS=$OPTS"-x ";;
 	\?)	echo $USAGE 1>&2
 		exit 2
 		;;
