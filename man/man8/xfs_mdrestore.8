@@ -7,6 +7,8 @@ xfs_mdrestore \- restores an XFS metadump image to a filesystem image
 .B \-gi
 ] [
 .B \-l logdev
+] [
+.B \-R rtdev
 ]
 .I source
 .I target
@@ -15,6 +17,8 @@ xfs_mdrestore \- restores an XFS metadump image to a filesystem image
 .B \-i
 [
 .B \-l logdev
+] [
+.B \-R rtdev
 ]
 .I source
 .br
@@ -56,6 +60,9 @@ Shows metadump information on stdout.  If no
 .I target
 is specified, exits after displaying information.  Older metadumps man not
 include any descriptive information.
+.TP
+.B \-R
+Restore realtime device metadata to this device.
 .TP
 .B \-V
 Prints the version number and exits.
