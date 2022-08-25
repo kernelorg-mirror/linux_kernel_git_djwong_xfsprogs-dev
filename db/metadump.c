@@ -3003,6 +3003,74 @@ done:
 }
 
 static int
+copy_external_log(void)
+{
+	struct xlog	log;
+	int		dirty;
+	xfs_daddr_t	logstart;
+	int		logblocks;
+	int		logversion;
+	int		cycle = XLOG_INIT_CYCLE;
+	int		error;
+
+	if (show_progress)
+		print_progress("Copying external log");
+
+	push_cur();
+	error = set_log_cur(&typtab[TYP_LOG],
+			XFS_FSB_TO_DADDR(mp, mp->m_sb.sb_logstart),
+			mp->m_sb.sb_logblocks * blkbb, DB_RING_IGN, NULL);
+	if (error)
+		return 0;
+	if (iocur_top->data == NULL) {
+		pop_cur();
+		print_warning("cannot read external log");
+		return !stop_on_read_error;
+	}
+
+	/* If not obfuscating or zeroing, just copy the log as it is */
+	if (!obfuscate && !zero_stale_data)
+		goto done;
+
+	dirty = xlog_is_dirty(mp, &log, &x, 0);
+
+	switch (dirty) {
+	case 0:
+		/* clear out a clean log */
+		if (show_progress)
+			print_progress("Zeroing clean log");
+
+		logstart = XFS_FSB_TO_DADDR(mp, mp->m_sb.sb_logstart);
+		logblocks = XFS_FSB_TO_BB(mp, mp->m_sb.sb_logblocks);
+		logversion = xfs_has_logv2(mp) ? 2 : 1;
+		if (xfs_has_crc(mp))
+			cycle = log.l_curr_cycle + 1;
+
+		libxfs_log_clear(NULL, iocur_top->data, logstart, logblocks,
+				 &mp->m_sb.sb_uuid, logversion,
+				 mp->m_sb.sb_logsunit, XLOG_FMT, cycle, true);
+		break;
+	case 1:
+		/* keep the dirty log */
+		if (obfuscate)
+			print_warning(
+_("Warning: log recovery of an obfuscated metadata image can leak "
+"unobfuscated metadata and/or cause image corruption.  If possible, "
+"please mount the filesystem to clean the log, or disable obfuscation."));
+		break;
+	case -1:
+		/* log detection error */
+		if (obfuscate)
+			print_warning(
+_("Could not discern log; image will contain unobfuscated metadata in log."));
+		break;
+	}
+
+done:
+	return !write_buf(iocur_top);
+}
+
+static int
 metadump_f(
 	int 		argc,
 	char 		**argv)
@@ -3012,6 +3080,7 @@ metadump_f(
 	int		start_iocur_sp;
 	int		outfd = -1;
 	int		ret;
+	bool		copy_external = false;
 	char		*p;
 
 	exitcode = 1;
@@ -3035,7 +3104,7 @@ metadump_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "aegm:ow")) != EOF) {
+	while ((c = getopt(argc, argv, "aegm:owx")) != EOF) {
 		switch (c) {
 			case 'a':
 				zero_stale_data = 0;
@@ -3060,6 +3129,9 @@ metadump_f(
 			case 'w':
 				show_warnings = 1;
 				break;
+			case 'x':
+				copy_external = true;
+				break;
 			default:
 				print_warning("bad option for metadump command");
 				return 0;
@@ -3077,7 +3149,10 @@ metadump_f(
 		return 0;
 	}
 	metablock->mb_blocklog = BBSHIFT;
-	metablock->mb_magic = cpu_to_be32(XFS_MD_MAGIC);
+	if (copy_external && mp->m_sb.sb_logstart == 0)
+		metablock->mb_magic = cpu_to_be32(XFS_MDX_MAGIC);
+	else
+		metablock->mb_magic = cpu_to_be32(XFS_MD_MAGIC);
 
 	/* Set flags about state of metadump */
 	metablock->mb_info = XFS_METADUMP_INFO_FLAGS;
@@ -3165,7 +3240,7 @@ metadump_f(
 
 	exitcode = 0;
 
-	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++) {
+	for (agno = 0; !exitcode && agno < mp->m_sb.sb_agcount; agno++) {
 		if (!scan_ag(agno)) {
 			exitcode = 1;
 			break;
@@ -3183,6 +3258,16 @@ metadump_f(
 	/* write the remaining index */
 	if (!exitcode)
 		exitcode = write_index() < 0;
+
+	/* write the external log, if desired */
+	if (!exitcode && mp->m_sb.sb_logstart == 0 && copy_external) {
+		metablock->mb_info |= XFS_METADUMP_LOGDEV;
+
+		if (!copy_external_log())
+			exitcode = 1;
+		if (!exitcode)
+			exitcode = write_index() < 0;
+	}
 
 	if (progress_since_warning)
 		fputc('\n', stdout_metadump ? stderr : stdout);
