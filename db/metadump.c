@@ -3054,6 +3054,39 @@ done:
 }
 
 static int
+copy_rtsupers(void)
+{
+	int		error;
+	xfs_rtblock_t	rtbno;
+	xfs_rgnumber_t	rgno = 0;
+
+	if (show_progress)
+		print_progress("Copying realtime superblocks");
+
+	for (rgno = 0; rgno < mp->m_sb.sb_rgcount; rgno++) {
+		rtbno = xfs_rgbno_to_rtb(mp, rgno, 0);
+
+		push_cur();
+		error = set_rt_cur(&typtab[TYP_RTSB],
+				xfs_rtb_to_daddr(mp, rtbno),
+				XFS_FSB_TO_BB(mp, 1), DB_RING_ADD, NULL);
+		if (error)
+			return 0;
+		if (iocur_top->data == NULL) {
+			pop_cur();
+			print_warning("cannot read rt super %u", rgno);
+			return !stop_on_read_error;
+		}
+		error = write_buf(iocur_top);
+		pop_cur();
+		if (error)
+			return 0;
+	}
+
+	return 1;
+}
+
+static int
 metadump_f(
 	int 		argc,
 	char 		**argv)
@@ -3128,9 +3161,11 @@ metadump_f(
 
 	/*
 	 * Use the old format if there are no external devices with metadata to
-	 * dump.
+	 * dump.  Force the new format if we have realtime group superblocks.
 	 */
-	if (mp->m_sb.sb_logstart != 0)
+	if (xfs_has_rtgroups(mp))
+		copy_external = true;
+	else if (mp->m_sb.sb_logstart != 0 /* && !rtgroups */)
 		copy_external = false;
 
 	metablock = (xfs_metablock_t *)calloc(BBSIZE + 1, BBSIZE);
@@ -3254,6 +3289,18 @@ metadump_f(
 		metablock->mb_info |= XFS_METADUMP_LOGDEV;
 
 		if (!copy_external_log())
+			exitcode = 1;
+		if (!exitcode)
+			exitcode = write_index() < 0;
+	}
+
+	/* write the realtime device, if desired */
+	if (!exitcode && xfs_has_realtime(mp) && xfs_has_rtgroups(mp) &&
+	    copy_external) {
+		metablock->mb_info &= ~XFS_METADUMP_LOGDEV;
+		metablock->mb_info |= XFS_METADUMP_RTDEV;
+
+		if (!copy_rtsupers())
 			exitcode = 1;
 		if (!exitcode)
 			exitcode = write_index() < 0;
