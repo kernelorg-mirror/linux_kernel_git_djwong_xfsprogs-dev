@@ -4,7 +4,7 @@ xfs_metadump \- copy XFS filesystem metadata to a file
 .SH SYNOPSIS
 .B xfs_metadump
 [
-.B \-aefFgow
+.B \-aefFgowx
 ] [
 .B \-m
 .I max_extents
@@ -123,8 +123,10 @@ is stdout.
 .TP
 .BI \-l " logdev"
 For filesystems which use an external log, this specifies the device where the
-external log resides. The external log is not copied, only internal logs are
-copied.
+external log resides.
+To record the contents of the external log in the dump, the
+.B \-x
+option must also be specified.
 .TP
 .B \-m
 Set the maximum size of an allowed metadata extent.  Extremely large metadata
@@ -137,6 +139,11 @@ Disables obfuscation of file names and extended attributes.
 .B \-w
 Prints warnings of inconsistent metadata encountered to stderr. Bad metadata
 is still copied.
+.TP
+.B \-x
+Dump the external log device, if present.
+The metadump file will not be compatible with older versions of
+.BR xfs_mdrestore (1).
 .TP
 .B \-V
 Prints the version number and exits.
