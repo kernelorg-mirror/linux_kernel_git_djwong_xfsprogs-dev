@@ -126,6 +126,7 @@ perform_restore(
 	int			mb_count;
 	xfs_sb_t		sb;
 	int64_t			bytes_read;
+	int64_t			mb_read = 0;
 	int			log_fd = -1;
 	bool			is_mdx;
 
@@ -204,8 +205,14 @@ perform_restore(
 			fatal("rtdev not supported");
 		}
 
-		if (show_progress && (bytes_read & ((1 << 20) - 1)) == 0)
-			print_progress("%lld MB read", bytes_read >> 20);
+		if (show_progress) {
+			int64_t		mb_now = bytes_read >> 20;
+
+			if (mb_now != mb_read) {
+				print_progress("%lld MB read", mb_now);
+				mb_read = mb_now;
+			}
+		}
 
 		for (cur_index = 0; cur_index < mb_count; cur_index++) {
 			if (pwrite(write_fd, &block_buffer[cur_index <<
@@ -243,6 +250,9 @@ perform_restore(
 
 		bytes_read += block_size + (mb_count << mbp->mb_blocklog);
 	}
+
+	if (show_progress && bytes_read > (mb_read << 20))
+		print_progress("%lld MB read", mb_read + 1);
 
 	if (progress_since_warning)
 		putchar('\n');
