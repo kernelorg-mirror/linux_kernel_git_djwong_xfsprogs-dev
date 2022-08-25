@@ -11,6 +11,9 @@ xfs_metadump \- copy XFS filesystem metadata to a file
 ] [
 .B \-l
 .I logdev
+] [
+.B \-R
+.I rtdev
 ]
 .I source
 .I target
@@ -136,12 +139,19 @@ this value.  The default size is 2097151 blocks.
 .B \-o
 Disables obfuscation of file names and extended attributes.
 .TP
+.B \-R
+For filesystems that have a realtime section, this specifies the device where
+the realtime section resides.
+To record the contents of the realtime section in the dump, the
+.B \-x
+option must also be specified.
+.TP
 .B \-w
 Prints warnings of inconsistent metadata encountered to stderr. Bad metadata
 is still copied.
 .TP
 .B \-x
-Dump the external log device, if present.
+Dump the external log and realtime device, if present.
 The metadump file will not be compatible with older versions of
 .BR xfs_mdrestore (1).
 .TP
