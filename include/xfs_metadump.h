@@ -8,6 +8,7 @@
 #define _XFS_METADUMP_H_
 
 #define	XFS_MD_MAGIC		0x5846534d	/* 'XFSM' */
+#define	XFS_MDX_MAGIC		0x584d4458	/* 'XMDX' */
 
 typedef struct xfs_metablock {
 	__be32		mb_magic;
@@ -22,5 +23,7 @@ typedef struct xfs_metablock {
 #define XFS_METADUMP_OBFUSCATED	(1 << 1)
 #define XFS_METADUMP_FULLBLOCKS	(1 << 2)
 #define XFS_METADUMP_DIRTYLOG	(1 << 3)
+#define XFS_METADUMP_LOGDEV	(1 << 4) /* targets external log device */
+#define XFS_METADUMP_RTDEV	(1 << 5) /* targets realtime volume */
 
 #endif /* _XFS_METADUMP_H_ */
