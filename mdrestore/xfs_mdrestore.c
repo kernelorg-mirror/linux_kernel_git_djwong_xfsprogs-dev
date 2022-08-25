@@ -280,7 +280,7 @@ read_header_v2(
 			sizeof(h->v2) - sizeof(h->v2.xmh_magic), 1, md_fp) != 1)
 		fatal("error reading from metadump file\n");
 
-	if (h->v2.xmh_incompat_flags != 0)
+	if (h->v2.xmh_incompat_flags & cpu_to_be32(~XFS_MD2_INCOMPAT_ALL))
 		fatal("Metadump header has unknown incompat flags set\n");
 
 	if (h->v2.xmh_reserved != 0)
@@ -289,6 +289,9 @@ read_header_v2(
 	if ((h->v2.xmh_compat_flags & cpu_to_be32(XFS_MD2_COMPAT_EXTERNALLOG)) &&
 	    !mdrestore.external_log)
 		fatal("External Log device is required\n");
+
+	if (h->v2.xmh_incompat_flags & cpu_to_be32(XFS_MD2_INCOMPAT_RTDEVICE))
+		fatal("Realtime device not yet supported\n");
 }
 
 static void
