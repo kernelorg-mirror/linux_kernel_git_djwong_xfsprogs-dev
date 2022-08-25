@@ -115,7 +115,8 @@ perform_restore(
 	int			dst_fd,
 	int			is_target_file,
 	const struct xfs_metablock	*mbp,
-	char			*log_path)
+	char			*log_path,
+	char			*rtdev_path)
 {
 	struct xfs_metablock	*metablock;	/* header + index + blocks */
 	__be64			*block_index;
@@ -127,7 +128,7 @@ perform_restore(
 	xfs_sb_t		sb;
 	int64_t			bytes_read;
 	int64_t			mb_read = 0;
-	int			log_fd = -1;
+	int			log_fd = -1, rtdev_fd = -1;
 	bool			is_mdx;
 
 	is_mdx = mbp->mb_magic == cpu_to_be32(XFS_MDX_MAGIC);
@@ -200,9 +201,19 @@ perform_restore(
 			write_fd = log_fd;
 		}
 		if (metablock->mb_info & XFS_METADUMP_RTDEV) {
+			int rtdev_is_file;
+
 			if (!is_mdx)
 				fatal("rtdev set on an old style metadump?");
-			fatal("rtdev not supported");
+			if (rtdev_fd == -1) {
+				if (!rtdev_path)
+					fatal(
+	"metadump has rtdev contents but -r was not specified?");
+				rtdev_fd = open_device(rtdev_path, &rtdev_is_file);
+				check_dev(rtdev_fd, rtdev_is_file,
+						sb.sb_rblocks * sb.sb_blocksize);
+			}
+			write_fd = rtdev_fd;
 		}
 
 		if (show_progress) {
@@ -266,6 +277,8 @@ perform_restore(
 	if (pwrite(dst_fd, block_buffer, sb.sb_sectsize, 0) < 0)
 		fatal("error writing primary superblock: %s\n", strerror(errno));
 
+	if (rtdev_fd >= 0)
+		close(rtdev_fd);
 	if (log_fd >= 0)
 		close(log_fd);
 
@@ -275,7 +288,7 @@ perform_restore(
 static void
 usage(void)
 {
-	fprintf(stderr, "Usage: %s [-V] [-g] [-i] [-l logdev] source target\n", progname);
+	fprintf(stderr, "Usage: %s [-V] [-g] [-i] [-l logdev] [-R rtdev] source target\n", progname);
 	exit(1);
 }
 
@@ -285,6 +298,7 @@ main(
 	char 		**argv)
 {
 	char		*log_path = NULL;
+	char		*rtdev_path = NULL;
 	FILE		*src_f;
 	int		dst_fd;
 	int		c;
@@ -293,7 +307,7 @@ main(
 
 	progname = basename(argv[0]);
 
-	while ((c = getopt(argc, argv, "gl:iV")) != EOF) {
+	while ((c = getopt(argc, argv, "gl:iVR:")) != EOF) {
 		switch (c) {
 			case 'g':
 				show_progress = 1;
@@ -307,6 +321,9 @@ main(
 			case 'V':
 				printf("%s version %s\n", progname, VERSION);
 				exit(0);
+			case 'R':
+				rtdev_path = optarg;
+				break;
 			default:
 				usage();
 		}
@@ -362,7 +379,8 @@ main(
 	/* check and open target */
 	dst_fd = open_device(argv[optind], &is_target_file);
 
-	perform_restore(src_f, dst_fd, is_target_file, &mb, log_path);
+	perform_restore(src_f, dst_fd, is_target_file, &mb, log_path,
+			rtdev_path);
 
 	close(dst_fd);
 	if (src_f != stdin)
