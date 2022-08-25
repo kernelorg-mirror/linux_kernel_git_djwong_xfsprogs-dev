@@ -53,10 +53,16 @@ extern void	*kmem_alloc(size_t, int);
 extern void	*kvmalloc(size_t, gfp_t);
 extern void	*kmem_zalloc(size_t, int);
 
+#define kmalloc(sz, gfp)	kvmalloc((sz), (gfp))
+#define kzalloc(sz, gfp)	kvmalloc((sz), (gfp) | __GFP_ZERO)
+#define kvcalloc(nr, sz, gfp)	kvmalloc((sz) * (nr), (gfp) | __GFP_ZERO)
+
 static inline void
 kmem_free(const void *ptr) {
 	free((void *)ptr);
 }
+
+#define kfree(p)	kmem_free(p)
 
 extern void	*krealloc(void *, size_t, int);
 
