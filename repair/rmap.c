@@ -980,7 +980,7 @@ mark_inode_rl(
 /*
  * Emit a refcount object for refcntbt reconstruction during phase 5.
  */
-#define REFCOUNT_CLAMP(nr)	((nr) > MAXREFCOUNT ? MAXREFCOUNT : (nr))
+#define REFCOUNT_CLAMP(nr)	((nr) > XFS_REFC_REFCOUNT_MAX ? XFS_REFC_REFCOUNT_MAX : (nr))
 static void
 refcount_emit(
 	struct xfs_mount		*mp,
