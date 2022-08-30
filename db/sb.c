@@ -852,6 +852,8 @@ version_string(
 		strcat(s, ",NREXT64");
 	if (xfs_has_metadir(mp))
 		strcat(s, ",METADIR");
+	if (xfs_has_rtgroups(mp))
+		strcat(s, ",RTGROUPS");
 	return s;
 }
 
