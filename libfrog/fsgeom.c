@@ -7,6 +7,7 @@
 #include "bitops.h"
 #include "fsgeom.h"
 #include "util.h"
+#include "xfs_fs_staging.h"
 
 void
 xfs_report_geom(
@@ -206,6 +207,24 @@ xfrog_ag_geometry(
 
 	ageo->ag_number = agno;
 	ret = ioctl(fd, XFS_IOC_AG_GEOMETRY, ageo);
+	if (ret)
+		return -errno;
+	return 0;
+}
+
+/*
+ * Try to obtain a rt group's geometry.  Returns zero or a negative error code.
+ */
+int
+xfrog_rtgroup_geometry(
+	int			fd,
+	unsigned int		rgno,
+	struct xfs_rtgroup_geometry	*rgeo)
+{
+	int			ret;
+
+	rgeo->rg_number = rgno;
+	ret = ioctl(fd, XFS_IOC_RTGROUP_GEOMETRY, rgeo);
 	if (ret)
 		return -errno;
 	return 0;
