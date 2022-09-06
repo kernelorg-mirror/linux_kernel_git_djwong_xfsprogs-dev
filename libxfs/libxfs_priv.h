@@ -169,6 +169,7 @@ enum ce { CE_DEBUG, CE_CONT, CE_NOTE, CE_WARN, CE_ALERT, CE_PANIC };
 	(unlikely(expr) ? XFS_WARN_CORRUPT((mp), (expr)) : false)
 
 #define XFS_ERRLEVEL_LOW		1
+#define XFS_ILOCK_SHARED		0
 #define XFS_ILOCK_EXCL			0
 #define XFS_IOLOCK_SHARED		0
 #define XFS_IOLOCK_EXCL			0
