@@ -198,6 +198,9 @@ typedef enum fldt	{
 	FLDT_UINT8O,
 	FLDT_UINT8X,
 	FLDT_UUID,
+
+	FLDT_RTWORD,
+	FLDT_RGBITMAP,
 	FLDT_ZZZ			/* mark last entry */
 } fldt_t;
 
