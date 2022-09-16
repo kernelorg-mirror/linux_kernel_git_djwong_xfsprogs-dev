@@ -909,6 +909,7 @@ struct sb_feat_args {
 	bool	nodalign;
 	bool	nortalign;
 	bool	nrext64;
+	bool	rtgroups;		/* XFS_SB_FEAT_COMPAT_RTGROUPS */
 };
 
 struct cli_params {
@@ -3159,6 +3160,7 @@ validate_rtdev(
 	char			**devname)
 {
 	struct libxfs_xinit	*xi = cli->xi;
+	unsigned int		rbmblocksize = cfg->blocksize;
 
 	*devname = NULL;
 
@@ -3206,8 +3208,10 @@ reported by the device (%u).\n"),
 	}
 
 	cfg->rtextents = cfg->rtblocks / cfg->rtextblocks;
+	if (cfg->sb_feat.rtgroups)
+		rbmblocksize -= sizeof(struct xfs_rtbuf_blkinfo);
 	cfg->rtbmblocks = (xfs_extlen_t)howmany(cfg->rtextents,
-						NBBY * cfg->blocksize);
+						NBBY * rbmblocksize);
 }
 
 static bool
