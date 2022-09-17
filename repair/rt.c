@@ -25,14 +25,14 @@ rtinit(xfs_mount_t *mp)
 		return;
 
 	/*
-	 * realtime init -- blockmap initialization is
-	 * handled by incore_init()
+	 * Allocate buffers for formatting the collected rt free space
+	 * information.  The rtbitmap buffer must be large enough to compare
+	 * against any unused bytes in the last block of the file.
 	 */
-	/*
-	sumfile = calloc(mp->m_rsumsize, 1);
-	*/
-	wordcnt = xfs_rtbitmap_wordcount(&mp->m_sb, mp->m_sb.sb_rextents);
-	btmcompute = calloc(wordcnt, sizeof(xfs_rtword_t));
+	wordcnt = roundup_64(
+			xfs_rtbitmap_wordcount(&mp->m_sb, mp->m_sb.sb_rextents),
+			mp->m_rtx_per_rbmblock);
+	btmcompute = calloc(wordcnt, sizeof(xfs_rtword_raw_t));
 	if (!btmcompute)
 		do_error(
 	_("couldn't allocate memory for incore realtime bitmap.\n"));
@@ -48,7 +48,7 @@ rtinit(xfs_mount_t *mp)
  */
 int
 generate_rtinfo(xfs_mount_t	*mp,
-		xfs_rtword_t	*words,
+		xfs_rtword_raw_t *words,
 		xfs_suminfo_t	*sumcompute)
 {
 	xfs_rtxnum_t	extno;
@@ -66,7 +66,7 @@ generate_rtinfo(xfs_mount_t	*mp,
 
 	ASSERT(mp->m_rbmip == NULL);
 
-	bitsperblock = mp->m_sb.sb_blocksize * NBBY;
+	bitsperblock = mp->m_blockwsize << XFS_NBWORDLOG;
 	extno = start_ext = 0;
 	bmbno = in_extent = start_bmbno = 0;
 
@@ -78,7 +78,7 @@ generate_rtinfo(xfs_mount_t	*mp,
 	 */
 	while (extno < mp->m_sb.sb_rextents)  {
 		freebit = 1;
-		*words = 0;
+		xfs_rtbitmap_setword(mp, words, 0);
 		bits = 0;
 		for (i = 0; i < sizeof(xfs_rtword_t) * NBBY &&
 				extno < mp->m_sb.sb_rextents; i++, extno++)  {
@@ -101,7 +101,7 @@ generate_rtinfo(xfs_mount_t	*mp,
 
 			freebit <<= 1;
 		}
-		*words = bits;
+		xfs_rtbitmap_setword(mp, words, bits);
 		words++;
 
 		if (extno % bitsperblock == 0)
@@ -123,16 +123,56 @@ generate_rtinfo(xfs_mount_t	*mp,
 }
 
 static void
+check_rtwords(
+	struct xfs_mount	*mp,
+	const char		*filename,
+	unsigned long long	bno,
+	void			*ondisk,
+	void			*incore)
+{
+	unsigned int		wordcnt = mp->m_blockwsize;
+	xfs_rtword_raw_t	*o = ondisk, *i = incore;
+	int			badstart = -1;
+	unsigned int		j;
+
+	if (memcmp(ondisk, incore, wordcnt << XFS_WORDLOG) == 0)
+		return;
+
+	for (j = 0; j < wordcnt; j++, o++, i++) {
+		if (*o == *i) {
+			/* Report a range of inconsistency that just ended. */
+			if (badstart >= 0)
+				do_warn(
+ _("discrepancy in %s at dblock 0x%llx words 0x%x-0x%x/0x%x\n"),
+					filename, bno, badstart, j - 1, wordcnt);
+			badstart = -1;
+			continue;
+		}
+
+		if (badstart == -1)
+			badstart = j;
+	}
+
+	if (badstart >= 0)
+		do_warn(
+ _("discrepancy in %s at dblock 0x%llx words 0x%x-0x%x/0x%x\n"),
+					filename, bno, badstart, wordcnt,
+					wordcnt);
+}
+
+static void
 check_rtfile_contents(
 	struct xfs_mount	*mp,
 	const char		*filename,
 	xfs_ino_t		ino,
 	void			*buf,
-	xfs_fileoff_t		filelen)
+	xfs_fileoff_t		filelen,
+	const struct xfs_buf_ops *buf_ops)
 {
 	struct xfs_bmbt_irec	map;
 	struct xfs_buf		*bp;
 	struct xfs_inode	*ip;
+	xfs_rtword_raw_t	*words = buf;
 	xfs_fileoff_t		bno = 0;
 	int			error;
 
@@ -150,12 +190,11 @@ check_rtfile_contents(
 	}
 
 	while (bno < filelen)  {
-		xfs_filblks_t	maplen;
+		xfs_rtword_raw_t *ondisk;
+		xfs_daddr_t	daddr;
 		int		nmap = 1;
 
-		/* Read up to 1MB at a time. */
-		maplen = min(filelen - bno, XFS_B_TO_FSBT(mp, 1048576));
-		error = -libxfs_bmapi_read(ip, bno, maplen, &map, &nmap, 0);
+		error = -libxfs_bmapi_read(ip, bno, 1, &map, &nmap, 0);
 		if (error) {
 			do_warn(_("unable to read %s mapping, err %d\n"),
 					filename, error);
@@ -168,21 +207,35 @@ check_rtfile_contents(
 			break;
 		}
 
-		error = -libxfs_buf_read_uncached(mp->m_dev,
-				XFS_FSB_TO_DADDR(mp, map.br_startblock),
+		daddr = XFS_FSB_TO_DADDR(mp, map.br_startblock);
+		error = -libxfs_buf_read_uncached(mp->m_dev, daddr,
 				XFS_FSB_TO_BB(mp, map.br_blockcount),
-				0, &bp, NULL);
+				0, &bp, buf_ops);
 		if (error) {
 			do_warn(_("unable to read %s at dblock 0x%llx, err %d\n"),
 					filename, (unsigned long long)bno, error);
 			break;
 		}
 
-		if (memcmp(bp->b_addr, buf, mp->m_sb.sb_blocksize))
-			do_warn(_("discrepancy in %s at dblock 0x%llx\n"),
+		if (xfs_has_rtgroups(mp) && buf_ops) {
+			struct xfs_rtbuf_blkinfo	*hdr = bp->b_addr;
+
+			if (hdr->rt_owner != cpu_to_be64(ino)) {
+				do_warn(
+	_("corrupt owner in %s at dblock 0x%llx\n"),
+					filename, (unsigned long long)bno);
+			}
+			ondisk = xfs_rbmblock_wordptr(bp, 0);
+			check_rtwords(mp, filename, bno, ondisk, words);
+			words += mp->m_blockwsize;
+		} else {
+			if (memcmp(bp->b_addr, buf, mp->m_sb.sb_blocksize))
+				do_warn(_("discrepancy in %s at dblock 0x%llx\n"),
 					filename, (unsigned long long)bno);
 
-		buf += XFS_FSB_TO_B(mp, map.br_blockcount);
+			buf += XFS_FSB_TO_B(mp, map.br_blockcount);
+		}
+
 		bno += map.br_blockcount;
 		libxfs_buf_relse(bp);
 	}
@@ -194,11 +247,14 @@ void
 check_rtbitmap(
 	struct xfs_mount	*mp)
 {
+	const struct xfs_buf_ops *buf_ops = NULL;
 	if (need_rbmino)
 		return;
+	if (xfs_has_rtgroups(mp))
+		buf_ops = &xfs_rtbitmap_buf_ops;
 
 	check_rtfile_contents(mp, "rtbitmap", mp->m_sb.sb_rbmino, btmcompute,
-			mp->m_sb.sb_rbmblocks);
+			mp->m_sb.sb_rbmblocks, buf_ops);
 }
 
 void
@@ -209,7 +265,7 @@ check_rtsummary(
 		return;
 
 	check_rtfile_contents(mp, "rtsummary", mp->m_sb.sb_rsumino, sumcompute,
-			XFS_B_TO_FSB(mp, mp->m_rsumsize));
+			XFS_B_TO_FSB(mp, mp->m_rsumsize), NULL);
 }
 
 void
