@@ -261,11 +261,15 @@ void
 check_rtsummary(
 	struct xfs_mount	*mp)
 {
+	const struct xfs_buf_ops *buf_ops = NULL;
+
 	if (need_rsumino)
 		return;
+	if (xfs_has_rtgroups(mp))
+		buf_ops = &xfs_rtsummary_buf_ops;
 
 	check_rtfile_contents(mp, "rtsummary", mp->m_sb.sb_rsumino, sumcompute,
-			XFS_B_TO_FSB(mp, mp->m_rsumsize), NULL);
+			XFS_B_TO_FSB(mp, mp->m_rsumsize), buf_ops);
 }
 
 void
