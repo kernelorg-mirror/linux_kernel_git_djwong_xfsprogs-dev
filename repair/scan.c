@@ -1376,9 +1376,9 @@ _("%s btree block claimed (state %d), agno %d, bno %d, suspect %d\n"),
 			len = be32_to_cpu(rp[i].rc_blockcount);
 			nr = be32_to_cpu(rp[i].rc_refcount);
 
-			if (b & XFS_REFC_COW_START) {
+			if (b & XFS_REFC_COWFLAG) {
 				domain = XFS_RCDOM_COW;
-				agb &= ~XFS_REFC_COW_START;
+				agb &= ~XFS_REFC_COWFLAG;
 			} else {
 				domain = XFS_RCDOM_SHARED;
 			}

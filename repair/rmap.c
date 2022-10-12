@@ -1433,7 +1433,7 @@ _("Missing reference count record for (%u/%u) len %u count %u\n"),
 			unsigned int	start = tmp.rc_startblock;
 
 			if (tmp.rc_domain == XFS_RCDOM_COW)
-				start |= XFS_REFC_COW_START;
+				start |= XFS_REFC_COWFLAG;
 
 			do_warn(
 _("Incorrect reference count: saw (%u/%u) len %u nlinks %u; should be (%u/%u) len %u nlinks %u\n"),
