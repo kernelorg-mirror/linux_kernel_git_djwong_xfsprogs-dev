@@ -42,6 +42,47 @@ struct repair_list_schedule {
 	bool				made_progress;
 };
 
+/*
+ * After a successful repair, schedule any additional revalidations needed in
+ * other scrub groups.
+ */
+static int
+revalidate_across_groups(
+	struct scrub_ctx		*ctx,
+	const struct action_item	*old_aitem,
+	struct repair_list_schedule	*rls)
+{
+	struct action_list		alist;
+	int				error;
+
+	action_list_init(&alist);
+
+	error = action_item_schedule_revalidation(ctx, old_aitem, &alist);
+	if (error) {
+		rls->aborted = true;
+		return error;
+	}
+
+	if (action_list_empty(&alist))
+		return 0;
+
+	pthread_mutex_unlock(&rls->lock);
+	error = action_list_revalidate(ctx, &alist);
+	pthread_mutex_lock(&rls->lock);
+
+	if (error)
+		rls->aborted = true;
+	else
+		rls->made_progress = true;
+
+	/*
+	 * Merge the action items into the scrub context for freeing, even if
+	 * there was an error.
+	 */
+	action_list_merge(&rls->requeue_list, &alist);
+	return error;
+}
+
 /* Try to repair as many things on our list as we can. */
 static void
 repair_list_worker(
@@ -89,6 +130,8 @@ repair_list_worker(
 			action_list_add(&rls->requeue_list, aitem);
 			break;
 		case TR_REPAIRED:
+			revalidate_across_groups(ctx, aitem, rls);
+
 			/* Item is clean.  Free it. */
 			free(aitem);
 			break;
