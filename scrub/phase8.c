@@ -18,6 +18,7 @@
 #include "repair.h"
 #include "vfs.h"
 #include "atomic.h"
+#include "disk.h"
 
 /* Phase 8: Trim filesystem. */
 
@@ -45,24 +46,89 @@ fstrim_ok(
 	return true;
 }
 
+struct trim_ctl {
+	uint64_t	datadev_end_pos;
+	bool		aborted;
+};
+
+/* Trim each AG. */
+static void
+trim_ag(
+	struct workqueue	*wq,
+	xfs_agnumber_t		agno,
+	void			*arg)
+{
+	struct scrub_ctx	*ctx = (struct scrub_ctx *)wq->wq_ctx;
+	struct trim_ctl		*tctl = arg;
+	uint64_t		pos, len, eoag_pos;
+	int			error;
+
+	pos = cvt_agbno_to_b(&ctx->mnt, agno, 0);
+	eoag_pos = cvt_agbno_to_b(&ctx->mnt, agno, ctx->mnt.fsgeom.agblocks);
+	len = min(tctl->datadev_end_pos, eoag_pos) - pos;
+
+	error = fstrim(ctx, pos, len);
+	if (error) {
+		char		descr[DESCR_BUFSZ];
+
+		snprintf(descr, sizeof(descr) - 1, _("fstrim agno %u"), agno);
+		str_liberror(ctx, error, descr);
+		tctl->aborted = true;
+		return;
+	}
+
+	progress_add(1);
+}
+
 /* Trim the filesystem, if desired. */
 int
 phase8_func(
 	struct scrub_ctx	*ctx)
 {
-	int			error;
+	struct workqueue	wq;
+	struct trim_ctl		tctl = {
+		.aborted	= false,
+	};
+	xfs_agnumber_t		agno;
+	int			error, err2;
 
 	if (!fstrim_ok(ctx))
 		return 0;
 
-	error = fstrim(ctx);
+	tctl.datadev_end_pos = cvt_off_fsb_to_b(&ctx->mnt,
+			ctx->mnt.fsgeom.datablocks);
+
+	error = -workqueue_create(&wq, (struct xfs_mount *)ctx,
+			disk_heads(ctx->datadev));
 	if (error) {
-		str_liberror(ctx, error, _("fstrim"));
+		str_liberror(ctx, error, _("creating fstrim workqueue"));
 		return error;
 	}
 
-	progress_add(1);
-	return 0;
+	/* Trim each AG in parallel. */
+	for (agno = 0;
+	     agno < ctx->mnt.fsgeom.agcount && !tctl.aborted;
+	     agno++) {
+		error = -workqueue_add(&wq, trim_ag, agno, &tctl);
+		if (error) {
+			str_liberror(ctx, error,
+					_("queueing per-AG fstrim work"));
+			goto out_wq;
+		}
+	}
+
+out_wq:
+	err2 = -workqueue_terminate(&wq);
+	if (err2) {
+		str_liberror(ctx, err2, _("finishing fstrim work"));
+		if (!error && err2)
+			error = err2;
+	}
+	workqueue_destroy(&wq);
+
+	if (!error && tctl.aborted)
+		return ECANCELED;
+	return error;
 }
 
 /* Estimate how much work we're going to do. */
@@ -76,9 +142,9 @@ phase8_estimate(
 	*items = 0;
 
 	if (fstrim_ok(ctx))
-		*items = 1;
+		*items = ctx->mnt.fsgeom.agcount;
 
-	*nr_threads = 1;
+	*nr_threads = disk_heads(ctx->datadev);
 	*rshift = 0;
 	return 0;
 }
