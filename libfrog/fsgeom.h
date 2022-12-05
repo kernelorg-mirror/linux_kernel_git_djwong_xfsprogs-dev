@@ -203,4 +203,25 @@ cvt_b_to_agbno(
 	return cvt_daddr_to_agbno(xfd, cvt_btobbt(byteno));
 }
 
+/* Convert rtgroup number and rtgroup block to fs block number */
+static inline uint64_t
+cvt_rgbno_to_daddr(
+	struct xfs_fd		*xfd,
+	uint32_t		rgno,
+	uint32_t		rgbno)
+{
+	return cvt_off_fsb_to_bb(xfd,
+			(uint64_t)rgno * xfd->fsgeom.rgblocks + rgbno);
+}
+
+/* Convert rtgroup number and rtgroup block to a byte location on disk. */
+static inline uint64_t
+cvt_rgbno_to_b(
+	struct xfs_fd		*xfd,
+	xfs_rgnumber_t		rgno,
+	xfs_rgblock_t		rgbno)
+{
+	return cvt_bbtob(cvt_rgbno_to_daddr(xfd, rgno, rgbno));
+}
+
 #endif /* __LIBFROG_FSGEOM_H__ */
