@@ -11,6 +11,7 @@
 #include "list.h"
 #include "libfrog/paths.h"
 #include "libfrog/workqueue.h"
+#include "libfrog/histogram.h"
 #include "xfs_scrub.h"
 #include "common.h"
 #include "progress.h"
@@ -57,10 +58,12 @@ static int
 fstrim_fsblocks(
 	struct scrub_ctx	*ctx,
 	uint64_t		start_fsb,
-	uint64_t		fsbcount)
+	uint64_t		fsbcount,
+	uint64_t		minlen_fsb)
 {
 	uint64_t		start = cvt_off_fsb_to_b(&ctx->mnt, start_fsb);
 	uint64_t		len = cvt_off_fsb_to_b(&ctx->mnt, fsbcount);
+	uint64_t		minlen = cvt_off_fsb_to_b(&ctx->mnt, minlen_fsb);
 	int			error;
 
 	while (len > 0) {
@@ -68,7 +71,7 @@ fstrim_fsblocks(
 
 		run = min(len, FSTRIM_MAX_BYTES);
 
-		error = fstrim(ctx, start, run);
+		error = fstrim(ctx, start, run, minlen);
 		if (error == EOPNOTSUPP) {
 			/* Pretend we finished all the work. */
 			progress_add(len);
@@ -93,6 +96,53 @@ fstrim_fsblocks(
 	return 0;
 }
 
+/* Compute a suitable minlen parameter for fstrim. */
+static uint64_t
+fstrim_compute_minlen(
+	const struct scrub_ctx	*ctx,
+	const struct histogram	*freesp_hist)
+{
+	struct histogram	cdf;
+	uint64_t		ret = 0;
+	double			blk_threshold = 0;
+	unsigned int		i;
+	int			error;
+
+	if (freesp_hist->totexts == 0)
+		goto out;
+
+	if (debug > 1)
+		hist_print(freesp_hist);
+
+	/* Insufficient samples to make a meaningful histogram */
+	if (freesp_hist->totexts < freesp_hist->nr_buckets * 10)
+		goto out;
+
+	hist_init(&cdf);
+	error = hist_cdf(freesp_hist, &cdf);
+	if (error)
+		goto out_free;
+
+	blk_threshold = freesp_hist->totblocks * ctx->fstrim_block_pct;
+	for (i = 1; i < freesp_hist->nr_buckets; i++) {
+		if (cdf.buckets[i].blocks < blk_threshold) {
+			ret = freesp_hist->buckets[i - 1].low;
+			break;
+		}
+	}
+
+out_free:
+	hist_free(&cdf);
+out:
+	if (ret == 1)
+		ret = 0;
+	if (debug > 1)
+		printf(_("fstrim minlen %lld threshold %lld\n"),
+				(unsigned long long)ret,
+				(unsigned long long)blk_threshold);
+	return ret;
+}
+
 /* Trim each AG on the data device. */
 static int
 fstrim_datadev(
@@ -100,7 +150,10 @@ fstrim_datadev(
 {
 	struct xfs_fsop_geom	*geo = &ctx->mnt.fsgeom;
 	uint64_t		fsbno;
+	uint64_t		minlen_fsb;
 	int			error;
+
+	minlen_fsb = fstrim_compute_minlen(ctx, &ctx->datadev_hist);
 
 	for (fsbno = 0; fsbno < geo->datablocks; fsbno += geo->agblocks) {
 		uint64_t	fsbcount;
@@ -112,7 +165,7 @@ fstrim_datadev(
 		 */
 		progress_add(geo->blocksize);
 		fsbcount = min(geo->datablocks - fsbno + 1, geo->agblocks);
-		error = fstrim_fsblocks(ctx, fsbno + 1, fsbcount);
+		error = fstrim_fsblocks(ctx, fsbno + 1, fsbcount, minlen_fsb);
 		if (error)
 			return error;
 	}
