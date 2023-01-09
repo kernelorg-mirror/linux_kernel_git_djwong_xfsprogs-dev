@@ -12,7 +12,7 @@ Documentation=man:xfs_scrub(8)
 Type=oneshot
 Environment=SERVICE_MODE=1
 Environment=SERVICE_MOUNTPOINT=/tmp/scrub
-ExecStart=@sbindir@/xfs_scrub @scrub_args@ %I
+ExecStart=@sbindir@/xfs_scrub @scrub_service_args@ @scrub_args@ %I
 SyslogIdentifier=%N
 
 # Run scrub with minimal CPU and IO priority so that nothing else will starve.
