@@ -23,7 +23,7 @@ RequiresMountsFor=%f
 Type=oneshot
 Environment=SERVICE_MODE=1
 Environment=SERVICE_MOUNTPOINT=/tmp/scrub
-ExecStart=@sbindir@/xfs_scrub @scrub_args@ %f
+ExecStart=@sbindir@/xfs_scrub @scrub_service_args@ @scrub_args@ %f
 SyslogIdentifier=%N
 
 # Run scrub with minimal CPU and IO priority so that nothing else will starve.
