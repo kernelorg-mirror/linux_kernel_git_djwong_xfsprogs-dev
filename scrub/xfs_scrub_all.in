@@ -15,6 +15,7 @@ import sys
 import os
 import argparse
 import signal
+import dbus
 from io import TextIOWrapper
 from pathlib import Path
 from datetime import timedelta
@@ -182,25 +183,55 @@ class scrub_service(scrub_control):
 			self.unitname = 'xfs_scrub_media@%s' % m
 		else:
 			self.unitname = 'xfs_scrub@%s' % m
+		self.prop = None
+		self.unit = None
+		self.bind()
+
+	def bind(self):
+		'''Bind to the dbus proxy object for this service.'''
+		sysbus = dbus.SystemBus()
+		systemd1 = sysbus.get_object('org.freedesktop.systemd1',
+					    '/org/freedesktop/systemd1')
+		manager = dbus.Interface(systemd1,
+				'org.freedesktop.systemd1.Manager')
+		path = manager.LoadUnit('%s.service' % self.unitname)
+
+		svc_obj = sysbus.get_object('org.freedesktop.systemd1', path)
+		self.prop = dbus.Interface(svc_obj,
+				'org.freedesktop.DBus.Properties')
+		self.unit = dbus.Interface(svc_obj,
+				'org.freedesktop.systemd1.Unit')
+
+	def state(self):
+		'''Retrieve the active state for a systemd service.  As of
+		systemd 249, this is supposed to be one of the following:
+		"active", "reloading", "inactive", "failed", "activating",
+		or "deactivating".  These strings are not localized.'''
+		while True:
+			try:
+				return self.prop.Get('org.freedesktop.systemd1.Unit', 'ActiveState')
+			except dbus.exceptions.DBusException:
+				time.sleep(0.5)
+				self.bind()
 
 	def wait(self, interval = 1):
 		'''Wait until the service finishes.'''
+		global debug
 
-		# As of systemd 249, the is-active command returns any of the
-		# following states: active, reloading, inactive, failed,
-		# activating, deactivating, or maintenance.  Apparently these
-		# strings are not localized.
-		while True:
-			try:
-				for l in backtick(['systemctl', 'is-active', self.unitname]):
-					if l == 'failed':
-						return 1
-					if l == 'inactive':
-						return 0
-			except:
-				return -1
-
+		# Use a poll/sleep loop to wait for the service to finish.
+		# Avoid adding a dependency on python3 glib, which is required
+		# to use an event loop to receive a dbus signal.
+		s = self.state()
+		while s not in ['failed', 'inactive']:
+			if debug:
+				print('waiting %s %s' % (self.unitname, s))
 			time.sleep(interval)
+			s = self.state()
+		if debug:
+			print('waited %s %s' % (self.unitname, s))
+		if s == 'failed':
+			return 1
+		return 0
 
 	def start(self):
 		'''Start the service and wait for it to complete.  Returns -1
@@ -208,38 +239,39 @@ class scrub_service(scrub_control):
 		failed.'''
 		global debug
 
-		cmd = ['systemctl', 'start', self.unitname]
-		try:
-			if debug:
-				print(' '.join(cmd))
-			proc = subprocess.Popen(cmd, stdout = DEVNULL())
-			proc.wait()
-			ret = proc.returncode
-		except:
-			return -1
-
-		if ret != 1:
-			return ret
-
-		# If systemctl-start returns 1, it's possible that the service
-		# failed or that dbus/systemd restarted and the client program
-		# lost its connection -- according to the systemctl man page, 1
-		# means "unit not failed".
+		while True:
+			try:
+				if debug:
+					print('starting %s' % self.unitname)
+				self.unit.Start('replace')
+				break
+			except dbus.exceptions.DBusException:
+				time.sleep(0.5)
+				self.bind()
 		return self.wait()
 
 	def stop(self):
 		'''Stop the service.'''
 		global debug
 
-		cmd = ['systemctl', 'stop', self.unitname]
-		if debug:
-			print(' '.join(cmd))
-		x = subprocess.Popen(cmd)
-		x.wait()
+		while True:
+			try:
+				if debug:
+					print('stopping %s' % self.unitname)
+				self.unit.Stop('replace')
+				break
+			except dbus.exceptions.DBusException:
+				time.sleep(0.5)
+				self.bind()
+		return self.wait()
 
 def run_service(mnt, scrub_media, killfuncs):
 	'''Run scrub as a service.'''
-	svc = scrub_service(mnt, scrub_media)
+	try:
+		svc = scrub_service(mnt, scrub_media)
+	except:
+		return -1
+
 	killfuncs.add(svc.stop)
 	retcode = svc.start()
 	remove_killfunc(killfuncs, svc.stop)
