@@ -47,7 +47,7 @@ pptr_print(
 	return 0;
 }
 
-int
+static int
 print_parents(
 	struct xfs_handle	*handle,
 	uint64_t		pino,
@@ -90,7 +90,7 @@ path_print(
 	return 0;
 }
 
-int
+static int
 print_paths(
 	struct xfs_handle	*handle,
 	uint64_t		pino,
