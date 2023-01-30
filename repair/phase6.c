@@ -18,6 +18,7 @@
 #include "dinode.h"
 #include "progress.h"
 #include "versions.h"
+#include "repair/pptr.h"
 
 static struct cred		zerocr;
 static struct fsxattr 		zerofsx;
@@ -71,6 +72,7 @@ struct dir_hash_ent {
 	struct dir_hash_ent	*nextbyorder;	/* next in order added */
 	xfs_dahash_t		hashval;	/* hash value of name */
 	uint32_t		address;	/* offset of data entry */
+	uint32_t		new_address;	/* new address, if we rebuild */
 	xfs_ino_t		inum;		/* inode num of entry */
 	short			junkit;		/* name starts with / */
 	short			seen;		/* have seen leaf entry */
@@ -228,6 +230,7 @@ dir_hash_add(
 	p->address = addr;
 	p->inum = inum;
 	p->seen = 0;
+	p->new_address = addr;
 
 	/* Set up the name in the region trailing the hash entry. */
 	memcpy(p->namebuf, name, namelen);
@@ -889,6 +892,7 @@ mk_orphanage(xfs_mount_t *mp)
 	int		error;
 	const int	mode = 0755;
 	int		nres;
+	xfs_dir2_dataptr_t	diroffset;
 	struct xfs_name	xname;
 
 	/*
@@ -973,11 +977,13 @@ mk_orphanage(xfs_mount_t *mp)
 	/*
 	 * create the actual entry
 	 */
-	error = -libxfs_dir_createname(tp, pip, &xname, ip->i_ino, nres, NULL);
+	error = -libxfs_dir_createname(tp, pip, &xname, ip->i_ino, nres,
+			&diroffset);
 	if (error)
 		do_error(
 		_("can't make %s, createname error %d\n"),
 			ORPHANAGE, error);
+	add_parent_ptr(ip->i_ino, ORPHANAGE, diroffset, pip);
 
 	/*
 	 * bump up the link count in the root directory to account
@@ -1022,6 +1028,7 @@ mv_orphanage(
 	int			nres;
 	int			incr;
 	ino_tree_node_t		*irec;
+	xfs_dir2_dataptr_t	diroffset;
 	int			ino_offset = 0;
 	struct xfs_name		xname;
 
@@ -1070,7 +1077,7 @@ mv_orphanage(
 			libxfs_trans_ijoin(tp, ino_p, 0);
 
 			err = -libxfs_dir_createname(tp, orphanage_ip, &xname,
-						ino, nres, NULL);
+						ino, nres, &diroffset);
 			if (err)
 				do_error(
 	_("name create failed in %s (%d)\n"), ORPHANAGE, err);
@@ -1104,7 +1111,7 @@ mv_orphanage(
 
 
 			err = -libxfs_dir_createname(tp, orphanage_ip, &xname,
-						ino, nres, NULL);
+						ino, nres, &diroffset);
 			if (err)
 				do_error(
 	_("name create failed in %s (%d)\n"), ORPHANAGE, err);
@@ -1151,7 +1158,7 @@ mv_orphanage(
 		libxfs_trans_ijoin(tp, ino_p, 0);
 
 		err = -libxfs_dir_createname(tp, orphanage_ip, &xname, ino,
-						nres, NULL);
+						nres, &diroffset);
 		if (err)
 			do_error(
 	_("name create failed in %s (%d)\n"), ORPHANAGE, err);
@@ -1164,6 +1171,11 @@ mv_orphanage(
 			do_error(
 	_("orphanage name create failed (%d)\n"), err);
 	}
+
+	if (xfs_has_parent(mp))
+		add_parent_ptr(ino_p->i_ino, xname.name, diroffset,
+				orphanage_ip);
+
 	libxfs_irele(ino_p);
 	libxfs_irele(orphanage_ip);
 }
@@ -1334,7 +1346,7 @@ longform_dir2_rebuild(
 		libxfs_trans_ijoin(tp, ip, 0);
 
 		error = -libxfs_dir_createname(tp, ip, &p->name, p->inum,
-						nres, NULL);
+						nres, &p->new_address);
 		if (error) {
 			do_warn(
 _("name create failed in ino %" PRIu64 " (%d)\n"), ino, error);
@@ -2463,6 +2475,7 @@ shortform_dir2_entry_check(
 	struct xfs_dir2_sf_entry *next_sfep;
 	struct xfs_ifork	*ifp;
 	struct ino_tree_node	*irec;
+	xfs_dir2_dataptr_t	diroffset;
 	int			max_size;
 	int			ino_offset;
 	int			i;
@@ -2641,8 +2654,9 @@ shortform_dir2_entry_check(
 		/*
 		 * check for duplicate names in directory.
 		 */
-		if (!dir_hash_add(mp, hashtab, (xfs_dir2_dataptr_t)
-				(sfep - xfs_dir2_sf_firstentry(sfp)),
+		diroffset = xfs_dir2_byte_to_dataptr(
+				xfs_dir2_sf_get_offset(sfep));
+		if (!dir_hash_add(mp, hashtab, diroffset,
 				lino, sfep->namelen, sfep->name,
 				libxfs_dir2_sf_get_ftype(mp, sfep))) {
 			do_warn(
@@ -2676,6 +2690,7 @@ _("entry \"%s\" (ino %" PRIu64 ") in dir %" PRIu64 " is a duplicate name"),
 				next_sfep = shortform_dir2_junk(mp, sfp, sfep,
 						lino, &max_size, &i,
 						&bytes_deleted, ino_dirty);
+				dir_hash_junkit(hashtab, diroffset);
 				continue;
 			} else if (parent == ino)  {
 				add_inode_reached(irec, ino_offset);
@@ -2700,6 +2715,7 @@ _("entry \"%s\" (ino %" PRIu64 ") in dir %" PRIu64 " is a duplicate name"),
 				next_sfep = shortform_dir2_junk(mp, sfp, sfep,
 						lino, &max_size, &i,
 						&bytes_deleted, ino_dirty);
+				dir_hash_junkit(hashtab, diroffset);
 				continue;
 			}
 		}
@@ -2788,6 +2804,26 @@ _("entry \"%s\" (ino %" PRIu64 ") in dir %" PRIu64 " is a duplicate name"),
 	_("setting size to %" PRId64 " bytes to reflect junked entries\n"),
 			ip->i_disk_size);
 		*ino_dirty = 1;
+	}
+}
+
+static void
+dir_hash_add_parent_ptrs(
+	struct xfs_inode	*dp,
+	struct dir_hash_tab	*hashtab)
+{
+	struct dir_hash_ent	*p;
+
+	if (!xfs_has_parent(dp->i_mount))
+		return;
+
+	for (p = hashtab->first; p; p = p->nextbyorder) {
+		if (p->name.name[0] == '/' || (p->name.name[0] == '.' &&
+				(p->name.len == 1 || (p->name.len == 2 &&
+						p->name.name[1] == '.'))))
+			continue;
+
+		add_parent_ptr(p->inum, p->name.name, p->new_address, dp);
 	}
 }
 
@@ -2917,6 +2953,7 @@ _("error %d fixing shortform directory %llu\n"),
 		default:
 			break;
 	}
+	dir_hash_add_parent_ptrs(ip, hashtab);
 	dir_hash_done(hashtab);
 
 	/*
@@ -3208,6 +3245,8 @@ phase6(xfs_mount_t *mp)
 	ino_tree_node_t		*irec;
 	int			i;
 
+	parent_ptr_init(mp);
+
 	memset(&zerocr, 0, sizeof(struct cred));
 	memset(&zerofsx, 0, sizeof(struct fsxattr));
 	orphanage_ino = 0;
@@ -3308,4 +3347,6 @@ _("        - resetting contents of realtime bitmap and summary inodes\n"));
 			irec = next_ino_rec(irec);
 		}
 	}
+
+	parent_ptr_free(mp);
 }
