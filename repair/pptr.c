@@ -6,8 +6,13 @@
 #include "libxfs.h"
 #include "libxfs/xfile.h"
 #include "libxfs/xfblob.h"
+#include "libfrog/workqueue.h"
+#include "repair/globals.h"
 #include "repair/err_protos.h"
 #include "repair/slab.h"
+#include "repair/listxattr.h"
+#include "repair/threads.h"
+#include "repair/incore.h"
 #include "repair/pptr.h"
 
 #undef PPTR_DEBUG
@@ -132,12 +137,94 @@ struct ag_pptrs {
 
 	/* Parent pointer records for files in this AG. */
 	struct xfs_slab		*pptr_recs;
+
+	/* File parent pointer scan data */
+
+	/* cursor for comparing pptr_recs against file_pptrs_recs */
+	struct xfs_slab_cursor	*pptr_recs_cur;
+
+	/* xfs_parent_name_rec records for a file that we're checking */
+	struct xfs_slab		*file_pptr_recs;
+
+	/* cursor for comparing file_pptr_recs against pptrs_recs */
+	struct xfs_slab_cursor	*file_pptr_recs_cur;
+
+	/* names associated with file_pptr_recs */
+	struct xfblob		*file_pptr_names;
+
+	/* Number of parent pointers recorded for this file. */
+	unsigned int		nr_file_pptrs;
+
+	/* Does this file have garbage xattrs with ATTR_PARENT set? */
+	bool			have_garbage;
+};
+
+struct file_pptr {
+	/* parent directory handle */
+	xfs_ino_t		parent_ino;
+	unsigned int		parent_gen;
+
+	/* dirent offset */
+	xfs_dir2_dataptr_t	diroffset;
+
+	/* name length */
+	unsigned int		namelen;
+
+	/* cookie for the file dirent name */
+	xfblob_cookie		name_cookie;
 };
 
 /* Global names storage file. */
 static struct xfblob	*names;
 static pthread_mutex_t	names_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct ag_pptrs	*pptrs;
+
+static int
+cmp_ag_pptr(
+	const void		*a,
+	const void		*b)
+{
+	const struct ag_pptr	*pa = a;
+	const struct ag_pptr	*pb = b;
+
+	if (pa->child_agino < pb->child_agino)
+		return -1;
+	if (pa->child_agino > pb->child_agino)
+		return 1;
+
+	if (pa->parent_ino < pb->parent_ino)
+		return -1;
+	if (pa->parent_ino > pb->parent_ino)
+		return 1;
+
+	if (pa->diroffset < pb->diroffset)
+		return -1;
+	if (pa->diroffset > pb->diroffset)
+		return 1;
+
+	return 0;
+}
+
+static int
+cmp_file_pptr(
+	const void		*a,
+	const void		*b)
+{
+	const struct file_pptr	*pa = a;
+	const struct file_pptr	*pb = b;
+
+	if (pa->parent_ino < pb->parent_ino)
+		return -1;
+	if (pa->parent_ino > pb->parent_ino)
+		return 1;
+
+	if (pa->diroffset < pb->diroffset)
+		return -1;
+	if (pa->diroffset > pb->diroffset)
+		return 1;
+
+	return 0;
+}
 
 void
 parent_ptr_free(
@@ -238,4 +325,528 @@ add_parent_ptr(
 			__func__, (unsigned long long)dp->i_ino, fname,
 			diroffset, (unsigned long long)ino,
 			(unsigned long long)pptr.name_cookie);
+}
+
+/* Schedule this extended attribute for deletion. */
+static void
+record_garbage_xattr(
+	struct xfs_inode	*ip,
+	struct ag_pptrs		*ag_pptrs,
+	unsigned int		attr_filter,
+	const void		*name,
+	unsigned int		namelen)
+{
+	if (ag_pptrs->have_garbage)
+		return;
+	ag_pptrs->have_garbage = true;
+
+	if (no_modify) {
+		do_warn(
+ _("would delete garbage parent pointer in ino %llu\n"),
+				(unsigned long long)ip->i_ino);
+		return;
+	}
+
+	do_warn(
+ _("deleting garbage parent pointer in ino %llu\n"),
+			(unsigned long long)ip->i_ino);
+	/* XXX do the work */
+}
+
+/* Decide if this is a directory parent pointer and stash it if so. */
+static int
+examine_xattr(
+	struct xfs_inode	*ip,
+	unsigned int		attr_flags,
+	const void		*name,
+	unsigned int		namelen,
+	const void		*value,
+	unsigned int		valuelen,
+	void			*priv)
+{
+	struct file_pptr	file_pptr = {
+		.namelen	= valuelen,
+	};
+	struct xfs_parent_name_irec irec;
+	struct xfs_mount	*mp = ip->i_mount;
+	struct ag_pptrs		*ag_pptrs = priv;
+	int			error;
+
+	/* Ignore anything that isn't a parent pointer. */
+	if (!(attr_flags & XFS_ATTR_PARENT))
+		return 0;
+
+	/* No incomplete parent pointers. */
+	if (attr_flags & XFS_ATTR_INCOMPLETE)
+		goto corrupt;
+
+	/* Only one namespace bit allowed. */
+	if ((attr_flags & ~XFS_ATTR_PARENT) & XFS_ATTR_NSP_ONDISK_MASK)
+		goto corrupt;
+
+	/* Does the ondisk parent pointer structure make sense? */
+	if (!xfs_attr_namecheck(mp, name, namelen, attr_flags))
+		goto corrupt;
+
+	/* Can't overflow our dirent name buffers. */
+	if (valuelen > MAXNAMELEN)
+		goto corrupt;
+
+	/* Parent pointers are never remote attrs. */
+	if (!value)
+		goto corrupt;
+
+	libxfs_init_parent_name_irec(&irec, name);
+
+	file_pptr.parent_ino = irec.p_ino;
+	file_pptr.parent_gen = irec.p_gen;
+	file_pptr.diroffset = irec.p_diroffset;
+
+	error = -xfblob_store(ag_pptrs->file_pptr_names,
+			&file_pptr.name_cookie, value, valuelen);
+	if (error)
+		do_error(
+ _("storing ino %llu parent pointer '%.*s' failed: %s\n"),
+				(unsigned long long)ip->i_ino, valuelen,
+				(const char *)value, strerror(error));
+
+	error = -slab_add(ag_pptrs->file_pptr_recs, &file_pptr);
+	if (error)
+		do_error(_("storing ino %llu parent pointer rec failed: %s\n"),
+				(unsigned long long)ip->i_ino, strerror(error));
+
+	dbg_printf(
+ _("%s: dp %llu fname '%.*s' namelen %u diroffset %u ino %llu cookie 0x%llx\n"),
+			__func__, (unsigned long long)irec.p_ino, valuelen,
+			(const char *)value, valuelen, irec.p_diroffset,
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)file_pptr.name_cookie);
+	ag_pptrs->nr_file_pptrs++;
+	return 0;
+corrupt:
+	record_garbage_xattr(ip, ag_pptrs, attr_flags, name, namelen);
+	return 0;
+}
+
+/* Remove all pptrs from @ip. */
+static void
+clear_all_pptrs(
+	struct xfs_inode	*ip)
+{
+	if (no_modify) {
+		do_warn(_("would delete unlinked ino %llu parent pointers\n"),
+				(unsigned long long)ip->i_ino);
+		return;
+	}
+
+	do_warn(_("deleting unlinked ino %llu parent pointers\n"),
+			(unsigned long long)ip->i_ino);
+	/* XXX actually do the work */
+}
+
+/* Add @ag_pptr to @ip. */
+static void
+add_missing_parent_ptr(
+	struct xfs_inode	*ip,
+	struct ag_pptrs		*ag_pptrs,
+	const struct ag_pptr	*ag_pptr)
+{
+	unsigned char		name[MAXNAMELEN];
+	int			error;
+
+	error = -xfblob_load(names, ag_pptr->name_cookie, name,
+			ag_pptr->namelen);
+	if (error)
+		do_error(
+ _("loading missing name for ino %llu parent pointer (ino %llu gen 0x%x diroffset %u namecookie 0x%llx) failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)ag_pptr->parent_ino,
+				ag_pptr->parent_gen, ag_pptr->diroffset,
+				(unsigned long long)ag_pptr->name_cookie,
+				strerror(error));
+
+	if (no_modify) {
+		do_warn(
+ _("would add missing ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)ag_pptr->parent_ino,
+				ag_pptr->parent_gen, ag_pptr->diroffset,
+				ag_pptr->namelen, name);
+		return;
+	}
+
+	do_warn(
+ _("adding missing ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)ag_pptr->parent_ino,
+			ag_pptr->parent_gen, ag_pptr->diroffset,
+			ag_pptr->namelen, name);
+
+	/* XXX actually do the work */
+}
+
+/* Remove @file_pptr from @ip. */
+static void
+remove_incorrect_parent_ptr(
+	struct xfs_inode	*ip,
+	struct ag_pptrs		*ag_pptrs,
+	const struct file_pptr	*file_pptr)
+{
+	unsigned char		name[MAXNAMELEN];
+	int			error;
+
+	error = -xfblob_load(ag_pptrs->file_pptr_names, file_pptr->name_cookie,
+			name, file_pptr->namelen);
+	if (error)
+		do_error(
+ _("loading incorrect name for ino %llu parent pointer (ino %llu gen 0x%x diroffset %u namecookie 0x%llx) failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)file_pptr->parent_ino,
+				file_pptr->parent_gen, file_pptr->diroffset,
+				(unsigned long long)file_pptr->name_cookie,
+				strerror(error));
+
+	if (no_modify) {
+		do_warn(
+ _("would remove bad ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)file_pptr->parent_ino,
+				file_pptr->parent_gen, file_pptr->diroffset,
+				file_pptr->namelen, name);
+		return;
+	}
+
+	do_warn(
+ _("removing bad ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)file_pptr->parent_ino,
+			file_pptr->parent_gen, file_pptr->diroffset,
+			file_pptr->namelen, name);
+
+	/* XXX actually do the work */
+}
+
+/*
+ * We found parent pointers that point to the same inode and directory offset.
+ * Make sure they have the same generation number and dirent name.
+ */
+static void
+compare_parent_pointers(
+	struct xfs_inode	*ip,
+	struct ag_pptrs		*ag_pptrs,
+	const struct ag_pptr	*ag_pptr,
+	const struct file_pptr	*file_pptr)
+{
+	unsigned char		name1[MAXNAMELEN];
+	unsigned char		name2[MAXNAMELEN];
+	int			error;
+
+	if (ag_pptr->parent_gen != file_pptr->parent_gen)
+		goto reset;
+	if (ag_pptr->namelen != file_pptr->namelen)
+		goto reset;
+
+	error = -xfblob_load(names, ag_pptr->name_cookie, name1,
+			ag_pptr->namelen);
+	if (error)
+		do_error(
+ _("loading master-list name for ino %llu parent pointer (ino %llu gen 0x%x diroffset %u namecookie 0x%llx namelen %u) failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)ag_pptr->parent_ino,
+				ag_pptr->parent_gen, ag_pptr->diroffset,
+				(unsigned long long)ag_pptr->name_cookie,
+				ag_pptr->namelen, strerror(error));
+
+	error = -xfblob_load(ag_pptrs->file_pptr_names, file_pptr->name_cookie,
+			name2, file_pptr->namelen);
+	if (error)
+		do_error(
+ _("loading file-list name for ino %llu parent pointer (ino %llu gen 0x%x diroffset %u namecookie 0x%llx namelen %u) failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)file_pptr->parent_ino,
+				file_pptr->parent_gen, file_pptr->diroffset,
+				(unsigned long long)file_pptr->name_cookie,
+				ag_pptr->namelen, strerror(error));
+
+	if (!memcmp(name1, name2, ag_pptr->namelen))
+		return;
+
+reset:
+	if (no_modify) {
+		do_warn(
+ _("would update ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)ag_pptr->parent_ino,
+				ag_pptr->parent_gen, ag_pptr->diroffset,
+				ag_pptr->namelen, name1);
+		return;
+	}
+
+	do_warn(
+ _("updating ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)ag_pptr->parent_ino,
+			ag_pptr->parent_gen, ag_pptr->diroffset,
+			ag_pptr->namelen, name1);
+
+	/* XXX do the work */
+}
+
+/*
+ * Make sure that the parent pointers we observed match the ones ondisk.
+ *
+ * Earlier, we generated a master list of parent pointers for files in this AG
+ * based on what we saw during the directory walk at the start of phase 6.
+ * Now that we've read in all of this file's parent pointers, make sure the
+ * lists match.
+ */
+static void
+crosscheck_file_parent_ptrs(
+	struct xfs_inode	*ip,
+	struct ag_pptrs		*ag_pptrs)
+{
+	struct ag_pptr		*ag_pptr;
+	struct file_pptr	*file_pptr;
+	struct xfs_mount	*mp = ip->i_mount;
+	xfs_agino_t		agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
+	int			error;
+
+	ag_pptr = peek_slab_cursor(ag_pptrs->pptr_recs_cur);
+
+	if (!ag_pptr || ag_pptr->child_agino > agino) {
+		/*
+		 * The cursor for the master pptr list has gone beyond this
+		 * file that we're scanning.  Evidently it has no parents at
+		 * all, so we better not have found any pptrs attached to the
+		 * file.
+		 */
+		if (ag_pptrs->nr_file_pptrs > 0)
+			clear_all_pptrs(ip);
+
+		return;
+	}
+
+	if (ag_pptr->child_agino < agino) {
+		/*
+		 * The cursor for the master pptr list is behind the file that
+		 * we're scanning.  This suggests that the incore inode tree
+		 * doesn't know about a file that is mentioned by a dirent.
+		 * At this point the inode liveness is supposed to be settled,
+		 * which means our incore information is inconsistent.
+		 */
+		do_error(
+ _("found dirent referring to ino %llu even though inobt scan moved on to ino %llu?!\n"),
+				(unsigned long long)XFS_AGINO_TO_INO(mp,
+					XFS_INO_TO_AGNO(mp, ip->i_ino),
+					ag_pptr->child_agino),
+				(unsigned long long)ip->i_ino);
+		/* does not return */
+	}
+
+	/*
+	 * The master pptr list cursor is pointing to the inode that we want
+	 * to check.  Sort the pptr records that we recorded from the ondisk
+	 * pptrs for this file, then set up for the comparison.
+	 */
+	qsort_slab(ag_pptrs->file_pptr_recs, cmp_file_pptr);
+
+	error = -init_slab_cursor(ag_pptrs->file_pptr_recs, cmp_file_pptr,
+			&ag_pptrs->file_pptr_recs_cur);
+	if (error)
+		do_error(_("init ino %llu parent pointer cursor failed: %s\n"),
+				(unsigned long long)ip->i_ino, strerror(error));
+
+	do {
+		file_pptr = peek_slab_cursor(ag_pptrs->file_pptr_recs_cur);
+
+		dbg_printf(
+ _("%s: dp %llu dp_gen 0x%x namelen %u diroffset %u ino %llu namecookie 0x%llx (master)\n"),
+				__func__,
+				(unsigned long long)ag_pptr->parent_ino,
+				ag_pptr->parent_gen,
+				ag_pptr->namelen,
+				ag_pptr->diroffset,
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)ag_pptr->name_cookie);
+
+		if (file_pptr) {
+			dbg_printf(
+ _("%s: dp %llu dp_gen 0x%x namelen %u diroffset %u ino %llu namecookie 0x%llx (file)\n"),
+					__func__,
+					(unsigned long long)file_pptr->parent_ino,
+					file_pptr->parent_gen,
+					file_pptr->namelen,
+					file_pptr->diroffset,
+					(unsigned long long)ip->i_ino,
+					(unsigned long long)file_pptr->name_cookie);
+		} else {
+			dbg_printf(
+ _("%s: ran out of parent pointers for ino %llu (file)\n"),
+					__func__,
+					(unsigned long long)ip->i_ino);
+		}
+
+		if (!file_pptr ||
+		    file_pptr->parent_ino > ag_pptr->parent_ino ||
+		    file_pptr->diroffset > ag_pptr->diroffset) {
+			/*
+			 * The master pptr list knows about pptrs that are not
+			 * in the ondisk metadata.  Add the missing pptr and
+			 * advance only the master pptr cursor.
+			 */
+			add_missing_parent_ptr(ip, ag_pptrs, ag_pptr);
+			advance_slab_cursor(ag_pptrs->pptr_recs_cur);
+		} else if (file_pptr->parent_ino < ag_pptr->parent_ino ||
+			   file_pptr->diroffset < ag_pptr->diroffset) {
+			/*
+			 * The ondisk pptrs mention a link that is not in the
+			 * master list.  Delete the extra pptr and advance only
+			 * the file pptr cursor.
+			 */
+			remove_incorrect_parent_ptr(ip, ag_pptrs, file_pptr);
+			advance_slab_cursor(ag_pptrs->file_pptr_recs_cur);
+		} else {
+			/*
+			 * Exact match, make sure the parent_gen and dirent
+			 * name parts of the parent pointer match.  Move both
+			 * cursors forward.
+			 */
+			compare_parent_pointers(ip, ag_pptrs, ag_pptr,
+					file_pptr);
+			advance_slab_cursor(ag_pptrs->pptr_recs_cur);
+			advance_slab_cursor(ag_pptrs->file_pptr_recs_cur);
+		}
+
+		ag_pptr = peek_slab_cursor(ag_pptrs->pptr_recs_cur);
+	} while (ag_pptr && ag_pptr->child_agino == agino);
+
+	while ((file_pptr = pop_slab_cursor(ag_pptrs->file_pptr_recs_cur))) {
+		dbg_printf(
+ _("%s: dp %llu dp_gen 0x%x namelen %u diroffset %u ino %llu namecookie 0x%llx (excess)\n"),
+				__func__,
+				(unsigned long long)file_pptr->parent_ino,
+				file_pptr->parent_gen,
+				file_pptr->namelen,
+				file_pptr->diroffset,
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)file_pptr->name_cookie);
+
+		/*
+		 * The master pptr list does not have any more pptrs for this
+		 * file, but we still have unprocessed ondisk pptrs.  Delete
+		 * all these ondisk pptrs.
+		 */
+		remove_incorrect_parent_ptr(ip, ag_pptrs, file_pptr);
+	}
+}
+
+/* Ensure this file's parent pointers match what we found in the dirent scan. */
+static void
+check_file_parent_ptrs(
+	struct xfs_inode	*ip,
+	struct ag_pptrs		*ag_pptrs)
+{
+	int			error;
+
+	error = -init_slab(&ag_pptrs->file_pptr_recs, sizeof(struct file_pptr));
+	if (error)
+		do_error(_("init file parent pointer recs failed: %s\n"),
+				strerror(error));
+
+	ag_pptrs->have_garbage = false;
+	ag_pptrs->nr_file_pptrs = 0;
+
+	error = listxattr(ip, examine_xattr, ag_pptrs);
+	if (error)
+		do_error(_("ino %llu listxattr failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				strerror(error));
+
+	crosscheck_file_parent_ptrs(ip, ag_pptrs);
+
+	free_slab(&ag_pptrs->file_pptr_recs);
+
+	xfblob_truncate(ag_pptrs->file_pptr_names);
+}
+
+/* Check all the parent pointers of files in this AG. */
+static void
+check_ag_parent_ptrs(
+	struct workqueue	*wq,
+	uint32_t		agno,
+	void			*arg)
+{
+	struct xfs_mount	*mp = wq->wq_ctx;
+	struct ag_pptrs		*ag_pptrs = &pptrs[agno];
+	struct ino_tree_node	*irec;
+	int			error;
+
+	qsort_slab(ag_pptrs->pptr_recs, cmp_ag_pptr);
+
+	error = -init_slab_cursor(ag_pptrs->pptr_recs, cmp_ag_pptr,
+			&ag_pptrs->pptr_recs_cur);
+	if (error)
+		do_error(
+ _("init agno %u parent pointer slab cursor failed: %s\n"),
+				agno, strerror(error));
+
+	error = -xfblob_create(mp, "file parent pointer names",
+			&ag_pptrs->file_pptr_names);
+	if (error)
+		do_error(
+ _("init agno %u file parent pointer names failed: %s\n"),
+				agno, strerror(error));
+
+	for (irec = findfirst_inode_rec(agno);
+	     irec != NULL;
+	     irec = next_ino_rec(irec)) {
+		unsigned int	ino_offset;
+
+		for (ino_offset = 0;
+		     ino_offset < XFS_INODES_PER_CHUNK;
+		     ino_offset++) {
+			struct xfs_inode *ip;
+			xfs_ino_t	ino;
+
+			if (is_inode_free(irec, ino_offset))
+				continue;
+
+			ino = XFS_AGINO_TO_INO(mp, agno,
+					irec->ino_startnum + ino_offset);
+			error = -libxfs_iget(mp, NULL, ino, 0, &ip);
+			if (error)
+				do_error(
+ _("loading ino %llu for parent pointer check failed: %s\n"),
+						(unsigned long long)ino,
+						strerror(error));
+
+			check_file_parent_ptrs(ip, ag_pptrs);
+
+			libxfs_irele(ip);
+		}
+	}
+
+	xfblob_destroy(ag_pptrs->file_pptr_names);
+	ag_pptrs->file_pptr_names = NULL;
+
+	free_slab_cursor(&ag_pptrs->pptr_recs_cur);
+}
+
+/* Check all the parent pointers of all files in this filesystem. */
+void
+check_parent_ptrs(
+	struct xfs_mount	*mp)
+{
+	struct workqueue	wq;
+	xfs_agnumber_t		agno;
+
+	if (!xfs_has_parent(mp))
+		return;
+
+	create_work_queue(&wq, mp, ag_stride);
+
+	for (agno = 0; agno < mp->m_sb.sb_agcount; agno++)
+		queue_work(&wq, check_ag_parent_ptrs, agno, NULL);
+
+	destroy_work_queue(&wq);
 }
