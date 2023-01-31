@@ -336,6 +336,30 @@ newdirent(
 }
 
 static void
+newpptr(
+	struct xfs_inode	*ip,
+	struct xfs_inode	*dp,
+	xfs_dir2_dataptr_t	diroffset,
+	struct xfs_name		*xname)
+{
+	struct xfs_parent_name_rec      rec = { };
+	struct xfs_da_args		args = {
+		.dp = ip,
+		.name = (const unsigned char *)&rec,
+		.namelen = sizeof(rec),
+		.attr_filter = XFS_ATTR_PARENT,
+		.value = (void *)xname->name,
+		.valuelen = xname->len,
+	};
+	int			error;
+
+	libxfs_init_parent_name_rec(&rec, dp, diroffset);
+	error = -libxfs_attr_set(&args);
+	if (error)
+		fail(_("Error creating parent pointer"), error);
+}
+
+static void
 newdirectory(
 	xfs_mount_t	*mp,
 	xfs_trans_t	*tp,
@@ -575,6 +599,10 @@ parseproto(
 		error = -libxfs_trans_commit(tp);
 		if (error)
 			fail(_("Directory inode allocation failed."), error);
+
+		if (xfs_has_parent(mp) && !isroot)
+			newpptr(ip, pip, offset, &xname);
+
 		/*
 		 * RT initialization.  Do this here to ensure that
 		 * the RT inodes get placed after the root inode.
@@ -603,21 +631,8 @@ parseproto(
 			error);
 	}
 
-	if (xfs_has_parent(mp)) {
-		struct xfs_parent_name_rec      rec;
-		struct xfs_da_args		args = {
-			.dp = ip,
-			.name = (const unsigned char *)&rec,
-			.namelen = sizeof(rec),
-			.attr_filter = XFS_ATTR_PARENT,
-			.value = (void *)xname.name,
-			.valuelen = xname.len,
-		};
-		libxfs_init_parent_name_rec(&rec, pip, offset);
-		error = -libxfs_attr_set(&args);
-		if (error)
-			fail(_("Error creating parent pointer"), error);
-	}
+	if (xfs_has_parent(mp))
+		newpptr(ip, pip, offset, &xname);
 
 	libxfs_irele(ip);
 }
