@@ -12,6 +12,7 @@
 #include "xfs_scrub.h"
 #include "common.h"
 #include "progress.h"
+#include "libfrog/pptrs.h"
 
 extern char		*progname;
 
@@ -406,6 +407,26 @@ scrub_render_ino_descr(
 	uint32_t		agno;
 	uint32_t		agino;
 	int			ret;
+
+	if (ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_PARENT) {
+		struct xfs_handle handle;
+
+		memcpy(&handle.ha_fsid, ctx->fshandle, sizeof(handle.ha_fsid));
+		handle.ha_fid.fid_len = sizeof(xfs_fid_t) -
+				sizeof(handle.ha_fid.fid_len);
+		handle.ha_fid.fid_pad = 0;
+		handle.ha_fid.fid_ino = ino;
+		handle.ha_fid.fid_gen = gen;
+
+		ret = handle_to_path(&handle, sizeof(struct xfs_handle), buf,
+				buflen);
+		/*
+		 * If successful, return any positive integer to use the
+		 * formatted error string.
+		 */
+		if (ret == 0)
+			return 1;
+	}
 
 	agno = cvt_ino_to_agno(&ctx->mnt, ino);
 	agino = cvt_ino_to_agino(&ctx->mnt, ino);
