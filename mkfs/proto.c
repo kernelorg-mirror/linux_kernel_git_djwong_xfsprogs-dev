@@ -508,8 +508,8 @@ parseproto(
 		newdirent(mp, tp, pip, &xname, ip->i_ino, &offset);
 		libxfs_trans_log_inode(tp, ip, flags);
 		if (parent) {
-			error = -libxfs_parent_defer_add(tp, parent, pip,
-					&xname, offset, ip);
+			error = -libxfs_parent_add(tp, parent, pip, &xname,
+					offset, ip);
 			if (error)
 				fail(_("committing parent pointers failed."),
 						error);
@@ -601,8 +601,8 @@ parseproto(
 		newdirectory(mp, tp, ip, pip);
 		libxfs_trans_log_inode(tp, ip, flags);
 		if (parent) {
-			error = -libxfs_parent_defer_add(tp, parent, pip,
-					&xname, offset, ip);
+			error = -libxfs_parent_add(tp, parent, pip, &xname,
+					offset, ip);
 			if (error)
 				fail(_("committing parent pointers failed."),
 						error);
@@ -636,8 +636,8 @@ parseproto(
 	}
 	libxfs_trans_log_inode(tp, ip, flags);
 	if (parent) {
-		error = -libxfs_parent_defer_add(tp, parent, pip, &xname,
-				offset, ip);
+		error = -libxfs_parent_add(tp, parent, pip, &xname, offset,
+				ip);
 		if (error)
 			fail(_("committing parent pointers failed."), error);
 	}
