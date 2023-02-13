@@ -367,7 +367,6 @@ int main() {
 			p = xfs_ppinfo_to_pp(pi, i);
 			printf("inode		= %llu\\n", (unsigned long long)p->xpp_ino);
 			printf("generation	= %u\\n", (unsigned int)p->xpp_gen);
-			printf("diroffset	= %u\\n", (unsigned int)p->xpp_diroffset);
 			printf("name		= \\"%s\\"\\n\\n", (char *)p->xpp_name);
 		}
 	} while (!pi->pi_flags & XFS_PPTR_OFLAG_DONE);

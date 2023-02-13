@@ -119,9 +119,6 @@ struct ag_pptr {
 	xfs_ino_t		parent_ino;
 	unsigned int		parent_gen;
 
-	/* dirent offset */
-	xfs_dir2_dataptr_t	diroffset;
-
 	/* dirent name length */
 	unsigned int		namelen;
 
@@ -139,9 +136,6 @@ struct file_pptr {
 	/* parent directory handle */
 	unsigned long long	parent_ino:63;
 	unsigned int		parent_gen;
-
-	/* dirent offset */
-	xfs_dir2_dataptr_t	diroffset;
 
 	/* parent pointer name length */
 	unsigned int		namelen;
@@ -220,9 +214,9 @@ cmp_ag_pptr(
 	if (pa->parent_ino > pb->parent_ino)
 		return 1;
 
-	if (pa->diroffset < pb->diroffset)
+	if (pa->name_cookie < pb->name_cookie)
 		return -1;
-	if (pa->diroffset > pb->diroffset)
+	if (pa->name_cookie > pb->name_cookie)
 		return 1;
 
 	return 0;
@@ -241,9 +235,18 @@ cmp_file_pptr(
 	if (pa->parent_ino > pb->parent_ino)
 		return 1;
 
-	if (pa->diroffset < pb->diroffset)
+	/*
+	 * Push the parent pointer names that we didn't find in the dirent scan
+	 * towards the front of the list so that we delete them first.
+	 */
+	if (!pa->name_in_nameblobs && pb->name_in_nameblobs)
 		return -1;
-	if (pa->diroffset > pb->diroffset)
+	if (pa->name_in_nameblobs && !pb->name_in_nameblobs)
+		return 1;
+
+	if (pa->name_cookie < pb->name_cookie)
+		return -1;
+	if (pa->name_cookie > pb->name_cookie)
 		return 1;
 
 	return 0;
@@ -308,12 +311,11 @@ parent_ptr_init(
 	}
 }
 
-/* Remember that @dp has a dirent (@fname, @ino) at @diroffset. */
+/* Remember that @dp has a dirent (@fname, @ino). */
 void
 add_parent_ptr(
 	xfs_ino_t		ino,
 	const unsigned char	*fname,
-	xfs_dir2_dataptr_t	diroffset,
 	struct xfs_inode	*dp)
 {
 	struct xfs_mount	*mp = dp->i_mount;
@@ -321,7 +323,6 @@ add_parent_ptr(
 		.child_agino	= XFS_INO_TO_AGINO(mp, ino),
 		.parent_ino	= dp->i_ino,
 		.parent_gen	= VFS_I(dp)->i_generation,
-		.diroffset	= diroffset,
 		.namelen	= strlen(fname),
 	};
 	struct ag_pptrs		*ag_pptrs;
@@ -348,9 +349,9 @@ add_parent_ptr(
 				fname, strerror(error));
 
 	dbg_printf(
- _("%s: dp %llu fname '%s' diroffset %u ino %llu cookie 0x%llx\n"),
+ _("%s: dp %llu fname '%s' ino %llu cookie 0x%llx\n"),
 			__func__, (unsigned long long)dp->i_ino, fname,
-			diroffset, (unsigned long long)ino,
+			(unsigned long long)ino,
 			(unsigned long long)ag_pptr.name_cookie);
 }
 
@@ -509,6 +510,8 @@ examine_xattr(
 {
 	struct file_pptr	file_pptr = { };
 	struct xfs_parent_name_irec irec;
+	struct xfs_name		xname;
+	uint8_t			namehash[XFS_PARENT_NAME_HASH_SIZE];
 	struct xfs_mount	*mp = ip->i_mount;
 	struct file_scan	*fscan = priv;
 	const struct xfs_parent_name_rec *rec = (const void *)name;
@@ -531,8 +534,22 @@ examine_xattr(
 
 	file_pptr.parent_ino = irec.p_ino;
 	file_pptr.parent_gen = irec.p_gen;
-	file_pptr.diroffset = irec.p_diroffset;
 	file_pptr.namelen = irec.p_namelen;
+
+	xname.name = irec.p_name;
+	xname.len = irec.p_namelen;
+
+	/*
+	 * Does the namehash in the attr key match the name in the attr value?
+	 * If not, there's no point in checking further.
+	 */
+	error = -libxfs_parent_namehash(ip, &xname, namehash,
+			sizeof(namehash));
+	if (error)
+		goto corrupt;
+
+	if (memcmp(irec.p_namehash, namehash, sizeof(irec.p_namehash)))
+		goto corrupt;
 
 	error = store_file_pptr_name(fscan, &file_pptr, &irec);
 	if (error)
@@ -547,10 +564,10 @@ examine_xattr(
 				(unsigned long long)ip->i_ino, strerror(error));
 
 	dbg_printf(
- _("%s: dp %llu fname '%.*s' namelen %u diroffset %u ino %llu cookie 0x%llx\n"),
+ _("%s: dp %llu fname '%.*s' namelen %u ino %llu cookie 0x%llx\n"),
 			__func__, (unsigned long long)irec.p_ino,
 			irec.p_namelen, (const char *)irec.p_name,
-			irec.p_namelen, irec.p_diroffset,
+			irec.p_namelen,
 			(unsigned long long)ip->i_ino,
 			(unsigned long long)file_pptr.name_cookie);
 	fscan->nr_file_pptrs++;
@@ -570,12 +587,16 @@ add_file_pptr(
 	struct xfs_parent_name_irec	pptr_rec = {
 		.p_ino			= ag_pptr->parent_ino,
 		.p_gen			= ag_pptr->parent_gen,
-		.p_diroffset		= ag_pptr->diroffset,
 		.p_namelen		= ag_pptr->namelen,
 	};
 	struct xfs_parent_scratch	scratch;
+	int				error;
 
 	memcpy(pptr_rec.p_name, name, ag_pptr->namelen);
+
+	error = -libxfs_parent_irec_hash(ip, &pptr_rec);
+	if (error)
+		return error;
 
 	return -libxfs_parent_set(ip, &pptr_rec, &scratch);
 }
@@ -584,14 +605,22 @@ add_file_pptr(
 static int
 remove_file_pptr(
 	struct xfs_inode		*ip,
-	const struct file_pptr		*file_pptr)
+	const struct file_pptr		*file_pptr,
+	const unsigned char		*name)
 {
 	struct xfs_parent_name_irec	pptr_rec = {
 		.p_ino			= file_pptr->parent_ino,
 		.p_gen			= file_pptr->parent_gen,
-		.p_diroffset		= file_pptr->diroffset,
+		.p_namelen		= file_pptr->namelen,
 	};
 	struct xfs_parent_scratch	scratch;
+	int				error;
+
+	memcpy(pptr_rec.p_name, name, file_pptr->namelen);
+
+	error = -libxfs_parent_irec_hash(ip, &pptr_rec);
+	if (error)
+		return error;
 
 	return -libxfs_parent_unset(ip, &pptr_rec, &scratch);
 }
@@ -637,13 +666,25 @@ clear_all_pptrs(
 				strerror(error));
 
 	while ((file_pptr = pop_slab_cursor(cur)) != NULL) {
-		error = remove_file_pptr(ip, file_pptr);
+		unsigned char	name[MAXNAMELEN];
+
+		error = load_file_pptr_name(fscan, file_pptr, name);
 		if (error)
 			do_error(
- _("wiping ino %llu pptr (ino %llu gen 0x%x diroffset %u) failed: %s\n"),
+  _("loading incorrect name for ino %llu parent pointer (ino %llu gen 0x%x namecookie 0x%llx) failed: %s\n"),
+					(unsigned long long)ip->i_ino,
+					(unsigned long long)file_pptr->parent_ino,
+					file_pptr->parent_gen,
+					(unsigned long long)file_pptr->name_cookie,
+					strerror(error));
+
+		error = remove_file_pptr(ip, file_pptr, name);
+		if (error)
+			do_error(
+ _("wiping ino %llu pptr (ino %llu gen 0x%x) failed: %s\n"),
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)file_pptr->parent_ino,
-				file_pptr->parent_gen, file_pptr->diroffset,
+				file_pptr->parent_gen,
 				strerror(error));
 	}
 
@@ -664,37 +705,37 @@ add_missing_parent_ptr(
 			ag_pptr->namelen);
 	if (error)
 		do_error(
- _("loading missing name for ino %llu parent pointer (ino %llu gen 0x%x diroffset %u namecookie 0x%llx) failed: %s\n"),
+ _("loading missing name for ino %llu parent pointer (ino %llu gen 0x%x namecookie 0x%llx) failed: %s\n"),
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)ag_pptr->parent_ino,
-				ag_pptr->parent_gen, ag_pptr->diroffset,
+				ag_pptr->parent_gen,
 				(unsigned long long)ag_pptr->name_cookie,
 				strerror(error));
 
 	if (no_modify) {
 		do_warn(
- _("would add missing ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+ _("would add missing ino %llu parent pointer (ino %llu gen 0x%x name '%.*s')\n"),
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)ag_pptr->parent_ino,
-				ag_pptr->parent_gen, ag_pptr->diroffset,
+				ag_pptr->parent_gen,
 				ag_pptr->namelen, name);
 		return;
 	}
 
 	do_warn(
- _("adding missing ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+ _("adding missing ino %llu parent pointer (ino %llu gen 0x%x name '%.*s')\n"),
 			(unsigned long long)ip->i_ino,
 			(unsigned long long)ag_pptr->parent_ino,
-			ag_pptr->parent_gen, ag_pptr->diroffset,
+			ag_pptr->parent_gen,
 			ag_pptr->namelen, name);
 
 	error = add_file_pptr(ip, ag_pptr, name);
 	if (error)
 		do_error(
- _("adding ino %llu pptr (ino %llu gen 0x%x diroffset %u name '%.*s') failed: %s\n"),
+ _("adding ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
 			(unsigned long long)ip->i_ino,
 			(unsigned long long)ag_pptr->parent_ino,
-			ag_pptr->parent_gen, ag_pptr->diroffset,
+			ag_pptr->parent_gen,
 			ag_pptr->namelen, name, strerror(error));
 }
 
@@ -711,37 +752,37 @@ remove_incorrect_parent_ptr(
 	error = load_file_pptr_name(fscan, file_pptr, name);
 	if (error)
 		do_error(
- _("loading incorrect name for ino %llu parent pointer (ino %llu gen 0x%x diroffset %u namecookie 0x%llx) failed: %s\n"),
+ _("loading incorrect name for ino %llu parent pointer (ino %llu gen 0x%x namecookie 0x%llx) failed: %s\n"),
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)file_pptr->parent_ino,
-				file_pptr->parent_gen, file_pptr->diroffset,
+				file_pptr->parent_gen,
 				(unsigned long long)file_pptr->name_cookie,
 				strerror(error));
 
 	if (no_modify) {
 		do_warn(
- _("would remove bad ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+ _("would remove bad ino %llu parent pointer (ino %llu gen 0x%x name '%.*s')\n"),
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)file_pptr->parent_ino,
-				file_pptr->parent_gen, file_pptr->diroffset,
+				file_pptr->parent_gen,
 				file_pptr->namelen, name);
 		return;
 	}
 
 	do_warn(
- _("removing bad ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+ _("removing bad ino %llu parent pointer (ino %llu gen 0x%x name '%.*s')\n"),
 			(unsigned long long)ip->i_ino,
 			(unsigned long long)file_pptr->parent_ino,
-			file_pptr->parent_gen, file_pptr->diroffset,
+			file_pptr->parent_gen,
 			file_pptr->namelen, name);
 
-	error = remove_file_pptr(ip, file_pptr);
+	error = remove_file_pptr(ip, file_pptr, name);
 	if (error)
 		do_error(
- _("removing ino %llu pptr (ino %llu gen 0x%x diroffset %u name '%.*s') failed: %s\n"),
+ _("removing ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
 			(unsigned long long)ip->i_ino,
 			(unsigned long long)file_pptr->parent_ino,
-			file_pptr->parent_gen, file_pptr->diroffset,
+			file_pptr->parent_gen,
 			file_pptr->namelen, name, strerror(error));
 }
 
@@ -764,20 +805,20 @@ compare_parent_pointers(
 			ag_pptr->namelen);
 	if (error)
 		do_error(
- _("loading master-list name for ino %llu parent pointer (ino %llu gen 0x%x diroffset %u namecookie 0x%llx namelen %u) failed: %s\n"),
+ _("loading master-list name for ino %llu parent pointer (ino %llu gen 0x%x  namecookie 0x%llx namelen %u) failed: %s\n"),
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)ag_pptr->parent_ino,
-				ag_pptr->parent_gen, ag_pptr->diroffset,
+				ag_pptr->parent_gen,
 				(unsigned long long)ag_pptr->name_cookie,
 				ag_pptr->namelen, strerror(error));
 
 	error = load_file_pptr_name(fscan, file_pptr, name2);
 	if (error)
 		do_error(
- _("loading file-list name for ino %llu parent pointer (ino %llu gen 0x%x diroffset %u namecookie 0x%llx namelen %u) failed: %s\n"),
+ _("loading file-list name for ino %llu parent pointer (ino %llu gen 0x%x namecookie 0x%llx namelen %u) failed: %s\n"),
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)file_pptr->parent_ino,
-				file_pptr->parent_gen, file_pptr->diroffset,
+				file_pptr->parent_gen,
 				(unsigned long long)file_pptr->name_cookie,
 				ag_pptr->namelen, strerror(error));
 
@@ -793,40 +834,65 @@ compare_parent_pointers(
 reset:
 	if (no_modify) {
 		do_warn(
- _("would update ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+ _("would update ino %llu parent pointer (ino %llu gen 0x%x name '%.*s')\n"),
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)ag_pptr->parent_ino,
-				ag_pptr->parent_gen, ag_pptr->diroffset,
+				ag_pptr->parent_gen,
 				ag_pptr->namelen, name1);
 		return;
 	}
 
 	do_warn(
- _("updating ino %llu parent pointer (ino %llu gen 0x%x diroffset %u name '%.*s')\n"),
+ _("updating ino %llu parent pointer (ino %llu gen 0x%x name '%.*s')\n"),
 			(unsigned long long)ip->i_ino,
 			(unsigned long long)ag_pptr->parent_ino,
-			ag_pptr->parent_gen, ag_pptr->diroffset,
+			ag_pptr->parent_gen,
 			ag_pptr->namelen, name1);
 
 	if (ag_pptr->parent_gen != file_pptr->parent_gen) {
-		error = remove_file_pptr(ip, file_pptr);
+		error = remove_file_pptr(ip, file_pptr, name2);
 		if (error)
 			do_error(
- _("erasing ino %llu pptr (ino %llu gen 0x%x diroffset %u name '%.*s') failed: %s\n"),
+ _("erasing ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)file_pptr->parent_ino,
-				file_pptr->parent_gen, file_pptr->diroffset,
+				file_pptr->parent_gen,
 				file_pptr->namelen, name2, strerror(error));
 	}
 
 	error = add_file_pptr(ip, ag_pptr, name1);
 	if (error)
 		do_error(
- _("updating ino %llu pptr (ino %llu gen 0x%x diroffset %u name '%.*s') failed: %s\n"),
+ _("updating ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
 			(unsigned long long)ip->i_ino,
 			(unsigned long long)ag_pptr->parent_ino,
-			ag_pptr->parent_gen, ag_pptr->diroffset,
+			ag_pptr->parent_gen,
 			ag_pptr->namelen, name1, strerror(error));
+}
+
+static int
+cmp_file_to_ag_pptr(
+	const struct file_pptr	*fp,
+	const struct ag_pptr	*ap)
+{
+	if (fp->parent_ino > ap->parent_ino)
+		return 1;
+	if (fp->parent_ino < ap->parent_ino)
+		return -1;
+
+	/*
+	 * If this parent pointer wasn't found in the dirent scan, we know it
+	 * should be removed.
+	 */
+	if (!fp->name_in_nameblobs)
+		return -1;
+
+	if (fp->name_cookie < ap->name_cookie)
+		return -1;
+	if (fp->name_cookie > ap->name_cookie)
+		return 1;
+
+	return 0;
 }
 
 /*
@@ -894,26 +960,26 @@ crosscheck_file_parent_ptrs(
 				(unsigned long long)ip->i_ino, strerror(error));
 
 	do {
+		int	cmp_result;
+
 		file_pptr = peek_slab_cursor(fscan->file_pptr_recs_cur);
 
 		dbg_printf(
- _("%s: dp %llu dp_gen 0x%x namelen %u diroffset %u ino %llu namecookie 0x%llx (master)\n"),
+ _("%s: dp %llu dp_gen 0x%x namelen %u ino %llu namecookie 0x%llx (master)\n"),
 				__func__,
 				(unsigned long long)ag_pptr->parent_ino,
 				ag_pptr->parent_gen,
 				ag_pptr->namelen,
-				ag_pptr->diroffset,
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)ag_pptr->name_cookie);
 
 		if (file_pptr) {
 			dbg_printf(
- _("%s: dp %llu dp_gen 0x%x namelen %u diroffset %u ino %llu namecookie 0x%llx (file)\n"),
+ _("%s: dp %llu dp_gen 0x%x namelen %u ino %llu namecookie 0x%llx (file)\n"),
 					__func__,
 					(unsigned long long)file_pptr->parent_ino,
 					file_pptr->parent_gen,
 					file_pptr->namelen,
-					file_pptr->diroffset,
 					(unsigned long long)ip->i_ino,
 					(unsigned long long)file_pptr->name_cookie);
 		} else {
@@ -923,9 +989,8 @@ crosscheck_file_parent_ptrs(
 					(unsigned long long)ip->i_ino);
 		}
 
-		if (!file_pptr ||
-		    file_pptr->parent_ino > ag_pptr->parent_ino ||
-		    file_pptr->diroffset > ag_pptr->diroffset) {
+		cmp_result = file_pptr ? cmp_file_to_ag_pptr(file_pptr, ag_pptr) : 1;
+		if (cmp_result > 0) {
 			/*
 			 * The master pptr list knows about pptrs that are not
 			 * in the ondisk metadata.  Add the missing pptr and
@@ -933,8 +998,7 @@ crosscheck_file_parent_ptrs(
 			 */
 			add_missing_parent_ptr(ip, fscan, ag_pptr);
 			advance_slab_cursor(fscan->ag_pptr_recs_cur);
-		} else if (file_pptr->parent_ino < ag_pptr->parent_ino ||
-			   file_pptr->diroffset < ag_pptr->diroffset) {
+		} else if (cmp_result < 0) {
 			/*
 			 * The ondisk pptrs mention a link that is not in the
 			 * master list.  Delete the extra pptr and advance only
@@ -958,12 +1022,11 @@ crosscheck_file_parent_ptrs(
 
 	while ((file_pptr = pop_slab_cursor(fscan->file_pptr_recs_cur))) {
 		dbg_printf(
- _("%s: dp %llu dp_gen 0x%x namelen %u diroffset %u ino %llu namecookie 0x%llx (excess)\n"),
+ _("%s: dp %llu dp_gen 0x%x namelen %u ino %llu namecookie 0x%llx (excess)\n"),
 				__func__,
 				(unsigned long long)file_pptr->parent_ino,
 				file_pptr->parent_gen,
 				file_pptr->namelen,
-				file_pptr->diroffset,
 				(unsigned long long)ip->i_ino,
 				(unsigned long long)file_pptr->name_cookie);
 

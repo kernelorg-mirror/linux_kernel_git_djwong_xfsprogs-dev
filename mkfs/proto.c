@@ -509,7 +509,7 @@ parseproto(
 		libxfs_trans_log_inode(tp, ip, flags);
 		if (parent) {
 			error = -libxfs_parent_add(tp, parent, pip, &xname,
-					offset, ip);
+					ip);
 			if (error)
 				fail(_("committing parent pointers failed."),
 						error);
@@ -602,7 +602,7 @@ parseproto(
 		libxfs_trans_log_inode(tp, ip, flags);
 		if (parent) {
 			error = -libxfs_parent_add(tp, parent, pip, &xname,
-					offset, ip);
+					ip);
 			if (error)
 				fail(_("committing parent pointers failed."),
 						error);
@@ -636,8 +636,7 @@ parseproto(
 	}
 	libxfs_trans_log_inode(tp, ip, flags);
 	if (parent) {
-		error = -libxfs_parent_add(tp, parent, pip, &xname, offset,
-				ip);
+		error = -libxfs_parent_add(tp, parent, pip, &xname, ip);
 		if (error)
 			fail(_("committing parent pointers failed."), error);
 	}

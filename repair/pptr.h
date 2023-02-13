@@ -10,7 +10,7 @@ void parent_ptr_free(struct xfs_mount *mp);
 void parent_ptr_init(struct xfs_mount *mp);
 
 void add_parent_ptr(xfs_ino_t ino, const unsigned char *fname,
-		xfs_dir2_dataptr_t diroffset, struct xfs_inode *dp);
+		struct xfs_inode *dp);
 
 void check_parent_ptrs(struct xfs_mount *mp);
 

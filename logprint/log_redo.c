@@ -805,9 +805,8 @@ xlog_print_trans_attri_name(
 	}
 	memmove((char*)src_f, *ptr, src_len);
 
-	printf(_("ATTRI:  #p_ino: %llu	p_gen: %u, p_diroffset: %u\n"),
-		be64_to_cpu(src_f->p_ino), be32_to_cpu(src_f->p_gen),
-				be32_to_cpu(src_f->p_diroffset));
+	printf(_("ATTRI:  #p_ino: %llu	p_gen: %u\n"),
+		be64_to_cpu(src_f->p_ino), be32_to_cpu(src_f->p_gen));
 
 	free(src_f);
 out:
@@ -898,9 +897,8 @@ xlog_recover_print_attri(
 				goto out;
 			}
 
-			printf(_("ATTRI:  #inode: %llu     gen: %u, offset: %u\n"),
-				be64_to_cpu(rec->p_ino), be32_to_cpu(rec->p_gen),
-				be32_to_cpu(rec->p_diroffset));
+			printf(_("ATTRI:  #inode: %llu     gen: %u\n"),
+				be64_to_cpu(rec->p_ino), be32_to_cpu(rec->p_gen));
 
 			free(rec);
 		}
@@ -929,9 +927,8 @@ xlog_recover_print_attri(
 				goto out;
 			}
 
-			printf(_("ATTRI:  new #inode: %llu     gen: %u, offset: %u\n"),
-				be64_to_cpu(rec->p_ino), be32_to_cpu(rec->p_gen),
-				be32_to_cpu(rec->p_diroffset));
+			printf(_("ATTRI:  new #inode: %llu     gen: %u\n"),
+				be64_to_cpu(rec->p_ino), be32_to_cpu(rec->p_gen));
 
 			free(rec);
 		}

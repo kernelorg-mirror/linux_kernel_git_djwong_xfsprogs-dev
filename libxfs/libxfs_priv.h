@@ -56,6 +56,7 @@
 
 #include "xfs_fs.h"
 #include "libfrog/crc32c.h"
+#include "libfrog/sha512.h"
 
 #include <sys/xattr.h>
 
