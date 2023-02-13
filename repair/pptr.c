@@ -136,7 +136,7 @@ struct file_pptr {
 	xfs_ino_t		parent_ino;
 	unsigned int		parent_gen;
 
-	/* name length */
+	/* dirent name length */
 	unsigned int		namelen;
 
 	/* cookie for the file dirent name */
@@ -291,8 +291,9 @@ parent_ptr_init(
 	}
 }
 
+/* Compute a simpler hash for internal usage. */
 static inline void
-namehash(
+compute_namehash(
 	uint8_t			*hashbuf,
 	const void		*name,
 	size_t			namelen)
@@ -325,7 +326,7 @@ add_parent_ptr(
 	if (!xfs_has_parent(mp))
 		return;
 
-	namehash(ag_pptr.namehash, fname, ag_pptr.namelen);
+	compute_namehash(ag_pptr.namehash, fname, ag_pptr.namelen);
 
 	pthread_mutex_lock(&names_mutex);
 	error = -xfblob_store(names, &ag_pptr.name_cookie, fname,
@@ -479,9 +480,12 @@ examine_xattr(
 {
 	struct file_pptr	file_pptr = { };
 	struct xfs_parent_name_irec irec;
+	struct xfs_name		xname;
+	uint8_t			p_namehash[XFS_PARENT_NAME_HASH_SIZE];
 	struct xfs_mount	*mp = ip->i_mount;
 	struct file_scan	*fscan = priv;
 	const struct xfs_parent_name_rec *rec = (const void *)name;
+	int			hashlen;
 	int			error;
 
 	/* Ignore anything that isn't a parent pointer. */
@@ -497,20 +501,29 @@ examine_xattr(
 	    !xfs_parent_valuecheck(mp, value, valuelen))
 		goto corrupt;
 
-	libxfs_parent_irec_from_disk(&irec, rec, value, valuelen);
+	libxfs_parent_irec_from_disk(&irec, rec, namelen, value, valuelen);
 
 	file_pptr.parent_ino = irec.p_ino;
 	file_pptr.parent_gen = irec.p_gen;
 	file_pptr.namelen = irec.p_namelen;
 
+	xname.name = irec.p_name;
+	xname.len = irec.p_namelen;
+
 	/*
 	 * Does the namehash in the attr key match the name in the attr value?
 	 * If not, there's no point in checking further.
 	 */
-	namehash(file_pptr.namehash, irec.p_name, irec.p_namelen);
-	if (memcmp(irec.p_namehash, file_pptr.namehash,
-				sizeof(irec.p_namehash)))
+	hashlen = libxfs_parent_namehash(ip, &xname, p_namehash,
+			sizeof(p_namehash));
+	if (hashlen < 0)
 		goto corrupt;
+
+	if (namelen != xfs_parent_name_rec_sizeof(hashlen) ||
+	    memcmp(irec.p_namehash, p_namehash, hashlen))
+		goto corrupt;
+
+	compute_namehash(file_pptr.namehash, irec.p_name, irec.p_namelen);
 
 	error = -xfblob_store(fscan->file_pptr_names,
 			&file_pptr.name_cookie, irec.p_name, irec.p_namelen);
@@ -552,11 +565,13 @@ add_file_pptr(
 		.p_namelen		= ag_pptr->namelen,
 	};
 	struct xfs_parent_scratch	scratch;
+	int				error;
 
 	memcpy(pptr_rec.p_name, name, ag_pptr->namelen);
 
-	memcpy(pptr_rec.p_namehash, ag_pptr->namehash,
-			sizeof(pptr_rec.p_namehash));
+	error = -libxfs_parent_irec_hash(ip, &pptr_rec);
+	if (error < 0)
+		return error;
 
 	return -libxfs_parent_set(ip, &pptr_rec, &scratch);
 }
@@ -565,16 +580,22 @@ add_file_pptr(
 static int
 remove_file_pptr(
 	struct xfs_inode		*ip,
-	const struct file_pptr		*file_pptr)
+	const struct file_pptr		*file_pptr,
+	unsigned char			*name)
 {
 	struct xfs_parent_name_irec	pptr_rec = {
 		.p_ino			= file_pptr->parent_ino,
 		.p_gen			= file_pptr->parent_gen,
+		.p_namelen		= file_pptr->namelen,
 	};
 	struct xfs_parent_scratch	scratch;
+	int				error;
 
-	memcpy(pptr_rec.p_namehash, file_pptr->namehash,
-			sizeof(pptr_rec.p_namehash));
+	memcpy(pptr_rec.p_name, name, file_pptr->namelen);
+
+	error = -libxfs_parent_irec_hash(ip, &pptr_rec);
+	if (error)
+		return error;
 
 	return -libxfs_parent_unset(ip, &pptr_rec, &scratch);
 }
@@ -605,7 +626,21 @@ clear_all_pptrs(
 				strerror(error));
 
 	while ((file_pptr = pop_slab_cursor(cur)) != NULL) {
-		error = remove_file_pptr(ip, file_pptr);
+		unsigned char	name[MAXNAMELEN];
+
+		error = -xfblob_load(fscan->file_pptr_names,
+				file_pptr->name_cookie, name,
+				file_pptr->namelen);
+		if (error)
+			do_error(
+  _("loading incorrect name for ino %llu parent pointer (ino %llu gen 0x%x namecookie 0x%llx) failed: %s\n"),
+					(unsigned long long)ip->i_ino,
+					(unsigned long long)file_pptr->parent_ino,
+					file_pptr->parent_gen,
+					(unsigned long long)file_pptr->name_cookie,
+					strerror(error));
+
+		error = remove_file_pptr(ip, file_pptr, name);
 		if (error)
 			do_error(
  _("wiping ino %llu pptr (ino %llu gen 0x%x) failed: %s\n"),
@@ -704,7 +739,7 @@ remove_incorrect_parent_ptr(
 			file_pptr->parent_gen,
 			file_pptr->namelen, name);
 
-	error = remove_file_pptr(ip, file_pptr);
+	error = remove_file_pptr(ip, file_pptr, name);
 	if (error)
 		do_error(
  _("removing ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
@@ -779,7 +814,7 @@ reset:
 			ag_pptr->namelen, name1);
 
 	if (ag_pptr->parent_gen != file_pptr->parent_gen) {
-		error = remove_file_pptr(ip, file_pptr);
+		error = remove_file_pptr(ip, file_pptr, name2);
 		if (error)
 			do_error(
  _("erasing ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
