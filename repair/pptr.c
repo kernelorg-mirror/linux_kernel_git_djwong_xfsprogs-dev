@@ -528,6 +528,42 @@ corrupt:
 	return 0;
 }
 
+/* Add an on disk parent pointer to a file. */
+static int
+add_file_pptr(
+	struct xfs_inode		*ip,
+	const struct ag_pptr		*ag_pptr,
+	const unsigned char		*name)
+{
+	struct xfs_parent_name_irec	pptr_rec = {
+		.p_ino			= ag_pptr->parent_ino,
+		.p_gen			= ag_pptr->parent_gen,
+		.p_diroffset		= ag_pptr->diroffset,
+		.p_namelen		= ag_pptr->namelen,
+	};
+	struct xfs_parent_scratch	scratch;
+
+	memcpy(pptr_rec.p_name, name, ag_pptr->namelen);
+
+	return -libxfs_parent_set(ip, &pptr_rec, &scratch);
+}
+
+/* Remove an on disk parent pointer from a file. */
+static int
+remove_file_pptr(
+	struct xfs_inode		*ip,
+	const struct file_pptr		*file_pptr)
+{
+	struct xfs_parent_name_irec	pptr_rec = {
+		.p_ino			= file_pptr->parent_ino,
+		.p_gen			= file_pptr->parent_gen,
+		.p_diroffset		= file_pptr->diroffset,
+	};
+	struct xfs_parent_scratch	scratch;
+
+	return -libxfs_parent_unset(ip, &pptr_rec, &scratch);
+}
+
 /* Remove all pptrs from @ip. */
 static void
 clear_all_pptrs(
@@ -582,7 +618,14 @@ add_missing_parent_ptr(
 			ag_pptr->parent_gen, ag_pptr->diroffset,
 			ag_pptr->namelen, name);
 
-	/* XXX actually do the work */
+	error = add_file_pptr(ip, ag_pptr, name);
+	if (error)
+		do_error(
+ _("adding ino %llu pptr (ino %llu gen 0x%x diroffset %u name '%.*s') failed: %s\n"),
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)ag_pptr->parent_ino,
+			ag_pptr->parent_gen, ag_pptr->diroffset,
+			ag_pptr->namelen, name, strerror(error));
 }
 
 /* Remove @file_pptr from @ip. */
@@ -623,7 +666,14 @@ remove_incorrect_parent_ptr(
 			file_pptr->parent_gen, file_pptr->diroffset,
 			file_pptr->namelen, name);
 
-	/* XXX actually do the work */
+	error = remove_file_pptr(ip, file_pptr);
+	if (error)
+		do_error(
+ _("removing ino %llu pptr (ino %llu gen 0x%x diroffset %u name '%.*s') failed: %s\n"),
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)file_pptr->parent_ino,
+			file_pptr->parent_gen, file_pptr->diroffset,
+			file_pptr->namelen, name, strerror(error));
 }
 
 /*
@@ -690,7 +740,25 @@ reset:
 			ag_pptr->parent_gen, ag_pptr->diroffset,
 			ag_pptr->namelen, name1);
 
-	/* XXX do the work */
+	if (ag_pptr->parent_gen != file_pptr->parent_gen) {
+		error = remove_file_pptr(ip, file_pptr);
+		if (error)
+			do_error(
+ _("erasing ino %llu pptr (ino %llu gen 0x%x diroffset %u name '%.*s') failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				(unsigned long long)file_pptr->parent_ino,
+				file_pptr->parent_gen, file_pptr->diroffset,
+				file_pptr->namelen, name2, strerror(error));
+	}
+
+	error = add_file_pptr(ip, ag_pptr, name1);
+	if (error)
+		do_error(
+ _("updating ino %llu pptr (ino %llu gen 0x%x diroffset %u name '%.*s') failed: %s\n"),
+			(unsigned long long)ip->i_ino,
+			(unsigned long long)ag_pptr->parent_ino,
+			ag_pptr->parent_gen, ag_pptr->diroffset,
+			ag_pptr->namelen, name1, strerror(error));
 }
 
 /*
