@@ -8,6 +8,7 @@
 #include "input.h"
 #include "libfrog/paths.h"
 #include "parent.h"
+#include "libfrog/pptrs.h"
 #include "handle.h"
 #include "init.h"
 #include "io.h"
