@@ -12,7 +12,7 @@ LT_AGE = 0
 
 LTLDFLAGS += -Wl,--version-script,libhandle.sym
 
-CFILES = handle.c jdm.c parent.c
+CFILES = handle.c jdm.c
 LSRCFILES = libhandle.sym
 
 default: ltdepend $(LTLIBRARY)
