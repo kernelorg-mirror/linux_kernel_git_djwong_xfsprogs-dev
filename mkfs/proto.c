@@ -613,8 +613,8 @@ parseproto(
 			.value = (void *)xname.name,
 			.valuelen = xname.len,
 		};
-		xfs_init_parent_name_rec(&rec, pip, offset);
-		error = xfs_attr_set(&args);
+		libxfs_init_parent_name_rec(&rec, pip, offset);
+		error = -libxfs_attr_set(&args);
 		if (error)
 			fail(_("Error creating parent pointer"), error);
 	}
