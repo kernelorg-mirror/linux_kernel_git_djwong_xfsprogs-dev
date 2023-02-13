@@ -88,7 +88,7 @@ attr_sf_entry_pptr_namehashlen(
 	ASSERT(bitoffs(startoff) == 0);
 	e = (struct xfs_attr_sf_entry *)((char *)obj + byteize(startoff));
 	if (e->flags & XFS_ATTR_PARENT)
-		return XFS_PARENT_NAME_HASH_SIZE;
+		return xfs_parent_name_hashlen(e->namelen);
 	return 0;
 }
 

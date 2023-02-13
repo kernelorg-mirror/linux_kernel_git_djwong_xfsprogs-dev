@@ -309,8 +309,12 @@ __attr_leaf_name_pptr_namehashlen(
 	struct xfs_attr_leaf_entry      *e,
 	int				i)
 {
-	if (e->flags & XFS_ATTR_PARENT)
-		return XFS_PARENT_NAME_HASH_SIZE;
+	struct xfs_attr_leaf_name_local	*lname;
+
+	if (e->flags & XFS_ATTR_PARENT) {
+		lname = xfs_attr3_leaf_name_local(leaf, i);
+		return xfs_parent_name_hashlen(lname->namelen);
+	}
 	return 0;
 }
 

@@ -515,6 +515,7 @@ examine_xattr(
 	struct xfs_mount	*mp = ip->i_mount;
 	struct file_scan	*fscan = priv;
 	const struct xfs_parent_name_rec *rec = (const void *)name;
+	int			hashlen;
 	int			error;
 
 	/* Ignore anything that isn't a parent pointer. */
@@ -530,7 +531,7 @@ examine_xattr(
 	    !xfs_parent_valuecheck(mp, value, valuelen))
 		goto corrupt;
 
-	libxfs_parent_irec_from_disk(&irec, rec, value, valuelen);
+	libxfs_parent_irec_from_disk(&irec, rec, namelen, value, valuelen);
 
 	file_pptr.parent_ino = irec.p_ino;
 	file_pptr.parent_gen = irec.p_gen;
@@ -543,12 +544,13 @@ examine_xattr(
 	 * Does the namehash in the attr key match the name in the attr value?
 	 * If not, there's no point in checking further.
 	 */
-	error = -libxfs_parent_namehash(ip, &xname, namehash,
+	hashlen = libxfs_parent_namehash(ip, &xname, namehash,
 			sizeof(namehash));
-	if (error)
+	if (hashlen < 0)
 		goto corrupt;
 
-	if (memcmp(irec.p_namehash, namehash, sizeof(irec.p_namehash)))
+	if (namelen != xfs_parent_name_rec_sizeof(hashlen) ||
+	    memcmp(irec.p_namehash, namehash, hashlen))
 		goto corrupt;
 
 	error = store_file_pptr_name(fscan, &file_pptr, &irec);
