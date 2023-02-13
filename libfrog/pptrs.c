@@ -13,17 +13,17 @@
 
 /* Allocate a buffer large enough for some parent pointer records. */
 static inline struct xfs_pptr_info *
-xfs_pptr_alloc(
-      size_t                  nr_ptrs)
+alloc_pptr_buf(
+	size_t			nr_ptrs)
 {
-      struct xfs_pptr_info    *pi;
+	struct xfs_pptr_info	*pi;
 
-      pi = malloc(xfs_pptr_info_sizeof(nr_ptrs));
-      if (!pi)
-              return NULL;
-      memset(pi, 0, sizeof(struct xfs_pptr_info));
-      pi->pi_ptrs_size = nr_ptrs;
-      return pi;
+	pi = malloc(xfs_pptr_info_sizeof(nr_ptrs));
+	if (!pi)
+		return NULL;
+	memset(pi, 0, sizeof(struct xfs_pptr_info));
+	pi->pi_ptrs_size = nr_ptrs;
+	return pi;
 }
 
 /* Walk all parents of the given file handle. */
@@ -39,7 +39,7 @@ handle_walk_parents(
 	unsigned int		i;
 	ssize_t			ret = -1;
 
-	pi = xfs_pptr_alloc(4);
+	pi = alloc_pptr_buf(4);
 	if (!pi)
 		return -1;
 
