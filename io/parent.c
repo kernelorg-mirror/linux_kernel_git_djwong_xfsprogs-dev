@@ -24,14 +24,14 @@ struct pptr_args {
 
 static int
 pptr_print(
-	struct xfs_pptr_info	*pi,
+	struct xfs_getparents	*pi,
 	struct xfs_parent_ptr	*pptr,
 	void			*arg)
 {
 	struct pptr_args	*args = arg;
 	unsigned int		namelen;
 
-	if (pi->pi_flags & XFS_PPTR_OFLAG_ROOT) {
+	if (pi->gp_flags & XFS_GETPARENTS_OFLAG_ROOT) {
 		printf(_("Root directory.\n"));
 		return 0;
 	}
