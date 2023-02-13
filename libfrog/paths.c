@@ -608,7 +608,7 @@ path_component_free(
 	free(pc);
 }
 
-/* Change a path component's filename. */
+/* Change a path component's filename or returns positive errno. */
 int
 path_component_change(
 	struct path_component	*pc,
@@ -620,7 +620,7 @@ path_component_change(
 
 	p = realloc(pc->pc_fname, namelen + 1);
 	if (!p)
-		return -1;
+		return errno;
 	pc->pc_fname = p;
 	memcpy(pc->pc_fname, name, namelen);
 	pc->pc_fname[namelen] = 0;
@@ -628,7 +628,7 @@ path_component_change(
 	return 0;
 }
 
-/* Initialize a pathname. */
+/* Initialize a pathname or returns positive errno. */
 struct path_list *
 path_list_init(void)
 {
@@ -683,7 +683,10 @@ path_list_del_component(
 	list_del_init(&pc->pc_list);
 }
 
-/* Convert a pathname into a string. */
+/*
+ * Convert a pathname into a string or returns -1 if the buffer isn't long
+ * enough.
+ */
 ssize_t
 path_list_to_string(
 	struct path_list	*path,
