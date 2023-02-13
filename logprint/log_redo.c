@@ -927,7 +927,7 @@ xlog_recover_print_attri(
 				goto out;
 			}
 
-			printf(_("ATTRI:  new #inode: %llu     gen: %u"),
+			printf(_("ATTRI:  new #inode: %llu     gen: %u\n"),
 				be64_to_cpu(rec->p_ino), be32_to_cpu(rec->p_gen));
 
 			free(rec);
