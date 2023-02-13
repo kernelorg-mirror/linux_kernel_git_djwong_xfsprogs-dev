@@ -14,15 +14,15 @@
 /* Allocate a buffer large enough for some parent pointer records. */
 static inline struct xfs_getparents *
 alloc_pptr_buf(
-	size_t			nr_ptrs)
+	size_t			bufsize)
 {
 	struct xfs_getparents	*pi;
 
-	pi = malloc(xfs_getparents_sizeof(nr_ptrs));
+	pi = calloc(bufsize, 1);
 	if (!pi)
 		return NULL;
-	memset(pi, 0, sizeof(struct xfs_getparents));
-	pi->gp_ptrs_size = nr_ptrs;
+
+	pi->gp_bufsize = bufsize;
 	return pi;
 }
 
@@ -42,7 +42,7 @@ handle_walk_parents(
 	unsigned int		i;
 	ssize_t			ret = -1;
 
-	pi = alloc_pptr_buf(4);
+	pi = alloc_pptr_buf(XFS_XATTR_LIST_MAX);
 	if (!pi)
 		return errno;
 
@@ -58,7 +58,7 @@ handle_walk_parents(
 			goto out_pi;
 		}
 
-		for (i = 0; i < pi->gp_ptrs_used; i++) {
+		for (i = 0; i < pi->gp_count; i++) {
 			p = xfs_getparents_rec(pi, i);
 			ret = fn(pi, p, arg);
 			if (ret)
