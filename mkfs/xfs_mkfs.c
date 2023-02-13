@@ -11,6 +11,7 @@
 #include "libfrog/fsgeom.h"
 #include "libfrog/convert.h"
 #include "libfrog/crc32cselftest.h"
+#include "libfrog/sha512selftest.h"
 #include "proto.h"
 #include <ini.h>
 
@@ -4284,6 +4285,13 @@ main(
 	if (crc32c_test(CRC32CTEST_QUIET) != 0) {
 		fprintf(stderr,
  _("crc32c self-test failed, will not create a filesystem here.\n"));
+		return 1;
+	}
+
+	/* Make sure our checksum algorithm really works. */
+	if (sha512_test(SHA512TEST_QUIET) != 0) {
+		fprintf(stderr,
+ _("sha512 self-test failed, will not create a filesystem here.\n"));
 		return 1;
 	}
 
