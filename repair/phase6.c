@@ -68,7 +68,6 @@ struct dir_hash_ent {
 	struct dir_hash_ent	*nextbyorder;	/* next in order added */
 	xfs_dahash_t		hashval;	/* hash value of name */
 	uint32_t		address;	/* offset of data entry */
-	uint32_t		new_address;	/* new address, if we rebuild */
 	xfs_ino_t		inum;		/* inode num of entry */
 	short			junkit;		/* name starts with / */
 	short			seen;		/* have seen leaf entry */
@@ -226,7 +225,6 @@ dir_hash_add(
 	p->address = addr;
 	p->inum = inum;
 	p->seen = 0;
-	p->new_address = addr;
 
 	/* Set up the name in the region trailing the hash entry. */
 	memcpy(p->namebuf, name, namelen);
@@ -979,7 +977,7 @@ mk_orphanage(xfs_mount_t *mp)
 		do_error(
 		_("can't make %s, createname error %d\n"),
 			ORPHANAGE, error);
-	add_parent_ptr(ip->i_ino, ORPHANAGE, diroffset, pip);
+	add_parent_ptr(ip->i_ino, ORPHANAGE, pip);
 
 	/*
 	 * bump up the link count in the root directory to account
@@ -1169,8 +1167,7 @@ mv_orphanage(
 	}
 
 	if (xfs_has_parent(mp))
-		add_parent_ptr(ino_p->i_ino, xname.name, diroffset,
-				orphanage_ip);
+		add_parent_ptr(ino_p->i_ino, xname.name, orphanage_ip);
 
 	libxfs_irele(ino_p);
 	libxfs_irele(orphanage_ip);
@@ -1341,8 +1338,8 @@ longform_dir2_rebuild(
 
 		libxfs_trans_ijoin(tp, ip, 0);
 
-		error = -libxfs_dir_createname(tp, ip, &p->name, p->inum,
-						nres, &p->new_address);
+		error = -libxfs_dir_createname(tp, ip, &p->name, p->inum, nres,
+				NULL);
 		if (error) {
 			do_warn(
 _("name create failed in ino %" PRIu64 " (%d)\n"), ino, error);
@@ -2819,7 +2816,7 @@ dir_hash_add_parent_ptrs(
 						p->name.name[1] == '.'))))
 			continue;
 
-		add_parent_ptr(p->inum, p->name.name, p->new_address, dp);
+		add_parent_ptr(p->inum, p->name.name, dp);
 	}
 }
 
