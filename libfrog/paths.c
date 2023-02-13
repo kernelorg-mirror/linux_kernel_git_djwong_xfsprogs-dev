@@ -574,13 +574,15 @@ struct path_list {
 
 struct path_component {
 	struct list_head	pc_list;
+	uint64_t		pc_ino;
 	char			*pc_fname;
 };
 
 /* Initialize a path component with a given name. */
 struct path_component *
 path_component_init(
-	const char		*name)
+	const char		*name,
+	uint64_t		ino)
 {
 	struct path_component	*pc;
 
@@ -593,6 +595,7 @@ path_component_init(
 		free(pc);
 		return NULL;
 	}
+	pc->pc_ino = ino;
 	return pc;
 }
 
@@ -610,7 +613,8 @@ int
 path_component_change(
 	struct path_component	*pc,
 	void			*name,
-	size_t			namelen)
+	size_t			namelen,
+	uint64_t		ino)
 {
 	void			*p;
 
@@ -620,6 +624,7 @@ path_component_change(
 	pc->pc_fname = p;
 	memcpy(pc->pc_fname, name, namelen);
 	pc->pc_fname[namelen] = 0;
+	pc->pc_ino = ino;
 	return 0;
 }
 
@@ -698,4 +703,23 @@ path_list_to_string(
 		buflen -= ret;
 	}
 	return bytes;
+}
+
+/* Walk each component of a path. */
+int
+path_walk_components(
+	struct path_list	*path,
+	path_walk_fn_t		fn,
+	void			*arg)
+{
+	struct path_component	*pos;
+	int			ret;
+
+	list_for_each_entry(pos, &path->p_head, pc_list) {
+		ret = fn(pos->pc_fname, pos->pc_ino, arg);
+		if (ret)
+			return ret;
+	}
+
+	return 0;
 }
