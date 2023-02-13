@@ -52,5 +52,6 @@ struct xfile_stat {
 
 int xfile_stat(struct xfile *xf, struct xfile_stat *statbuf);
 int xfile_dump(struct xfile *xf);
+void xfile_discard(struct xfile *xf, loff_t pos, unsigned long long count);
 
 #endif /* __LIBXFS_XFILE_H__ */
