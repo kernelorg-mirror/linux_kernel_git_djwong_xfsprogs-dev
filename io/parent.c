@@ -15,34 +15,41 @@
 static cmdinfo_t parent_cmd;
 static char *mntpt;
 
+struct pptr_args {
+	uint64_t	filter_ino;
+	char		*filter_name;
+	bool		shortformat;
+};
+
 static int
 pptr_print(
 	struct xfs_pptr_info	*pi,
 	struct xfs_parent_ptr	*pptr,
-	void			*arg,
-	int			flags)
+	void			*arg)
 {
-	char			buf[XFS_PPTR_MAXNAMELEN + 1];
-	unsigned int		namelen = strlen((char *)pptr->xpp_name);
+	struct pptr_args	*args = arg;
+	unsigned int		namelen;
 
 	if (pi->pi_flags & XFS_PPTR_OFLAG_ROOT) {
 		printf(_("Root directory.\n"));
 		return 0;
 	}
 
-	memcpy(buf, pptr->xpp_name, namelen);
-	buf[namelen] = 0;
+	if (args->filter_ino && pptr->xpp_ino != args->filter_ino)
+		return 0;
+	if (args->filter_name && strcmp(args->filter_name, pptr->xpp_name))
+		return 0;
 
-	if (flags & XFS_PPPTR_OFLAG_SHORT) {
+	namelen = strlen(pptr->xpp_name);
+	if (args->shortformat) {
 		printf("%llu/%u/%u/%s\n",
 			(unsigned long long)pptr->xpp_ino,
-			(unsigned int)pptr->xpp_gen, namelen, buf);
-	}
-	else {
+			(unsigned int)pptr->xpp_gen, namelen, pptr->xpp_name);
+	} else {
 		printf(_("p_ino    = %llu\n"), (unsigned long long)pptr->xpp_ino);
 		printf(_("p_gen    = %u\n"), (unsigned int)pptr->xpp_gen);
 		printf(_("p_reclen = %u\n"), namelen);
-		printf(_("p_name   = \"%s\"\n\n"), buf);
+		printf(_("p_name   = \"%s\"\n\n"), pptr->xpp_name);
 	}
 	return 0;
 }
@@ -50,18 +57,15 @@ pptr_print(
 static int
 print_parents(
 	struct xfs_handle	*handle,
-	uint64_t		pino,
-	char			*pname,
-	int			flags)
+	struct pptr_args	*args)
 {
 	int			ret;
 
 	if (handle)
-		ret = handle_walk_pptrs(handle, sizeof(*handle), pino,
-				pname, pptr_print, NULL, flags);
+		ret = handle_walk_pptrs(handle, sizeof(*handle), pptr_print,
+				args);
 	else
-		ret = fd_walk_pptrs(file->fd, pino, pname, pptr_print,
-				NULL, flags);
+		ret = fd_walk_pptrs(file->fd, pptr_print, args);
 	if (ret)
 		perror(file->name);
 
@@ -69,14 +73,36 @@ print_parents(
 }
 
 static int
+filter_path_components(
+	const char		*name,
+	uint64_t		ino,
+	void			*arg)
+{
+	struct pptr_args	*args = arg;
+
+	if (args->filter_ino && ino == args->filter_ino)
+		return ECANCELED;
+	if (args->filter_name && !strcmp(args->filter_name, name))
+		return ECANCELED;
+	return 0;
+}
+
+static int
 path_print(
 	const char		*mntpt,
 	struct path_list	*path,
-	void			*arg) {
-
+	void			*arg)
+{
+	struct pptr_args	*args = arg;
 	char			buf[PATH_MAX];
 	size_t			len = PATH_MAX;
 	int			ret;
+
+	if (args->filter_ino || args->filter_name) {
+		ret = path_walk_components(path, filter_path_components, args);
+		if (ret != ECANCELED)
+			return 0;
+	}
 
 	ret = snprintf(buf, len, "%s", mntpt);
 	if (ret != strlen(mntpt)) {
@@ -95,18 +121,15 @@ path_print(
 static int
 print_paths(
 	struct xfs_handle	*handle,
-	uint64_t		pino,
-	char			*pname,
-	int			flags)
+	struct pptr_args	*args)
 {
 	int			ret;
 
 	if (handle)
-		ret = handle_walk_ppaths(handle, sizeof(*handle), pino,
-				pname, path_print, NULL, flags);
+		ret = handle_walk_ppaths(handle, sizeof(*handle), path_print,
+				args);
  	else
-		ret = fd_walk_ppaths(file->fd, pino, pname, path_print,
-				NULL, flags);
+		ret = fd_walk_ppaths(file->fd, path_print, args);
 	if (ret)
 		perror(file->name);
 	return 0;
@@ -118,6 +141,7 @@ parent_f(
 	char			**argv)
 {
 	struct xfs_handle	handle;
+	struct pptr_args	args = { 0 };
 	void			*hanp = NULL;
 	size_t			hlen;
 	struct fs_path		*fs;
@@ -128,9 +152,6 @@ parent_f(
 	int			listpath_flag = 0;
 	int			ret;
 	static int		tab_init;
-	uint64_t		pino = 0;
-	char			*pname = NULL;
-	int			ppptr_flags = 0;
 
 	if (!tab_init) {
 		tab_init = 1;
@@ -151,8 +172,8 @@ parent_f(
 			listpath_flag = 1;
 			break;
 		case 'i':
-	                pino = strtoull(optarg, &p, 0);
-	                if (*p != '\0' || pino == 0) {
+	                args.filter_ino = strtoull(optarg, &p, 0);
+	                if (*p != '\0' || args.filter_ino == 0) {
 	                        fprintf(stderr,
 	                                _("Bad inode number '%s'.\n"),
 	                                optarg);
@@ -161,10 +182,10 @@ parent_f(
 
 			break;
 		case 'n':
-			pname = optarg;
+			args.filter_name = optarg;
 			break;
 		case 'f':
-			ppptr_flags |= XFS_PPPTR_OFLAG_SHORT;
+			args.shortformat = true;
 			break;
 		default:
 			return command_usage(&parent_cmd);
@@ -204,14 +225,14 @@ parent_f(
 		handle.ha_fid.fid_ino = ino;
 		handle.ha_fid.fid_gen = gen;
 
+	} else if (optind != argc) {
+		return command_usage(&parent_cmd);
 	}
 
 	if (listpath_flag)
-		exitcode = print_paths(ino ? &handle : NULL,
-				pino, pname, ppptr_flags);
+		exitcode = print_paths(ino ? &handle : NULL, &args);
 	else
-		exitcode = print_parents(ino ? &handle : NULL,
-				pino, pname, ppptr_flags);
+		exitcode = print_parents(ino ? &handle : NULL, &args);
 
 	if (hanp)
 		free_handle(hanp, hlen);
@@ -245,7 +266,7 @@ parent_init(void)
 	parent_cmd.cfunc = parent_f;
 	parent_cmd.argmin = 0;
 	parent_cmd.argmax = -1;
-	parent_cmd.args = _("[-p] [ino gen] [-i] [ino] [-n] [name] [-f]");
+	parent_cmd.args = _("[-p] [ino gen] [-i ino] [-n name] [-f]");
 	parent_cmd.flags = CMD_NOMAP_OK;
 	parent_cmd.oneline = _("print parent inodes");
 	parent_cmd.help = parent_help;
