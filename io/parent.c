@@ -97,6 +97,7 @@ path_print(
 	struct pptr_args	*args = arg;
 	char			buf[PATH_MAX];
 	size_t			len = PATH_MAX;
+	int			mntpt_len = strlen(mntpt);
 	int			ret;
 
 	if (args->filter_ino || args->filter_name) {
@@ -105,8 +106,12 @@ path_print(
 			return 0;
 	}
 
-	ret = snprintf(buf, len, "%s", mntpt);
-	if (ret != strlen(mntpt))
+	/* Trim trailing slashes from the mountpoint */
+	while (mntpt_len > 0 && mntpt[mntpt_len - 1] == '/')
+		mntpt_len--;
+
+	ret = snprintf(buf, len, "%.*s", mntpt_len, mntpt);
+	if (ret != mntpt_len)
 		return ENAMETOOLONG;
 
 	ret = path_list_to_string(path, buf + ret, len - ret);
