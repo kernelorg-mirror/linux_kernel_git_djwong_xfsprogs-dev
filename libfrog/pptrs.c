@@ -12,17 +12,17 @@
 #include "libfrog/pptrs.h"
 
 /* Allocate a buffer large enough for some parent pointer records. */
-static inline struct xfs_pptr_info *
+static inline struct xfs_getparents *
 alloc_pptr_buf(
 	size_t			nr_ptrs)
 {
-	struct xfs_pptr_info	*pi;
+	struct xfs_getparents	*pi;
 
-	pi = malloc(xfs_pptr_info_sizeof(nr_ptrs));
+	pi = malloc(xfs_getparents_sizeof(nr_ptrs));
 	if (!pi)
 		return NULL;
-	memset(pi, 0, sizeof(struct xfs_pptr_info));
-	pi->pi_ptrs_size = nr_ptrs;
+	memset(pi, 0, sizeof(struct xfs_getparents));
+	pi->gp_ptrs_size = nr_ptrs;
 	return pi;
 }
 
@@ -37,7 +37,7 @@ handle_walk_parents(
 	walk_pptr_fn		fn,
 	void			*arg)
 {
-	struct xfs_pptr_info	*pi;
+	struct xfs_getparents	*pi;
 	struct xfs_parent_ptr	*p;
 	unsigned int		i;
 	ssize_t			ret = -1;
@@ -47,25 +47,25 @@ handle_walk_parents(
 		return errno;
 
 	if (handle) {
-		memcpy(&pi->pi_handle, handle, sizeof(struct xfs_handle));
-		pi->pi_flags = XFS_PPTR_IFLAG_HANDLE;
+		memcpy(&pi->gp_handle, handle, sizeof(struct xfs_handle));
+		pi->gp_flags = XFS_GETPARENTS_IFLAG_HANDLE;
 	}
 
 	ret = ioctl(fd, XFS_IOC_GETPARENTS, pi);
 	while (!ret) {
-		if (pi->pi_flags & XFS_PPTR_OFLAG_ROOT) {
+		if (pi->gp_flags & XFS_GETPARENTS_OFLAG_ROOT) {
 			ret = fn(pi, NULL, arg);
 			goto out_pi;
 		}
 
-		for (i = 0; i < pi->pi_ptrs_used; i++) {
-			p = xfs_ppinfo_to_pp(pi, i);
+		for (i = 0; i < pi->gp_ptrs_used; i++) {
+			p = xfs_getparents_rec(pi, i);
 			ret = fn(pi, p, arg);
 			if (ret)
 				goto out_pi;
 		}
 
-		if (pi->pi_flags & XFS_PPTR_OFLAG_DONE)
+		if (pi->gp_flags & XFS_GETPARENTS_OFLAG_DONE)
 			break;
 
 		ret = ioctl(fd, XFS_IOC_GETPARENTS, pi);
@@ -128,7 +128,7 @@ static int handle_walk_parent_paths(struct walk_ppaths_info *wpi,
 
 static int
 handle_walk_parent_path_ptr(
-	struct xfs_pptr_info		*pi,
+	struct xfs_getparents		*pi,
 	struct xfs_parent_ptr		*p,
 	void				*arg)
 {
@@ -136,7 +136,7 @@ handle_walk_parent_path_ptr(
 	struct walk_ppaths_info		*wpi = wpli->wpi;
 	int				ret = 0;
 
-	if (pi->pi_flags & XFS_PPTR_OFLAG_ROOT)
+	if (pi->gp_flags & XFS_GETPARENTS_OFLAG_ROOT)
 		return wpi->fn(wpi->mntpt, wpi->path, wpi->arg);
 
 	ret = path_component_change(wpli->pc, p->xpp_name,
