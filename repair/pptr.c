@@ -481,7 +481,7 @@ examine_xattr(
 	struct file_pptr	file_pptr = { };
 	struct xfs_parent_name_irec irec;
 	struct xfs_name		xname;
-	uint8_t			p_namehash[XFS_PARENT_NAME_HASH_SIZE];
+	uint8_t			p_namehash[XFS_PARENT_NAME_MAX_HASH_SIZE];
 	struct xfs_mount	*mp = ip->i_mount;
 	struct file_scan	*fscan = priv;
 	const struct xfs_parent_name_rec *rec = (const void *)name;
@@ -498,7 +498,7 @@ examine_xattr(
 
 	/* Does the ondisk parent pointer structure make sense? */
 	if (!xfs_parent_namecheck(mp, rec, namelen, attr_flags) ||
-	    !xfs_parent_valuecheck(mp, value, valuelen))
+	    !xfs_parent_valuecheck(mp, namelen, value, valuelen))
 		goto corrupt;
 
 	libxfs_parent_irec_from_disk(&irec, rec, namelen, value, valuelen);
