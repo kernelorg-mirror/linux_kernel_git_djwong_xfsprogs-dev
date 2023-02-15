@@ -269,13 +269,16 @@ void
 parent_ptr_init(
 	struct xfs_mount	*mp)
 {
+	uint64_t		iused;
 	xfs_agnumber_t		agno;
 	int			error;
 
 	if (!xfs_has_parent(mp))
 		return;
 
-	error = strblobs_init(mp, "parent pointer names", &nameblobs);
+	/* One hash bucket per inode, up to about 8M of memory on 64-bit. */
+	iused = min(mp->m_sb.sb_icount - mp->m_sb.sb_ifree, 1048573);
+	error = strblobs_init(mp, "parent pointer names", iused, &nameblobs);
 	if (error)
 		do_error(_("init parent pointer names failed: %s\n"),
 				strerror(error));
