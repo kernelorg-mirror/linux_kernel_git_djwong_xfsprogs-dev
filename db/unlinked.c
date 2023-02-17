@@ -197,8 +197,108 @@ static const cmdinfo_t	unlinked_cmd =
 	  N_("[-a agno] [-b bucket] [-q] [-v]"),
 	  N_("dump chain of unlinked inode buckets"), NULL };
 
+static int
+create_unlinked(
+	struct xfs_mount	*mp)
+{
+	struct xfs_icreate_args	args = {
+		.mode		= S_IFREG | 0700,
+		.flags		= XFS_ICREATE_ARGS_FORCE_UID |
+				  XFS_ICREATE_ARGS_FORCE_GID |
+				  XFS_ICREATE_ARGS_FORCE_MODE,
+	};
+	struct xfs_inode	*ip;
+	struct xfs_trans	*tp;
+	xfs_ino_t		ino;
+	unsigned int		resblks;
+	int			error;
+
+	resblks = XFS_IALLOC_SPACE_RES(mp);
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_create_tmpfile, resblks,
+			0, 0, &tp);
+	if (error) {
+		dbprintf(_("alloc trans: %s\n"), strerror(error));
+		return error;
+	}
+
+	error = -libxfs_dialloc(&tp, args.pip, args.mode, &ino);
+	if (error) {
+		dbprintf(_("alloc inode: %s\n"), strerror(error));
+		goto out_cancel;
+	}
+
+	error = -libxfs_icreate(tp, ino, &args, &ip);
+	if (error) {
+		dbprintf(_("create inode: %s\n"), strerror(error));
+		goto out_cancel;
+	}
+
+	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+
+	error = -libxfs_iunlink(tp, ip);
+	if (error) {
+		dbprintf(_("unlink inode: %s\n"), strerror(error));
+		goto out_rele;
+	}
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		dbprintf(_("commit inode: %s\n"), strerror(error));
+
+	dbprintf(_("Created unlinked inode %llu in agno %u\n"),
+			(unsigned long long)ino,
+			XFS_INO_TO_AGNO(mp, ino));
+	libxfs_irele(ip);
+	return error;
+out_rele:
+	libxfs_irele(ip);
+out_cancel:
+	libxfs_trans_cancel(tp);
+	return error;
+}
+
+static int
+unlink_f(
+	int		argc,
+	char		**argv)
+{
+	int		nr = 1;
+	int		c;
+	int		error;
+
+	while ((c = getopt(argc, argv, "n:")) != EOF) {
+		switch (c) {
+		case 'n':
+			nr = atoi(optarg);
+			if (nr <= 0) {
+				dbprintf(_("%s: need positive number\n"));
+				return 0;
+			}
+			break;
+		default:
+			dbprintf(_("Bad option for unlink command.\n"));
+			return 0;
+		}
+	}
+
+	for (c = 0; c < nr; c++) {
+		error = create_unlinked(mp);
+		if (error)
+			return 1;
+	}
+
+	return 0;
+}
+
+static const cmdinfo_t	unlink_cmd =
+	{ "unlink", NULL, unlink_f, 0, -1, 0,
+	  N_("[-n nr]"),
+	  N_("allocate inodes and put them on the unlinked list"), NULL };
+
 void
 unlinked_init(void)
 {
 	add_command(&unlinked_cmd);
+	if (expert_mode)
+		add_command(&unlink_cmd);
 }
