@@ -211,6 +211,8 @@
 
 #define xfs_iread_extents		libxfs_iread_extents
 #define xfs_irele			libxfs_irele
+#define xfs_iunlink			libxfs_iunlink
+#define xfs_iunlink_log_inode		libxfs_iunlink_log_inode
 #define xfs_is_meta_ino			libxfs_is_meta_ino
 #define xfs_log_calc_minimum_size	libxfs_log_calc_minimum_size
 #define xfs_log_get_max_trans_res	libxfs_log_get_max_trans_res
@@ -221,6 +223,7 @@
 #define xfs_prealloc_blocks		libxfs_prealloc_blocks
 
 #define xfs_read_agf			libxfs_read_agf
+#define xfs_read_agi			libxfs_read_agi
 #define xfs_refc_block			libxfs_refc_block
 #define xfs_refcountbt_calc_reserves	libxfs_refcountbt_calc_reserves
 #define xfs_refcountbt_calc_size	libxfs_refcountbt_calc_size
