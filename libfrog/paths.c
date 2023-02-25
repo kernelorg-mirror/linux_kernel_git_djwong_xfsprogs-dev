@@ -694,13 +694,18 @@ path_list_to_string(
 	size_t			buflen)
 {
 	struct path_component	*pos;
+	char			*buf_end = buf + buflen;
 	ssize_t			bytes = 0;
 	int			ret;
 
 	list_for_each_entry(pos, &path->p_head, pc_list) {
-		ret = snprintf(buf, buflen, "/%s", pos->pc_fname);
-		if (ret != 1 + strlen(pos->pc_fname))
+		if (buf >= buf_end)
 			return -1;
+
+		ret = snprintf(buf, buflen, "/%s", pos->pc_fname);
+		if (ret < 0 || ret >= buflen)
+			return -1;
+
 		bytes += ret;
 		buf += ret;
 		buflen -= ret;
