@@ -38,7 +38,6 @@ extern uint32_t crc32c_le(uint32_t crc, unsigned char const *p, size_t len);
 /* fake up kernel's iomap, (not) used in xfs_bmap.[ch] */
 struct iomap;
 #include "xfs_cksum.h"
-#include "libfrog/sha512.h"
 
 #define __round_mask(x, y) ((__typeof__(x))((y)-1))
 #define round_up(x, y) ((((x)-1) | __round_mask(x, y))+1)

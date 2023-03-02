@@ -28,7 +28,6 @@ projects.c \
 ptvar.c \
 radix-tree.c \
 scrub.c \
-sha512.c \
 util.c \
 workqueue.c
 
@@ -49,7 +48,6 @@ projects.h \
 ptvar.h \
 radix-tree.h \
 scrub.h \
-sha512.h \
 workqueue.h
 
 LSRCFILES += gen_crc32table.c
@@ -58,9 +56,9 @@ ifeq ($(HAVE_GETMNTENT),yes)
 LCFLAGS += -DHAVE_GETMNTENT
 endif
 
-LDIRT = gen_crc32table crc32table.h crc32selftest sha512selftest
+LDIRT = gen_crc32table crc32table.h crc32selftest
 
-default: crc32selftest sha512selftest ltdepend $(LTLIBRARY)
+default: crc32selftest ltdepend $(LTLIBRARY)
 
 crc32table.h: gen_crc32table.c crc32defs.h
 	@echo "    [CC]     gen_crc32table"
@@ -76,10 +74,6 @@ crc32table.h: gen_crc32table.c crc32defs.h
 crc32selftest: gen_crc32table.c crc32table.h crc32.c crc32defs.h
 	@echo "    [TEST]    CRC32"
 	$(Q) $(BUILD_CC) $(BUILD_CFLAGS) -D CRC32_SELFTEST=1 crc32.c -o $@
-	$(Q) ./$@
-sha512selftest: sha512.h sha512selftest.h sha512.c
-	@echo "    [TEST]    SHA512"
-	$(Q) $(BUILD_CC) $(BUILD_CFLAGS) -D SHA512_SELFTEST=1 sha512.c -o $@
 	$(Q) ./$@
 
 include $(BUILDRULES)
