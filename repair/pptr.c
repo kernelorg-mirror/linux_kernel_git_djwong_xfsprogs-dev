@@ -187,8 +187,14 @@ struct garbage_xattr {
 	/* attribute name length */
 	unsigned int		attrnamelen;
 
+	/* attribute value length */
+	unsigned int		attrvaluelen;
+
 	/* cookie for the attribute name */
 	xfblob_cookie		attrname_cookie;
+
+	/* cookie for the attribute value */
+	xfblob_cookie		attrvalue_cookie;
 };
 
 /* Global names storage file. */
@@ -375,20 +381,28 @@ remove_garbage_xattrs(
 			.dp		= ip,
 			.attr_filter	= ga->attr_filter,
 			.namelen	= ga->attrnamelen,
-			.op_flags	= XFS_DA_OP_REMOVE,
+			.op_flags	= XFS_DA_OP_REMOVE | XFS_DA_OP_VLOOKUP,
 		};
 		void			*buf;
 
-		buf = malloc(ga->attrnamelen);
+		buf = malloc(ga->attrnamelen + ga->attrvaluelen);
 		if (!buf)
 			do_error(
  _("allocating %u bytes to remove ino %llu garbage xattr failed: %s\n"),
-					ga->attrnamelen,
+					ga->attrnamelen + ga->attrvaluelen,
 					(unsigned long long)ip->i_ino,
 					strerror(errno));
 
 		error = -xfblob_load(fscan->garbage_xattr_names,
 				ga->attrname_cookie, buf, ga->attrnamelen);
+		if (error)
+			do_error(
+ _("loading garbage xattr name failed: %s\n"),
+					strerror(error));
+
+		error = -xfblob_load(fscan->garbage_xattr_names,
+				ga->attrvalue_cookie, buf + ga->attrnamelen,
+				ga->attrvaluelen);
 		if (error)
 			do_error(
  _("loading garbage xattr name failed: %s\n"),
@@ -419,11 +433,14 @@ record_garbage_xattr(
 	struct file_scan	*fscan,
 	unsigned int		attr_filter,
 	const void		*name,
-	unsigned int		namelen)
+	unsigned int		namelen,
+	const void		*value,
+	unsigned int		valuelen)
 {
 	struct garbage_xattr	garbage_xattr = {
 		.attr_filter	= attr_filter,
 		.attrnamelen	= namelen,
+		.attrvaluelen	= valuelen,
 	};
 	struct xfs_mount	*mp = ip->i_mount;
 	int			error;
@@ -460,6 +477,13 @@ record_garbage_xattr(
 stuffit:
 	error = -xfblob_store(fscan->garbage_xattr_names,
 			&garbage_xattr.attrname_cookie, name, namelen);
+	if (error)
+		do_error(_("storing ino %llu garbage xattr failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				strerror(error));
+
+	error = -xfblob_store(fscan->garbage_xattr_names,
+			&garbage_xattr.attrvalue_cookie, value, valuelen);
 	if (error)
 		do_error(_("storing ino %llu garbage xattr failed: %s\n"),
 				(unsigned long long)ip->i_ino,
@@ -511,12 +535,9 @@ examine_xattr(
 {
 	struct file_pptr	file_pptr = { };
 	struct xfs_parent_name_irec irec;
-	struct xfs_name		xname;
-	uint8_t			namehash[XFS_PARENT_NAME_MAX_HASH_SIZE];
 	struct xfs_mount	*mp = ip->i_mount;
 	struct file_scan	*fscan = priv;
 	const struct xfs_parent_name_rec *rec = (const void *)name;
-	int			hashlen;
 	int			error;
 
 	/* Ignore anything that isn't a parent pointer. */
@@ -537,22 +558,6 @@ examine_xattr(
 	file_pptr.parent_ino = irec.p_ino;
 	file_pptr.parent_gen = irec.p_gen;
 	file_pptr.namelen = irec.p_namelen;
-
-	xname.name = irec.p_name;
-	xname.len = irec.p_namelen;
-
-	/*
-	 * Does the namehash in the attr key match the name in the attr value?
-	 * If not, there's no point in checking further.
-	 */
-	hashlen = libxfs_parent_namehash(ip, &xname, namehash,
-			sizeof(namehash));
-	if (hashlen < 0)
-		goto corrupt;
-
-	if (namelen != xfs_parent_name_rec_sizeof(hashlen) ||
-	    memcmp(irec.p_namehash, namehash, hashlen))
-		goto corrupt;
 
 	error = store_file_pptr_name(fscan, &file_pptr, &irec);
 	if (error)
@@ -576,7 +581,8 @@ examine_xattr(
 	fscan->nr_file_pptrs++;
 	return 0;
 corrupt:
-	record_garbage_xattr(ip, fscan, attr_flags, name, namelen);
+	record_garbage_xattr(ip, fscan, attr_flags, name, namelen, value,
+			valuelen);
 	return 0;
 }
 
@@ -593,14 +599,8 @@ add_file_pptr(
 		.p_namelen		= ag_pptr->namelen,
 	};
 	struct xfs_parent_scratch	scratch;
-	int				error;
 
 	memcpy(pptr_rec.p_name, name, ag_pptr->namelen);
-
-	error = -libxfs_parent_irec_hash(ip, &pptr_rec);
-	if (error)
-		return error;
-
 	return -libxfs_parent_set(ip, &pptr_rec, &scratch);
 }
 
@@ -617,14 +617,8 @@ remove_file_pptr(
 		.p_namelen		= file_pptr->namelen,
 	};
 	struct xfs_parent_scratch	scratch;
-	int				error;
 
 	memcpy(pptr_rec.p_name, name, file_pptr->namelen);
-
-	error = -libxfs_parent_irec_hash(ip, &pptr_rec);
-	if (error)
-		return error;
-
 	return -libxfs_parent_unset(ip, &pptr_rec, &scratch);
 }
 

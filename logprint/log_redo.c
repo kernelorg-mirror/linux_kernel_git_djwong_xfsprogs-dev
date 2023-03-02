@@ -711,9 +711,8 @@ dump_pptr(
 	libxfs_parent_irec_from_disk(&irec, name, namelen, value, valuelen);
 
 	printf("PPTR: %s attr_namelen %u value_namelen %u\n", tag, namelen, valuelen);
-	printf("PPTR: %s parent_ino %llu parent_gen %u hashlen %u namelen %u name '%.*s'\n",
+	printf("PPTR: %s parent_ino %llu parent_gen %u namelen %u name '%.*s'\n",
 			tag, (unsigned long long)irec.p_ino, irec.p_gen,
-			irec.hashlen,
 			irec.p_namelen, irec.p_namelen, irec.p_name);
 }
 
