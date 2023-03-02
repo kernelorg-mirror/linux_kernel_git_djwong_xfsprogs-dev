@@ -717,6 +717,12 @@ dump_pptr(
 			irec.p_namelen, irec.p_namelen, irec.p_name);
 }
 
+static inline unsigned int
+xfs_attr_log_item_op(const struct xfs_attri_log_format *attrp)
+{
+	return attrp->alfi_op_flags & XFS_ATTRI_OP_FLAGS_TYPE_MASK;
+}
+
 int
 xlog_print_trans_attri(
 	char				**ptr,
@@ -751,37 +757,42 @@ xlog_print_trans_attri(
 	memmove((char*)src_f, *ptr, src_len);
 	*ptr += src_len;
 
+	if (xfs_attr_log_item_op(src_f) == XFS_ATTRI_OP_FLAGS_NVREPLACE) {
+		name_len = src_f->alfi_oldname_len;
+		nname_len = src_f->alfi_newname_len;
+	} else {
+		name_len = src_f->alfi_name_len;
+	}
+
 	printf(_("ATTRI:  #regs: %d	f: 0x%x, ino: 0x%llx, attr_filter: 0x%x, name_len: %d, nname_len: %d, value_len: %d  id: 0x%llx\n"),
 			src_f->alfi_size, src_f->alfi_op_flags,
 			(unsigned long long)src_f->alfi_ino,
-			src_f->alfi_attr_filter, src_f->alfi_name_len,
-			src_f->alfi_nname_len, src_f->alfi_value_len,
+			src_f->alfi_attr_filter, name_len, nname_len,
+			src_f->alfi_value_len,
 			(unsigned long long)src_f->alfi_id);
 
-	if (src_f->alfi_name_len > 0) {
+	if (name_len > 0) {
 		printf(_("\n"));
 		(*i)++;
 		head = (xlog_op_header_t *)*ptr;
 		xlog_print_op_header(head, *i, ptr);
 		name_ptr = *ptr;
-		name_len = src_f->alfi_name_len;
-		error = xlog_print_trans_attri_name(ptr, be32_to_cpu(head->oh_len),
-						    src_f->alfi_name_len,
-						    src_f->alfi_attr_filter);
+		error = xlog_print_trans_attri_name(ptr,
+				be32_to_cpu(head->oh_len), name_len,
+				src_f->alfi_attr_filter);
 		if (error)
 			goto error;
 	}
 
-	if (src_f->alfi_nname_len > 0) {
+	if (nname_len > 0) {
 		printf(_("\n"));
 		(*i)++;
 		head = (xlog_op_header_t *)*ptr;
 		xlog_print_op_header(head, *i, ptr);
 		nname_ptr = *ptr;
-		nname_len = src_f->alfi_nname_len;
-		error = xlog_print_trans_attri_name(ptr, be32_to_cpu(head->oh_len),
-						    src_f->alfi_nname_len,
-						    src_f->alfi_attr_filter);
+		error = xlog_print_trans_attri_name(ptr,
+				be32_to_cpu(head->oh_len), nname_len,
+				src_f->alfi_attr_filter);
 		if (error)
 			goto error;
 	}
@@ -922,13 +933,20 @@ xlog_recover_print_attri(
 	if (xfs_attri_copy_log_format((char*)src_f, src_len, f))
 		goto out;
 
+	if (xfs_attr_log_item_op(f) == XFS_ATTRI_OP_FLAGS_NVREPLACE) {
+		name_len = f->alfi_oldname_len;
+		nname_len = f->alfi_newname_len;
+	} else {
+		name_len = f->alfi_name_len;
+	}
+
 	printf(_("ATTRI:  #regs: %d	f: 0x%x, ino: 0x%llx, attr_filter: 0x%x, name_len: %d, nname_len: %d, value_len: %d  id: 0x%llx\n"),
 			f->alfi_size, f->alfi_op_flags,
 			(unsigned long long)f->alfi_ino, f->alfi_attr_filter,
-			f->alfi_name_len, f->alfi_nname_len, f->alfi_value_len,
+			name_len, nname_len, f->alfi_value_len,
 			(unsigned long long)f->alfi_id);
 
-	if (f->alfi_name_len > 0) {
+	if (name_len > 0) {
 		region++;
 
 		if (f->alfi_attr_filter & XFS_ATTR_PARENT) {
@@ -940,12 +958,11 @@ xlog_recover_print_attri(
 					progname);
 				exit(1);
 			}
-			if (xfs_attri_copy_name_format((char *)src_rec, src_len, f->alfi_name_len, rec)) {
+			if (xfs_attri_copy_name_format((char *)src_rec, src_len, name_len, rec)) {
 				goto out;
 			}
 
 			name_ptr = src_rec;
-			name_len = src_len;
 
 			printf(_("ATTRI:  #inode: %llu     gen: %u\n"),
 				be64_to_cpu(rec->p_ino), be32_to_cpu(rec->p_gen));
@@ -953,13 +970,13 @@ xlog_recover_print_attri(
 			free(rec);
 		}
 		else {
-			printf(_("ATTRI:  name len:%u\n"), f->alfi_name_len);
+			printf(_("ATTRI:  name len:%u\n"), name_len);
 			print_or_dump((char *)item->ri_buf[region].i_addr,
-					f->alfi_name_len);
+					name_len);
 		}
 	}
 
-	if (f->alfi_nname_len > 0) {
+	if (nname_len > 0) {
 		region++;
 
 		if (f->alfi_attr_filter & XFS_ATTR_PARENT) {
@@ -971,12 +988,11 @@ xlog_recover_print_attri(
 					progname);
 				exit(1);
 			}
-			if (xfs_attri_copy_name_format((char *)src_rec, src_len, f->alfi_nname_len, rec)) {
+			if (xfs_attri_copy_name_format((char *)src_rec, src_len, nname_len, rec)) {
 				goto out;
 			}
 
 			nname_ptr = src_rec;
-			nname_len = src_len;
 
 			printf(_("ATTRI:  new #inode: %llu     gen: %u\n"),
 				be64_to_cpu(rec->p_ino), be32_to_cpu(rec->p_gen));
@@ -984,9 +1000,9 @@ xlog_recover_print_attri(
 			free(rec);
 		}
 		else {
-			printf(_("ATTRI:  nname len:%u\n"), f->alfi_nname_len);
+			printf(_("ATTRI:  nname len:%u\n"), nname_len);
 			print_or_dump((char *)item->ri_buf[region].i_addr,
-				       f->alfi_nname_len);
+				       nname_len);
 		}
 	}
 
