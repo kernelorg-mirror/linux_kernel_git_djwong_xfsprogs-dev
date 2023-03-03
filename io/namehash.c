@@ -193,21 +193,31 @@ hashcoll_help(void)
 " -a -- create extended attributes.  This is the default for nondirectories.\n"
 " -i -- read standard input for the name, up to %d bytes.\n"
 " -n -- create this many names.\n"
+" -p -- create directory entries with colliding XFS parent pointers.\n"
 " -s -- seed the rng with this value.\n"
 "\n"),
 			MAXNAMELEN - 1);
 }
 
+#define XFS_PARENT_MAX_DNAME_SIZE	243
+
 static int
 collide_dirents(
 	unsigned long		nr,
 	const unsigned char	*name,
-	size_t			namelen)
+	size_t			namelen,
+	bool			collide_pptrs)
 {
 	unsigned char		direntname[MAXNAMELEN];
-	unsigned int		hash = hashname(name, namelen);
+	size_t			hashlen = namelen;
+	unsigned int		hash;
 	unsigned long		i;
 	int			newfd, ret;
+
+	if (collide_pptrs)
+		hashlen = min(namelen, XFS_PARENT_MAX_DNAME_SIZE);
+
+	hash = hashname(name, hashlen);
 
 #ifdef HAVE_OPENAT
 	newfd = openat(file->fd, name, O_CREAT, 0700);
@@ -218,7 +228,7 @@ collide_dirents(
 
 	for (i = 0; i < nr; i++) {
 		strncpy(direntname, name, MAXNAMELEN - 1);
-		obfuscate_name(hash, namelen, direntname);
+		obfuscate_name(hash, hashlen, direntname);
 
 		printf("%lu/%lu: '%s' -> '%s'\n", i, nr, name, direntname);
 
@@ -281,6 +291,7 @@ hashcoll_f(
 	bool		create_dirent = false, create_xattr = false;
 	bool		read_stdin = false;
 	bool		create_defaults = true;
+	bool		pptr_collisions = false;
 	unsigned long	nr = 1, seed = 0;
 	int		c;
 
@@ -292,7 +303,7 @@ hashcoll_f(
 			create_xattr = true;
 	}
 
-	while ((c = getopt(argc, argv, "adin:s:")) != EOF) {
+	while ((c = getopt(argc, argv, "adin:ps:")) != EOF) {
 		switch (c) {
 		case 'a':
 			if (create_defaults)
@@ -311,6 +322,9 @@ hashcoll_f(
 			break;
 		case 'n':
 			nr = strtoul(optarg, NULL, 10);
+			break;
+		case 'p':
+			pptr_collisions = true;
 			break;
 		case 's':
 			seed = strtoul(optarg, NULL, 10);
@@ -351,7 +365,7 @@ hashcoll_f(
 		}
 
 		if (create_dirent)
-			collide_dirents(nr, buf, len);
+			collide_dirents(nr, buf, len, pptr_collisions);
 		if (create_xattr)
 			collide_xattrs(nr, buf, len);
 		return 0;
@@ -368,7 +382,7 @@ hashcoll_f(
 		}
 
 		if (create_dirent)
-			collide_dirents(nr, argv[c], len);
+			collide_dirents(nr, argv[c], len, pptr_collisions);
 		if (create_xattr)
 			collide_xattrs(nr, argv[c], len);
 	}

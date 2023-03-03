@@ -887,7 +887,7 @@ copy on write extent hint (XFS_XFLAG_COWEXTSIZE)
 has extended attributes (XFS_XFLAG_HASATTR)
 .RE
 .TP
-.BI "hashcoll [-d] [-a] [-n " nr "] -i | " names...
+.BI "hashcoll [-d] [-a] [-n " nr "] [-p] -i | " names...
 Create directory entries and extended attributes with names that all have the
 same hash value.
 The metadump name obfuscation algorithm is used here.
@@ -910,6 +910,10 @@ If this option is not specified, first names are taken from the command line.
 .BI \-n " nr"
 Create this many duplicated names.
 The default is to create one name.
+.TP 0.4i
+.B \-p
+When creating directory entries, make the hashes of the parent pointers
+collide.
 .TP 0.4i
 .BI \-s " seed"
 Seed the random number generator with this value.
