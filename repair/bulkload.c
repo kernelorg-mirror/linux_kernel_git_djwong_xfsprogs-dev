@@ -151,8 +151,9 @@ bulkload_destroy_reservation(
 	if (resv->len == 0)
 		return 0;
 
-	return __xfs_free_extent_later(sc->tp, resv->fsbno, resv->len,
-			&bkl->oinfo, XFS_AG_RESV_NONE, true);
+	return -libxfs_free_extent_later(sc->tp, resv->fsbno, resv->len,
+			&bkl->oinfo, XFS_AG_RESV_NONE,
+			XFS_FREE_EXTENT_SKIP_DISCARD);
 }
 
 /* Free all the accounting info and disk space we reserved for a new btree. */
