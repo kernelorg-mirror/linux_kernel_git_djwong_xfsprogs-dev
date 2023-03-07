@@ -357,6 +357,11 @@ xfs_refcount_update_diff_items(
 	ra = container_of(a, struct xfs_refcount_intent, ri_list);
 	rb = container_of(b, struct xfs_refcount_intent, ri_list);
 
+	ASSERT(ra->ri_realtime == rb->ri_realtime);
+
+	if (ra->ri_realtime)
+		return ra->ri_rtg->rtg_rgno - rb->ri_rtg->rtg_rgno;
+
 	return ra->ri_pag->pag_agno - rb->ri_pag->pag_agno;
 }
 
@@ -393,6 +398,14 @@ xfs_refcount_update_get_group(
 {
 	xfs_agnumber_t			agno;
 
+	if (ri->ri_realtime) {
+		xfs_rgnumber_t	rgno;
+
+		rgno = xfs_rtb_to_rgno(mp, ri->ri_startblock);
+		ri->ri_rtg = xfs_rtgroup_intent_get(mp, rgno);
+		return;
+	}
+
 	agno = XFS_FSB_TO_AGNO(mp, ri->ri_startblock);
 	ri->ri_pag = xfs_perag_intent_get(mp, agno);
 }
@@ -402,6 +415,11 @@ static inline void
 xfs_refcount_update_put_group(
 	struct xfs_refcount_intent	*ri)
 {
+	if (ri->ri_realtime) {
+		xfs_rtgroup_intent_put(ri->ri_rtg);
+		return;
+	}
+
 	xfs_perag_intent_put(ri->ri_pag);
 }
 
