@@ -8,6 +8,7 @@
 #define __LIBXFS_H__
 
 #define CONFIG_XFS_BTREE_IN_XFILE
+#define CONFIG_XFS_RT
 
 #include "libxfs_api_defs.h"
 #include "platform_defs.h"
@@ -85,6 +86,7 @@ struct iomap;
 #include "xfs_symlink_remote.h"
 #include "xfs_ag_resv.h"
 #include "xfs_imeta.h"
+#include "xfs_rtbitmap.h"
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
