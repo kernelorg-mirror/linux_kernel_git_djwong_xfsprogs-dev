@@ -36,7 +36,7 @@ rtinit(xfs_mount_t *mp)
 
 	wordcnt = libxfs_rtsummary_wordcount(mp, mp->m_rsumlevels,
 			mp->m_sb.sb_rbmblocks);
-	sumcompute = calloc(wordcnt, sizeof(xfs_suminfo_t));
+	sumcompute = calloc(wordcnt, sizeof(union xfs_suminfo_ondisk));
 	if (!sumcompute)
 		do_error(
 	_("couldn't allocate memory for incore realtime summary info.\n"));
@@ -50,7 +50,7 @@ int
 generate_rtinfo(
 	struct xfs_mount	*mp,
 	union xfs_rtword_ondisk	*words,
-	xfs_suminfo_t		*sumcompute)
+	union xfs_suminfo_ondisk	*sumcompute)
 {
 	xfs_rtxnum_t	extno;
 	xfs_rtxnum_t	start_ext;
@@ -96,7 +96,7 @@ generate_rtinfo(
 				len = (int) (extno - start_ext);
 				log = XFS_RTBLOCKLOG(len);
 				offs = xfs_rtsumoffs(mp, log, start_bmbno);
-				sumcompute[offs]++;
+				libxfs_suminfo_add(mp, &sumcompute[offs], 1);
 				in_extent = 0;
 			}
 
@@ -112,7 +112,7 @@ generate_rtinfo(
 		len = (int) (extno - start_ext);
 		log = XFS_RTBLOCKLOG(len);
 		offs = xfs_rtsumoffs(mp, log, start_bmbno);
-		sumcompute[offs]++;
+		libxfs_suminfo_add(mp, &sumcompute[offs], 1);
 	}
 
 	if (mp->m_sb.sb_frextents != sb_frextents) {
