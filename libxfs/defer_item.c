@@ -90,7 +90,7 @@ xfs_extent_free_get_group(
 		xfs_rgnumber_t		rgno;
 
 		rgno = xfs_rtb_to_rgno(mp, xefi->xefi_startblock);
-		xefi->xefi_rtg = xfs_rtgroup_get(mp, rgno);
+		xefi->xefi_rtg = xfs_rtgroup_intent_get(mp, rgno);
 		return;
 	}
 
@@ -104,7 +104,7 @@ xfs_extent_free_put_group(
 	struct xfs_extent_free_item	*xefi)
 {
 	if (xfs_efi_is_realtime(xefi)) {
-		xfs_rtgroup_put(xefi->xefi_rtg);
+		xfs_rtgroup_intent_put(xefi->xefi_rtg);
 		return;
 	}
 
@@ -272,7 +272,7 @@ xfs_rmap_update_get_group(
 		xfs_rgnumber_t	rgno;
 
 		rgno = xfs_rtb_to_rgno(mp, ri->ri_bmap.br_startblock);
-		ri->ri_rtg = xfs_rtgroup_get(mp, rgno);
+		ri->ri_rtg = xfs_rtgroup_intent_get(mp, rgno);
 		return;
 	}
 
@@ -286,7 +286,7 @@ xfs_rmap_update_put_group(
 	struct xfs_rmap_intent	*ri)
 {
 	if (ri->ri_realtime) {
-		xfs_rtgroup_put(ri->ri_rtg);
+		xfs_rtgroup_intent_put(ri->ri_rtg);
 		return;
 	}
 
@@ -515,7 +515,7 @@ xfs_bmap_update_get_group(
 			xfs_rgnumber_t	rgno;
 
 			rgno = xfs_rtb_to_rgno(mp, bi->bi_bmap.br_startblock);
-			bi->bi_rtg = xfs_rtgroup_get(mp, rgno);
+			bi->bi_rtg = xfs_rtgroup_intent_get(mp, rgno);
 		} else {
 			bi->bi_rtg = NULL;
 		}
@@ -541,8 +541,9 @@ xfs_bmap_update_put_group(
 	struct xfs_bmap_intent	*bi)
 {
 	if (xfs_ifork_is_realtime(bi->bi_owner, bi->bi_whichfork)) {
-		if (xfs_has_rtgroups(bi->bi_owner->i_mount))
-			xfs_rtgroup_put(bi->bi_rtg);
+		if (xfs_has_rtgroups(bi->bi_owner->i_mount)) {
+			xfs_rtgroup_intent_put(bi->bi_rtg);
+		}
 		return;
 	}
 
