@@ -23,6 +23,7 @@ PKGHFILES = xfs_fs.h \
 HFILES = \
 	libxfs_io.h \
 	libxfs_api_defs.h \
+	imeta_utils.h \
 	init.h \
 	iunlink.h \
 	libxfs_priv.h \
@@ -49,6 +50,7 @@ HFILES = \
 	xfs_errortag.h \
 	xfs_ialloc.h \
 	xfs_ialloc_btree.h \
+	xfs_imeta.h \
 	xfs_inode_buf.h \
 	xfs_inode_fork.h \
 	xfs_inode_util.h \
@@ -67,6 +69,7 @@ HFILES = \
 
 CFILES = cache.c \
 	defer_item.c \
+	imeta_utils.c \
 	init.c \
 	inode.c \
 	iunlink.c \
@@ -102,6 +105,7 @@ CFILES = cache.c \
 	xfs_dquot_buf.c \
 	xfs_ialloc.c \
 	xfs_iext_tree.c \
+	xfs_imeta.c \
 	xfs_inode_buf.c \
 	xfs_inode_fork.c \
 	xfs_inode_util.c \
