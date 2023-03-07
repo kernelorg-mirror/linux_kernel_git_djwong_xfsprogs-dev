@@ -826,6 +826,24 @@ libxfs_compute_all_maxlevels(
 	xfs_agbtree_compute_maxlevels(mp);
 }
 
+/* Mount the metadata files under the metadata directory tree. */
+STATIC void
+libxfs_mountfs_imeta(
+	struct xfs_mount	*mp)
+{
+	int			error;
+
+	/* Ignore filesystems that are under construction. */
+	if (mp->m_sb.sb_inprogress)
+		return;
+
+	error = -xfs_imeta_mount(mp);
+	if (error)
+		fprintf(stderr,
+_("%s: metadata inode mounting failed, error %d\n"),
+			progname, error);
+}
+
 /*
  * precalculate the low space thresholds for dynamic speculative preallocation.
  */
@@ -1005,6 +1023,8 @@ libxfs_mount(
 		exit(1);
 	}
 	xfs_set_perag_data_loaded(mp);
+
+	libxfs_mountfs_imeta(mp);
 
 	return mp;
 out_da:
