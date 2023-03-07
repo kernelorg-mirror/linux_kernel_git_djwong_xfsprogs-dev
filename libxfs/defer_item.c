@@ -88,12 +88,21 @@ xfs_extent_free_defer_add(
 
 	trace_xfs_extent_free_defer(mp, xefi);
 
-	if (xefi->xefi_agresv == XFS_AG_RESV_AGFL)
+	if (xfs_efi_is_realtime(xefi))
+		optype = XFS_DEFER_OPS_TYPE_FREE_RT;
+	else if (xefi->xefi_agresv == XFS_AG_RESV_AGFL)
 		optype = XFS_DEFER_OPS_TYPE_AGFL_FREE;
 	else
 		optype = XFS_DEFER_OPS_TYPE_FREE;
 
-	xefi->xefi_pag = xfs_perag_intent_get(mp, xefi->xefi_startblock);
+	if (xfs_efi_is_realtime(xefi)) {
+		xfs_rgnumber_t		rgno;
+
+		rgno = xfs_rtb_to_rgno(mp, xefi->xefi_startblock);
+		xefi->xefi_rtg = xfs_rtgroup_get(mp, rgno);
+	} else {
+		xefi->xefi_pag = xfs_perag_intent_get(mp, xefi->xefi_startblock);
+	}
 	*dfpp = xfs_defer_add(tp, optype, &xefi->xefi_list);
 }
 
@@ -157,6 +166,69 @@ const struct xfs_defer_op_type xfs_extent_free_defer_type = {
 	.create_done	= xfs_extent_free_create_done,
 	.finish_item	= xfs_extent_free_finish_item,
 	.cancel_item	= xfs_extent_free_cancel_item,
+};
+
+/* Sort bmap items by rtgroup. */
+static int
+xfs_rtextent_free_diff_items(
+	void				*priv,
+	const struct list_head		*a,
+	const struct list_head		*b)
+{
+	struct xfs_extent_free_item	*ra = xefi_entry(a);
+	struct xfs_extent_free_item	*rb = xefi_entry(b);
+
+	return ra->xefi_rtg->rtg_rgno - rb->xefi_rtg->rtg_rgno;
+}
+
+static struct xfs_log_item *
+xfs_rtextent_free_create_intent(
+	struct xfs_trans		*tp,
+	struct list_head		*items,
+	unsigned int			count,
+	bool				sort)
+{
+	struct xfs_mount		*mp = tp->t_mountp;
+
+	if (sort)
+		list_sort(mp, items, xfs_rtextent_free_diff_items);
+	return NULL;
+}
+
+/* Cancel a free extent. */
+STATIC void
+xfs_rtextent_free_cancel_item(
+	struct list_head		*item)
+{
+	struct xfs_extent_free_item	*xefi = xefi_entry(item);
+
+	xfs_rtgroup_put(xefi->xefi_rtg);
+	kmem_cache_free(xfs_extfree_item_cache, xefi);
+}
+
+STATIC int
+xfs_rtextent_free_finish_item(
+	struct xfs_trans		*tp,
+	struct xfs_log_item		*done,
+	struct list_head		*item,
+	struct xfs_btree_cur		**state)
+{
+	struct xfs_extent_free_item	*xefi = xefi_entry(item);
+	int				error;
+
+	error = xfs_rtfree_blocks(tp, xefi->xefi_startblock,
+			xefi->xefi_blockcount);
+	if (error != -EAGAIN)
+		xfs_rtextent_free_cancel_item(item);
+	return error;
+}
+
+const struct xfs_defer_op_type xfs_rtextent_free_defer_type = {
+	.create_intent	= xfs_rtextent_free_create_intent,
+	.abort_intent	= xfs_extent_free_abort_intent,
+	.create_done	= xfs_extent_free_create_done,
+	.finish_item	= xfs_rtextent_free_finish_item,
+	.cancel_item	= xfs_rtextent_free_cancel_item,
 };
 
 /*
