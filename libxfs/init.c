@@ -22,6 +22,7 @@
 #include "xfs_rmap_btree.h"
 #include "xfs_refcount_btree.h"
 #include "libfrog/platform.h"
+#include "xfile.h"
 
 #include "libxfs.h"		/* for now */
 
@@ -320,6 +321,8 @@ libxfs_init(libxfs_init_t *a)
 	a->ddev = a->logdev = a->rtdev = 0;
 	a->dsize = a->lbsize = a->rtbsize = 0;
 	a->dbsize = a->logBBsize = a->logBBstart = a->rtsize = 0;
+
+	xfile_libinit();
 
 	fd = -1;
 	flags = (a->isreadonly | a->isdirect);
