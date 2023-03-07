@@ -328,6 +328,11 @@ struct xfs_drain { /* empty */ };
 static inline void xfs_perag_intent_hold(struct xfs_perag *pag) { }
 static inline void xfs_perag_intent_rele(struct xfs_perag *pag) { }
 
+struct xfs_rtgroup;
+
+static inline void xfs_rtgroup_intent_hold(struct xfs_rtgroup *rtg) { }
+static inline void xfs_rtgroup_intent_rele(struct xfs_rtgroup *rtg) { }
+
 #define xfs_drain_free(dr)		((void)0)
 #define xfs_drain_init(dr)		((void)0)
 
