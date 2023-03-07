@@ -173,6 +173,9 @@ xfs_rtbitmap_getword(
 	struct xfs_mount	*mp,
 	union xfs_rtword_ondisk	*wordptr)
 {
+	if (xfs_has_rtgroups(mp))
+		return le32_to_cpu(wordptr->rtg);
+
 	return wordptr->raw;
 }
 
@@ -183,7 +186,10 @@ xfs_rtbitmap_setword(
 	union xfs_rtword_ondisk	*wordptr,
 	xfs_rtword_t		incore)
 {
-	wordptr->raw = incore;
+	if (xfs_has_rtgroups(mp))
+		wordptr->rtg = cpu_to_le32(incore);
+	else
+		wordptr->raw = incore;
 }
 
 /*
