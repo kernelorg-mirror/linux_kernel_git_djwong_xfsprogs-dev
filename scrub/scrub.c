@@ -49,6 +49,9 @@ format_scrub_descr(
 	case XFROG_SCRUB_GROUP_ISCAN:
 	case XFROG_SCRUB_GROUP_NONE:
 		return snprintf(buf, buflen, _("%s"), _(sc->descr));
+	case XFROG_SCRUB_GROUP_RTGROUP:
+		return snprintf(buf, buflen, _("rtgroup %u %s"), meta->sm_agno,
+				_(sc->descr));
 	}
 	return -1;
 }
@@ -97,6 +100,7 @@ xfs_check_metadata(
 	switch (group) {
 	case XFROG_SCRUB_GROUP_AGHEADER:
 	case XFROG_SCRUB_GROUP_PERAG:
+	case XFROG_SCRUB_GROUP_RTGROUP:
 		meta.sm_agno = sri->sri_agno;
 		break;
 	case XFROG_SCRUB_GROUP_METAFILES:
