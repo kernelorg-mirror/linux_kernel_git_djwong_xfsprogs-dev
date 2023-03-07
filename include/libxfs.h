@@ -90,6 +90,7 @@ struct iomap;
 #include "xfs_imeta.h"
 #include "imeta_utils.h"
 #include "xfs_rtbitmap.h"
+#include "xfs_rtgroup.h"
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
