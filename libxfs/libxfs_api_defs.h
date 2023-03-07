@@ -265,4 +265,7 @@
 
 /* Please keep this list alphabetized. */
 
+/* XXX remove this */
+#define dump_stack() do { } while(0)
+
 #endif /* __LIBXFS_API_DEFS_H__ */
