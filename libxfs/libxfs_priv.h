@@ -211,6 +211,16 @@ static inline bool WARN_ON(bool expr) {
 #define percpu_counter_read_positive(x)	((*x) > 0 ? (*x) : 0)
 #define percpu_counter_sum(x)		(*x)
 
+static inline int
+__percpu_counter_compare(uint64_t *count, int64_t rhs, int32_t batch)
+{
+	if (*count > rhs)
+		return 1;
+	else if (*count < rhs)
+		return -1;
+	return 0;
+}
+
 /*
  * get_random_u32 is used for di_gen inode allocation, it must be zero for
  * libxfs or all sorts of badness can occur!
