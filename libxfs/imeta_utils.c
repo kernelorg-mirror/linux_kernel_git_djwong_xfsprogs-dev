@@ -21,6 +21,7 @@
 #include "xfs_imeta.h"
 #include "xfs_trace.h"
 #include "xfs_parent.h"
+#include "xfs_health.h"
 #include "imeta_utils.h"
 
 static inline int
@@ -45,8 +46,10 @@ xfs_imeta_init(
 	 * /quota already exists.
 	 */
 	error = xfs_imeta_dir_parent(mp, upd->path, &upd->dp);
-	if (error == -ENOENT)
+	if (error == -ENOENT) {
+		xfs_fs_mark_sick(mp, XFS_SICK_FS_METADIR);
 		return -EFSCORRUPTED;
+	}
 	if (error)
 		return error;
 
