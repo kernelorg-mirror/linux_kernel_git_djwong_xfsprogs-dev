@@ -3663,7 +3663,7 @@ process_rtbitmap(
 				len = ((int)bmbno - start_bmbno) *
 					bitsperblock + (bit - start_bit);
 				log = XFS_RTBLOCKLOG(len);
-				offs = XFS_SUMOFFS(mp, log, start_bmbno);
+				offs = xfs_rtsumoffs(mp, log, start_bmbno);
 				sumcompute[offs]++;
 				prevbit = 0;
 			}
@@ -3676,7 +3676,7 @@ process_rtbitmap(
 		len = ((int)bmbno - start_bmbno) * bitsperblock +
 			(bit - start_bit);
 		log = XFS_RTBLOCKLOG(len);
-		offs = XFS_SUMOFFS(mp, log, start_bmbno);
+		offs = xfs_rtsumoffs(mp, log, start_bmbno);
 		sumcompute[offs]++;
 	}
 }
