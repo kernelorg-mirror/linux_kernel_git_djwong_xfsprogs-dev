@@ -3623,10 +3623,18 @@ process_rtbitmap(
 	xfs_rtword_t	*words;
 
 	bitsperblock = mp->m_sb.sb_blocksize * NBBY;
+	words = malloc(mp->m_blockwsize << XFS_WORDLOG);
+	if (!words) {
+		dbprintf(_("could not allocate rtwords buffer\n"));
+		error++;
+		return;
+	}
 	bit = extno = prevbit = start_bmbno = start_bit = 0;
 	bmbno = NULLFILEOFF;
-	while ((bmbno = blkmap_next_off(blkmap, bmbno, &t)) !=
-	       NULLFILEOFF) {
+	while ((bmbno = blkmap_next_off(blkmap, bmbno, &t)) != NULLFILEOFF) {
+		xfs_rtword_t	*incore = words;
+		unsigned int	i;
+
 		bno = blkmap_get(blkmap, bmbno);
 		if (bno == NULLFSBLOCK) {
 			if (!sflag)
@@ -3649,7 +3657,9 @@ process_rtbitmap(
 			continue;
 		}
 
-		words = xfs_rbmblock_wordptr(iocur_top->bp, 0);
+		for (i = 0; i < mp->m_blockwsize; i++, incore++)
+			*incore = libxfs_rtbitmap_getword(iocur_top->bp, i);
+
 		for (bit = 0;
 		     bit < bitsperblock && extno < mp->m_sb.sb_rextents;
 		     bit++, extno++) {
@@ -3683,6 +3693,7 @@ process_rtbitmap(
 		offs = xfs_rtsumoffs(mp, log, start_bmbno);
 		sumcompute[offs]++;
 	}
+	free(words);
 }
 
 static void
