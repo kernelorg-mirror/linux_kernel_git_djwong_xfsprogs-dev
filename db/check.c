@@ -3639,7 +3639,7 @@ process_rtbitmap(
 		push_cur();
 		set_cur(&typtab[TYP_RTBITMAP], XFS_FSB_TO_DADDR(mp, bno), blkbb,
 			DB_RING_IGN, NULL);
-		if ((words = iocur_top->data) == NULL) {
+		if (!iocur_top->bp) {
 			if (!sflag)
 				dbprintf(_("can't read block %lld for rtbitmap "
 					 "inode\n"),
@@ -3648,6 +3648,8 @@ process_rtbitmap(
 			pop_cur();
 			continue;
 		}
+
+		words = xfs_rbmblock_wordptr(iocur_top->bp, 0);
 		for (bit = 0;
 		     bit < bitsperblock && extno < mp->m_sb.sb_rextents;
 		     bit++, extno++) {
