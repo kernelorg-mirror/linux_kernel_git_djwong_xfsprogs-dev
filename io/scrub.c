@@ -84,6 +84,7 @@ scrub_ioctl(
 	switch (sc->group) {
 	case XFROG_SCRUB_GROUP_AGHEADER:
 	case XFROG_SCRUB_GROUP_PERAG:
+	case XFROG_SCRUB_GROUP_RTGROUP:
 		meta.sm_agno = control;
 		break;
 	case XFROG_SCRUB_GROUP_METAPATH:
@@ -224,6 +225,19 @@ parse_args(
 			return 0;
 		}
 		break;
+	case XFROG_SCRUB_GROUP_RTGROUP:
+		if (optind != argc - 1) {
+			fprintf(stderr,
+				_("Must specify one rtgroup number.\n"));
+			return 0;
+		}
+		control = strtoul(argv[optind], &p, 0);
+		if (*p != '\0') {
+			fprintf(stderr,
+				_("Bad rtgroup number '%s'.\n"), argv[optind]);
+			return 0;
+		}
+		break;
 	default:
 		ASSERT(0);
 		break;
@@ -326,6 +340,7 @@ repair_ioctl(
 	switch (sc->group) {
 	case XFROG_SCRUB_GROUP_AGHEADER:
 	case XFROG_SCRUB_GROUP_PERAG:
+	case XFROG_SCRUB_GROUP_RTGROUP:
 		meta.sm_agno = control;
 		break;
 	case XFROG_SCRUB_GROUP_METAPATH:
