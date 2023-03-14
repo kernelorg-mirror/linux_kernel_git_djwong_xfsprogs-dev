@@ -740,12 +740,14 @@ nametable_add(xfs_dahash_t hash, int namelen, unsigned char *name)
 #define rol32(x,y)		(((x) << (y)) | ((x) >> (32 - (y))))
 
 static inline unsigned char
-random_filename_char(void)
+random_filename_char(xfs_ino_t	ino)
 {
 	static unsigned char filename_alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 						"abcdefghijklmnopqrstuvwxyz"
 						"0123456789-_";
 
+	if (ino)
+		return filename_alphabet[ino % (sizeof filename_alphabet - 1)];
 	return filename_alphabet[random() % (sizeof filename_alphabet - 1)];
 }
 
@@ -815,6 +817,7 @@ in_lost_found(
  */
 static void
 obfuscate_name(
+	xfs_ino_t	ino,
 	xfs_dahash_t	hash,
 	size_t		name_len,
 	unsigned char	*name)
@@ -842,7 +845,7 @@ obfuscate_name(
 	 * Accumulate its new hash value as we go.
 	 */
 	for (i = 0; i < name_len - 5; i++) {
-		*newp = random_filename_char();
+		*newp = random_filename_char(ino);
 		new_hash = *newp ^ rol32(new_hash, 7);
 		newp++;
 	}
@@ -1207,7 +1210,10 @@ generate_obfuscated_name(
 	/* Obfuscate the name (if possible) */
 
 	hash = libxfs_da_hashname(name, namelen);
-	obfuscate_name(hash, namelen, name);
+	if (xfs_has_parent(mp))
+		obfuscate_name(ino, hash, namelen, name);
+	else
+		obfuscate_name(0, hash, namelen, name);
 
 	/*
 	 * Make sure the name is not something already seen.  If we
@@ -1320,7 +1326,7 @@ obfuscate_path_components(
 			/* last (or single) component */
 			namelen = strnlen((char *)comp, len);
 			hash = libxfs_da_hashname(comp, namelen);
-			obfuscate_name(hash, namelen, comp);
+			obfuscate_name(0, hash, namelen, comp);
 			break;
 		}
 		namelen = slash - (char *)comp;
@@ -1331,7 +1337,7 @@ obfuscate_path_components(
 			continue;
 		}
 		hash = libxfs_da_hashname(comp, namelen);
-		obfuscate_name(hash, namelen, comp);
+		obfuscate_name(0, hash, namelen, comp);
 		comp += namelen + 1;
 		len -= namelen + 1;
 	}
@@ -1407,10 +1413,15 @@ process_sf_attr(
 		}
 
 		if (obfuscate) {
-			generate_obfuscated_name(0, asfep->namelen,
-						 &asfep->nameval[0]);
-			memset(&asfep->nameval[asfep->namelen], 'v',
-			       asfep->valuelen);
+			if (asfep->flags & XFS_ATTR_PARENT) {
+				generate_obfuscated_name(cur_ino, asfep->valuelen,
+					 &asfep->nameval[asfep->namelen]);
+			} else {
+				generate_obfuscated_name(0, asfep->namelen,
+							 &asfep->nameval[0]);
+				memset(&asfep->nameval[asfep->namelen], 'v',
+				       asfep->valuelen);
+			}
 		}
 
 		asfep = (struct xfs_attr_sf_entry *)((char *)asfep +
@@ -1785,7 +1796,7 @@ process_attr_block(
 						(long long)cur_ino);
 				break;
 			}
-			if (obfuscate) {
+			if (obfuscate && !(entry->flags & XFS_ATTR_PARENT)) {
 				generate_obfuscated_name(0, local->namelen,
 					&local->nameval[0]);
 				memset(&local->nameval[local->namelen], 'v',
@@ -1797,6 +1808,9 @@ process_attr_block(
 			zlen = xfs_attr_leaf_entsize_local(nlen, vlen) -
 				(sizeof(xfs_attr_leaf_name_local_t) - 1 +
 				 nlen + vlen);
+			if (obfuscate && (entry->flags & XFS_ATTR_PARENT))
+				generate_obfuscated_name(cur_ino, vlen,
+						&local->nameval[nlen]);
 			if (zero_stale_data)
 				memset(&local->nameval[nlen + vlen], 0, zlen);
 		} else {
