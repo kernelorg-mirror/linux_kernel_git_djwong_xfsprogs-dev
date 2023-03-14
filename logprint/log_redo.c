@@ -759,7 +759,7 @@ xlog_print_trans_attri(
 	memmove((char*)src_f, *ptr, src_len);
 	*ptr += src_len;
 
-	if (xfs_attr_log_item_op(src_f) == XFS_ATTRI_OP_FLAGS_NVREPLACEXXX) {
+	if (xfs_attr_log_item_op(src_f) == XFS_ATTRI_OP_FLAGS_NVREPLACE) {
 		name_len = src_f->alfi_oldname_len;
 		newname_len = src_f->alfi_newname_len;
 		value_len = src_f->alfi_value_len;
@@ -900,7 +900,7 @@ xlog_recover_print_attri(
 	if (xfs_attri_copy_log_format((char*)src_f, src_len, f))
 		goto out;
 
-	if (xfs_attr_log_item_op(f) == XFS_ATTRI_OP_FLAGS_NVREPLACEXXX) {
+	if (xfs_attr_log_item_op(f) == XFS_ATTRI_OP_FLAGS_NVREPLACE) {
 		name_len = f->alfi_oldname_len;
 		newname_len = f->alfi_newname_len;
 		value_len = f->alfi_value_len;
