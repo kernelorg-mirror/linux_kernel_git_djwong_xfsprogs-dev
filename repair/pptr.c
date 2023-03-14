@@ -133,8 +133,11 @@ struct ag_pptr {
 };
 
 struct file_pptr {
+	/* Is the name stored in the global nameblobs structure? */
+	unsigned int		name_in_nameblobs:1;
+
 	/* parent directory handle */
-	xfs_ino_t		parent_ino;
+	unsigned long long	parent_ino:63;
 	unsigned int		parent_gen;
 
 	/* dirent offset */
@@ -467,6 +470,32 @@ stuffit:
 				strerror(error));
 }
 
+/*
+ * Store this file parent pointer's name in the file scan namelist unless it's
+ * already in the global list.
+ */
+static int
+store_file_pptr_name(
+	struct file_scan			*fscan,
+	struct file_pptr			*file_pptr,
+	const struct xfs_parent_name_irec	*irec)
+{
+	int					error;
+
+	error = strblobs_lookup(nameblobs, &file_pptr->name_cookie,
+			irec->p_name, irec->p_namelen);
+	if (!error) {
+		file_pptr->name_in_nameblobs = true;
+		return 0;
+	}
+	if (error != ENOENT)
+		return error;
+
+	file_pptr->name_in_nameblobs = false;
+	return -xfblob_store(fscan->file_pptr_names, &file_pptr->name_cookie,
+			irec->p_name, irec->p_namelen);
+}
+
 /* Decide if this is a directory parent pointer and stash it if so. */
 static int
 examine_xattr(
@@ -505,8 +534,7 @@ examine_xattr(
 	file_pptr.diroffset = irec.p_diroffset;
 	file_pptr.namelen = irec.p_namelen;
 
-	error = -xfblob_store(fscan->file_pptr_names,
-			&file_pptr.name_cookie, irec.p_name, irec.p_namelen);
+	error = store_file_pptr_name(fscan, &file_pptr, &irec);
 	if (error)
 		do_error(
  _("storing ino %llu parent pointer '%.*s' failed: %s\n"),
@@ -566,6 +594,21 @@ remove_file_pptr(
 	struct xfs_parent_scratch	scratch;
 
 	return -libxfs_parent_unset(ip, &pptr_rec, &scratch);
+}
+
+/* Load a file parent pointer name from wherever we stored it. */
+static int
+load_file_pptr_name(
+	struct file_scan	*fscan,
+	const struct file_pptr	*file_pptr,
+	unsigned char		*name)
+{
+	if (file_pptr->name_in_nameblobs)
+		return strblobs_load(nameblobs, file_pptr->name_cookie,
+				name, file_pptr->namelen);
+
+	return -xfblob_load(fscan->file_pptr_names, file_pptr->name_cookie,
+			name, file_pptr->namelen);
 }
 
 /* Remove all pptrs from @ip. */
@@ -665,8 +708,7 @@ remove_incorrect_parent_ptr(
 	unsigned char		name[MAXNAMELEN] = { };
 	int			error;
 
-	error = -xfblob_load(fscan->file_pptr_names, file_pptr->name_cookie,
-			name, file_pptr->namelen);
+	error = load_file_pptr_name(fscan, file_pptr, name);
 	if (error)
 		do_error(
  _("loading incorrect name for ino %llu parent pointer (ino %llu gen 0x%x diroffset %u namecookie 0x%llx) failed: %s\n"),
@@ -729,8 +771,7 @@ compare_parent_pointers(
 				(unsigned long long)ag_pptr->name_cookie,
 				ag_pptr->namelen, strerror(error));
 
-	error = -xfblob_load(fscan->file_pptr_names, file_pptr->name_cookie,
-			name2, file_pptr->namelen);
+	error = load_file_pptr_name(fscan, file_pptr, name2);
 	if (error)
 		do_error(
  _("loading file-list name for ino %llu parent pointer (ino %llu gen 0x%x diroffset %u namecookie 0x%llx namelen %u) failed: %s\n"),
@@ -1050,6 +1091,13 @@ check_parent_ptrs(
 {
 	struct workqueue	wq;
 	xfs_agnumber_t		agno;
+
+	/*
+	 * We only store the lower 63 bits of the inode number in struct
+	 * file_pptr to save space, so we must guarantee that we'll never
+	 * encounter an inumber with the top bit set.
+	 */
+	BUILD_BUG_ON((1ULL << 63) & XFS_MAXINUMBER);
 
 	if (!xfs_has_parent(mp))
 		return;
