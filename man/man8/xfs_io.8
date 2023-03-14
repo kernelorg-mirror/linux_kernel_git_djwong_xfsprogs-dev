@@ -886,6 +886,35 @@ copy on write extent hint (XFS_XFLAG_COWEXTSIZE)
 .B X
 has extended attributes (XFS_XFLAG_HASATTR)
 .RE
+.TP
+.BI "hashcoll [-d] [-a] [-n " nr "] -i | " names...
+Create directory entries and extended attributes with names that all have the
+same hash value.
+The metadump name obfuscation algorithm is used here.
+.RS 1.0i
+.PD 0
+.TP 0.4i
+.B \-d
+Create directory entries.
+This is the default for directories.
+.TP 0.4i
+.B \-a
+Create extended attributes.
+This is the default for non-special files.
+.TP 0.4i
+.B \-i
+Read the first name to create from standard input.
+Up to 255 bytes are read.
+If this option is not specified, first names are taken from the command line.
+.TP 0.4i
+.BI \-n " nr"
+Create this many duplicated names.
+The default is to create one name.
+.TP 0.4i
+.BI \-s " seed"
+Seed the random number generator with this value.
+.PD
+.RE
 
 .TP
 .BR chattr " [ " \-R " | " \-D " ] [ " + / \-riasAdtPneEfSxC " ]"
@@ -1503,6 +1532,19 @@ command.
 .B crc32cselftest
 Test the internal crc32c implementation to make sure that it computes results
 correctly.
+.TP
+.BI "namehash -i | " names...
+Compute the dahash value of the given names.
+.RS 1.0i
+.PD 0
+.TP 0.4i
+.B \-i
+Read the first name to create from standard input.
+Up to 255 bytes are read.
+If this option is not specified, first names are taken from the command line.
+.PD
+.RE
+
 .SH SEE ALSO
 .BR mkfs.xfs (8),
 .BR xfsctl (3),

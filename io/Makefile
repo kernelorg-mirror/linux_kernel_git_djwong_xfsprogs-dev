@@ -13,7 +13,7 @@ CFILES = init.c \
 	file.c freeze.c fsync.c getrusage.c imap.c inject.c label.c link.c \
 	mmap.c open.c parent.c pread.c prealloc.c pwrite.c reflink.c \
 	resblks.c scrub.c seek.c shutdown.c stat.c swapext.c sync.c \
-	truncate.c utimes.c
+	truncate.c utimes.c namehash.c
 
 LLDLIBS = $(LIBXCMD) $(LIBHANDLE) $(LIBFROG) $(LIBPTHREAD)
 LTDEPENDENCIES = $(LIBXCMD) $(LIBHANDLE) $(LIBFROG)
@@ -110,6 +110,10 @@ endif
 
 ifeq ($(HAVE_STATFS_FLAGS),yes)
 LCFLAGS += -DHAVE_STATFS_FLAGS
+endif
+
+ifeq ($(HAVE_OPENAT),yes)
+LCFLAGS += -DHAVE_OPENAT
 endif
 
 default: depend $(LTCOMMAND)

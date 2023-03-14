@@ -66,6 +66,7 @@ init_commands(void)
 	madvise_init();
 	mincore_init();
 	mmap_init();
+	namehash_init();
 	open_init();
 	parent_init();
 	pread_init();
