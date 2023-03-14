@@ -267,10 +267,15 @@ handle_to_path_walk(
 	void			*arg)
 {
 	struct path_walk_info	*pwi = arg;
+	int			mntpt_len = strlen(mntpt);
 	int			ret;
 
-	ret = snprintf(pwi->buf, pwi->len, "%s", mntpt);
-	if (ret != strlen(mntpt))
+	/* Trim trailing slashes from the mountpoint */
+	while (mntpt_len > 0 && mntpt[mntpt_len - 1] == '/')
+		mntpt_len--;
+
+	ret = snprintf(pwi->buf, pwi->len, "%.*s", mntpt_len, mntpt);
+	if (ret != mntpt_len)
 		return ENAMETOOLONG;
 
 	ret = path_list_to_string(path, pwi->buf + ret, pwi->len - ret);
