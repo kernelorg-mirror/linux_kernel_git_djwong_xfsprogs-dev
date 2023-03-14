@@ -37,7 +37,7 @@ handle_walk_parents(
 	void			*arg)
 {
 	struct xfs_getparents	*pi;
-	struct xfs_parent_ptr	*p;
+	struct xfs_getparents_rec	*p;
 	unsigned int		i;
 	ssize_t			ret = -1;
 
@@ -128,7 +128,7 @@ static int handle_walk_parent_paths(struct walk_ppaths_info *wpi,
 static int
 handle_walk_parent_path_ptr(
 	struct xfs_getparents		*pi,
-	struct xfs_parent_ptr		*p,
+	struct xfs_getparents_rec	*p,
 	void				*arg)
 {
 	struct walk_ppath_level_info	*wpli = arg;
@@ -138,13 +138,13 @@ handle_walk_parent_path_ptr(
 	if (pi->gp_flags & XFS_GETPARENTS_OFLAG_ROOT)
 		return wpi->fn(wpi->mntpt, wpi->path, wpi->arg);
 
-	ret = path_component_change(wpli->pc, p->xpp_name,
-				strlen((char *)p->xpp_name), p->xpp_ino);
+	ret = path_component_change(wpli->pc, p->gpr_name,
+				strlen((char *)p->gpr_name), p->gpr_ino);
 	if (ret)
 		return ret;
 
-	wpli->newhandle.ha_fid.fid_ino = p->xpp_ino;
-	wpli->newhandle.ha_fid.fid_gen = p->xpp_gen;
+	wpli->newhandle.ha_fid.fid_ino = p->gpr_ino;
+	wpli->newhandle.ha_fid.fid_gen = p->gpr_gen;
 
 	path_list_add_parent_component(wpi->path, wpli->pc);
 	ret = handle_walk_parent_paths(wpi, &wpli->newhandle);

@@ -25,7 +25,7 @@ struct pptr_args {
 static int
 pptr_print(
 	struct xfs_getparents	*pi,
-	struct xfs_parent_ptr	*pptr,
+	struct xfs_getparents_rec	*pptr,
 	void			*arg)
 {
 	struct pptr_args	*args = arg;
@@ -36,21 +36,21 @@ pptr_print(
 		return 0;
 	}
 
-	if (args->filter_ino && pptr->xpp_ino != args->filter_ino)
+	if (args->filter_ino && pptr->gpr_ino != args->filter_ino)
 		return 0;
-	if (args->filter_name && strcmp(args->filter_name, pptr->xpp_name))
+	if (args->filter_name && strcmp(args->filter_name, pptr->gpr_name))
 		return 0;
 
-	namelen = strlen(pptr->xpp_name);
+	namelen = strlen(pptr->gpr_name);
 	if (args->shortformat) {
 		printf("%llu/%u/%u/%s\n",
-			(unsigned long long)pptr->xpp_ino,
-			(unsigned int)pptr->xpp_gen, namelen, pptr->xpp_name);
+			(unsigned long long)pptr->gpr_ino,
+			(unsigned int)pptr->gpr_gen, namelen, pptr->gpr_name);
 	} else {
-		printf(_("p_ino    = %llu\n"), (unsigned long long)pptr->xpp_ino);
-		printf(_("p_gen    = %u\n"), (unsigned int)pptr->xpp_gen);
+		printf(_("p_ino    = %llu\n"), (unsigned long long)pptr->gpr_ino);
+		printf(_("p_gen    = %u\n"), (unsigned int)pptr->gpr_gen);
 		printf(_("p_reclen = %u\n"), namelen);
-		printf(_("p_name   = \"%s\"\n\n"), pptr->xpp_name);
+		printf(_("p_name   = \"%s\"\n\n"), pptr->gpr_name);
 	}
 	return 0;
 }
