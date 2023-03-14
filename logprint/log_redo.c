@@ -700,18 +700,22 @@ dump_pptr_update(
 	const void	*newname_ptr,
 	unsigned int	newname_len,
 	const void	*value_ptr,
-	unsigned int	value_len)
+	unsigned int	value_len,
+	const void	*newvalue_ptr,
+	unsigned int	newvalue_len)
 {
 	if (newname_ptr && name_ptr) {
 		dump_pptr("OLDNAME", name_ptr, name_len, value_ptr, value_len);
-		dump_pptr("NEWNAME", newname_ptr, newname_len, "", 0);
+		dump_pptr("NEWNAME", newname_ptr, newname_len, newvalue_ptr,
+				newvalue_len);
 		return;
 	}
 
 	if (name_ptr)
 		dump_pptr("NAME", name_ptr, name_len, value_ptr, value_len);
 	if (newname_ptr)
-		dump_pptr("NNAME", newname_ptr, newname_len, NULL, 0);
+		dump_pptr("NNAME", newname_ptr, newname_len, newvalue_ptr,
+				newvalue_len);
 }
 
 static inline unsigned int
@@ -729,9 +733,10 @@ xlog_print_trans_attri(
 	struct xfs_attri_log_format	*src_f = NULL;
 	xlog_op_header_t		*head = NULL;
 	void				*name_ptr = NULL, *newname_ptr = NULL;
-	void				*value_ptr = NULL;
+	void				*value_ptr = NULL, *newvalue_ptr = NULL;
 	uint				dst_len;
 	unsigned int			name_len, newname_len = 0;
+	unsigned int			value_len = 0, newvalue_len = 0;
 	int				error = 0;
 
 	dst_len = sizeof(struct xfs_attri_log_format);
@@ -757,21 +762,26 @@ xlog_print_trans_attri(
 	if (xfs_attr_log_item_op(src_f) == XFS_ATTRI_OP_FLAGS_NVREPLACEXXX) {
 		name_len = src_f->alfi_oldname_len;
 		newname_len = src_f->alfi_newname_len;
+		value_len = src_f->alfi_value_len;
+		newvalue_len = src_f->alfi_newvalue_len;
 	} else if (xfs_attr_log_item_op(src_f) == XFS_ATTRI_OP_FLAGS_NVREPLACE) {
 		name_len = src_f->alfi_oldname_len;
 		newname_len = src_f->alfi_newname_len;
+		value_len = src_f->alfi_value_len;
 	} else {
 		name_len = src_f->alfi_name_len;
+		value_len = src_f->alfi_value_len;
 	}
 
-	printf(_("ATTRI:  #regs: %d	f: 0x%x, ino: 0x%llx, attr_filter: 0x%x, name_len: %d, newname_len: %d, value_len: %d  id: 0x%llx\n"),
+	printf(_("ATTRI:  #regs: %d	f: 0x%x, ino: 0x%llx, attr_filter: 0x%x, name_len: %d, newname_len: %d, value_len: %d, newvalue_len: %d  id: 0x%llx\n"),
 			src_f->alfi_size,
 			src_f->alfi_op_flags,
 			(unsigned long long)src_f->alfi_ino,
 			src_f->alfi_attr_filter,
 			name_len,
 			newname_len,
-			src_f->alfi_value_len,
+			value_len,
+			newvalue_len,
 			(unsigned long long)src_f->alfi_id);
 
 	if (name_len > 0) {
@@ -798,14 +808,27 @@ xlog_print_trans_attri(
 			goto error;
 	}
 
-	if (src_f->alfi_value_len > 0) {
+	if (value_len > 0) {
 		printf(_("\n"));
 		(*i)++;
 		head = (xlog_op_header_t *)*ptr;
 		xlog_print_op_header(head, *i, ptr);
 		value_ptr = *ptr;
-		error = xlog_print_trans_attri_value(ptr, be32_to_cpu(head->oh_len),
-				src_f->alfi_value_len);
+		error = xlog_print_trans_attri_value(ptr,
+				be32_to_cpu(head->oh_len), value_len, "value");
+		if (error)
+			goto error;
+	}
+
+	if (newvalue_len > 0) {
+		printf(_("\n"));
+		(*i)++;
+		head = (xlog_op_header_t *)*ptr;
+		xlog_print_op_header(head, *i, ptr);
+		newvalue_ptr = *ptr;
+		error = xlog_print_trans_attri_value(ptr,
+				be32_to_cpu(head->oh_len), newvalue_len,
+				"newvalue");
 		if (error)
 			goto error;
 	}
@@ -813,7 +836,8 @@ xlog_print_trans_attri(
 	if (src_f->alfi_attr_filter & XFS_ATTR_PARENT)
 		dump_pptr_update(name_ptr, name_len,
 				 newname_ptr, newname_len,
-				 value_ptr, src_f->alfi_value_len);
+				 value_ptr, value_len,
+				 newvalue_ptr, newvalue_len);
 error:
 	free(src_f);
 
@@ -838,17 +862,18 @@ int
 xlog_print_trans_attri_value(
 	char				**ptr,
 	uint				src_len,
-	int				value_len)
+	unsigned int			value_len,
+	const char			*tag)
 {
 	int len = min(value_len, src_len);
 
-	printf(_("ATTRI:  value len:%u\n"), value_len);
+	printf(_("ATTRI:  %s len: %u\n"), tag, value_len);
 	print_or_dump(*ptr, len);
 
 	*ptr += src_len;
 
 	return 0;
-}	/* xlog_print_trans_attri_value */
+}
 
 void
 xlog_recover_print_attri(
@@ -857,8 +882,9 @@ xlog_recover_print_attri(
 	struct xfs_attri_log_format	*f, *src_f = NULL;
 	uint				src_len, dst_len;
 	void				*name_ptr = NULL, *newname_ptr = NULL;
-	void				*value_ptr = NULL;
+	void				*value_ptr = NULL, *newvalue_ptr = NULL;
 	unsigned int			name_len, newname_len = 0;
+	unsigned int			value_len = 0, newvalue_len = 0;
 	int				region = 0;
 
 	src_f = (struct xfs_attri_log_format *)item->ri_buf[0].i_addr;
@@ -881,21 +907,26 @@ xlog_recover_print_attri(
 	if (xfs_attr_log_item_op(f) == XFS_ATTRI_OP_FLAGS_NVREPLACEXXX) {
 		name_len = f->alfi_oldname_len;
 		newname_len = f->alfi_newname_len;
+		value_len = f->alfi_value_len;
+		newvalue_len = f->alfi_newvalue_len;
 	} else if (xfs_attr_log_item_op(f) == XFS_ATTRI_OP_FLAGS_NVREPLACE) {
 		name_len = f->alfi_oldname_len;
 		newname_len = f->alfi_newname_len;
+		value_len = f->alfi_value_len;
 	} else {
 		name_len = f->alfi_name_len;
+		value_len = f->alfi_value_len;
 	}
 
-	printf(_("ATTRI:  #regs: %d	f: 0x%x, ino: 0x%llx, attr_filter: 0x%x, name_len: %d, newname_len:%d, value_len: %d  id: 0x%llx\n"),
+	printf(_("ATTRI:  #regs: %d	f: 0x%x, ino: 0x%llx, attr_filter: 0x%x, name_len: %d, newname_len:%d, value_len: %d, newvalue_len: %d  id: 0x%llx\n"),
 			f->alfi_size,
 			f->alfi_op_flags,
 			(unsigned long long)f->alfi_ino,
 			f->alfi_attr_filter,
 			name_len,
 			newname_len,
-			f->alfi_value_len,
+			value_len,
+			newvalue_len,
 			(unsigned long long)f->alfi_id);
 
 	if (name_len > 0) {
@@ -913,22 +944,29 @@ xlog_recover_print_attri(
 		newname_ptr = item->ri_buf[region].i_addr;
 	}
 
-	if (f->alfi_value_len > 0) {
-		int len = f->alfi_value_len;
-
-		if (len > MAX_ATTR_VAL_PRINT)
-			len = MAX_ATTR_VAL_PRINT;
+	if (value_len > 0) {
+		int	len = min(MAX_ATTR_VAL_PRINT, value_len);
 
 		region++;
-		printf(_("ATTRI:  value len:%u\n"), f->alfi_value_len);
+		printf(_("ATTRI:  value len:%u\n"), value_len);
 		print_or_dump((char *)item->ri_buf[region].i_addr, len);
 		value_ptr = item->ri_buf[region].i_addr;
+	}
+
+	if (newvalue_len > 0) {
+		int	len = min(MAX_ATTR_VAL_PRINT, newvalue_len);
+
+		region++;
+		printf(_("ATTRI:  newvalue len:%u\n"), newvalue_len);
+		print_or_dump((char *)item->ri_buf[region].i_addr, len);
+		newvalue_ptr = item->ri_buf[region].i_addr;
 	}
 
 	if (src_f->alfi_attr_filter & XFS_ATTR_PARENT)
 		dump_pptr_update(name_ptr, name_len,
 				 newname_ptr, newname_len,
-				 value_ptr, src_f->alfi_value_len);
+				 value_ptr, value_len,
+				 newvalue_ptr, newvalue_len);
 
 out:
 	free(f);
