@@ -68,7 +68,7 @@ print_parents(
 	else
 		ret = fd_walk_pptrs(file->fd, pptr_print, args);
 	if (ret)
-		perror(file->name);
+		fprintf(stderr, "%s: %s\n", file->name, strerror(ret));
 
 	return 0;
 }
@@ -106,14 +106,12 @@ path_print(
 	}
 
 	ret = snprintf(buf, len, "%s", mntpt);
-	if (ret != strlen(mntpt)) {
-		errno = ENOMEM;
-		return -1;
-	}
+	if (ret != strlen(mntpt))
+		return ENAMETOOLONG;
 
 	ret = path_list_to_string(path, buf + ret, len - ret);
 	if (ret < 0)
-		return ret;
+		return ENAMETOOLONG;
 
 	printf("%s\n", buf);
 	return 0;
@@ -132,7 +130,7 @@ print_paths(
  	else
 		ret = fd_walk_ppaths(file->fd, path_print, args);
 	if (ret)
-		perror(file->name);
+		fprintf(stderr, "%s: %s\n", file->name, strerror(ret));
 	return 0;
 }
 

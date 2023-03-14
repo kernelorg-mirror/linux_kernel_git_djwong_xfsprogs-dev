@@ -25,7 +25,10 @@ alloc_pptr_buf(
 	return pi;
 }
 
-/* Walk all parents of the given file handle. */
+/*
+ * Walk all parents of the given file handle.  Returns 0 on success or positive
+ * errno.
+ */
 static int
 handle_walk_parents(
 	int			fd,
@@ -40,7 +43,7 @@ handle_walk_parents(
 
 	pi = alloc_pptr_buf(XFS_XATTR_LIST_MAX);
 	if (!pi)
-		return -1;
+		return errno;
 
 	if (handle) {
 		memcpy(&pi->pi_handle, handle, sizeof(struct xfs_handle));
@@ -51,7 +54,7 @@ handle_walk_parents(
 	while (!ret) {
 		if (pi->pi_flags & XFS_PPTR_OFLAG_ROOT) {
 			ret = fn(pi, NULL, arg);
-			break;
+			goto out_pi;
 		}
 
 		for (i = 0; i < pi->pi_count; i++) {
@@ -66,13 +69,15 @@ handle_walk_parents(
 
 		ret = ioctl(fd, XFS_IOC_GETPARENTS, pi);
 	}
+	if (ret)
+		ret = errno;
 
 out_pi:
 	free(pi);
 	return ret;
 }
 
-/* Walk all parent pointers of this handle. */
+/* Walk all parent pointers of this handle.  Returns 0 or positive errno. */
 int
 handle_walk_pptrs(
 	void			*hanp,
@@ -83,19 +88,17 @@ handle_walk_pptrs(
 	char			*mntpt;
 	int			fd;
 
-	if (hlen != sizeof(struct xfs_handle)) {
-		errno = EINVAL;
-		return -1;
-	}
+	if (hlen != sizeof(struct xfs_handle))
+		return EINVAL;
 
 	fd = handle_to_fsfd(hanp, &mntpt);
 	if (fd < 0)
-		return -1;
+		return errno;
 
 	return handle_walk_parents(fd, hanp, fn, arg);
 }
 
-/* Walk all parent pointers of this fd. */
+/* Walk all parent pointers of this fd.  Returns 0 or positive errno. */
 int
 fd_walk_pptrs(
 	int			fd,
@@ -157,6 +160,7 @@ handle_walk_parent_path_ptr(
 /*
  * Recursively walk all parents of the given file handle; if we hit the
  * fs root then we call the associated function with the constructed path.
+ * Returns 0 for success or positive errno.
  */
 static int
 handle_walk_parent_paths(
@@ -168,11 +172,12 @@ handle_walk_parent_paths(
 
 	wpli = malloc(sizeof(struct walk_ppath_level_info));
 	if (!wpli)
-		return -1;
+		return errno;
 	wpli->pc = path_component_init("", 0);
 	if (!wpli->pc) {
+		ret = errno;
 		free(wpli);
-		return -1;
+		return ret;
 	}
 	wpli->wpi = wpi;
 	memcpy(&wpli->newhandle, handle, sizeof(struct xfs_handle));
@@ -187,7 +192,7 @@ handle_walk_parent_paths(
 
 /*
  * Call the given function on all known paths from the vfs root to the inode
- * described in the handle.
+ * described in the handle.  Returns 0 for success or positive errno.
  */
 int
 handle_walk_ppaths(
@@ -199,17 +204,15 @@ handle_walk_ppaths(
 	struct walk_ppaths_info	wpi;
 	ssize_t			ret;
 
-	if (hlen != sizeof(struct xfs_handle)) {
-		errno = EINVAL;
-		return -1;
-	}
+	if (hlen != sizeof(struct xfs_handle))
+		return EINVAL;
 
 	wpi.fd = handle_to_fsfd(hanp, &wpi.mntpt);
 	if (wpi.fd < 0)
-		return -1;
+		return errno;
 	wpi.path = path_list_init();
 	if (!wpi.path)
-		return -1;
+		return errno;
 	wpi.fn = fn;
 	wpi.arg = arg;
 
@@ -221,7 +224,7 @@ handle_walk_ppaths(
 
 /*
  * Call the given function on all known paths from the vfs root to the inode
- * referred to by the file description.
+ * referred to by the file description.  Returns 0 or positive errno.
  */
 int
 fd_walk_ppaths(
@@ -237,15 +240,15 @@ fd_walk_ppaths(
 
 	ret = fd_to_handle(fd, &hanp, &hlen);
 	if (ret)
-		return ret;
+		return errno;
 
 	fsfd = handle_to_fsfd(hanp, &wpi.mntpt);
 	if (fsfd < 0)
-		return -1;
+		return errno;
 	wpi.fd = fd;
 	wpi.path = path_list_init();
 	if (!wpi.path)
-		return -1;
+		return errno;
 	wpi.fn = fn;
 	wpi.arg = arg;
 
@@ -271,19 +274,20 @@ handle_to_path_walk(
 	int			ret;
 
 	ret = snprintf(pwi->buf, pwi->len, "%s", mntpt);
-	if (ret != strlen(mntpt)) {
-		errno = ENOMEM;
-		return -1;
-	}
+	if (ret != strlen(mntpt))
+		return ENAMETOOLONG;
 
 	ret = path_list_to_string(path, pwi->buf + ret, pwi->len - ret);
 	if (ret < 0)
-		return ret;
+		return ENAMETOOLONG;
 
-	return WALK_PPATHS_ABORT;
+	return ECANCELED;
 }
 
-/* Return any eligible path to this file handle. */
+/*
+ * Return any eligible path to this file handle.  Returns 0 for success or
+ * positive errno.
+ */
 int
 handle_to_path(
 	void			*hanp,
@@ -292,13 +296,20 @@ handle_to_path(
 	size_t			pathlen)
 {
 	struct path_walk_info	pwi;
+	int			ret;
 
 	pwi.buf = path;
 	pwi.len = pathlen;
-	return handle_walk_ppaths(hanp, hlen, handle_to_path_walk, &pwi);
+	ret = handle_walk_ppaths(hanp, hlen, handle_to_path_walk, &pwi);
+	if (ret == ECANCELED)
+		return 0;
+	return ret;
 }
 
-/* Return any eligible path to this file description. */
+/*
+ * Return any eligible path to this file description.  Returns 0 for success
+ * or positive errno.
+ */
 int
 fd_to_path(
 	int			fd,
@@ -306,8 +317,12 @@ fd_to_path(
 	size_t			pathlen)
 {
 	struct path_walk_info	pwi;
+	int			ret;
 
 	pwi.buf = path;
 	pwi.len = pathlen;
-	return fd_walk_ppaths(fd, handle_to_path_walk, &pwi);
+	ret = fd_walk_ppaths(fd, handle_to_path_walk, &pwi);
+	if (ret == ECANCELED)
+		return 0;
+	return ret;
 }
