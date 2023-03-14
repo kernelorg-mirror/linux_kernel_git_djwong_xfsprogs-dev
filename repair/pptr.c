@@ -174,6 +174,23 @@ struct file_scan {
 
 	/* Does this file have garbage xattrs with ATTR_PARENT set? */
 	bool			have_garbage;
+
+	/* xattrs that we have to remove from this file */
+	struct xfs_slab		*garbage_xattr_recs;
+
+	/* attr names associated with garbage_xattr_recs */
+	struct xfblob		*garbage_xattr_names;
+};
+
+struct garbage_xattr {
+	/* xfs_da_args.attr_filter for the attribute being removed */
+	unsigned int		attr_filter;
+
+	/* attribute name length */
+	unsigned int		attrnamelen;
+
+	/* cookie for the attribute name */
+	xfblob_cookie		attrname_cookie;
 };
 
 /* Global names storage file. */
@@ -330,7 +347,63 @@ add_parent_ptr(
 			(unsigned long long)ag_pptr.name_cookie);
 }
 
-/* Schedule this extended attribute for deletion. */
+/* Remove garbage extended attributes that have ATTR_PARENT set. */
+static void
+remove_garbage_xattrs(
+	struct xfs_inode	*ip,
+	struct file_scan	*fscan)
+{
+	struct xfs_slab_cursor	*cur;
+	struct garbage_xattr	*ga;
+	int			error;
+
+	error = -init_slab_cursor(fscan->garbage_xattr_recs, NULL, &cur);
+	if (error)
+		do_error(_("init garbage xattr cursor failed: %s\n"),
+				strerror(error));
+
+	while ((ga = pop_slab_cursor(cur)) != NULL) {
+		struct xfs_da_args	args = {
+			.dp		= ip,
+			.attr_filter	= ga->attr_filter,
+			.namelen	= ga->attrnamelen,
+		};
+		void			*buf;
+
+		buf = malloc(ga->attrnamelen);
+		if (!buf)
+			do_error(
+ _("allocating %u bytes to remove ino %llu garbage xattr failed: %s\n"),
+					ga->attrnamelen,
+					(unsigned long long)ip->i_ino,
+					strerror(errno));
+
+		error = -xfblob_load(fscan->garbage_xattr_names,
+				ga->attrname_cookie, buf, ga->attrnamelen);
+		if (error)
+			do_error(
+ _("loading garbage xattr name failed: %s\n"),
+					strerror(error));
+
+		args.name = buf;
+		error = -libxfs_attr_set(&args);
+		if (error)
+			do_error(
+ _("removing ino %llu garbage xattr failed: %s\n"),
+					(unsigned long long)ip->i_ino,
+					strerror(error));
+
+		free(buf);
+	}
+
+	free_slab_cursor(&cur);
+
+	free_slab(&fscan->garbage_xattr_recs);
+	xfblob_destroy(fscan->garbage_xattr_names);
+	fscan->garbage_xattr_names = NULL;
+}
+
+/* Schedule this ATTR_PARENT extended attribute for deletion. */
 static void
 record_garbage_xattr(
 	struct xfs_inode	*ip,
@@ -339,6 +412,13 @@ record_garbage_xattr(
 	const void		*name,
 	unsigned int		namelen)
 {
+	struct garbage_xattr	garbage_xattr = {
+		.attr_filter	= attr_filter,
+		.attrnamelen	= namelen,
+	};
+	struct xfs_mount	*mp = ip->i_mount;
+	int			error;
+
 	if (no_modify) {
 		if (!fscan->have_garbage)
 			do_warn(
@@ -349,13 +429,38 @@ record_garbage_xattr(
 	}
 
 	if (fscan->have_garbage)
-		return;
+		goto stuffit;
 	fscan->have_garbage = true;
 
 	do_warn(
  _("deleting garbage parent pointer extended attributes in ino %llu\n"),
 			(unsigned long long)ip->i_ino);
-	/* XXX do the work */
+
+	error = -init_slab(&fscan->garbage_xattr_recs,
+			sizeof(struct garbage_xattr));
+	if (error)
+		do_error(_("init garbage xattr recs failed: %s\n"),
+				strerror(error));
+
+	error = -xfblob_create(mp, "garbage xattr names",
+			&fscan->garbage_xattr_names);
+	if (error)
+		do_error("init garbage xattr names failed: %s\n",
+				strerror(error));
+
+stuffit:
+	error = -xfblob_store(fscan->garbage_xattr_names,
+			&garbage_xattr.attrname_cookie, name, namelen);
+	if (error)
+		do_error(_("storing ino %llu garbage xattr failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				strerror(error));
+
+	error = -slab_add(fscan->garbage_xattr_recs, &garbage_xattr);
+	if (error)
+		do_error(_("storing ino %llu garbage xattr rec failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				strerror(error));
 }
 
 /* Decide if this is a directory parent pointer and stash it if so. */
@@ -762,6 +867,9 @@ check_file_parent_ptrs(
 				strerror(error));
 		goto out_free;
 	}
+
+	if (!no_modify && fscan->have_garbage)
+		remove_garbage_xattrs(ip, fscan);
 
 	crosscheck_file_parent_ptrs(ip, fscan);
 
