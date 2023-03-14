@@ -374,6 +374,7 @@ remove_garbage_xattrs(
 			.dp		= ip,
 			.attr_filter	= ga->attr_filter,
 			.namelen	= ga->attrnamelen,
+			.op_flags	= XFS_DA_OP_REMOVE,
 		};
 		void			*buf;
 
