@@ -21,7 +21,7 @@ alloc_pptr_buf(
 	pi = calloc(bufsize, 1);
 	if (!pi)
 		return NULL;
-	pi->gp_ptrs_size = bufsize;
+	pi->gp_bufsize = bufsize;
 	return pi;
 }
 
