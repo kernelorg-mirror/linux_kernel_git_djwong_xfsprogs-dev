@@ -441,8 +441,7 @@ xfs_dir_removename(
 	struct xfs_inode	*dp,
 	const struct xfs_name	*name,
 	xfs_ino_t		ino,
-	xfs_extlen_t		total,		/* bmap's total block count */
-	xfs_dir2_dataptr_t	*offset)	/* OUT: offset in directory */
+	xfs_extlen_t		total)		/* bmap's total block count */
 {
 	struct xfs_da_args	*args;
 	int			rval;
@@ -487,9 +486,6 @@ xfs_dir_removename(
 	else
 		rval = xfs_dir2_node_removename(args);
 out_free:
-	if (offset)
-		*offset = args->offset;
-
 	kmem_free(args);
 	return rval;
 }
