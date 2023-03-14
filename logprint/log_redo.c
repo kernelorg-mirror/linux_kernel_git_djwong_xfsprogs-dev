@@ -705,9 +705,15 @@ xlog_print_trans_attri(
 	memmove((char*)src_f, *ptr, src_len);
 	*ptr += src_len;
 
-	printf(_("ATTRI:  #regs: %d	name_len: %d, nname_len: %d value_len: %d  id: 0x%llx\n"),
-		src_f->alfi_size, src_f->alfi_name_len, src_f->alfi_nname_len,
-		src_f->alfi_value_len, (unsigned long long)src_f->alfi_id);
+	printf(_("ATTRI:  #regs: %d	f: 0x%x, ino: 0x%llx, attr_filter: 0x%x, name_len: %d, newname_len: %d, value_len: %d  id: 0x%llx\n"),
+			src_f->alfi_size,
+			src_f->alfi_op_flags,
+			(unsigned long long)src_f->alfi_ino,
+			src_f->alfi_attr_filter,
+			src_f->alfi_name_len,
+			src_f->alfi_nname_len,
+			src_f->alfi_value_len,
+			(unsigned long long)src_f->alfi_id);
 
 	if (src_f->alfi_name_len > 0) {
 		printf(_("\n"));
@@ -798,8 +804,15 @@ xlog_recover_print_attri(
 	if (xfs_attri_copy_log_format((char*)src_f, src_len, f))
 		goto out;
 
-	printf(_("ATTRI:  #regs: %d	name_len: %d, nname_len:%d, value_len: %d  id: 0x%llx\n"),
-		f->alfi_size, f->alfi_name_len, f->alfi_nname_len, f->alfi_value_len, (unsigned long long)f->alfi_id);
+	printf(_("ATTRI:  #regs: %d	f: 0x%x, ino: 0x%llx, attr_filter: 0x%x, name_len: %d, newname_len:%d, value_len: %d  id: 0x%llx\n"),
+			f->alfi_size,
+			f->alfi_op_flags,
+			(unsigned long long)f->alfi_ino,
+			f->alfi_attr_filter,
+			f->alfi_name_len,
+			f->alfi_nname_len,
+			f->alfi_value_len,
+			(unsigned long long)f->alfi_id);
 
 	if (f->alfi_name_len > 0) {
 		region++;
