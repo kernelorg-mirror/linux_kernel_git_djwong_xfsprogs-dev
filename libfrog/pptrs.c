@@ -133,26 +133,22 @@ handle_walk_parent_path_ptr(
 {
 	struct walk_ppath_level_info	*wpli = arg;
 	struct walk_ppaths_info		*wpi = wpli->wpi;
-	unsigned int			i;
 	int				ret = 0;
 
 	if (pi->pi_flags & XFS_PPTR_OFLAG_ROOT)
 		return wpi->fn(wpi->mntpt, wpi->path, wpi->arg);
 
-	for (i = 0; i < pi->pi_count; i++) {
-		p = xfs_ppinfo_to_pp(pi, i);
-		ret = path_component_change(wpli->pc, p->xpp_name,
+	ret = path_component_change(wpli->pc, p->xpp_name,
 				strlen((char *)p->xpp_name), p->xpp_ino);
-		if (ret)
-			break;
-		wpli->newhandle.ha_fid.fid_ino = p->xpp_ino;
-		wpli->newhandle.ha_fid.fid_gen = p->xpp_gen;
-		path_list_add_parent_component(wpi->path, wpli->pc);
-		ret = handle_walk_parent_paths(wpi, &wpli->newhandle);
-		path_list_del_component(wpi->path, wpli->pc);
-		if (ret)
-			break;
-	}
+	if (ret)
+		return ret;
+
+	wpli->newhandle.ha_fid.fid_ino = p->xpp_ino;
+	wpli->newhandle.ha_fid.fid_gen = p->xpp_gen;
+
+	path_list_add_parent_component(wpi->path, wpli->pc);
+	ret = handle_walk_parent_paths(wpi, &wpli->newhandle);
+	path_list_del_component(wpi->path, wpli->pc);
 
 	return ret;
 }
