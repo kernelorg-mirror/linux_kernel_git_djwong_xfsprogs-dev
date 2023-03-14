@@ -764,10 +764,6 @@ xlog_print_trans_attri(
 		newname_len = src_f->alfi_newname_len;
 		value_len = src_f->alfi_value_len;
 		newvalue_len = src_f->alfi_newvalue_len;
-	} else if (xfs_attr_log_item_op(src_f) == XFS_ATTRI_OP_FLAGS_NVREPLACE) {
-		name_len = src_f->alfi_oldname_len;
-		newname_len = src_f->alfi_newname_len;
-		value_len = src_f->alfi_value_len;
 	} else {
 		name_len = src_f->alfi_name_len;
 		value_len = src_f->alfi_value_len;
@@ -909,10 +905,6 @@ xlog_recover_print_attri(
 		newname_len = f->alfi_newname_len;
 		value_len = f->alfi_value_len;
 		newvalue_len = f->alfi_newvalue_len;
-	} else if (xfs_attr_log_item_op(f) == XFS_ATTRI_OP_FLAGS_NVREPLACE) {
-		name_len = f->alfi_oldname_len;
-		newname_len = f->alfi_newname_len;
-		value_len = f->alfi_value_len;
 	} else {
 		name_len = f->alfi_name_len;
 		value_len = f->alfi_value_len;
