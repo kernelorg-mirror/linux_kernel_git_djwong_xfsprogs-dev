@@ -8,7 +8,7 @@
 
 struct path_list;
 
-typedef int (*walk_pptr_fn)(struct xfs_pptr_info *pi,
+typedef int (*walk_pptr_fn)(struct xfs_getparents *pi,
 		struct xfs_parent_ptr *pptr, void *arg);
 typedef int (*walk_ppath_fn)(const char *mntpt, struct path_list *path,
 		void *arg);
