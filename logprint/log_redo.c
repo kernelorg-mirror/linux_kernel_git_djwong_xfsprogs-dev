@@ -720,7 +720,8 @@ xlog_print_trans_attri(
 		(*i)++;
 		head = (xlog_op_header_t *)*ptr;
 		xlog_print_op_header(head, *i, ptr);
-		error = xlog_print_trans_attri_name(ptr, be32_to_cpu(head->oh_len));
+		error = xlog_print_trans_attri_name(ptr,
+				be32_to_cpu(head->oh_len), "name");
 		if (error)
 			goto error;
 	}
@@ -730,7 +731,8 @@ xlog_print_trans_attri(
 		(*i)++;
 		head = (xlog_op_header_t *)*ptr;
 		xlog_print_op_header(head, *i, ptr);
-		error = xlog_print_trans_attri_name(ptr, be32_to_cpu(head->oh_len));
+		error = xlog_print_trans_attri_name(ptr,
+				be32_to_cpu(head->oh_len), "newname");
 		if (error)
 			goto error;
 	}
@@ -752,15 +754,16 @@ error:
 int
 xlog_print_trans_attri_name(
 	char				**ptr,
-	uint				src_len)
+	uint				src_len,
+	const char			*tag)
 {
-	printf(_("ATTRI:  name len:%u\n"), src_len);
+	printf(_("ATTRI:  %s len:%u\n"), tag, src_len);
 	print_or_dump(*ptr, src_len);
 
 	*ptr += src_len;
 
 	return 0;
-}	/* xlog_print_trans_attri */
+}
 
 int
 xlog_print_trans_attri_value(
@@ -823,7 +826,7 @@ xlog_recover_print_attri(
 
 	if (f->alfi_nname_len > 0) {
 		region++;
-		printf(_("ATTRI:  nname len:%u\n"), f->alfi_nname_len);
+		printf(_("ATTRI:  newname len:%u\n"), f->alfi_nname_len);
 		print_or_dump((char *)item->ri_buf[region].i_addr,
 			       f->alfi_nname_len);
 	}
