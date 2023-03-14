@@ -87,6 +87,8 @@ path_print(
 	ret = path_list_to_string(path, buf + ret, len - ret);
 	if (ret < 0)
 		return ret;
+
+	printf("%s\n", buf);
 	return 0;
 }
 
