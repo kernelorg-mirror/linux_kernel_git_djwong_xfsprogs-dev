@@ -684,12 +684,12 @@ dump_pptr(
 {
 	struct xfs_parent_name_irec	irec;
 
-	libxfs_parent_irec_from_disk(&irec, name_ptr, value_ptr, value_len);
+	libxfs_parent_irec_from_disk(&irec, name_ptr, name_len, value_ptr,
+			value_len);
 
 	printf("PPTR: %s attr_namelen %u attr_valuelen %u\n", tag, name_len, value_len);
-	printf("PPTR: %s parent_ino %llu parent_gen %u diroffset %u namelen %u name '%.*s'\n",
+	printf("PPTR: %s parent_ino %llu parent_gen %u namelen %u name '%.*s'\n",
 			tag, (unsigned long long)irec.p_ino, irec.p_gen,
-			irec.p_diroffset,
 			irec.p_namelen, irec.p_namelen, irec.p_name);
 }
 

@@ -14,6 +14,7 @@
 
 static int	attr_sf_entry_name_count(void *obj, int startoff);
 static int	attr_sf_entry_pptr_count(void *obj, int startoff);
+static int	attr_sf_entry_pptr_dnamelen(void *obj, int startoff);
 static int	attr_sf_entry_value_count(void *obj, int startoff);
 static int	attr_sf_entry_value_offset(void *obj, int startoff, int idx);
 static int	attr_shortform_list_count(void *obj, int startoff);
@@ -56,8 +57,8 @@ const field_t	attr_sf_entry_flds[] = {
 	  FLD_COUNT, TYP_INODE },
 	{ "parent_gen", FLDT_UINT32D, OI(PPOFF(p_gen)), attr_sf_entry_pptr_count,
 	  FLD_COUNT, TYP_NONE },
-	{ "parent_diroffset", FLDT_UINT32D, OI(PPOFF(p_diroffset)),
-	   attr_sf_entry_pptr_count, FLD_COUNT, TYP_NONE },
+	{ "parent_dname", FLDT_CHARNS, OI(PPOFF(p_dname)),
+	   attr_sf_entry_pptr_dnamelen, FLD_COUNT, TYP_NONE },
 	{ "value", FLDT_CHARNS, attr_sf_entry_value_offset,
 	  attr_sf_entry_value_count, FLD_COUNT|FLD_OFFSET, TYP_NONE },
 	{ NULL }
@@ -74,6 +75,20 @@ attr_sf_entry_pptr_count(
 	e = (struct xfs_attr_sf_entry *)((char *)obj + byteize(startoff));
 	if (e->flags & XFS_ATTR_PARENT)
 		return 1;
+	return 0;
+}
+
+static int
+attr_sf_entry_pptr_dnamelen(
+	void				*obj,
+	int				startoff)
+{
+	struct xfs_attr_sf_entry	*e;
+
+	ASSERT(bitoffs(startoff) == 0);
+	e = (struct xfs_attr_sf_entry *)((char *)obj + byteize(startoff));
+	if (e->flags & XFS_ATTR_PARENT)
+		return xfs_parent_name_dnamelen(e->namelen);
 	return 0;
 }
 

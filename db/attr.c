@@ -20,6 +20,7 @@ static int	attr_leaf_hdr_count(void *obj, int startoff);
 static int	attr_leaf_name_local_count(void *obj, int startoff);
 static int	attr_leaf_name_local_name_count(void *obj, int startoff);
 static int	attr_leaf_name_pptr_count(void *obj, int startoff);
+static int	attr_leaf_name_pptr_dnamelen(void *obj, int startoff);
 static int	attr_leaf_name_local_value_count(void *obj, int startoff);
 static int	attr_leaf_name_local_value_offset(void *obj, int startoff,
 						  int idx);
@@ -125,8 +126,8 @@ const field_t	attr_leaf_name_flds[] = {
 	  attr_leaf_name_pptr_count, FLD_COUNT, TYP_INODE },
 	{ "parent_gen", FLDT_UINT32D, OI(PPOFF(p_gen)),
 	  attr_leaf_name_pptr_count, FLD_COUNT, TYP_NONE },
-	{ "parent_diroffset", FLDT_UINT32D, OI(PPOFF(p_diroffset)),
-	  attr_leaf_name_pptr_count, FLD_COUNT, TYP_NONE },
+	{ "parent_dname", FLDT_CHARNS, OI(PPOFF(p_dname)),
+	  attr_leaf_name_pptr_dnamelen, FLD_COUNT, TYP_NONE },
 	{ "value", FLDT_CHARNS, attr_leaf_name_local_value_offset,
 	  attr_leaf_name_local_value_count, FLD_COUNT|FLD_OFFSET, TYP_NONE },
 	{ "valueblk", FLDT_UINT32X, OI(LVOFF(valueblk)),
@@ -300,6 +301,30 @@ attr_leaf_name_pptr_count(
 {
 	return attr_leaf_entry_walk(obj, startoff,
 			__attr_leaf_name_pptr_count);
+}
+
+static int
+__attr_leaf_name_pptr_dnamelen(
+	struct xfs_attr_leafblock	*leaf,
+	struct xfs_attr_leaf_entry      *e,
+	int				i)
+{
+	struct xfs_attr_leaf_name_local	*lname;
+
+	if (e->flags & XFS_ATTR_PARENT) {
+		lname = xfs_attr3_leaf_name_local(leaf, i);
+		return xfs_parent_name_dnamelen(lname->namelen);
+	}
+	return 0;
+}
+
+static int
+attr_leaf_name_pptr_dnamelen(
+	void				*obj,
+	int				startoff)
+{
+	return attr_leaf_entry_walk(obj, startoff,
+			__attr_leaf_name_pptr_dnamelen);
 }
 
 static int
