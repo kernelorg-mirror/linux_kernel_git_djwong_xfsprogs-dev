@@ -33,6 +33,7 @@
 #define xfs_alloc_read_agf		libxfs_alloc_read_agf
 #define xfs_alloc_vextent		libxfs_alloc_vextent
 
+#define xfs_attr3_leaf_hdr_from_disk	libxfs_attr3_leaf_hdr_from_disk
 #define xfs_attr_get			libxfs_attr_get
 #define xfs_attr_leaf_newentsize	libxfs_attr_leaf_newentsize
 #define xfs_attr_namecheck		libxfs_attr_namecheck
