@@ -23,6 +23,7 @@ list_sort.c \
 linux.c \
 logging.c \
 paths.c \
+pptrs.c \
 projects.c \
 ptvar.c \
 radix-tree.c \
@@ -42,6 +43,7 @@ crc32table.h \
 fsgeom.h \
 logging.h \
 paths.h \
+pptrs.h \
 projects.h \
 ptvar.h \
 radix-tree.h \
