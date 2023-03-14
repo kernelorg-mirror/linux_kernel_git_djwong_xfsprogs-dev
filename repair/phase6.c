@@ -886,7 +886,6 @@ mk_orphanage(xfs_mount_t *mp)
 	int		error;
 	const int	mode = 0755;
 	int		nres;
-	xfs_dir2_dataptr_t	diroffset;
 	struct xfs_name	xname;
 
 	/*
@@ -971,8 +970,7 @@ mk_orphanage(xfs_mount_t *mp)
 	/*
 	 * create the actual entry
 	 */
-	error = -libxfs_dir_createname(tp, pip, &xname, ip->i_ino, nres,
-			&diroffset);
+	error = -libxfs_dir_createname(tp, pip, &xname, ip->i_ino, nres);
 	if (error)
 		do_error(
 		_("can't make %s, createname error %d\n"),
@@ -1022,7 +1020,6 @@ mv_orphanage(
 	int			nres;
 	int			incr;
 	ino_tree_node_t		*irec;
-	xfs_dir2_dataptr_t	diroffset;
 	int			ino_offset = 0;
 	struct xfs_name		xname;
 
@@ -1071,7 +1068,7 @@ mv_orphanage(
 			libxfs_trans_ijoin(tp, ino_p, 0);
 
 			err = -libxfs_dir_createname(tp, orphanage_ip, &xname,
-						ino, nres, &diroffset);
+						ino, nres);
 			if (err)
 				do_error(
 	_("name create failed in %s (%d)\n"), ORPHANAGE, err);
@@ -1083,7 +1080,7 @@ mv_orphanage(
 			libxfs_trans_log_inode(tp, orphanage_ip, XFS_ILOG_CORE);
 
 			err = -libxfs_dir_createname(tp, ino_p, &xfs_name_dotdot,
-					orphanage_ino, nres, NULL);
+					orphanage_ino, nres);
 			if (err)
 				do_error(
 	_("creation of .. entry failed (%d)\n"), err);
@@ -1105,7 +1102,7 @@ mv_orphanage(
 
 
 			err = -libxfs_dir_createname(tp, orphanage_ip, &xname,
-						ino, nres, &diroffset);
+						ino, nres);
 			if (err)
 				do_error(
 	_("name create failed in %s (%d)\n"), ORPHANAGE, err);
@@ -1152,7 +1149,7 @@ mv_orphanage(
 		libxfs_trans_ijoin(tp, ino_p, 0);
 
 		err = -libxfs_dir_createname(tp, orphanage_ip, &xname, ino,
-						nres, &diroffset);
+				nres);
 		if (err)
 			do_error(
 	_("name create failed in %s (%d)\n"), ORPHANAGE, err);
@@ -1338,8 +1335,7 @@ longform_dir2_rebuild(
 
 		libxfs_trans_ijoin(tp, ip, 0);
 
-		error = -libxfs_dir_createname(tp, ip, &p->name, p->inum, nres,
-				NULL);
+		error = -libxfs_dir_createname(tp, ip, &p->name, p->inum, nres);
 		if (error) {
 			do_warn(
 _("name create failed in ino %" PRIu64 " (%d)\n"), ino, error);
@@ -2973,7 +2969,7 @@ _("error %d fixing shortform directory %llu\n"),
 		libxfs_trans_ijoin(tp, ip, 0);
 
 		error = -libxfs_dir_createname(tp, ip, &xfs_name_dotdot,
-					ip->i_ino, nres, NULL);
+					ip->i_ino, nres);
 		if (error)
 			do_error(
 	_("can't make \"..\" entry in root inode %" PRIu64 ", createname error %d\n"), ino, error);
@@ -3028,7 +3024,7 @@ _("error %d fixing shortform directory %llu\n"),
 			libxfs_trans_ijoin(tp, ip, 0);
 
 			error = -libxfs_dir_createname(tp, ip, &xfs_name_dot,
-					ip->i_ino, nres, NULL);
+					ip->i_ino, nres);
 			if (error)
 				do_error(
 	_("can't make \".\" entry in dir ino %" PRIu64 ", createname error %d\n"),
