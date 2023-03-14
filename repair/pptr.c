@@ -14,6 +14,7 @@
 #include "repair/threads.h"
 #include "repair/incore.h"
 #include "repair/pptr.h"
+#include "repair/strblobs.h"
 
 #undef PPTR_DEBUG
 
@@ -194,7 +195,7 @@ struct garbage_xattr {
 };
 
 /* Global names storage file. */
-static struct xfblob	*names;
+static struct strblobs	*nameblobs;
 static pthread_mutex_t	names_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct ag_pptrs	*fs_pptrs;
 
@@ -261,7 +262,7 @@ parent_ptr_free(
 	free(fs_pptrs);
 	fs_pptrs = NULL;
 
-	xfblob_destroy(names);
+	strblobs_destroy(&nameblobs);
 }
 
 void
@@ -274,7 +275,7 @@ parent_ptr_init(
 	if (!xfs_has_parent(mp))
 		return;
 
-	error = -xfblob_create(mp, "parent pointer names", &names);
+	error = strblobs_init(mp, "parent pointer names", &nameblobs);
 	if (error)
 		do_error(_("init parent pointer names failed: %s\n"),
 				strerror(error));
@@ -325,7 +326,7 @@ add_parent_ptr(
 		return;
 
 	pthread_mutex_lock(&names_mutex);
-	error = -xfblob_store(names, &ag_pptr.name_cookie, fname,
+	error = strblobs_store(nameblobs, &ag_pptr.name_cookie, fname,
 			ag_pptr.namelen);
 	pthread_mutex_unlock(&names_mutex);
 	if (error)
@@ -613,7 +614,7 @@ add_missing_parent_ptr(
 	unsigned char		name[MAXNAMELEN];
 	int			error;
 
-	error = -xfblob_load(names, ag_pptr->name_cookie, name,
+	error = strblobs_load(nameblobs, ag_pptr->name_cookie, name,
 			ag_pptr->namelen);
 	if (error)
 		do_error(
@@ -714,7 +715,7 @@ compare_parent_pointers(
 	unsigned char		name2[MAXNAMELEN] = { };
 	int			error;
 
-	error = -xfblob_load(names, ag_pptr->name_cookie, name1,
+	error = strblobs_load(nameblobs, ag_pptr->name_cookie, name1,
 			ag_pptr->namelen);
 	if (error)
 		do_error(
