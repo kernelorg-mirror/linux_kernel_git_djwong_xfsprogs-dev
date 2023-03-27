@@ -19,6 +19,7 @@ bulkstat.c \
 convert.c \
 crc32.c \
 fsgeom.c \
+getparents.c \
 list_sort.c \
 linux.c \
 logging.c \
@@ -40,6 +41,7 @@ crc32cselftest.h \
 crc32defs.h \
 crc32table.h \
 fsgeom.h \
+getparents.h \
 logging.h \
 paths.h \
 projects.h \
