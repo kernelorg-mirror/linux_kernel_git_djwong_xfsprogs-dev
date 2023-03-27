@@ -4147,7 +4147,7 @@ main(
 			.rmapbt = true,
 			.reflink = true,
 			.inobtcnt = true,
-			.parent_pointers = false,
+			.parent_pointers = true,
 			.nodalign = false,
 			.nortalign = false,
 			.bigtime = true,
