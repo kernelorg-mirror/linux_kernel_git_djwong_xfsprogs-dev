@@ -27,6 +27,7 @@ HFILES = \
 	libxfs_priv.h \
 	linux-err.h \
 	topology.h \
+	xfblob.h \
 	xfile.h \
 	xfs_ag_resv.h \
 	xfs_alloc.h \
@@ -68,6 +69,7 @@ CFILES = cache.c \
 	topology.c \
 	trans.c \
 	util.c \
+	xfblob.c \
 	xfile.c \
 	xfs_ag.c \
 	xfs_ag_resv.c \
