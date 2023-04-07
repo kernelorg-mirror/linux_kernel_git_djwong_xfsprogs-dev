@@ -256,6 +256,8 @@ extern void	libxfs_trans_ichgtime(struct xfs_trans *,
 				struct xfs_inode *, int);
 extern int	libxfs_iflush_int (struct xfs_inode *, struct xfs_buf *);
 
+void libxfs_bumplink(struct xfs_trans *tp, struct xfs_inode *ip);
+
 extern struct timespec64 current_time(struct inode *inode);
 
 /* Inode Cache Interfaces */
