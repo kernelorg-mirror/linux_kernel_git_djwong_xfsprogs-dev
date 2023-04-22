@@ -178,4 +178,6 @@ extern int		thread_count;
 /* If nonzero, simulate failure after this phase. */
 extern int		fail_after_phase;
 
+extern bool		need_packed_btrees;
+
 #endif /* _XFS_REPAIR_GLOBAL_H */
