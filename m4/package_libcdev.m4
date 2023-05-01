@@ -575,3 +575,19 @@ AC_DEFUN([AC_HAVE_MKOSTEMP_CLOEXEC],
        AC_MSG_RESULT(yes)],[AC_MSG_RESULT(no)])
     AC_SUBST(have_mkostemp_cloexec)
   ])
+
+#
+# Check if unsigned long is large enough to hold a 64-bit inode number
+#
+AC_DEFUN([AC_HAVE_UNSIGNED_LONG_INUMS],
+  [ AC_MSG_CHECKING([for unsigned long can store 64-bit inums])
+    AC_LINK_IFELSE([AC_LANG_PROGRAM([[
+#include <sys/param.h>
+    ]], [[
+         #define BUILD_BUG_ON(condition) ((void)sizeof(char[1 - 2*!!(condition)]))
+         BUILD_BUG_ON(sizeof(unsigned long) < (64 / NBBY));
+         return 0;
+    ]])],[have_unsigned_long_inums=yes
+       AC_MSG_RESULT(yes)],[AC_MSG_RESULT(no)])
+    AC_SUBST(have_unsigned_long_inums)
+  ])
