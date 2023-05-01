@@ -7,7 +7,7 @@ include $(TOPDIR)/include/builddefs
 
 LTCOMMAND = xfs_spaceman
 HFILES = init.h space.h
-CFILES = find_owner.c info.c init.c file.c health.c move_inode.c prealloc.c relocation.c trim.c
+CFILES = info.c init.c file.c health.c prealloc.c trim.c
 LSRCFILES = xfs_info.sh
 
 LLDLIBS = $(LIBHANDLE) $(LIBXCMD) $(LIBFROG) $(LIBHANDLE)
@@ -20,6 +20,11 @@ endif
 
 ifeq ($(HAVE_GETFSMAP),yes)
 CFILES += freesp.c clearfree.c
+endif
+
+ifeq ($(HAVE_UNSIGNED_LONG_INUMS),yes)
+LCFLAGS += -DHAVE_UNSIGNED_LONG_INUMS
+CFILES += find_owner.c move_inode.c relocation.c
 endif
 
 default: depend $(LTCOMMAND)
