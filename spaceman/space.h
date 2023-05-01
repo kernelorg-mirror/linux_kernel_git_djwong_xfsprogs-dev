@@ -38,9 +38,17 @@ extern void	clearfree_init(void);
 #endif
 extern void	info_init(void);
 extern void	health_init(void);
+
+#ifdef HAVE_UNSIGNED_LONG_INUMS
 void		move_inode_init(void);
 void		find_owner_init(void);
 void		resolve_owner_init(void);
 void		relocate_init(void);
+#else
+static inline void move_inode_init(void) { }
+static inline void find_owner_init(void) { }
+static inline void resolve_owner_init(void) { }
+static inline void relocate_init(void) { }
+#endif
 
 #endif /* XFS_SPACEMAN_SPACE_H_ */
