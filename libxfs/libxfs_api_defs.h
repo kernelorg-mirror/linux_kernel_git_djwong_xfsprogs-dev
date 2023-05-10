@@ -185,9 +185,11 @@
 #define xfs_parent_irec_from_disk	libxfs_parent_irec_from_disk
 #define xfs_parent_irec_hashname	libxfs_parent_irec_hashname
 #define xfs_parent_lookup		libxfs_parent_lookup
+#define xfs_parent_set			libxfs_parent_set
 #define xfs_parent_start		libxfs_parent_start
 #define xfs_parent_namecheck		libxfs_parent_namecheck
 #define xfs_parent_valuecheck		libxfs_parent_valuecheck
+#define xfs_parent_unset		libxfs_parent_unset
 #define xfs_perag_get			libxfs_perag_get
 #define xfs_perag_put			libxfs_perag_put
 #define xfs_prealloc_blocks		libxfs_prealloc_blocks
