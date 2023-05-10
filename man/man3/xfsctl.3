@@ -321,6 +321,69 @@ They are all subject to change and should not be called directly
 by applications.
 XFS_IOC_FSSETDM_BY_HANDLE is not supported as of Linux 5.5.
 
+.PP
+.TP
+.B XFS_IOC_GETPARENTS
+This command is used to get a file's parent pointers.
+Parent pointers point upwards in the directory tree towards directories that
+have entries pointing downwards.
+
+Calling programs should allocate a large memory buffer, initialize the head
+structure to zeroes, set gp_bufsize to the size of the buffer, and call the
+ioctl.
+The kernel will fill out the gp_offsets array with integer offsets to
+struct xfs_getparents_rec objects that are written within the provided memory
+buffer.
+The size of the gp_offsets array is given by gp_count.
+The XFS_GETPARENTS_OFLAG_DONE flag will be set in gp_flags when there are no
+more parent pointers to be read.
+The below code is an example of XFS_IOC_GETPARENTS usage:
+
+.nf
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+#include <xfs/linux.h>
+#include <xfs/xfs.h>
+#include <xfs/xfs_types.h>
+#include <xfs/xfs_fs.h>
+#include <xfs/xfs_fs_staging.h>
+
+int main() {
+	struct xfs_getparents		*pi;
+	struct xfs_getparents_rec	*p;
+	int				i, error, fd, nr_ptrs = 4;
+
+	error = malloc(65536);
+	if (!error) {
+		perror("malloc");
+		return 1;
+	}
+
+	memset(pi, 0, sizeof(*pi));
+	pi->gp_bufsize = 65536;
+
+	fd = open("/mnt/test/foo.txt", O_RDONLY | O_CREAT);
+	if (fd  == -1)
+		return errno;
+
+	do {
+		error = ioctl(fd, XFS_IOC_GETPARENTS, pi);
+		if (error)
+			return error;
+
+		for (i = 0; i < pi->gp_count; i++) {
+			p = xfs_getparents_rec(pi, i);
+			printf("inode		= %llu\\n", (unsigned long long)p->gpr_ino);
+			printf("generation	= %u\\n", (unsigned int)p->gpr_gen);
+			printf("name		= \\"%s\\"\\n\\n", (char *)p->gpr_name);
+		}
+	} while (!(pi->gp_flags & XFS_GETPARENTS_OFLAG_DONE));
+
+	return 0;
+}
+.fi
+
 .SS Filesystem Operations
 In order to effect one of the following operations, the pathname
 and descriptor arguments passed to
