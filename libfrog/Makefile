@@ -20,6 +20,7 @@ convert.c \
 crc32.c \
 file_exchange.c \
 fsgeom.c \
+getparents.c \
 histogram.c \
 list_sort.c \
 linux.c \
@@ -45,6 +46,7 @@ crc32table.h \
 dahashselftest.h \
 file_exchange.h \
 fsgeom.h \
+getparents.h \
 histogram.h \
 logging.h \
 paths.h \
