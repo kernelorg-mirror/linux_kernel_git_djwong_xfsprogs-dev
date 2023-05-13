@@ -183,6 +183,8 @@
 #define xfs_parent_add			libxfs_parent_add
 #define xfs_parent_finish		libxfs_parent_finish
 #define xfs_parent_irec_from_disk	libxfs_parent_irec_from_disk
+#define xfs_parent_irec_hashname	libxfs_parent_irec_hashname
+#define xfs_parent_lookup		libxfs_parent_lookup
 #define xfs_parent_start		libxfs_parent_start
 #define xfs_parent_namecheck		libxfs_parent_namecheck
 #define xfs_parent_valuecheck		libxfs_parent_valuecheck
