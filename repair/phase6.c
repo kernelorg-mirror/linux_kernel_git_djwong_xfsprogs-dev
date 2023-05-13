@@ -886,6 +886,12 @@ mk_orphanage(xfs_mount_t *mp)
 	const int	mode = 0755;
 	int		nres;
 	struct xfs_name	xname;
+	struct xfs_parent_defer *parent = NULL;
+
+	i = -libxfs_parent_start(mp, &parent);
+	if (i)
+		do_error(_("%d - couldn't allocate parent pointer for %s\n"),
+			i, ORPHANAGE);
 
 	/*
 	 * check for an existing lost+found first, if it exists, return
@@ -975,6 +981,14 @@ mk_orphanage(xfs_mount_t *mp)
 		_("can't make %s, createname error %d\n"),
 			ORPHANAGE, error);
 
+	if (parent) {
+		error = -libxfs_parent_add(tp, parent, pip, &xname, ip);
+		if (error)
+			do_error(
+ _("committing %s parent pointer failed, error %d.\n"),
+					ORPHANAGE, error);
+	}
+
 	/*
 	 * bump up the link count in the root directory to account
 	 * for .. in the new directory, and update the irec copy of the
@@ -996,8 +1010,49 @@ mk_orphanage(xfs_mount_t *mp)
 	}
 	libxfs_irele(ip);
 	libxfs_irele(pip);
+	libxfs_parent_finish(mp, parent);
 
 	return(ino);
+}
+
+/*
+ * Add a parent pointer back to the orphanage for any file we're moving into
+ * the orphanage, being careful not to trip over any existing parent pointer.
+ * You never know when the orphanage might get corrupted.
+ */
+static void
+add_orphan_pptr(
+	struct xfs_trans	*tp,
+	struct xfs_inode	*orphanage_ip,
+	const struct xfs_name	*xname,
+	struct xfs_inode	*ip,
+	struct xfs_parent_defer	*parent)
+{
+	struct xfs_parent_name_irec	pptr = {
+		.p_ino		= orphanage_ip->i_ino,
+		.p_gen		= VFS_I(orphanage_ip)->i_generation,
+		.p_namelen	= xname->len,
+	};
+	struct xfs_parent_scratch	scr = { };
+	struct xfs_mount	*mp = tp->t_mountp;
+	int			error;
+
+	memcpy(pptr.p_name, xname->name, xname->len);
+	libxfs_parent_irec_hashname(mp, &pptr);
+
+	error = -libxfs_parent_lookup(tp, ip, &pptr, &scr);
+	if (!error)
+		return;
+	if (error != ENOATTR)
+		do_log(
+ _("cannot look up parent pointer for '%.*s', err %d\n"),
+				xname->len, xname->name, error);
+
+	error = -libxfs_parent_add(tp, parent, orphanage_ip, xname, ip);
+	if (error)
+		do_error(
+ _("adding '%.*s' parent pointer failed, error %d.\n"),
+				xname->len, xname->name, error);
 }
 
 /*
@@ -1020,6 +1075,13 @@ mv_orphanage(
 	ino_tree_node_t		*irec;
 	int			ino_offset = 0;
 	struct xfs_name		xname;
+	struct xfs_parent_defer	*parent = NULL;
+
+	err = -libxfs_parent_start(mp, &parent);
+	if (err)
+		do_error(
+ _("%d - couldn't allocate parent pointer for lost inode\n"),
+			err);
 
 	xname.name = fname;
 	xname.len = snprintf((char *)fname, sizeof(fname), "%llu",
@@ -1071,6 +1133,10 @@ mv_orphanage(
 				do_error(
 	_("name create failed in %s (%d)\n"), ORPHANAGE, err);
 
+			if (parent)
+				add_orphan_pptr(tp, orphanage_ip, &xname,
+						ino_p, parent);
+
 			if (irec)
 				add_inode_ref(irec, ino_offset);
 			else
@@ -1104,6 +1170,10 @@ mv_orphanage(
 			if (err)
 				do_error(
 	_("name create failed in %s (%d)\n"), ORPHANAGE, err);
+
+			if (parent)
+				add_orphan_pptr(tp, orphanage_ip, &xname,
+						ino_p, parent);
 
 			if (irec)
 				add_inode_ref(irec, ino_offset);
@@ -1153,6 +1223,10 @@ mv_orphanage(
 	_("name create failed in %s (%d)\n"), ORPHANAGE, err);
 		ASSERT(err == 0);
 
+		if (parent)
+			add_orphan_pptr(tp, orphanage_ip, &xname, ino_p,
+					parent);
+
 		set_nlink(VFS_I(ino_p), 1);
 		libxfs_trans_log_inode(tp, ino_p, XFS_ILOG_CORE);
 		err = -libxfs_trans_commit(tp);
@@ -1162,6 +1236,7 @@ mv_orphanage(
 	}
 	libxfs_irele(ino_p);
 	libxfs_irele(orphanage_ip);
+	libxfs_parent_finish(mp, parent);
 }
 
 static int
