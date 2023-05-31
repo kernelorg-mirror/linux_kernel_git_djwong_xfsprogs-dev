@@ -1,0 +1,66 @@
+#! /bin/bash
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2020 Red Hat, Inc.  All Rights Reserved.
+#
+# FS QA Test 521
+#
+# Test xfs_repair's progress reporting
+#
+. ./common/preamble
+_begin_fstest auto repair
+
+# Override the default cleanup function.
+_cleanup()
+{
+	cd /
+	rm -f $tmp.*
+	_cleanup_delay > /dev/null 2>&1
+}
+
+# Import common functions.
+. ./common/filter
+. ./common/dmdelay
+. ./common/populate
+
+# real QA test starts here
+
+# Modify as appropriate.
+_supported_fs xfs
+_require_scratch
+_require_dm_target delay
+
+# Filter output specific to the formatters in xfs_repair/progress.c
+# Ideally we'd like to see hits on anything that matches
+# awk '/{FMT/' xfsprogs-dev/repair/progress.c
+filter_repair()
+{
+	sed -nre '
+	s/[0-9]+/#/g;
+	s/^\s+/ /g;
+	s/(# (week|day|hour|minute|second)s?(, )?)+/{progres}/g;
+	/#:#:#:/p
+	'
+}
+
+echo "Format and populate"
+_scratch_populate_cached nofill > $seqres.full 2>&1
+
+echo "Introduce a dmdelay"
+_init_delay
+DELAY_MS=38
+
+# Introduce a read I/O delay
+# The default in common/dmdelay is a bit too agressive
+BLK_DEV_SIZE=`blockdev --getsz $SCRATCH_DEV`
+DELAY_TABLE_RDELAY="0 $BLK_DEV_SIZE delay $SCRATCH_DEV 0 $DELAY_MS"
+_load_delay_table $DELAY_READ
+
+echo "Run repair"
+SCRATCH_DEV=$DELAY_DEV _scratch_xfs_repair -o ag_stride=4 -t 1 2>&1 |
+        tee -a $seqres.full > $tmp.repair
+
+cat $tmp.repair | filter_repair | sort -u
+
+# success, all done
+status=0
+exit

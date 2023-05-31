@@ -1,0 +1,15 @@
+QA output created by 999
+Format and populate
+Introduce a dmdelay
+Run repair
+ - #:#:#: Phase #: #% done - estimated remaining time {progres}
+ - #:#:#: Phase #: elapsed time {progres} - processed # inodes per minute
+ - #:#:#: check for inodes claiming duplicate blocks - # of # inodes done
+ - #:#:#: process known inodes and inode discovery - # of # inodes done
+ - #:#:#: process newly discovered inodes - # of # allocation groups done
+ - #:#:#: rebuild AG headers and trees - # of # allocation groups done
+ - #:#:#: scanning agi unlinked lists - # of # allocation groups done
+ - #:#:#: scanning filesystem freespace - # of # allocation groups done
+ - #:#:#: setting up duplicate extent list - # of # allocation groups done
+ - #:#:#: verify and correct link counts - # of # allocation groups done
+ - #:#:#: zeroing log - # of # blocks done
