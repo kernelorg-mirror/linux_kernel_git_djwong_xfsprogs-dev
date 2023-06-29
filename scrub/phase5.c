@@ -275,6 +275,36 @@ check_inode_names(
 	descr_set(&dsc, bstat);
 	background_sleep();
 
+	/*
+	 * Try to fix directory loops before we have problems opening files by
+	 * handle.
+	 */
+	if (S_ISDIR(bstat->bs_mode)) {
+		struct scrub_item	sri = { };
+
+		scrub_item_init_file(&sri, bstat);
+		scrub_item_schedule(&sri, XFS_SCRUB_TYPE_DIRLOOP);
+
+		error = scrub_item_check_file(ctx, &sri, fd);
+		if (error) {
+			str_liberror(ctx, error, _("checking directory loops"));
+			goto out;
+		}
+
+		error = repair_file_corruption(ctx, &sri, fd);
+		if (error) {
+			str_liberror(ctx, error, _("repairing directory loops"));
+			goto out;
+		}
+
+		if (repair_item_count_needsrepair(&sri) > 0) {
+			/* XXX if we cannot fix the cycle, then what? */
+			str_corrupt(ctx, descr_render(&dsc),
+					_("XXX directory loop uncorrected!"));
+			goto out;
+		}
+	}
+
 	/* Warn about naming problems in xattrs. */
 	if (bstat->bs_xflags & FS_XFLAG_HASATTR) {
 		error = check_xattr_names(ctx, &dsc, handle, bstat);
