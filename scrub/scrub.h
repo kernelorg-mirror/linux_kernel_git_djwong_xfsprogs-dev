@@ -63,7 +63,7 @@ struct scrub_item {
 	__u32			sri_agno;
 
 	/* Bitmask of scrub types that were scheduled here. */
-	__u32			sri_selected;
+	__u64			sri_selected;
 
 	/* Scrub item state flags, one for each XFS_SCRUB_TYPE. */
 	__u8			sri_state[XFS_SCRUB_TYPE_NR];

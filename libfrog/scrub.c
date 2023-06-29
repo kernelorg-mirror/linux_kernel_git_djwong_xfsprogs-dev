@@ -169,6 +169,11 @@ const struct xfrog_scrub_descr xfrog_scrubbers[XFS_SCRUB_TYPE_NR] = {
 		.descr	= "realtime reference count btree",
 		.group	= XFROG_SCRUB_GROUP_RTGROUP,
 	},
+	[XFS_SCRUB_TYPE_DIRLOOP] = {
+		.name	= "dirloop",
+		.descr	= "directory cycle detector",
+		.group	= XFROG_SCRUB_GROUP_INODE,
+	},
 };
 #undef DEP
 
