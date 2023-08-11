@@ -540,6 +540,8 @@ scrubv_f(
 		group = XFROG_SCRUB_GROUP_ISCAN;
 	else if (!strcmp(argv[optind], "summary"))
 		group = XFROG_SCRUB_GROUP_SUMMARY;
+	else if (!strcmp(argv[optind], "rtgroup"))
+		group = XFROG_SCRUB_GROUP_RTGROUP;
 	else {
 		printf(_("Unknown group '%s'.\n"), argv[optind]);
 		scrubv_help();
@@ -610,6 +612,19 @@ scrubv_f(
 		if (optind != argc) {
 			fprintf(stderr,
 				_("No parameters allowed.\n"));
+			return 0;
+		}
+		break;
+	case XFROG_SCRUB_GROUP_RTGROUP:
+		if (optind != argc - 1) {
+			fprintf(stderr,
+				_("Must specify one rtgroup number.\n"));
+			return 0;
+		}
+		vhead->svh_agno = strtoul(argv[optind], &p, 0);
+		if (*p != '\0') {
+			fprintf(stderr,
+				_("Bad rtgroup number '%s'.\n"), argv[optind]);
 			return 0;
 		}
 		break;
