@@ -49,6 +49,7 @@ int	rt_spec;		/* Realtime dev specified as option */
 int	convert_lazy_count;	/* Convert lazy-count mode on/off */
 int	lazy_count;		/* What to set if to if converting */
 bool	skip_freesp_check_on_upgrade; /* do not enable */
+bool	allow_rmapbt_upgrade_with_reflink; /* add rmapbt when reflink already on */
 bool	features_changed;	/* did we change superblock feature bits? */
 bool	add_inobtcount;		/* add inode btree counts to AGI */
 bool	add_bigtime;		/* add support for timestamps up to 2486 */
