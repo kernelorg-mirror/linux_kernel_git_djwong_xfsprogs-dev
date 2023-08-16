@@ -281,7 +281,7 @@ set_rmapbt(
 		exit(0);
 	}
 
-	if (xfs_has_reflink(mp)) {
+	if (!allow_rmapbt_upgrade_with_reflink && xfs_has_reflink(mp)) {
 		printf(
 	_("Reverse mapping btrees cannot be added when reflink is enabled.\n"));
 		exit(0);
