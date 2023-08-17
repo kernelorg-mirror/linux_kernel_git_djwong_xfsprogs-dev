@@ -536,3 +536,22 @@ libxfs_file_write(
 
 	return error;
 }
+
+#ifdef HAVE_GETRANDOM_NONBLOCK
+uint32_t
+get_random_u32(void)
+{
+	uint32_t	ret;
+	ssize_t		sz;
+
+	/*
+	 * Try to extract a u32 of randomness from /dev/urandom.  If that
+	 * fails, fall back to returning zero like we used to do.
+	 */
+	sz = getrandom(&ret, sizeof(ret), GRND_NONBLOCK);
+	if (sz != sizeof(ret))
+		return 0;
+
+	return ret;
+}
+#endif

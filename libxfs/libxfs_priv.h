@@ -65,6 +65,9 @@
 #include "libfrog/crc32c.h"
 
 #include <sys/xattr.h>
+#ifdef HAVE_GETRANDOM_NONBLOCK
+#include <sys/random.h>
+#endif
 
 /* Zones used in libxfs allocations that aren't in shared header files */
 extern struct kmem_cache *xfs_buf_item_cache;
@@ -221,11 +224,11 @@ __percpu_counter_compare(uint64_t *count, int64_t rhs, int32_t batch)
 	return 0;
 }
 
-/*
- * get_random_u32 is used for di_gen inode allocation, it must be zero for
- * libxfs or all sorts of badness can occur!
- */
+#ifdef HAVE_GETRANDOM_NONBLOCK
+uint32_t get_random_u32(void);
+#else
 #define get_random_u32()	(0)
+#endif
 
 #define PAGE_SIZE		getpagesize()
 
