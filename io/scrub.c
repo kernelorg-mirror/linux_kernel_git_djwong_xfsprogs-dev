@@ -89,6 +89,7 @@ scrub_ioctl(
 		break;
 	case XFROG_SCRUB_GROUP_METAPATH:
 		meta.sm_ino = control;
+		meta.sm_agno = control2;
 		break;
 	case XFROG_SCRUB_GROUP_INODE:
 		meta.sm_ino = control;
@@ -150,7 +151,7 @@ parse_args(
 
 	switch (d->group) {
 	case XFROG_SCRUB_GROUP_METAPATH:
-		if (optind == argc - 1) {
+		if (optind == argc - 1 || optind == argc - 2) {
 			bool	set = false;
 
 			for (i = 0; i < XFS_SCRUB_METAPATH_NR; i++) {
@@ -168,6 +169,29 @@ parse_args(
 					fprintf(stderr,
  _("Bad metapath number '%s'.\n"),
 						argv[optind]);
+					return 0;
+				}
+			}
+
+			if (xfrog_metapaths[control].group == XFROG_SCRUB_GROUP_RTGROUP) {
+				if (optind == argc - 1) {
+					fprintf(stderr,
+ _("%s: Metapath requires an rtgroup number.\n"),
+							xfrog_metapaths[control].name);
+					return 0;
+				}
+				control2 = strtoul(argv[optind + 1], &p, 0);
+				if (*p != '\0') {
+					fprintf(stderr,
+						_("Bad rtgroup number '%s'.\n"),
+						argv[optind + 1]);
+					return 0;
+				}
+			} else {
+				if (optind == argc - 2) {
+					fprintf(stderr,
+ _("%s: Metapath does not take a second argument.\n"),
+							xfrog_metapaths[control].name);
 					return 0;
 				}
 			}
@@ -345,6 +369,7 @@ repair_ioctl(
 		break;
 	case XFROG_SCRUB_GROUP_METAPATH:
 		meta.sm_ino = control;
+		meta.sm_agno = control2;
 		break;
 	case XFROG_SCRUB_GROUP_INODE:
 		meta.sm_ino = control;
