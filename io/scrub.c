@@ -80,6 +80,9 @@ scrub_ioctl(
 	case XFROG_SCRUB_GROUP_PERAG:
 		meta.sm_agno = control;
 		break;
+	case XFROG_SCRUB_GROUP_METAPATH:
+		meta.sm_ino = control;
+		break;
 	case XFROG_SCRUB_GROUP_INODE:
 		meta.sm_ino = control;
 		meta.sm_gen = control2;
@@ -285,6 +288,9 @@ repair_ioctl(
 	case XFROG_SCRUB_GROUP_AGHEADER:
 	case XFROG_SCRUB_GROUP_PERAG:
 		meta.sm_agno = control;
+		break;
+	case XFROG_SCRUB_GROUP_METAPATH:
+		meta.sm_ino = control;
 		break;
 	case XFROG_SCRUB_GROUP_INODE:
 		meta.sm_ino = control;
