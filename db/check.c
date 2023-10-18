@@ -3657,6 +3657,9 @@ process_rtbitmap(
 	bit = extno = prevbit = start_bmbno = start_bit = 0;
 	bmbno = NULLFILEOFF;
 	while ((bmbno = blkmap_next_off(blkmap, bmbno, &t)) != NULLFILEOFF) {
+		struct xfs_rtalloc_args	args = {
+			.mp		= mp,
+		};
 		xfs_rtword_t	*incore = words;
 		unsigned int	i;
 
@@ -3682,8 +3685,9 @@ process_rtbitmap(
 			continue;
 		}
 
+		args.rbmbp = iocur_top->bp;
 		for (i = 0; i < mp->m_blockwsize; i++, incore++)
-			*incore = libxfs_rtbitmap_getword(iocur_top->bp, i);
+			*incore = libxfs_rtbitmap_getword(&args, i);
 
 		for (bit = 0;
 		     bit < bitsperblock && extno < mp->m_sb.sb_rextents;
@@ -3732,6 +3736,9 @@ process_rtsummary(
 
 	sumbno = NULLFILEOFF;
 	while ((sumbno = blkmap_next_off(blkmap, sumbno, &t)) != NULLFILEOFF) {
+		struct xfs_rtalloc_args	args = {
+			.mp		= mp,
+		};
 		union xfs_suminfo_raw	*ondisk;
 
 		bno = blkmap_get(blkmap, sumbno);
@@ -3757,7 +3764,8 @@ process_rtsummary(
 			continue;
 		}
 
-		ondisk = xfs_rsumblock_infoptr(iocur_top->bp, 0);
+		args.sumbp = iocur_top->bp;
+		ondisk = xfs_rsumblock_infoptr(&args, 0);
 		memcpy(sfile, ondisk, mp->m_sb.sb_blocksize);
 		pop_cur();
 		sfile += mp->m_blockwsize;
