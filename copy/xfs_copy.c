@@ -854,6 +854,8 @@ main(int argc, char **argv)
 					progname, target[i].name, progname);
 				exit(1);
 			}
+			if (!buffered_output)
+				open_flags |= O_DIRECT;
 		}
 
 		target[i].fd = open(target[i].name, open_flags, 0644);
@@ -887,20 +889,22 @@ main(int argc, char **argv)
 				}
 			}
 		} else  {
-			char	*lb[XFS_MAX_SECTORSIZE] = { NULL };
+			char	*lb = memalign(wbuf_align, XFS_MAX_SECTORSIZE);
 			off64_t	off;
 
 			/* ensure device files are sufficiently large */
+			memset(lb, 0, XFS_MAX_SECTORSIZE);
 
 			off = mp->m_sb.sb_dblocks * source_blocksize;
-			off -= sizeof(lb);
-			if (pwrite(target[i].fd, lb, sizeof(lb), off) < 0)  {
+			off -= XFS_MAX_SECTORSIZE;
+			if (pwrite(target[i].fd, lb, XFS_MAX_SECTORSIZE, off) < 0)  {
 				do_log(_("%s:  failed to write last block\n"),
 					progname);
 				do_log(_("\tIs target \"%s\" too small?\n"),
 					target[i].name);
 				die_perror();
 			}
+			free(lb);
 		}
 	}
 
