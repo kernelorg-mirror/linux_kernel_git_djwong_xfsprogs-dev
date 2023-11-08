@@ -418,8 +418,10 @@ _("bad state %d, inode %" PRIu64 " bmap block 0x%" PRIx64 "\n"),
 					XFS_FSB_TO_AGBNO(mp, bno),
 					XFS_FSB_TO_AGBNO(mp, bno) + 1))
 				return(1);
-		} else  {
-			if (search_rt_dup_extent(mp, bno))
+		} else {
+			xfs_rtblock_t	rtx = bno / mp->m_sb.sb_rextsize;
+
+			if (search_rt_dup_extent(mp, rtx))
 				return(1);
 		}
 	}
