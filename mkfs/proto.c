@@ -809,7 +809,8 @@ rtbitmap_create(
 
 	rbmip->i_disk_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
 	rbmip->i_diflags |= XFS_DIFLAG_NEWRTBM;
-	*(uint64_t *)&VFS_I(rbmip)->i_atime = 0;
+	if (!xfs_has_rtgroups(mp))
+		*(uint64_t *)&VFS_I(rbmip)->i_atime = 0;
 	libxfs_trans_log_inode(upd.tp, rbmip, XFS_ILOG_CORE);
 
 	error = -libxfs_imeta_commit_update(&upd);
