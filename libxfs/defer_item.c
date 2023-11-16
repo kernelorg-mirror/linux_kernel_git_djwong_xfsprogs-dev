@@ -27,6 +27,7 @@
 #include "defer_item.h"
 #include "xfs_ag.h"
 #include "xfs_swapext.h"
+#include "defer_item.h"
 
 /* Dummy defer item ops, since we don't do logging. */
 
@@ -75,21 +76,25 @@ xfs_extent_free_create_done(
 	return NULL;
 }
 
-/* Take an active ref to the AG containing the space we're freeing. */
+/* Add this deferred EFI to the transaction. */
 void
-xfs_extent_free_get_group(
-	struct xfs_mount		*mp,
-	struct xfs_extent_free_item	*xefi)
+xfs_extent_free_defer_add(
+	struct xfs_trans		*tp,
+	struct xfs_extent_free_item	*xefi,
+	struct xfs_defer_pending	**dfpp)
 {
-	xefi->xefi_pag = xfs_perag_intent_get(mp, xefi->xefi_startblock);
-}
+	struct xfs_mount		*mp = tp->t_mountp;
+	enum xfs_defer_ops_type		optype;
 
-/* Release an active AG ref after some freeing work. */
-static inline void
-xfs_extent_free_put_group(
-	struct xfs_extent_free_item	*xefi)
-{
-	xfs_perag_intent_put(xefi->xefi_pag);
+	trace_xfs_extent_free_defer(mp, xefi);
+
+	if (xefi->xefi_agresv == XFS_AG_RESV_AGFL)
+		optype = XFS_DEFER_OPS_TYPE_AGFL_FREE;
+	else
+		optype = XFS_DEFER_OPS_TYPE_FREE;
+
+	xefi->xefi_pag = xfs_perag_intent_get(mp, xefi->xefi_startblock);
+	*dfpp = xfs_defer_add(tp, optype, &xefi->xefi_list);
 }
 
 /* Cancel a free extent. */
@@ -99,7 +104,7 @@ xfs_extent_free_cancel_item(
 {
 	struct xfs_extent_free_item	*xefi = xefi_entry(item);
 
-	xfs_extent_free_put_group(xefi);
+	xfs_perag_intent_put(xefi->xefi_pag);
 	kmem_cache_free(xfs_extfree_item_cache, xefi);
 }
 
