@@ -23,6 +23,11 @@
 #include "xfs_refcount_btree.h"
 #include "libfrog/platform.h"
 
+#include "xfs_format.h"
+#include "xfs_da_format.h"
+#include "xfs_log_format.h"
+#include "xfs_ondisk.h"
+
 #include "libxfs.h"		/* for now */
 
 #ifndef HAVE_LIBURCU_ATOMIC64
@@ -316,6 +321,8 @@ libxfs_init(libxfs_init_t *a)
 	char		rtpath[25];
 	int		rval = 0;
 	int		flags;
+
+	xfs_check_ondisk_structs();
 
 	dpath[0] = logpath[0] = rtpath[0] = '\0';
 	dname = a->dname;
