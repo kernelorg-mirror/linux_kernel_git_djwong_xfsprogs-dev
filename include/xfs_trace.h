@@ -84,6 +84,9 @@
 #define trace_xfs_defer_add_item(a,b,c)		((void) 0)
 #define trace_xfs_defer_cancel_item(a,b,c)	((void) 0)
 #define trace_xfs_defer_finish_item(a,b,c)	((void) 0)
+#define trace_xfs_defer_isolate_paused(...)	((void) 0)
+#define trace_xfs_defer_item_pause(...)		((void) 0)
+#define trace_xfs_defer_item_unpause(...)	((void) 0)
 #define trace_xfs_defer_relog_intent(a,b)	((void) 0)
 
 #define trace_xfs_dir2_grow_inode(a,b)		((void) 0)
