@@ -274,3 +274,43 @@ platform_physmem(void)
 	}
 	return (si.totalram >> 10) * si.mem_unit;	/* kilobytes */
 }
+
+#define BUFSIZE			4096
+#define HUGEPAGESIZE_KEY	"Hugepagesize:"
+
+long hugepage_size(void)
+{
+	char	buf[BUFSIZE];
+	FILE	*fp;
+	long	ret = 0;
+
+	fp = fopen("/proc/meminfo", "r");
+	if (!fp)
+		goto out_default;
+
+	while (fgets(buf, BUFSIZE, fp) != NULL) {
+		char	*remains, *p;
+		long	sz;
+
+		p = strstr(buf, HUGEPAGESIZE_KEY);
+		if (p != buf)
+			continue;
+		p += sizeof(HUGEPAGESIZE_KEY);
+
+		sz = strtol(p, &remains, 10);
+		if (sz == LONG_MIN || sz == LONG_MAX)
+			continue;
+
+		p = strstr(remains, " kB");
+		if (p == remains) {
+			ret = sz * 1024;
+			break;
+		}
+	}
+	fclose(fp);
+
+out_default:
+	if (!ret)
+		ret = sysconf(_SC_PAGESIZE);
+	return ret;
+}
