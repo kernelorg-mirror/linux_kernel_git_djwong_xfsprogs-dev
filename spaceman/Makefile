@@ -11,6 +11,7 @@ HFILES = \
 	space.h
 CFILES = \
 	file.c \
+	find_owner.c \
 	health.c \
 	info.c \
 	init.c \
