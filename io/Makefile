@@ -7,13 +7,43 @@ include $(TOPDIR)/include/builddefs
 
 LTCOMMAND = xfs_io
 LSRCFILES = xfs_bmap.sh xfs_freeze.sh xfs_mkfile.sh
-HFILES = init.h io.h
-CFILES = init.c \
-	attr.c bmap.c bulkstat.c crc32cselftest.c cowextsize.c encrypt.c \
-	file.c freeze.c fsuuid.c fsync.c getrusage.c imap.c inject.c label.c \
-	link.c mmap.c open.c parent.c pread.c prealloc.c pwrite.c reflink.c \
-	resblks.c scrub.c seek.c shutdown.c stat.c swapext.c sync.c \
-	truncate.c utimes.c
+HFILES = \
+	init.h \
+	io.h
+CFILES = \
+	atomicupdate.c \
+	attr.c \
+	bmap.c \
+	bulkstat.c \
+	cowextsize.c \
+	crc32cselftest.c \
+	encrypt.c \
+	file.c \
+	freeze.c \
+	fsuuid.c \
+	fsync.c \
+	getrusage.c \
+	imap.c \
+	init.c \
+	inject.c \
+	label.c \
+	link.c \
+	mmap.c \
+	open.c \
+	parent.c \
+	pread.c \
+	prealloc.c \
+	pwrite.c \
+	reflink.c \
+	resblks.c \
+	scrub.c \
+	seek.c \
+	shutdown.c \
+	stat.c \
+	swapext.c \
+	sync.c \
+	truncate.c \
+	utimes.c
 
 LLDLIBS = $(LIBXCMD) $(LIBHANDLE) $(LIBFROG) $(LIBPTHREAD) $(LIBUUID)
 LTDEPENDENCIES = $(LIBXCMD) $(LIBHANDLE) $(LIBFROG)
