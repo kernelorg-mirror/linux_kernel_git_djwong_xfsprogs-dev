@@ -188,7 +188,10 @@
 #define xfs_ifork_zap_attr		libxfs_ifork_zap_attr
 #define xfs_imap_to_bp			libxfs_imap_to_bp
 
+#define xfs_imeta_cancel		libxfs_imeta_cancel
+#define xfs_imeta_commit		libxfs_imeta_commit
 #define xfs_imeta_create_file_path	libxfs_imeta_create_file_path
+#define xfs_imeta_create_root		libxfs_imeta_create_root
 #define xfs_imeta_ensure_dirpath	libxfs_imeta_ensure_dirpath
 #define xfs_imeta_free_path		libxfs_imeta_free_path
 #define xfs_imeta_iget			libxfs_imeta_iget
