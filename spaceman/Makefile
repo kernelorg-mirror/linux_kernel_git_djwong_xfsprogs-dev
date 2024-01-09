@@ -14,11 +14,12 @@ CFILES = \
 	health.c \
 	info.c \
 	init.c \
+	move_inode.c \
 	prealloc.c \
 	trim.c
 LSRCFILES = xfs_info.sh
 
-LLDLIBS = $(LIBHANDLE) $(LIBXCMD) $(LIBFROG)
+LLDLIBS = $(LIBHANDLE) $(LIBXCMD) $(LIBFROG) $(LIBHANDLE)
 LTDEPENDENCIES = $(LIBHANDLE) $(LIBXCMD) $(LIBFROG)
 LLDFLAGS = -static
 
