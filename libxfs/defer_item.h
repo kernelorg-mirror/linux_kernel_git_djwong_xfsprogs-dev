@@ -17,6 +17,8 @@ enum xfs_attr_defer_op {
 };
 
 void xfs_attr_defer_add(struct xfs_da_args *args, enum xfs_attr_defer_op op);
+void xfs_attr_defer_parent(struct xfs_da_args *args,
+		enum xfs_attr_defer_op op);
 
 struct xfs_exchmaps_intent;
 
