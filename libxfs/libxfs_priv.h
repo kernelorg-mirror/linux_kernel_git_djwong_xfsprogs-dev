@@ -490,6 +490,8 @@ xfs_buf_readahead(
 static inline int retzero(void) { return 0; }
 #define xfs_trans_unreserve_quota_nblks(t,i,b,n,f)	retzero()
 #define xfs_quota_unreserve_blkres(i,b) 		retzero()
+#define xfs_qm_dqattach(i)				(0)
+#define xfs_qm_dqattach_locked(ip, alloc)		(0)
 
 #define xfs_quota_reserve_blkres(i,b)		(0)
 #define xfs_qm_dqattach(i)			(0)
