@@ -210,27 +210,25 @@ process_shortform_attr(
 	struct xfs_dinode		*dip,
 	int				*repair)
 {
-	struct xfs_attr_shortform	*asf;
+	struct xfs_attr_sf_hdr		*hdr = XFS_DFORK_APTR(dip);
 	struct xfs_attr_sf_entry	*currententry, *nextentry, *tempentry;
 	int				i, junkit;
 	int				currentsize, remainingspace;
 
 	*repair = 0;
 
-	asf = (struct xfs_attr_shortform *) XFS_DFORK_APTR(dip);
-
 	/* Assumption: hdr.totsize is less than a leaf block and was checked
 	 * by lclinode for valid sizes. Check the count though.
 	*/
-	if (asf->hdr.count == 0)
+	if (hdr->count == 0)
 		/* then the total size should just be the header length */
-		if (be16_to_cpu(asf->hdr.totsize) != sizeof(xfs_attr_sf_hdr_t)) {
+		if (be16_to_cpu(hdr->totsize) != sizeof(xfs_attr_sf_hdr_t)) {
 			/* whoops there's a discrepancy. Clear the hdr */
 			if (!no_modify) {
 				do_warn(
 	_("there are no attributes in the fork for inode %" PRIu64 "\n"),
 					ino);
-				asf->hdr.totsize =
+				hdr->totsize =
 					cpu_to_be16(sizeof(xfs_attr_sf_hdr_t));
 				*repair = 1;
 				return(1);
@@ -243,15 +241,15 @@ process_shortform_attr(
 		}
 
 	currentsize = sizeof(xfs_attr_sf_hdr_t);
-	remainingspace = be16_to_cpu(asf->hdr.totsize) - currentsize;
-	nextentry = &asf->list[0];
-	for (i = 0; i < asf->hdr.count; i++)  {
+	remainingspace = be16_to_cpu(hdr->totsize) - currentsize;
+	nextentry = libxfs_attr_sf_firstentry(hdr);
+	for (i = 0; i < hdr->count; i++)  {
 		currententry = nextentry;
 		junkit = 0;
 
 		/* don't go off the end if the hdr.count was off */
 		if ((currentsize + (sizeof(struct xfs_attr_sf_entry) - 1)) >
-						be16_to_cpu(asf->hdr.totsize))
+						be16_to_cpu(hdr->totsize))
 			break; /* get out and reset count and totSize */
 
 		/* if the namelen is 0, can't get to the rest of the entries */
@@ -326,7 +324,7 @@ process_shortform_attr(
 					((intptr_t) currententry +
 					 xfs_attr_sf_entsize(currententry));
 				memmove(currententry,tempentry,remainingspace);
-				asf->hdr.count -= 1;
+				hdr->count -= 1;
 				i--; /* no worries, it will wrap back to 0 */
 				*repair = 1;
 				continue; /* go back up now */
@@ -344,33 +342,33 @@ process_shortform_attr(
 
 	} /* end the loop */
 
-	if (asf->hdr.count != i)  {
+	if (hdr->count != i)  {
 		if (no_modify)  {
 			do_warn(
 	_("would have corrected attribute entry count in inode %" PRIu64 " from %d to %d\n"),
-				ino, asf->hdr.count, i);
+				ino, hdr->count, i);
 		} else  {
 			do_warn(
 	_("corrected attribute entry count in inode %" PRIu64 ", was %d, now %d\n"),
-				ino, asf->hdr.count, i);
-			asf->hdr.count = i;
+				ino, hdr->count, i);
+			hdr->count = i;
 			*repair = 1;
 		}
 	}
 
 	/* ASSUMPTION: currentsize <= totsize */
-	if (be16_to_cpu(asf->hdr.totsize) != currentsize)  {
+	if (be16_to_cpu(hdr->totsize) != currentsize)  {
 		if (no_modify)  {
 			do_warn(
 	_("would have corrected attribute totsize in inode %" PRIu64 " from %d to %d\n"),
-				ino, be16_to_cpu(asf->hdr.totsize),
+				ino, be16_to_cpu(hdr->totsize),
 				currentsize);
 		} else  {
 			do_warn(
 	_("corrected attribute entry totsize in inode %" PRIu64 ", was %d, now %d\n"),
-				ino, be16_to_cpu(asf->hdr.totsize),
+				ino, be16_to_cpu(hdr->totsize),
 				currentsize);
-			asf->hdr.totsize = cpu_to_be16(currentsize);
+			hdr->totsize = cpu_to_be16(currentsize);
 			*repair = 1;
 		}
 	}
@@ -1232,14 +1230,12 @@ process_attributes(
 	int			err;
 	__u8			aformat = dip->di_aformat;
 #ifdef DEBUG
-	struct xfs_attr_shortform *asf;
-
-	asf = (struct xfs_attr_shortform *) XFS_DFORK_APTR(dip);
+	struct xfs_attr_sf_hdr	*hdr = XFS_DFORK_APTR(dip);
 #endif
 
 	if (aformat == XFS_DINODE_FMT_LOCAL) {
-		ASSERT(be16_to_cpu(asf->hdr.totsize) <=
-			XFS_DFORK_ASIZE(dip, mp));
+		ASSERT(be16_to_cpu(hdr->totsize) <= XFS_DFORK_ASIZE(dip, mp));
+
 		err = process_shortform_attr(mp, ino, dip, repair);
 	} else if (aformat == XFS_DINODE_FMT_EXTENTS ||
 					aformat == XFS_DINODE_FMT_BTREE)  {
