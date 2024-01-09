@@ -98,6 +98,16 @@ kmem_zalloc(size_t size, int flags)
 void *
 krealloc(void *ptr, size_t new_size, int flags)
 {
+	/*
+	 * If @new_size is zero, Linux krealloc will free the memory and return
+	 * NULL, so force that behavior here.  The return value of realloc with
+	 * a zero size is implementation dependent, so we cannot use that.
+	 */
+	if (!new_size) {
+		free(ptr);
+		return NULL;
+	}
+
 	ptr = realloc(ptr, new_size);
 	if (ptr == NULL) {
 		fprintf(stderr, _("%s: realloc failed (%d bytes): %s\n"),
