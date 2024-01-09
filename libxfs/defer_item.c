@@ -712,6 +712,9 @@ xfs_attr_defer_parent(
 
 	switch (op) {
 	case XFS_ATTR_DEFER_SET:
+		new->xattri_op_flags = XFS_ATTRI_OP_FLAGS_PPTR_SET;
+		new->xattri_dela_state = xfs_attr_init_add_state(args);
+		break;
 	case XFS_ATTR_DEFER_REPLACE:
 		/* will be added in subsequent patches */
 		ASSERT(0);
