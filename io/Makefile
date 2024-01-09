@@ -10,6 +10,7 @@ LSRCFILES = xfs_bmap.sh xfs_freeze.sh xfs_mkfile.sh
 HFILES = init.h io.h
 CFILES = \
 	init.c \
+	aginfo.c \
 	attr.c \
 	bmap.c \
 	bulkstat.c \
