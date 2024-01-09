@@ -11,9 +11,10 @@
 void xfrog_scrubv_from_item(struct xfrog_scrubv *scrubv,
 		const struct scrub_item *sri);
 void xfrog_scrubv_add_item(struct xfrog_scrubv *scrubv,
-		const struct scrub_item *sri, unsigned int scrub_type);
+		const struct scrub_item *sri, unsigned int scrub_type,
+		bool want_repair);
 
-int format_scrub_descr(struct scrub_ctx *ctx, char *buf, size_t buflen,
+int format_scrubv_descr(struct scrub_ctx *ctx, char *buf, size_t buflen,
 		void *where);
 
 /* Predicates for scrub flag state. */
@@ -106,8 +107,7 @@ scrub_item_schedule_retry(struct scrub_item *sri, unsigned int scrub_type)
 	return true;
 }
 
-bool scrub_item_call_kernel_again(struct scrub_item *sri,
-		unsigned int scrub_type, uint8_t work_mask,
+bool scrub_item_call_kernel_again(struct scrub_item *sri, uint8_t work_mask,
 		const struct scrub_item *old);
 bool scrub_item_schedule_work(struct scrub_item *sri, uint8_t state_flags);
 
