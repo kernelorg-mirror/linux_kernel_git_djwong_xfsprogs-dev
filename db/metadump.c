@@ -1035,16 +1035,15 @@ process_sf_attr(
 	 * values with 'v' (to see a valid string length, as opposed to NULLs)
 	 */
 
-	struct xfs_attr_shortform	*asfp;
-	struct xfs_attr_sf_entry	*asfep;
+	struct xfs_attr_sf_hdr		*hdr = XFS_DFORK_APTR(dip);
+	struct xfs_attr_sf_entry	*asfep = libxfs_attr_sf_firstentry(hdr);
 	int				ino_attr_size;
 	int				i;
 
-	asfp = (struct xfs_attr_shortform *)XFS_DFORK_APTR(dip);
-	if (asfp->hdr.count == 0)
+	if (hdr->count == 0)
 		return;
 
-	ino_attr_size = be16_to_cpu(asfp->hdr.totsize);
+	ino_attr_size = be16_to_cpu(hdr->totsize);
 	if (ino_attr_size > XFS_DFORK_ASIZE(dip, mp)) {
 		ino_attr_size = XFS_DFORK_ASIZE(dip, mp);
 		if (metadump.show_warnings)
@@ -1052,9 +1051,8 @@ process_sf_attr(
 					(long long)metadump.cur_ino);
 	}
 
-	asfep = &asfp->list[0];
-	for (i = 0; (i < asfp->hdr.count) &&
-			((char *)asfep - (char *)asfp < ino_attr_size); i++) {
+	for (i = 0; (i < hdr->count) &&
+			((char *)asfep - (char *)hdr < ino_attr_size); i++) {
 
 		int	namelen = asfep->namelen;
 
@@ -1063,7 +1061,7 @@ process_sf_attr(
 				print_warning("zero length attr entry in inode "
 					"%llu", (long long)metadump.cur_ino);
 			break;
-		} else if ((char *)asfep - (char *)asfp +
+		} else if ((char *)asfep - (char *)hdr +
 				xfs_attr_sf_entsize(asfep) > ino_attr_size) {
 			if (metadump.show_warnings)
 				print_warning("attr entry length in inode %llu "
