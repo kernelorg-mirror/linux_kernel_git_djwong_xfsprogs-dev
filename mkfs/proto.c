@@ -1036,6 +1036,37 @@ rtsummary_init(
 	}
 }
 
+static void
+rtfreesp_init_groups(
+	struct xfs_mount	*mp)
+{
+	struct xfs_trans	*tp;
+	xfs_rtxnum_t		start_rtx = 0;
+	int			error;
+
+	/* The rt superblock, if present, must not be marked free. */
+	if (xfs_has_rtsuper(mp))
+		start_rtx++;
+
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate, 0, 0, 0,
+			&tp);
+	if (error)
+		res_failed(error);
+
+	libxfs_trans_ijoin(tp, mp->m_rbmip, 0);
+	error = -libxfs_rtfree_extent(tp, start_rtx,
+			mp->m_sb.sb_rextents - start_rtx);
+	if (error) {
+		fail(_("Error initializing the realtime space"),
+			error);
+	}
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		fail(_("Initialization of the realtime space failed"),
+				error);
+}
+
 /*
  * Free the whole realtime area using transactions.
  * Do one transaction per bitmap block.
@@ -1084,7 +1115,13 @@ rtinit(
 
 	rtbitmap_init(mp);
 	rtsummary_init(mp);
-	rtfreesp_init(mp);
+
+	if (!xfs_has_realtime(mp))
+		; /* empty */
+	else if (xfs_has_rtgroups(mp))
+		rtfreesp_init_groups(mp);
+	else
+		rtfreesp_init(mp);
 }
 
 static long
