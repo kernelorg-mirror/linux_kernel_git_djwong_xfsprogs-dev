@@ -61,5 +61,8 @@ int rmap_get_mem_rec(struct xfs_btree_cur *rmcur, struct xfs_rmap_irec *irec);
 xfs_rgnumber_t rtgroup_for_rtrmap_inode(struct xfs_mount *mp, xfs_ino_t ino);
 bool is_rtrmap_inode(xfs_ino_t ino);
 xfs_ino_t rtgroup_rmap_ino(struct xfs_rtgroup *rtg);
+int populate_rtgroup_rmapbt(struct xfs_rtgroup *rtg, struct xfs_inode *ip,
+		xfs_filblks_t fdblocks);
+xfs_filblks_t estimate_rtrmapbt_blocks(struct xfs_rtgroup *rtg);
 
 #endif /* RMAP_H_ */
