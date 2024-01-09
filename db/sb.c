@@ -857,6 +857,8 @@ version_string(
 		strcat(s, ",RTGROUPS");
 	if (xfs_has_verity(mp))
 		strcat(s, ",VERITY");
+	if (xfs_has_forcealign(mp))
+		strcat(s, ",FORCEALIGN");
 	return s;
 }
 
