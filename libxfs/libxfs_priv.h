@@ -504,6 +504,15 @@ xfs_buf_readahead(
 #define xfs_filestream_new_ag(ip,ag)		(0)
 #define xfs_filestream_select_ag(...)		(-ENOSYS)
 
+struct xfs_trans;
+
+static inline int
+xfs_rtallocate_extent(struct xfs_trans *tp, xfs_rtxnum_t start,
+		xfs_rtxlen_t maxlen, xfs_rtxlen_t *len, xfs_rtxnum_t *rtx)
+{
+	return -EOPNOTSUPP;
+}
+
 #define xfs_trans_inode_buf(tp, bp)		((void) 0)
 
 /* quota bits */
