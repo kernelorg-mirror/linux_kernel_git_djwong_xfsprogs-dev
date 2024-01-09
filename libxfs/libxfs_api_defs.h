@@ -214,6 +214,7 @@
 #define xfs_parent_start		libxfs_parent_start
 #define xfs_parent_hashcheck		libxfs_parent_hashcheck
 #define xfs_parent_namecheck		libxfs_parent_namecheck
+#define xfs_parent_unset		libxfs_parent_unset
 #define xfs_parent_valuecheck		libxfs_parent_valuecheck
 #define xfs_parent_verify_irec		libxfs_parent_verify_irec
 #define xfs_perag_get			libxfs_perag_get
