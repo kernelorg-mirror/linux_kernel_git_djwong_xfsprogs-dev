@@ -222,14 +222,14 @@ process_shortform_attr(
 	*/
 	if (hdr->count == 0)
 		/* then the total size should just be the header length */
-		if (be16_to_cpu(hdr->totsize) != sizeof(xfs_attr_sf_hdr_t)) {
+		if (be16_to_cpu(hdr->totsize) != sizeof(struct xfs_attr_sf_hdr)) {
 			/* whoops there's a discrepancy. Clear the hdr */
 			if (!no_modify) {
 				do_warn(
 	_("there are no attributes in the fork for inode %" PRIu64 "\n"),
 					ino);
 				hdr->totsize =
-					cpu_to_be16(sizeof(xfs_attr_sf_hdr_t));
+					cpu_to_be16(sizeof(struct xfs_attr_sf_hdr));
 				*repair = 1;
 				return(1);
 			} else {
@@ -240,7 +240,7 @@ process_shortform_attr(
 			}
 		}
 
-	currentsize = sizeof(xfs_attr_sf_hdr_t);
+	currentsize = sizeof(struct xfs_attr_sf_hdr);
 	remainingspace = be16_to_cpu(hdr->totsize) - currentsize;
 	nextentry = libxfs_attr_sf_firstentry(hdr);
 	for (i = 0; i < hdr->count; i++)  {
