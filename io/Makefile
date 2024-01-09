@@ -11,6 +11,7 @@ HFILES = \
 	init.h \
 	io.h
 CFILES = \
+	aginfo.c \
 	atomicupdate.c \
 	attr.c \
 	bmap.c \
