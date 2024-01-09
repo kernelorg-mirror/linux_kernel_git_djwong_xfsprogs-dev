@@ -20,6 +20,7 @@ CFILES = \
 	exchrange.c \
 	file.c \
 	freeze.c \
+	fsrefcounts.c \
 	fsuuid.c \
 	fsync.c \
 	getrusage.c \
