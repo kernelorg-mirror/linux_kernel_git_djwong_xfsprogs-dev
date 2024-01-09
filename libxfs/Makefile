@@ -69,6 +69,7 @@ CFILES = buf_mem.c \
 	cache.c \
 	defer_item.c \
 	init.c \
+	inode.c \
 	kmem.c \
 	logitem.c \
 	rdwr.c \
