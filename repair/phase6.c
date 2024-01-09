@@ -515,7 +515,7 @@ mk_rbmino(xfs_mount_t *mp)
 	 * now the ifork
 	 */
 	ip->i_df.if_bytes = 0;
-	ip->i_df.if_u1.if_root = NULL;
+	ip->i_df.if_data = NULL;
 
 	ip->i_disk_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
 
@@ -770,7 +770,7 @@ mk_rsumino(xfs_mount_t *mp)
 	 * now the ifork
 	 */
 	ip->i_df.if_bytes = 0;
-	ip->i_df.if_u1.if_root = NULL;
+	ip->i_df.if_data = NULL;
 
 	ip->i_disk_size = mp->m_rsumsize;
 
@@ -870,7 +870,7 @@ mk_root_dir(xfs_mount_t *mp)
 	 * now the ifork
 	 */
 	ip->i_df.if_bytes = 0;
-	ip->i_df.if_u1.if_root = NULL;
+	ip->i_df.if_data = NULL;
 
 	/*
 	 * initialize the directory
@@ -2472,7 +2472,7 @@ shortform_dir2_entry_check(
 {
 	xfs_ino_t		lino;
 	xfs_ino_t		parent;
-	struct xfs_dir2_sf_hdr	*sfp;
+	struct xfs_dir2_sf_hdr	*sfp = ip->i_df.if_data;
 	struct xfs_dir2_sf_entry *sfep;
 	struct xfs_dir2_sf_entry *next_sfep;
 	struct xfs_ifork	*ifp;
@@ -2487,7 +2487,6 @@ shortform_dir2_entry_check(
 	int			i8;
 
 	ifp = &ip->i_df;
-	sfp = (struct xfs_dir2_sf_hdr *) ifp->if_u1.if_data;
 	*ino_dirty = 0;
 	bytes_deleted = 0;
 
