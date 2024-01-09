@@ -1278,3 +1278,57 @@ check_parent_ptrs(
 
 	destroy_work_queue(&wq);
 }
+
+static int
+erase_pptrs(
+	struct xfs_inode	*ip,
+	unsigned int		attr_flags,
+	const unsigned char	*name,
+	unsigned int		namelen,
+	const void		*value,
+	unsigned int		valuelen,
+	void			*priv)
+{
+	struct xfs_da_args	args = {
+		.dp		= ip,
+		.attr_filter	= attr_flags,
+		.name		= name,
+		.namelen	= namelen,
+		.value		= (void *)value,
+		.valuelen	= valuelen,
+		.owner		= ip->i_ino,
+		.geo		= ip->i_mount->m_attr_geo,
+		.whichfork	= XFS_ATTR_FORK,
+	};
+	int			error;
+
+	if (!(attr_flags & XFS_ATTR_PARENT))
+		return 0;
+
+	libxfs_attr_sethash(&args);
+	error = -libxfs_attr_removename(&args, true);
+	if (error && error != ENOATTR)
+		do_warn(
+_("removing ino %llu parent pointer failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				strerror(error));
+
+	return 0;
+}
+
+/* Delete all of this file's parent pointers if we can. */
+void
+try_erase_parent_ptrs(
+	struct xfs_inode	*ip)
+{
+	int			error;
+
+	if (!xfs_has_parent(ip->i_mount))
+		return;
+
+	error = xattr_walk(ip, erase_pptrs, NULL);
+	if (error)
+		do_warn(_("ino %llu parent pointer erasure failed: %s\n"),
+				(unsigned long long)ip->i_ino,
+				strerror(error));
+}
