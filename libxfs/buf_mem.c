@@ -236,3 +236,16 @@ xmbuf_unmap_page(
 	munmap(bp->b_addr, BBTOB(bp->b_length));
 	bp->b_addr = NULL;
 }
+
+/* Is this a valid daddr within the buftarg? */
+bool
+xmbuf_verify_daddr(
+	struct xfs_buftarg	*btp,
+	xfs_daddr_t		daddr)
+{
+	struct xfile		*xf = btp->bt_xfile;
+
+	ASSERT(btp->flags & XFS_BUFTARG_MEM);
+
+	return daddr < (xf->partition_bytes >> BBSHIFT);
+}
