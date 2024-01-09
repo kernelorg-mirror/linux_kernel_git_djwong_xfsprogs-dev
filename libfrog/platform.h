@@ -21,4 +21,6 @@ int platform_nproc(void);
 
 void platform_findsizes(char *path, int fd, long long *sz, int *bsz);
 
+long hugepage_size(void);
+
 #endif /* __LIBFROG_PLATFORM_H__ */
