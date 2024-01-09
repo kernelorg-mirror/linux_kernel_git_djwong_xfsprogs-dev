@@ -423,3 +423,14 @@ xfile_stat(
 	statbuf->bytes = (unsigned long long)ks.st_blocks << 9;
 	return 0;
 }
+
+/* Discard pages backing a range of the xfile. */
+void
+xfile_discard(
+	struct xfile		*xf,
+	loff_t			pos,
+	unsigned long long	count)
+{
+	fallocate(xf->fcb->fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE,
+			pos, count);
+}
