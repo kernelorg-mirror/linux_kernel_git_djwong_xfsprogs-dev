@@ -205,6 +205,7 @@
 #define xfs_parent_addname		libxfs_parent_addname
 #define xfs_parent_finish		libxfs_parent_finish
 #define xfs_parent_hashval		libxfs_parent_hashval
+#define xfs_parent_lookup		libxfs_parent_lookup
 #define xfs_parent_removename		libxfs_parent_removename
 #define xfs_parent_start		libxfs_parent_start
 #define xfs_parent_from_xattr		libxfs_parent_from_xattr
