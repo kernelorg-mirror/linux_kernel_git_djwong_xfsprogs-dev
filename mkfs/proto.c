@@ -793,8 +793,8 @@ rtfreesp_init(
 			res_failed(error);
 
 		libxfs_trans_ijoin(tp, mp->m_rbmip, 0);
-		ertx = XFS_RTMIN(mp->m_sb.sb_rextents,
-			rtx + NBBY * mp->m_sb.sb_blocksize);
+		ertx = min(mp->m_sb.sb_rextents,
+			   rtx + NBBY * mp->m_sb.sb_blocksize);
 
 		error = -libxfs_rtfree_extent(tp, rtx,
 				(xfs_rtxlen_t)(ertx - rtx));
