@@ -25,7 +25,7 @@ const field_t	attr_shortform_flds[] = {
 	{ NULL }
 };
 
-#define	HOFF(f)	bitize(offsetof(xfs_attr_sf_hdr_t, f))
+#define	HOFF(f)	bitize(offsetof(struct xfs_attr_sf_hdr, f))
 const field_t	attr_sf_hdr_flds[] = {
 	{ "totsize", FLDT_UINT16D, OI(HOFF(totsize)), C1, 0, TYP_NONE },
 	{ "count", FLDT_UINT8D, OI(HOFF(count)), C1, 0, TYP_NONE },
