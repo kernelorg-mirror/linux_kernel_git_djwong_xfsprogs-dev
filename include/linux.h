@@ -253,6 +253,11 @@ struct fsxattr {
 #define FS_XFLAG_VERITY		0x00020000	/* fs-verity enabled */
 #endif
 
+/* data extent mappings for regular files must be aligned to extent size hint */
+#ifndef FS_XFLAG_FORCEALIGN
+#define FS_XFLAG_FORCEALIGN	0x00040000
+#endif
+
 /*
  * Reminder: anything added to this file will be compiled into downstream
  * userspace projects!
