@@ -227,6 +227,8 @@ libxfs_imeta_iget(
 
 	if (inode_wrong_type(VFS_I(ip), mode))
 		goto bad_rele;
+	if (xfs_has_metadir(mp) && !xfs_is_metadir_inode(ip))
+		goto bad_rele;
 
 	*ipp = ip;
 	return 0;
@@ -272,6 +274,8 @@ void
 libxfs_imeta_irele(
 	struct xfs_inode	*ip)
 {
+	ASSERT(!xfs_has_metadir(ip->i_mount) || xfs_is_metadir_inode(ip));
+
 	libxfs_irele(ip);
 }
 
