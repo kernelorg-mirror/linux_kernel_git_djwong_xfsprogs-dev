@@ -290,13 +290,11 @@ list_sfdir(
 	struct xfs_mount		*mp = dp->i_mount;
 	struct xfs_da_geometry		*geo = args->geo;
 	struct xfs_dir2_sf_entry	*sfep;
-	struct xfs_dir2_sf_hdr		*sfp;
+	struct xfs_dir2_sf_hdr		*sfp = dp->i_df.if_data;
 	xfs_ino_t			ino;
 	xfs_dir2_dataptr_t		off;
 	unsigned int			i;
 	uint8_t				filetype;
-
-	sfp = (struct xfs_dir2_sf_hdr *)dp->i_df.if_u1.if_data;
 
 	/* . and .. entries */
 	off = xfs_dir2_db_off_to_dataptr(geo, geo->datablk,
