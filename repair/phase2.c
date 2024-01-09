@@ -16,6 +16,8 @@
 #include "scan.h"
 #include "quotacheck.h"
 
+#define TERABYTES(count, blog)	((uint64_t)(count) << (40 - (blog)))
+
 /* workaround craziness in the xlog routines */
 int xlog_recover_do_trans(struct xlog *log, struct xlog_recover *t, int p)
 {
@@ -380,6 +382,84 @@ set_metadir(
 	return true;
 }
 
+static bool
+set_rtsuper(
+	struct xfs_mount	*mp,
+	struct xfs_sb		*new_sb)
+{
+	if (xfs_has_rtsuper(mp)) {
+		printf(_("Filesystem already supports realtime superblock.\n"));
+		exit(0);
+	}
+
+	if (!xfs_has_rtgroups(mp) && !add_rtgroups) {
+		printf(
+	_("Realtime superblock feature only supported if realtime groups are enabled.\n"));
+		exit(0);
+	}
+
+	if (!xfs_has_crc(mp)) {
+		printf(
+	_("Realtime superblock only supported on V5 filesystems.\n"));
+		exit(0);
+	}
+
+	if (xfs_has_realtime(mp)) {
+		printf(
+	_("Realtime superblock feature cannot be added to existing realtime volumes.\n"));
+		exit(0);
+	}
+
+	printf(_("Adding realtime superblock to filesystem.\n"));
+	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_RTSUPER;
+	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+	return true;
+}
+
+static bool
+set_rtgroups(
+	struct xfs_mount	*mp,
+	struct xfs_sb		*new_sb)
+{
+	uint64_t		rgsize;
+
+	if (xfs_has_rtgroups(mp)) {
+		printf(_("Filesystem already supports realtime groups.\n"));
+		exit(0);
+	}
+
+	if (!xfs_has_metadir(mp) && !add_metadir) {
+		printf(
+	_("Realtime allocation group feature only supported if metadir is enabled.\n"));
+		exit(0);
+	}
+
+	if (!xfs_has_crc(mp)) {
+		printf(
+	_("Realtime allocation groups only supported on V5 filesystems.\n"));
+		exit(0);
+	}
+
+	if (xfs_has_realtime(mp)) {
+		printf(
+	_("Realtime allocation group feature cannot be added to existing realtime volumes.\n"));
+		exit(0);
+	}
+
+	printf(_("Adding realtime groups to filesystem.\n"));
+	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_RTGROUPS;
+	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+	new_sb->sb_rgcount = 0;
+	/*
+	 * The allocation group size is 1TB, rounded down to the nearest rt
+	 * extent.
+	 */
+	rgsize = TERABYTES(1, mp->m_sb.sb_blocklog);
+	rgsize -= rgsize % mp->m_sb.sb_rextsize;
+	new_sb->sb_rgblocks = rgsize;
+	return true;
+}
+
 struct check_state {
 	struct xfs_sb		sb;
 	uint64_t		features;
@@ -657,6 +737,10 @@ upgrade_filesystem(
 		dirty |= set_parent(mp, &new_sb);
 	if (add_metadir)
 		dirty |= set_metadir(mp, &new_sb);
+	if (add_rtsuper)
+		dirty |= set_rtsuper(mp, &new_sb);
+	if (add_rtgroups)
+		dirty |= set_rtgroups(mp, &new_sb);
 	if (!dirty)
 		return;
 
