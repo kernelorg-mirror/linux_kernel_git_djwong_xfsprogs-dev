@@ -187,6 +187,7 @@ typedef struct xfs_mount {
 #define XFS_FEAT_METADIR	(1ULL << 27)	/* metadata directory tree */
 #define XFS_FEAT_RTGROUPS	(1ULL << 28)	/* realtime groups */
 #define XFS_FEAT_VERITY		(1ULL << 29)	/* fs-verity */
+#define XFS_FEAT_FORCEALIGN	(1ULL << 30)	/* aligned file data extents */
 
 #define __XFS_HAS_FEAT(name, NAME) \
 static inline bool xfs_has_ ## name (struct xfs_mount *mp) \
@@ -234,6 +235,7 @@ __XFS_HAS_FEAT(large_extent_counts, NREXT64)
 __XFS_HAS_FEAT(metadir, METADIR)
 __XFS_HAS_FEAT(rtgroups, RTGROUPS)
 __XFS_HAS_FEAT(verity, VERITY)
+__XFS_HAS_FEAT(forcealign, FORCEALIGN)
 
 static inline bool xfs_has_rtrmapbt(struct xfs_mount *mp)
 {
