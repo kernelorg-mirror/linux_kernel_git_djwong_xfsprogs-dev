@@ -1014,11 +1014,11 @@ process_lclinode(
 				XFS_DFORK_ASIZE(dip, mp));
 			return(1);
 		}
-		if (be16_to_cpu(hdr->totsize) < sizeof(xfs_attr_sf_hdr_t)) {
+		if (be16_to_cpu(hdr->totsize) < sizeof(struct xfs_attr_sf_hdr)) {
 			do_warn(
 	_("local inode %" PRIu64 " attr too small (size = %d, min size = %zd)\n"),
 				lino, be16_to_cpu(hdr->totsize),
-				sizeof(xfs_attr_sf_hdr_t));
+				sizeof(struct xfs_attr_sf_hdr));
 			return(1);
 		}
 	}
