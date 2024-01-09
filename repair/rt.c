@@ -14,8 +14,6 @@
 #include "err_protos.h"
 #include "rt.h"
 
-#define xfs_highbit64 libxfs_highbit64	/* for XFS_RTBLOCKLOG macro */
-
 void
 rtinit(xfs_mount_t *mp)
 {
@@ -115,7 +113,7 @@ generate_rtinfo(
 				}
 			} else if (in_extent == 1) {
 				len = (int) (extno - start_ext);
-				log = XFS_RTBLOCKLOG(len);
+				log = libxfs_highbit64(len);
 				offs = xfs_rtsumoffs(mp, log, start_bmbno);
 				inc_sumcount(mp, sumcompute, offs);
 				in_extent = 0;
@@ -131,7 +129,7 @@ generate_rtinfo(
 	}
 	if (in_extent == 1) {
 		len = (int) (extno - start_ext);
-		log = XFS_RTBLOCKLOG(len);
+		log = libxfs_highbit64(len);
 		offs = xfs_rtsumoffs(mp, log, start_bmbno);
 		inc_sumcount(mp, sumcompute, offs);
 	}
