@@ -7,6 +7,7 @@
 #define __LIBFROG_UTIL_H__
 
 unsigned int	log2_roundup(unsigned int i);
+unsigned int	log2_rounddown(unsigned long long i);
 
 #define min_t(type,x,y) \
 	({ type __x = (x); type __y = (y); __x < __y ? __x: __y; })
