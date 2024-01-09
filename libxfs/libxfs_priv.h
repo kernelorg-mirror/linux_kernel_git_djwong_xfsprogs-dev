@@ -578,4 +578,8 @@ int xfs_bmap_last_extent(struct xfs_trans *tp, struct xfs_inode *ip,
 /* xfs_inode.h */
 #define xfs_iflags_set(ip, flags)	do { } while (0)
 
+/* xfs_exchrange.h */
+#define xfs_exchrange_possible(mp) \
+	(xfs_has_bigtime(mp) || xfs_has_large_extent_counts(mp))
+
 #endif	/* __LIBXFS_INTERNAL_XFS_H__ */
