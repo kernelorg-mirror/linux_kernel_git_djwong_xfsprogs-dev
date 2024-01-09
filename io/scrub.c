@@ -20,6 +20,7 @@ static struct cmdinfo scrub_cmd;
 static struct cmdinfo repair_cmd;
 static const struct cmdinfo scrubv_cmd;
 static const struct cmdinfo noverity_cmd;
+static const struct cmdinfo addfeature_cmd;
 
 static void
 scrub_help(void)
@@ -358,6 +359,7 @@ scrub_init(void)
 	add_command(&scrub_cmd);
 	add_command(&scrubv_cmd);
 	add_command(&noverity_cmd);
+	add_command(&addfeature_cmd);
 }
 
 static void
@@ -775,4 +777,68 @@ static const struct cmdinfo noverity_cmd = {
 	.flags		= CMD_NOMAP_OK,
 	.oneline	= N_("disable fsverity"),
 	.help		= noverity_help,
+};
+
+static void
+addfeature_help(void)
+{
+	printf(_(
+"\n"
+" Upgrade the feature set of the mounted filesystem.\n"
+"\n"
+"Supported features: bigtime, inobtcount, nrext64, and verity.\n"));
+}
+
+static int
+addfeature_f(
+	int		argc,
+	char		**argv)
+{
+	__u64		flags = 0;
+	int		c;
+	int		error;
+
+	while ((c = getopt(argc, argv, "")) != EOF) {
+		switch (c) {
+		default:
+			addfeature_help();
+			return 0;
+		}
+	}
+
+	for (c = optind; c < argc; c++) {
+		if (!strcmp(argv[c], "bigtime"))
+			flags |= XFS_FSOP_GEOM_FLAGS_BIGTIME;
+		else if (!strcmp(argv[c], "inobtcount"))
+			flags |= XFS_FSOP_GEOM_FLAGS_INOBTCNT;
+		else if (!strcmp(argv[c], "nrext64"))
+			flags |= XFS_FSOP_GEOM_FLAGS_NREXT64;
+		else if (!strcmp(argv[c], "verity"))
+			flags |= XFS_FSOP_GEOM_FLAGS_VERITY;
+		else {
+			addfeature_help();
+			return 1;
+		}
+	}
+
+	if (!expert) {
+		printf(_("addfeature requires expert mode.\n"));
+		return 1;
+	}
+
+	error = ioctl(file->fd, XFS_IOC_ADDFEATURE, &flags);
+	if (error)
+		perror("addfeature");
+
+	return 0;
+}
+
+static const struct cmdinfo addfeature_cmd = {
+	.name		= "addfeature",
+	.cfunc		= addfeature_f,
+	.argmin		= -1,
+	.argmax		= -1,
+	.flags		= CMD_NOMAP_OK,
+	.oneline	= N_("add filesystem features"),
+	.help		= addfeature_help,
 };
