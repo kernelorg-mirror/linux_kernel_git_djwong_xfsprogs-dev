@@ -93,7 +93,8 @@ libxfs_icreate(
 	struct inode		*inode;
 	struct xfs_inode	*ip;
 	unsigned int		flags;
-	int			times = XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG;
+	int			times = XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG |
+					XFS_ICHGTIME_ACCESS;
 	int			error;
 
 	error = libxfs_iget(tp->t_mountp, tp, ino, XFS_IGET_CREATE, &ip);
