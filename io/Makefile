@@ -21,6 +21,7 @@ CFILES = \
 	fiemap.c \
 	file.c \
 	freeze.c \
+	fsrefcounts.c \
 	fsuuid.c \
 	fsync.c \
 	getrusage.c \
