@@ -46,6 +46,7 @@ enum o_opt_nums {
 	BLOAD_LEAF_SLACK,
 	BLOAD_NODE_SLACK,
 	NOQUOTA,
+	SKIP_FREESP_CHECK,
 	O_MAX_OPTS,
 };
 
@@ -59,6 +60,7 @@ static char *o_opts[] = {
 	[BLOAD_LEAF_SLACK]	= "debug_bload_leaf_slack",
 	[BLOAD_NODE_SLACK]	= "debug_bload_node_slack",
 	[NOQUOTA]		= "noquota",
+	[SKIP_FREESP_CHECK]	= "debug_skip_freesp_check_on_upgrade",
 	[O_MAX_OPTS]		= NULL,
 };
 
@@ -306,6 +308,15 @@ process_args(int argc, char **argv)
 					break;
 				case NOQUOTA:
 					quotacheck_skip();
+					break;
+				case SKIP_FREESP_CHECK:
+					if (!val)
+						do_abort(
+		_("-o debug_skip_freesp_check_on_upgrade requires a parameter\n"));
+					skip_freesp_check_on_upgrade = (int)strtol(val, NULL, 0);
+					if (skip_freesp_check_on_upgrade)
+						do_log(
+		_("WARNING: Allowing filesystem upgrades to proceed without free space check.  THIS MAY DESTROY YOUR FILESYSTEM!!!\n"));
 					break;
 				default:
 					unknown('o', val);
