@@ -357,7 +357,10 @@ secondary_sb_whack(
 	 *
 	 * size is the size of data which is valid for this sb.
 	 */
-	if (xfs_sb_version_hasmetadir(sb))
+	if (xfs_sb_version_hasrtgroups(sb))
+		size = offsetof(struct xfs_dsb, sb_rgblocks)
+			+ sizeof(sb->sb_rgblocks);
+	else if (xfs_sb_version_hasmetadir(sb))
 		size = offsetof(struct xfs_dsb, sb_metadirino)
 			+ sizeof(sb->sb_metadirino);
 	else if (xfs_sb_version_hasmetauuid(sb))
