@@ -187,6 +187,7 @@
 #define xfs_ifork_zap_attr		libxfs_ifork_zap_attr
 #define xfs_imap_to_bp			libxfs_imap_to_bp
 
+#define xfs_imeta_ensure_dirpath	libxfs_imeta_ensure_dirpath
 #define xfs_imeta_iget			libxfs_imeta_iget
 #define xfs_imeta_link			libxfs_imeta_link
 #define xfs_imeta_lookup		libxfs_imeta_lookup
