@@ -356,7 +356,7 @@ inode_a_size(
 	int				startoff,
 	int				idx)
 {
-	struct xfs_attr_shortform	*asf;
+	struct xfs_attr_sf_hdr		*hdr;
 	struct xfs_dinode		*dip;
 
 	ASSERT(startoff == 0);
@@ -364,8 +364,8 @@ inode_a_size(
 	dip = obj;
 	switch (dip->di_aformat) {
 	case XFS_DINODE_FMT_LOCAL:
-		asf = (struct xfs_attr_shortform *)XFS_DFORK_APTR(dip);
-		return bitize(be16_to_cpu(asf->hdr.totsize));
+		hdr = XFS_DFORK_APTR(dip);
+		return bitize(be16_to_cpu(hdr->totsize));
 	case XFS_DINODE_FMT_EXTENTS:
 		return (int)xfs_dfork_attr_extents(dip) * bitsz(xfs_bmbt_rec_t);
 	case XFS_DINODE_FMT_BTREE:
