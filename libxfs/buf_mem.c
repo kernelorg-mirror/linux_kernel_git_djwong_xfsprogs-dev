@@ -249,3 +249,42 @@ xmbuf_verify_daddr(
 
 	return daddr < (xf->partition_bytes >> BBSHIFT);
 }
+
+/* Discard the page backing this buffer. */
+static void
+xmbuf_stale(
+	struct xfs_buf		*bp)
+{
+	struct xfile		*xf = bp->b_target->bt_xfile;
+	loff_t			pos;
+
+	ASSERT(bp->b_target->bt_flags & XFS_BUFTARG_MEM);
+
+	pos = BBTOB(xfs_buf_daddr(bp)) + xf->partition_pos;
+	fallocate(xf->fcb->fd, FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE, pos,
+			BBTOB(bp->b_length));
+}
+
+/*
+ * Detach this xmbuf buffer from the transaction by any means necessary.
+ * All buffers are direct-mapped, so they do not need bwrite.
+ */
+void
+xmbuf_trans_bdetach(
+	struct xfs_trans	*tp,
+	struct xfs_buf		*bp)
+{
+	struct xfs_buf_log_item	*bli = bp->b_log_item;
+
+	ASSERT(bli != NULL);
+
+	if (bli->bli_flags & XFS_BLI_STALE)
+		xmbuf_stale(bp);
+
+	bli->bli_flags &= ~(XFS_BLI_DIRTY | XFS_BLI_ORDERED |
+			    XFS_BLI_STALE);
+	clear_bit(XFS_LI_DIRTY, &bli->bli_item.li_flags);
+
+	while (bp->b_log_item != NULL)
+		xfs_trans_bdetach(tp, bp);
+}
