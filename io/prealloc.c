@@ -41,6 +41,7 @@ static cmdinfo_t fcollapse_cmd;
 static cmdinfo_t finsert_cmd;
 static cmdinfo_t fzero_cmd;
 static cmdinfo_t funshare_cmd;
+static cmdinfo_t fmapfree_cmd;
 
 static int
 offset_length(
@@ -377,6 +378,30 @@ funshare_f(
 	return 0;
 }
 
+static int
+fmapfree_f(
+	int			argc,
+	char			**argv)
+{
+	struct xfs_flock64	segment;
+	struct xfs_map_freesp	args = { };
+
+	if (!offset_length(argv[1], argv[2], &segment)) {
+		exitcode = 1;
+		return 0;
+	}
+
+	args.offset = segment.l_start;
+	args.len = segment.l_len;
+
+	if (ioctl(file->fd, XFS_IOC_MAP_FREESP, &args)) {
+		perror("XFS_IOC_MAP_FREESP");
+		exitcode = 1;
+		return 0;
+	}
+	return 0;
+}
+
 void
 prealloc_init(void)
 {
@@ -489,4 +514,14 @@ prealloc_init(void)
 	funshare_cmd.oneline =
 	_("unshares shared blocks within the range");
 	add_command(&funshare_cmd);
+
+	fmapfree_cmd.name = "fmapfree";
+	fmapfree_cmd.cfunc = fmapfree_f;
+	fmapfree_cmd.argmin = 2;
+	fmapfree_cmd.argmax = 2;
+	fmapfree_cmd.flags = CMD_NOMAP_OK | CMD_FOREIGN_OK;
+	fmapfree_cmd.args = _("off len");
+	fmapfree_cmd.oneline =
+	_("maps free space into a file");
+	add_command(&fmapfree_cmd);
 }
