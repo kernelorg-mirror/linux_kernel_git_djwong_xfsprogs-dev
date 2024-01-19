@@ -124,6 +124,7 @@ daddr_f(
 {
 	int64_t		d;
 	char		*p;
+	int		bb_count = BTOBB(mp->m_sb.sb_sectsize);
 
 	if (argc == 1) {
 		xfs_daddr_t	daddr = iocur_top->off >> BBSHIFT;
@@ -144,7 +145,7 @@ daddr_f(
 		return 0;
 	}
 	ASSERT(typtab[TYP_DATA].typnm == TYP_DATA);
-	set_cur(&typtab[TYP_DATA], d, 1, DB_RING_ADD, NULL);
+	set_cur(&typtab[TYP_DATA], d, bb_count, DB_RING_ADD, NULL);
 	return 0;
 }
 

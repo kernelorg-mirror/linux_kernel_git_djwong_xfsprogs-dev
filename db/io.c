@@ -652,7 +652,8 @@ void
 set_iocur_type(
 	const typ_t	*type)
 {
-	int		bb_count = 1;	/* type's size in basic blocks */
+	/* type's size in basic blocks */
+	int		bb_count = BTOBB(mp->m_sb.sb_sectsize);
 	int		boff = iocur_top->boff;
 
 	/*
