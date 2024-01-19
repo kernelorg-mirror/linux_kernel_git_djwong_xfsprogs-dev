@@ -149,6 +149,7 @@ daddr_f(
 	int64_t		d;
 	char		*p;
 	int		c;
+	int		bb_count = BTOBB(mp->m_sb.sb_sectsize);
 	xfs_rfsblock_t	max_daddrs = mp->m_sb.sb_dblocks;
 	enum daddr_target tgt = DT_DATA;
 
@@ -202,13 +203,13 @@ daddr_f(
 	ASSERT(typtab[TYP_DATA].typnm == TYP_DATA);
 	switch (tgt) {
 	case DT_DATA:
-		set_cur(&typtab[TYP_DATA], d, 1, DB_RING_ADD, NULL);
+		set_cur(&typtab[TYP_DATA], d, bb_count, DB_RING_ADD, NULL);
 		break;
 	case DT_RT:
-		set_rt_cur(&typtab[TYP_DATA], d, 1, DB_RING_ADD, NULL);
+		set_rt_cur(&typtab[TYP_DATA], d, bb_count, DB_RING_ADD, NULL);
 		break;
 	case DT_LOG:
-		set_log_cur(&typtab[TYP_DATA], d, 1, DB_RING_ADD, NULL);
+		set_log_cur(&typtab[TYP_DATA], d, bb_count, DB_RING_ADD, NULL);
 		break;
 	}
 	return 0;
