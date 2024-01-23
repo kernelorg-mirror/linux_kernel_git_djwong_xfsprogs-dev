@@ -151,6 +151,7 @@
 #define xfs_init_local_fork		libxfs_init_local_fork
 
 #define xfs_inobt_init_cursor		libxfs_inobt_init_cursor
+#define xfs_finobt_init_cursor		libxfs_finobt_init_cursor
 #define xfs_inobt_maxrecs		libxfs_inobt_maxrecs
 #define xfs_inobt_stage_cursor		libxfs_inobt_stage_cursor
 #define xfs_inode_from_disk		libxfs_inode_from_disk
