@@ -26,7 +26,8 @@
 
 #define xfs_alloc_ag_max_usable		libxfs_alloc_ag_max_usable
 #define xfs_allocbt_calc_size		libxfs_allocbt_calc_size
-#define xfs_allocbt_init_cursor		libxfs_allocbt_init_cursor
+#define xfs_bnobt_init_cursor		libxfs_bnobt_init_cursor
+#define xfs_cntbt_init_cursor		libxfs_cntbt_init_cursor
 #define xfs_allocbt_maxlevels_ondisk	libxfs_allocbt_maxlevels_ondisk
 #define xfs_allocbt_maxrecs		libxfs_allocbt_maxrecs
 #define xfs_allocbt_stage_cursor	libxfs_allocbt_stage_cursor
