@@ -3338,13 +3338,13 @@ _("log size %lld is not a multiple of the log stripe unit %d\n"),
 		usage();
 	}
 
-	tmp_logblocks = ((cfg->logblocks + (sunit - 1)) / sunit) * sunit;
+	tmp_logblocks = roundup_64(cfg->logblocks, sunit);
 
 	/* If the log is too large, round down instead of round up */
 	if ((tmp_logblocks > XFS_MAX_LOG_BLOCKS) ||
 	    ((tmp_logblocks << cfg->blocklog) > XFS_MAX_LOG_BYTES) ||
 	    tmp_logblocks > max_logblocks) {
-		tmp_logblocks = (cfg->logblocks / sunit) * sunit;
+		tmp_logblocks = rounddown_64(cfg->logblocks, sunit);
 	}
 	cfg->logblocks = tmp_logblocks;
 }
@@ -3465,6 +3465,7 @@ static void
 calculate_log_size(
 	struct mkfs_params	*cfg,
 	struct cli_params	*cli,
+	struct libxfs_init	*xi,
 	struct xfs_mount	*mp)
 {
 	struct xfs_sb		*sbp = &mp->m_sb;
@@ -3503,8 +3504,13 @@ _("external log device size %lld blocks too small, must be at least %lld blocks\
 		}
 		cfg->logstart = 0;
 		cfg->logagno = 0;
-		if (cfg->lsunit)
-			align_log_size(cfg, cfg->lsunit, XFS_MAX_LOG_BLOCKS);
+		if (cfg->lsunit) {
+			uint64_t	max_logblocks;
+
+			max_logblocks = min(DTOBT(xi->log.size, cfg->blocklog),
+					    XFS_MAX_LOG_BLOCKS);
+			align_log_size(cfg, cfg->lsunit, max_logblocks);
+		}
 
 		validate_log_size(cfg->logblocks, cfg->blocklog, min_logblocks);
 		return;
@@ -4257,7 +4263,7 @@ main(
 	 * With the mount set up, we can finally calculate the log size
 	 * constraints and do default size calculations and final validation
 	 */
-	calculate_log_size(&cfg, &cli, mp);
+	calculate_log_size(&cfg, &cli, &xi, mp);
 
 	finish_superblock_setup(&cfg, mp, sbp);
 
