@@ -24,6 +24,7 @@ CFILES = \
 	fsuuid.c \
 	fsync.c \
 	getrusage.c \
+	healthmon.c \
 	imap.c \
 	inject.c \
 	label.c \

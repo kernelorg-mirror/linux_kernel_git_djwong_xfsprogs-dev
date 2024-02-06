@@ -91,6 +91,7 @@ init_commands(void)
 	utimes_init();
 	crc32cselftest_init();
 	exchrange_init();
+	healthmon_init();
 }
 
 /*
