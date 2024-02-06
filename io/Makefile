@@ -25,6 +25,7 @@ CFILES = \
 	fsuuid.c \
 	fsync.c \
 	getrusage.c \
+	healthmon.c \
 	imap.c \
 	init.c \
 	inject.c \
