@@ -192,3 +192,4 @@ extern void		bulkstat_init(void);
 extern void		atomicupdate_init(void);
 extern void		aginfo_init(void);
 extern void		fsrefcounts_init(void);
+extern void		healthmon_init(void);
