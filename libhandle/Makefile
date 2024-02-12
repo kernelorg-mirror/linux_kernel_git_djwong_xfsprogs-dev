@@ -6,7 +6,7 @@ TOPDIR = ..
 include $(TOPDIR)/include/builddefs
 
 LTLIBRARY = libhandle.la
-LT_CURRENT = 1
+LT_CURRENT = $(LIBHANDLE_MAJOR)
 LT_REVISION = 3
 LT_AGE = 0
 
