@@ -19,6 +19,7 @@ XFS_SCRUB_FAIL_PROG = xfs_scrub_fail
 XFS_SCRUB_ARGS = -p
 XFS_SCRUB_SERVICE_ARGS = -b
 XFS_SCRUBBED_PROG = xfs_scrubbed
+XFS_SCRUBBED_HELPER = xfs_scrubbed_start
 ifeq ($(HAVE_SYSTEMD),yes)
 INSTALL_SCRUB += install-systemd
 SYSTEMD_SERVICES=\
@@ -29,8 +30,9 @@ SYSTEMD_SERVICES=\
 	xfs_scrub_all.service \
 	xfs_scrub_all_fail.service \
 	xfs_scrub_all.timer \
-	system-xfs_scrub.slice
-OPTIONAL_TARGETS += $(SYSTEMD_SERVICES)
+	system-xfs_scrub.slice \
+	xfs_scrubbed@.service
+OPTIONAL_TARGETS += $(SYSTEMD_SERVICES) $(XFS_SCRUBBED_HELPER)
 endif
 ifeq ($(HAVE_CROND),yes)
 INSTALL_SCRUB += install-crond
@@ -189,6 +191,8 @@ install-scrub: default
 	$(INSTALL) -m 755 -d $(PKG_STATE_DIR)
 
 install-udev: $(UDEV_RULES)
+	$(INSTALL) -m 755 -d $(UDEV_DIR)
+	$(INSTALL) -m 755 $(XFS_SCRUBBED_HELPER) $(UDEV_DIR)
 	$(INSTALL) -m 755 -d $(UDEV_RULE_DIR)
 	for i in $(UDEV_RULES); do \
 		$(INSTALL) -m 644 $$i $(UDEV_RULE_DIR)/64-$$i; \
