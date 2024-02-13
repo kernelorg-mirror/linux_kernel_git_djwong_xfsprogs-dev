@@ -16,6 +16,7 @@ import datetime
 import errno
 import ctypes
 import ctypes.util
+import time
 
 debug = False
 log = False
@@ -767,6 +768,13 @@ def main():
 		ret = monitor(args.mountpoint)
 	except KeyboardInterrupt:
 		ret = 0
+
+	# See the service mode comments in xfs_scrub.c for why we do this.
+	if 'SERVICE_MODE' in os.environ:
+		time.sleep(2)
+		if ret != 0:
+			ret = 1
+
 	sys.exit(ret)
 
 if __name__ == '__main__':
