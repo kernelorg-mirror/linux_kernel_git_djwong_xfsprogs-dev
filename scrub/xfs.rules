@@ -11,3 +11,6 @@
 # supplying UDISKS_AUTO=0 here changes the HintAuto property of the block
 # device abstraction to mean "do not automatically start" (e.g. mount).
 SUBSYSTEM=="block", ENV{ID_FS_TYPE}=="xfs|xfs_external_log", ENV{UDISKS_AUTO}="0"
+
+# Start the background scrubber automatically
+ACTION=="add", SUBSYSTEM=="xfs", ENV{TYPE}=="mount", RUN+="xfs_scrubbed_start"
