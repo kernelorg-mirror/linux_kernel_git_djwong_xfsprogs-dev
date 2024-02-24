@@ -668,7 +668,7 @@ fix_perm_log_incompat_features(
 	unsigned int		perm = 0;
 	unsigned int		missing;
 
-	if (xfs_has_parent(mp)) {
+	if (xfs_has_parent(mp) || xfs_has_metadir(mp)) {
 		/*
 		 * Directory parent pointers require logged extended attribute
 		 * updates to maintain referential integrity with dirent
@@ -689,6 +689,11 @@ fix_perm_log_incompat_features(
 		 * Set the exchmaps bit.
 		 */
 		perm |= XFS_SB_FEAT_INCOMPAT_LOG_EXCHMAPS;
+
+		/*
+		 * Metadata directories are a modern feature, so the same
+		 * permanent log incompat rules apply.
+		 */
 	}
 
 	missing = perm & ~mp->m_sb.sb_features_log_incompat;
