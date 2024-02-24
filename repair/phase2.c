@@ -548,6 +548,56 @@ upgrade_filesystem(
 	features_changed = true;
 }
 
+/* Make sure our permanent log incompat features are present. */
+static void
+fix_perm_log_incompat_features(
+	struct xfs_mount	*mp)
+{
+	unsigned int		perm = 0;
+	unsigned int		missing;
+
+	if (xfs_has_parent(mp)) {
+		/*
+		 * Directory parent pointers require logged extended attribute
+		 * updates to maintain referential integrity with dirent
+		 * updates.  Set the LARP bit.
+		 */
+		perm |= XFS_SB_FEAT_INCOMPAT_LOG_XATTRS;
+
+		/*
+		 * Directory parent pointers make directory repairs practical.
+		 * However, online repairs of directories (and parent pointers
+		 * which are embedded in extended attributes) must commit the
+		 * repairs atomically by building a replacement structure in a
+		 * temporary file and then exchanging the contents.
+		 *
+		 * Although there's no hard dependency between parent pointers
+		 * and file mapping exchanges like there is with logged xattr
+		 * updates, these two features will likely go hand in hand.
+		 * Set the exchmaps bit.
+		 */
+		perm |= XFS_SB_FEAT_INCOMPAT_LOG_EXCHMAPS;
+	}
+
+	missing = perm & ~mp->m_sb.sb_features_log_incompat;
+	if (!missing)
+		return;
+
+	if (no_modify) {
+		/*
+		 * The kernel always sets missing permanent log incompat
+		 * feature bits at mount time.  Use do_log here because this
+		 * isn't a corruption error, but something we should tell the
+		 * user about anyway.
+		 */
+		do_log(_("would add log incompat features 0x%x\n"), missing);
+	} else {
+		do_warn(_("will add log incompat features 0x%x\n"), missing);
+		mp->m_sb.sb_features_log_incompat |= missing;
+		features_changed = true;
+	}
+}
+
 /*
  * ok, at this point, the fs is mounted but the root inode may be
  * trashed and the ag headers haven't been checked.  So we have
@@ -585,6 +635,12 @@ phase2(
 	 */
 	if (mp->m_buf_writeback_fn)
 		retain_primary_sb(mp);
+
+	/*
+	 * Now that we've got the primary sb sorted and the mount fully
+	 * initialized, make sure permanent log incompat bits are set.
+	 */
+	fix_perm_log_incompat_features(mp);
 
 	/* Zero log if applicable */
 	do_log(_("        - zero log...\n"));
