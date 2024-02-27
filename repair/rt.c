@@ -13,7 +13,6 @@
 #include "protos.h"
 #include "err_protos.h"
 #include "rt.h"
-#include "xfs_rtbitmap.h"
 
 #define xfs_highbit64 libxfs_highbit64	/* for XFS_RTBLOCKLOG macro */
 
