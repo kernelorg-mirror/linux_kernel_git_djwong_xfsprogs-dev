@@ -6,9 +6,6 @@
 #ifndef __XFS_RTBITMAP_H__
 #define	__XFS_RTBITMAP_H__
 
-/* For userspace XFS_RT is always defined */
-#define CONFIG_XFS_RT
-
 struct xfs_rtalloc_args {
 	struct xfs_mount	*mp;
 	struct xfs_trans	*tp;
