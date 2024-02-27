@@ -22,6 +22,7 @@ log = False
 everything = False
 printf_prefix = ''
 want_repair = False
+has_parent = False
 libhandle = None
 
 # ioctl encoding stuff
@@ -113,10 +114,16 @@ class xfs_handle(ctypes.Structure):
 assert ctypes.sizeof(xfs_handle) == 24
 
 class fshandle(object):
-	def __init__(self, fd, mountpoint):
+	def __init__(self, fd, mountpoint = None):
 		global libhandle, printf_prefix
 
 		self.handle = xfs_handle()
+
+		if isinstance(fd, fshandle):
+			# copy an existing fshandle
+			self.mountpoint = fd.mountpoint
+			ctypes.pointer(self.handle)[0] = fd.handle
+			return
 
 		if mountpoint is None:
 			raise Exception('fshandle needs a mountpoint')
@@ -166,6 +173,11 @@ class fshandle(object):
 
 		libhandle.free_handle(buf, buflen)
 		return fd
+
+	def subst(self, ino, gen):
+		'''Substitute the inode and generation components of a handle.'''
+		self.handle.ha_fid.fid_ino = ino
+		self.handle.ha_fid.fid_gen = gen
 
 def libhandle_load():
 	'''Load libhandle and set things up.'''
@@ -273,6 +285,166 @@ def xfs_repair_inode_metadata(fd, type, ino, gen):
 	'''Call the kernel to repair some inode metadata.'''
 	return __xfs_repair_metadata(fd, type, 0, ino, gen)
 
+# fsgeometry ioctl
+class xfs_fsop_geom(ctypes.Structure):
+	_fields_ = [
+		("blocksize",		ctypes.c_uint),
+		("rtextesize",		ctypes.c_uint),
+		("agblocks",		ctypes.c_uint),
+		("agcount",		ctypes.c_uint),
+		("logblocks",		ctypes.c_uint),
+		("sectsize",		ctypes.c_uint),
+		("inodesize",		ctypes.c_uint),
+		("imaxpct",		ctypes.c_uint),
+		("datablocks",		ctypes.c_ulonglong),
+		("rtblocks",		ctypes.c_ulonglong),
+		("rtextents",		ctypes.c_ulonglong),
+		("logstart",		ctypes.c_ulonglong),
+		("uuid",		ctypes.c_ubyte * 16),
+		("sunit",		ctypes.c_uint),
+		("swidth",		ctypes.c_uint),
+		("version",		ctypes.c_uint),
+		("flags",		ctypes.c_uint),
+		("logsectsize",		ctypes.c_uint),
+		("rtsectsize",		ctypes.c_uint),
+		("dirblocksize",	ctypes.c_uint),
+		("logsunit",		ctypes.c_uint),
+		("sick",		ctypes.c_uint),
+		("checked",		ctypes.c_uint),
+		("rgblocks",		ctypes.c_uint),
+		("rgcount",		ctypes.c_uint),
+		("_pad",		ctypes.c_ulonglong * 16),
+	]
+assert ctypes.sizeof(xfs_fsop_geom) == 256
+
+XFS_FSOP_GEOM_FLAGS_PARENT	= 1 << 30
+
+XFS_IOC_FSGEOMETRY		= _IOR (0x58, 126, xfs_fsop_geom)
+
+def xfs_has_parent(fd):
+	'''Does this filesystem have parent pointers?'''
+
+	arg = xfs_fsop_geom()
+	fcntl.ioctl(fd, XFS_IOC_FSGEOMETRY, arg)
+	return arg.flags & XFS_FSOP_GEOM_FLAGS_PARENT != 0
+
+# getparents ioctl
+class xfs_attrlist_cursor(ctypes.Structure):
+	_fields_ = [
+		("_opaque0",	ctypes.c_uint),
+		("_opaque1",	ctypes.c_uint),
+		("_opaque2",	ctypes.c_uint),
+		("_opaque3",	ctypes.c_uint)
+	]
+
+def xfs_getparents_sized(nr_offsets):
+	'''Return a type for the getparents flexarray with the given number of offsets.'''
+	class xfs_getparents(ctypes.Structure):
+		_fields_ = [
+			("gp_handle",		xfs_handle),
+			("_gp_cursor",		xfs_attrlist_cursor),
+			("gp_flags",		ctypes.c_uint),
+			("_pad",		ctypes.c_uint),
+			("gp_bufsize",		ctypes.c_uint),
+			("gp_count",		ctypes.c_uint),
+			("_pad2",		ctypes.c_ulonglong * 5),
+			("gp_offsets",		ctypes.c_uint * int(nr_offsets))
+		]
+	return xfs_getparents
+xfs_getparents = xfs_getparents_sized(0)
+
+def xfs_getparents_rec_sized(namelen):
+	'''Return a type for the getparents record flexarray with the given name length.'''
+	class xfs_getparents_rec(ctypes.Structure):
+		_pack_ = 1
+		_fields_ = [
+			("gpr_parent",		xfs_handle),
+			("gpr_reclen",		ctypes.c_ushort),
+			("gpr_name",		ctypes.c_char * int(namelen))
+		]
+	return xfs_getparents_rec
+xfs_getparents_rec = xfs_getparents_rec_sized(0)
+
+assert ctypes.sizeof(xfs_getparents) == 96
+assert ctypes.sizeof(xfs_getparents_rec) == 26
+
+XFS_GETPARENTS_OFLAG_ROOT	= 1 << 0
+XFS_GETPARENTS_OFLAG_DONE	= 1 << 1
+
+XFS_IOC_GETPARENTS		= _IOWR(0x58, 62, xfs_getparents)
+
+def fgetparents(fd, fh = None, bufsize = 1024):
+	'''Return all the parent pointers for a given fd and/or handle.'''
+
+	def invoke(arg):
+		if arg.gp_flags & XFS_GETPARENTS_OFLAG_DONE:
+			return False
+
+		ret = fcntl.ioctl(fd, XFS_IOC_GETPARENTS, arg)
+		return ret == 0 and arg.gp_count > 0
+
+	def alloc_getparents(bufsize):
+		'''Allocate the args array with the given buffer size.'''
+
+		# We cheat here by declaring an absurdly long gp_offsets array
+		# to get the buffer size we want, even though gp_count will
+		# never come close to nr_offsets.
+		nr_offsets = (bufsize - ctypes.sizeof(xfs_getparents)) / ctypes.sizeof(ctypes.c_uint)
+		realtype = xfs_getparents_sized(int(nr_offsets))
+		ret = realtype()
+		ret.gp_bufsize = bufsize
+		return ret
+
+	def sliced_rec_type(bufslice):
+		'''Return a getparents record type that is exactly the size of a buffer slice.'''
+
+		bufsize = len(bufslice)
+		namelen = (bufsize - ctypes.sizeof(xfs_getparents_rec)) / ctypes.sizeof(ctypes.c_char)
+		if namelen > 255:
+			namelen = 255
+		return xfs_getparents_rec_sized(namelen)
+
+	arg = alloc_getparents(bufsize)
+	lowest_off = bufsize
+
+	if fh is not None:
+		arg.gp_handle = fh.handle
+
+	while invoke(arg):
+		buf = bytes(arg)
+		for i in range(0, arg.gp_count):
+			off = arg.gp_offsets[i]
+			reclen = lowest_off - off
+
+			bufslice = buf[off:lowest_off]
+			if lowest_off > off:
+				lowest_off = off
+
+			rectype = sliced_rec_type(bufslice)
+			rec = ctypes.cast(bufslice, ctypes.POINTER(rectype))
+			yield rec.contents
+
+def fgetpath(fd, fh = None):
+	'''Return a list of path components up to the root dir of the filesystem for a given fd.'''
+	ret = []
+	if fh is None:
+		nfh = fshandle(fd)
+	else:
+		# Don't subst into the caller's handle
+		nfh = fshandle(fh)
+
+	while True:
+		added = False
+		for pptr in fgetparents(fd, nfh):
+			ret.insert(0, pptr.gpr_name)
+			nfh.subst(pptr.gpr_parent.ha_fid.fid_ino, \
+				  pptr.gpr_parent.ha_fid.fid_gen)
+			added = True
+			break
+		if not added:
+			break
+	return ret
+
 # main program
 
 def health_reports(mon_fp):
@@ -305,11 +477,23 @@ def health_reports(mon_fp):
 			lines = []
 		buf = mon_fp.readline()
 
+def inode_printf_prefix(event):
+	'''Compute the logging prefix for this event.'''
+	global printf_prefix
+
+	if 'path' not in event:
+		return printf_prefix
+
+	if printf_prefix.endswith(os.sep):
+		return f"{printf_prefix}{event['path']}"
+
+	return f"{printf_prefix}{os.sep}{event['path']}"
+
 def log_event(event):
 	'''Log a monitoring event to stdout.'''
 	global printf_prefix
 
-	print(f"{printf_prefix}: {event}")
+	print(f"{inode_printf_prefix(event)}: {event}")
 	sys.stdout.flush()
 
 def report_lost(event):
@@ -343,7 +527,7 @@ def report_shutdown(event):
 
 def monitor(mountpoint):
 	'''Monitor the given mountpoint for health events.'''
-	global log, printf_prefix, everything, want_repair
+	global log, printf_prefix, everything, want_repair, has_parent
 
 	def stringify_timestamp(event):
 		try:
@@ -355,9 +539,36 @@ def monitor(mountpoint):
 			# let's yell about that loudly
 			print(e)
 
+	def pathify_inogen(event, fh):
+		if event['domain'] != 'inode':
+			return
+		try:
+			path_fd = fh.open()
+		except Exception as e:
+			print(e)
+			return
+
+		try:
+			fh2 = fshandle(fh)
+			fh2.subst(event['inode'], event['generation'])
+			components = [x.decode('utf-8') for x in fgetpath(path_fd, fh2)]
+			event['path'] = os.sep.join(components)
+		except Exception as e:
+			# Not the end of the world if we get nothing
+			if e.errno != errno.EOPNOTSUPP:
+				print(e)
+		finally:
+			os.close(path_fd)
+
 	fd = os.open(mountpoint, os.O_RDONLY)
 	try:
-		if want_repair:
+		has_parent = xfs_has_parent(fd)
+	except Exception as e:
+		# Don't care if we can't detect parent pointers
+		print(e)
+
+	try:
+		if want_repair or has_parent:
 			fh = fshandle(fd, mountpoint)
 		mon_fd = open_health_monitor(fd, verbose = everything)
 	except OSError as e:
@@ -376,6 +587,8 @@ def monitor(mountpoint):
 	with os.fdopen(mon_fd) as mon_fp:
 		for event in health_reports(mon_fp):
 			stringify_timestamp(event)
+			if has_parent:
+				pathify_inogen(event, fh)
 			if log:
 				log_event(event)
 			if event['type'] == 'lost':
@@ -473,6 +686,8 @@ def repair_group(event, fd, group_type):
 
 def repair_inode(event, fd):
 	'''React to a inode-domain corruption event by repairing it.'''
+	ipp = inode_printf_prefix(event)
+
 	for s in event['structures']:
 		type = __scrub_type(s)
 		if type is None:
@@ -480,10 +695,10 @@ def repair_inode(event, fd):
 		try:
 			oflags = xfs_repair_inode_metadata(fd, type,
 				      event['inode'], event['generation'])
-			print(f"{printf_prefix}: {s}: {report_outcome(oflags)}")
+			print(f"{ipp}: {s}: {report_outcome(oflags)}")
 			sys.stdout.flush()
 		except Exception as e:
-			print(f"{printf_prefix}: {e}", file = sys.stderr)
+			print(f"{ipp}: {e}", file = sys.stderr)
 
 def repair_metadata(event, fh):
 	'''Repair a metadata corruption.'''
