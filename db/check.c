@@ -20,7 +20,6 @@
 #include "init.h"
 #include "malloc.h"
 #include "dir2.h"
-#include "xfs_rtbitmap.h"
 
 typedef enum {
 	IS_USER_QUOTA, IS_PROJECT_QUOTA, IS_GROUP_QUOTA,
