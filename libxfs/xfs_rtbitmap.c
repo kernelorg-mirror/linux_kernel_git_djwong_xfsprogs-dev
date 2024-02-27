@@ -931,7 +931,7 @@ xfs_rtcheck_alloc_range(
  */
 int
 xfs_rtfree_extent(
-	xfs_trans_t		*tp,	/* transaction pointer */
+	struct xfs_trans	*tp,	/* transaction pointer */
 	xfs_rtxnum_t		start,	/* starting rtext number to free */
 	xfs_rtxlen_t		len)	/* length of extent freed */
 {
