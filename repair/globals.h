@@ -100,6 +100,7 @@ extern bool	add_rmapbt;		/* add reverse mapping btrees */
 extern bool	add_parent;		/* add parent pointers */
 extern bool	add_metadir;		/* add metadata directory tree */
 extern bool	add_rtgroups;		/* add realtime allocation groups */
+extern bool	add_verity;		/* add fs-verity support */
 
 /* misc status variables */
 
