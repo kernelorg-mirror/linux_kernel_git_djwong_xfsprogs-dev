@@ -78,6 +78,7 @@ enum c_opt_nums {
 	CONVERT_METADIR,
 	CONVERT_RTSUPER,
 	CONVERT_RTGROUPS,
+	CONVERT_VERITY,
 	C_MAX_OPTS,
 };
 
@@ -94,6 +95,7 @@ static char *c_opts[] = {
 	[CONVERT_METADIR]	= "metadir",
 	[CONVERT_RTSUPER]	= "rtsuper",
 	[CONVERT_RTGROUPS]	= "rtgroups",
+	[CONVERT_VERITY]	= "verity",
 	[C_MAX_OPTS]		= NULL,
 };
 
@@ -448,6 +450,15 @@ process_args(int argc, char **argv)
 						do_abort(
 		_("-c rtgroups only supports upgrades\n"));
 					add_rtgroups = true;
+					break;
+				case CONVERT_VERITY:
+					if (!val)
+						do_abort(
+		_("-c verity requires a parameter\n"));
+					if (strtol(val, NULL, 0) != 1)
+						do_abort(
+		_("-c verity only supports upgrades\n"));
+					add_verity = true;
 					break;
 				default:
 					unknown('c', val);
