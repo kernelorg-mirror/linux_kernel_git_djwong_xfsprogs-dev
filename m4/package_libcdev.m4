@@ -237,3 +237,21 @@ AC_DEFUN([AC_USE_RADIX_TREE_FOR_INUMS],
        AC_MSG_RESULT(yes)],[AC_MSG_RESULT(no)])
     AC_SUBST(use_radix_tree_for_inums)
   ])
+
+#
+# Check if linux/fsverity.h defines the verity descriptor
+#
+AC_DEFUN([AC_HAVE_FSVERITY_DESCRIPTOR],
+  [ AC_MSG_CHECKING([for fsverity_descriptor in linux/fsverity.h ])
+    AC_COMPILE_IFELSE(
+    [	AC_LANG_PROGRAM([[
+#include <linux/types.h>
+#include <linux/fsverity.h>
+	]], [[
+struct fsverity_descriptor m = { };
+	]])
+    ], have_fsverity_descr=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_fsverity_descr)
+  ])
