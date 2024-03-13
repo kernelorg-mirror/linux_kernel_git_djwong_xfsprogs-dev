@@ -40,6 +40,7 @@ static int	attr3_remote_merkledata_count(void *obj, int startoff);
 static int	attr_leaf_name_local_merkledata_count(void *obj, int startoff);
 static int	attr_leaf_name_local_merkleoff_count(void *obj, int startoff);
 static int	attr_leaf_name_remote_merkleoff_count(void *obj, int startoff);
+static int	attr_leaf_vdesc_count(void *obj, int startoff);
 
 const field_t	attr_hfld[] = {
 	{ "", FLDT_ATTR, OI(0), C1, 0, TYP_NONE },
@@ -151,6 +152,8 @@ const field_t	attr_leaf_name_flds[] = {
 	  attr_leaf_name_remote_name_count, FLD_COUNT, TYP_NONE },
 	{ "merkle_pos", FLDT_UINT64X, OI(MKROFF(mk_pos)),
 	  attr_leaf_name_remote_merkleoff_count, FLD_COUNT, TYP_NONE },
+	{ "vdesc", FLDT_FSVERITY_DESCR, attr_leaf_name_local_value_offset,
+	  attr_leaf_vdesc_count, FLD_COUNT|FLD_OFFSET, TYP_NONE },
 	{ NULL }
 };
 
@@ -715,6 +718,34 @@ attr_leaf_name_remote_merkleoff_count(
 	int				startoff)
 {
 	return attr_leaf_entry_walk(obj, startoff, __leaf_remote_merkleoff_count);
+}
+
+static int
+__leaf_vdesc_count(
+	struct xfs_attr_leafblock	*leaf,
+	struct xfs_attr_leaf_entry      *e,
+	int				i)
+{
+	struct xfs_attr_leaf_name_local	*l;
+
+	if (!(e->flags & XFS_ATTR_LOCAL))
+		return 0;
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) != XFS_ATTR_VERITY)
+		return 0;
+
+	l = xfs_attr3_leaf_name_local(leaf, i);
+	if (l->namelen != XFS_VERITY_DESCRIPTOR_NAME_LEN)
+		return 0;
+
+	return 1;
+}
+
+static int
+attr_leaf_vdesc_count(
+	void				*obj,
+	int				startoff)
+{
+	return attr_leaf_entry_walk(obj, startoff, __leaf_vdesc_count);
 }
 
 int
