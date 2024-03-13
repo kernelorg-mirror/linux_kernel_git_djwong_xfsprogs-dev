@@ -21,7 +21,10 @@ static int	attr_leaf_name_local_count(void *obj, int startoff);
 static int	attr_leaf_name_local_name_count(void *obj, int startoff);
 static int	attr_leaf_name_pptr_count(void *obj, int startoff);
 static int	attr_leaf_name_pptr_namelen(void *obj, int startoff);
+static int	attr_leaf_name_local_merkle_count(void *obj, int startoff);
+static int	attr_leaf_name_remote_merkle_count(void *obj, int startoff);
 static int	attr_leaf_name_local_value_count(void *obj, int startoff);
+static int	attr_leaf_name_local_verity_value_count(void *obj, int startoff);
 static int	attr_leaf_name_local_value_offset(void *obj, int startoff,
 						  int idx);
 static int	attr_leaf_name_remote_count(void *obj, int startoff);
@@ -87,6 +90,9 @@ const field_t	attr_leaf_entry_flds[] = {
 	{ "parent", FLDT_UINT1,
 	  OI(LEOFF(flags) + bitsz(uint8_t) - XFS_ATTR_PARENT_BIT - 1), C1, 0,
 	  TYP_NONE },
+	{ "verity", FLDT_UINT1,
+	  OI(LEOFF(flags) + bitsz(uint8_t) - XFS_ATTR_VERITY_BIT - 1), C1, 0,
+	  TYP_NONE },
 	{ "pad2", FLDT_UINT8X, OI(LEOFF(pad2)), C1, FLD_SKIPALL, TYP_NONE },
 	{ NULL }
 };
@@ -115,6 +121,10 @@ const field_t	attr_leaf_map_flds[] = {
 #define	LVOFF(f)	bitize(offsetof(xfs_attr_leaf_name_remote_t, f))
 #define	PPOFF(f)	bitize(offsetof(xfs_attr_leaf_name_local_t, nameval) + \
 			       offsetof(struct xfs_parent_name_rec, f))
+#define	MKLOFF(f)	bitize(offsetof(xfs_attr_leaf_name_local_t, nameval) + \
+			       offsetof(struct xfs_verity_merkle_key, f))
+#define	MKROFF(f)	bitize(offsetof(xfs_attr_leaf_name_remote_t, name) + \
+			       offsetof(struct xfs_verity_merkle_key, f))
 const field_t	attr_leaf_name_flds[] = {
 	{ "valuelen", FLDT_UINT16D, OI(LNOFF(valuelen)),
 	  attr_leaf_name_local_count, FLD_COUNT, TYP_NONE },
@@ -130,8 +140,12 @@ const field_t	attr_leaf_name_flds[] = {
 	  attr_leaf_name_pptr_count, FLD_COUNT, TYP_NONE },
 	{ "parent_name", FLDT_CHARNS, attr_leaf_name_local_value_offset,
 	  attr_leaf_name_pptr_namelen, FLD_COUNT|FLD_OFFSET, TYP_NONE },
+	{ "merkle_off", FLDT_UINT64X, OI(MKLOFF(vi_merkleoff)),
+	  attr_leaf_name_local_merkle_count, FLD_COUNT, TYP_NONE },
 	{ "value", FLDT_CHARNS, attr_leaf_name_local_value_offset,
 	  attr_leaf_name_local_value_count, FLD_COUNT|FLD_OFFSET, TYP_NONE },
+	{ "verity_data", FLDT_HEXSTRING, attr_leaf_name_local_value_offset,
+	  attr_leaf_name_local_verity_value_count, FLD_COUNT|FLD_OFFSET, TYP_NONE },
 	{ "valueblk", FLDT_UINT32X, OI(LVOFF(valueblk)),
 	  attr_leaf_name_remote_count, FLD_COUNT, TYP_NONE },
 	{ "valuelen", FLDT_UINT32D, OI(LVOFF(valuelen)),
@@ -140,6 +154,8 @@ const field_t	attr_leaf_name_flds[] = {
 	  attr_leaf_name_remote_count, FLD_COUNT, TYP_NONE },
 	{ "name", FLDT_CHARNS, OI(LVOFF(name)),
 	  attr_leaf_name_remote_name_count, FLD_COUNT, TYP_NONE },
+	{ "merkle_off", FLDT_UINT64X, OI(MKROFF(vi_merkleoff)),
+	  attr_leaf_name_remote_merkle_count, FLD_COUNT, TYP_NONE },
 	{ NULL }
 };
 
@@ -217,6 +233,55 @@ attr_remote_data_count(
 	return 0;
 }
 
+/*
+ * Is the current file a verity file?  This is a kludge for handling merkle
+ * tree blocks stored in a XFS_ATTR_VERITY attr's remote value block because we
+ * can't access the leaf entry to find out if the attr is actually a verity
+ * attr.
+ */
+static bool is_verity_file(void)
+{
+	struct xfs_inode	*ip;
+	bool			ret = false;
+
+	if (iocur_top->ino == 0 || iocur_top->ino == NULLFSINO)
+		return false;
+
+	if (!xfs_has_verity(mp))
+		return false;
+
+	ret = -libxfs_iget(mp, NULL, iocur_top->ino, 0, &ip);
+	if (ret)
+		return false;
+
+	if (ip->i_diflags2 & XFS_DIFLAG2_VERITY)
+		ret = true;
+
+	libxfs_irele(ip);
+	return ret;
+}
+
+static int
+attr3_remote_verity_value_count(
+	void				*obj,
+	int				startoff)
+{
+	struct xfs_attr3_leaf_hdr	*lhdr = obj;
+	struct xfs_attr3_rmt_hdr	*rhdr = obj;
+
+	if (rhdr->rm_magic == cpu_to_be32(XFS_ATTR3_RMT_MAGIC) ||
+	    lhdr->info.hdr.magic == cpu_to_be16(XFS_DA_NODE_MAGIC) ||
+	    lhdr->info.hdr.magic == cpu_to_be16(XFS_DA3_NODE_MAGIC) ||
+	    lhdr->info.hdr.magic == cpu_to_be16(XFS_ATTR_LEAF_MAGIC) ||
+	    lhdr->info.hdr.magic == cpu_to_be16(XFS_ATTR3_LEAF_MAGIC))
+		return 0;
+
+	if (startoff != 0 || !is_verity_file())
+		return 0;
+
+	return mp->m_sb.sb_blocksize;
+}
+
 static int
 attr3_remote_data_count(
 	void				*obj,
@@ -273,7 +338,19 @@ __attr_leaf_name_local_count(
 	struct xfs_attr_leaf_entry      *e,
 	int				i)
 {
-	return (e->flags & XFS_ATTR_LOCAL) != 0;
+	struct xfs_attr_leaf_name_local	*l;
+
+	if (!(e->flags & XFS_ATTR_LOCAL))
+		return 0;
+
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY) {
+		l = xfs_attr3_leaf_name_local(leaf, i);
+
+		if (l->namelen == sizeof(struct xfs_verity_merkle_key))
+			return 0;
+	}
+
+	return 1;
 }
 
 static int
@@ -283,6 +360,64 @@ attr_leaf_name_local_count(
 {
 	return attr_leaf_entry_walk(obj, startoff,
 				    __attr_leaf_name_local_count);
+}
+
+static int
+__attr_leaf_name_local_merkle_count(
+	struct xfs_attr_leafblock	*leaf,
+	struct xfs_attr_leaf_entry      *e,
+	int				i)
+{
+	struct xfs_attr_leaf_name_local	*l;
+
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) != XFS_ATTR_VERITY)
+		return 0;
+	if (!(e->flags & XFS_ATTR_LOCAL))
+		return 0;
+
+	l = xfs_attr3_leaf_name_local(leaf, i);
+	if (l->namelen != sizeof(struct xfs_verity_merkle_key))
+		return 0;
+
+	return 1;
+}
+
+static int
+attr_leaf_name_local_merkle_count(
+	void				*obj,
+	int				startoff)
+{
+	return attr_leaf_entry_walk(obj, startoff,
+			__attr_leaf_name_local_merkle_count);
+}
+
+static int
+__attr_leaf_name_remote_merkle_count(
+	struct xfs_attr_leafblock	*leaf,
+	struct xfs_attr_leaf_entry      *e,
+	int				i)
+{
+	struct xfs_attr_leaf_name_remote	*r;
+
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) != XFS_ATTR_VERITY)
+		return 0;
+	if (e->flags & XFS_ATTR_LOCAL)
+		return 0;
+
+	r = xfs_attr3_leaf_name_remote(leaf, i);
+	if (r->namelen != sizeof(struct xfs_verity_merkle_key))
+		return 0;
+
+	return 1;
+}
+
+static int
+attr_leaf_name_remote_merkle_count(
+	void				*obj,
+	int				startoff)
+{
+	return attr_leaf_entry_walk(obj, startoff,
+			__attr_leaf_name_remote_merkle_count);
 }
 
 static int
@@ -319,6 +454,10 @@ __attr_leaf_name_local_name_count(
 		return 0;
 
 	l = xfs_attr3_leaf_name_local(leaf, i);
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY &&
+	    l->namelen == sizeof(struct xfs_verity_merkle_key))
+		return 0;
+
 	return l->namelen;
 }
 
@@ -367,7 +506,8 @@ __attr_leaf_name_local_value_count(
 
 	if (!(e->flags & XFS_ATTR_LOCAL))
 		return 0;
-	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_PARENT)
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_PARENT ||
+	    (e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY)
 		return 0;
 
 	l = xfs_attr3_leaf_name_local(leaf, i);
@@ -381,6 +521,36 @@ attr_leaf_name_local_value_count(
 {
 	return attr_leaf_entry_walk(obj, startoff,
 				    __attr_leaf_name_local_value_count);
+}
+
+static int
+__attr_leaf_name_local_verity_value_count(
+	struct xfs_attr_leafblock	*leaf,
+	struct xfs_attr_leaf_entry      *e,
+	int				i)
+{
+	struct xfs_attr_leaf_name_local	*l;
+
+	if (!(e->flags & XFS_ATTR_LOCAL))
+		return 0;
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_PARENT)
+		return 0;
+
+	l = xfs_attr3_leaf_name_local(leaf, i);
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY &&
+	    l->namelen == sizeof(struct xfs_verity_merkle_key))
+		return be16_to_cpu(l->valuelen);
+
+	return 0;
+}
+
+static int
+attr_leaf_name_local_verity_value_count(
+	void				*obj,
+	int				startoff)
+{
+	return attr_leaf_entry_walk(obj, startoff,
+				    __attr_leaf_name_local_verity_value_count);
 }
 
 static int
@@ -438,6 +608,10 @@ __attr_leaf_name_remote_name_count(
 		return 0;
 
 	r = xfs_attr3_leaf_name_remote(leaf, i);
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY &&
+	    r->namelen == sizeof(struct xfs_verity_merkle_key))
+		return 0;
+
 	return r->namelen;
 }
 
@@ -604,6 +778,8 @@ const field_t	attr3_flds[] = {
 	  FLD_COUNT, TYP_NONE },
 	{ "data", FLDT_CHARNS, OI(bitize(sizeof(struct xfs_attr3_rmt_hdr))),
 	  attr3_remote_data_count, FLD_COUNT, TYP_NONE },
+	{ "verity_data", FLDT_HEXSTRING, OI(0),
+	  attr3_remote_verity_value_count, FLD_COUNT, TYP_NONE },
 	{ "entries", FLDT_ATTR_LEAF_ENTRY, OI(L3OFF(entries)),
 	  attr3_leaf_entries_count, FLD_ARRAY|FLD_COUNT, TYP_NONE },
 	{ "btree", FLDT_ATTR_NODE_ENTRY, OI(N3OFF(__btree)),
@@ -686,6 +862,9 @@ xfs_attr3_set_crc(
 		xfs_buf_update_cksum(bp, XFS_ATTR3_RMT_CRC_OFF);
 		return;
 	default:
+		if (is_verity_file())
+			return;
+
 		dbprintf(_("Unknown attribute buffer type!\n"));
 		break;
 	}
@@ -721,6 +900,11 @@ xfs_attr3_db_read_verify(
 		bp->b_ops = &xfs_attr3_rmt_buf_ops;
 		break;
 	default:
+		if (is_verity_file()) {
+			bp->b_ops = &xfs_attr3_rmtverity_buf_ops;
+			goto verify;
+		}
+
 		dbprintf(_("Unknown attribute buffer type!\n"));
 		xfs_buf_ioerror(bp, -EFSCORRUPTED);
 		return;
