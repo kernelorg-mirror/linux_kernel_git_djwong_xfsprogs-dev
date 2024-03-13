@@ -174,4 +174,8 @@ static inline size_t __ab_c_size(size_t a, size_t b, size_t c)
 # define barrier() __memory_barrier()
 #endif
 
+#ifdef HAVE_FSVERITY_DESCR
+# include <linux/fsverity.h>
+#endif
+
 #endif	/* __XFS_PLATFORM_DEFS_H__ */
