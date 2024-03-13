@@ -33,6 +33,25 @@ const field_t		parent_flds[] = {
 };
 #undef PPOFF
 
+#ifdef HAVE_FSVERITY_DESCR
+# define	OFF(f)	bitize(offsetof(struct fsverity_descriptor, f))
+const field_t	vdesc_flds[] = {
+	{ "version", FLDT_UINT8D, OI(OFF(version)), C1, 0, TYP_NONE },
+	{ "hash_algorithm", FLDT_UINT8D, OI(OFF(hash_algorithm)), C1, 0, TYP_NONE },
+	{ "log_blocksize", FLDT_UINT8D, OI(OFF(log_blocksize)), C1, 0, TYP_NONE },
+	{ "salt_size", FLDT_UINT8D, OI(OFF(salt_size)), C1, 0, TYP_NONE },
+	{ "data_size", FLDT_UINT64D_LE, OI(OFF(data_size)), C1, 0, TYP_NONE },
+	{ "root_hash", FLDT_HEXSTRING, OI(OFF(root_hash)), CI(64), 0, TYP_NONE },
+	{ "salt", FLDT_HEXSTRING, OI(OFF(salt)), CI(32), 0, TYP_NONE },
+	{ NULL }
+};
+# undef OFF
+#else
+const field_t	vdesc_flds[] = {
+	{ NULL }
+};
+#endif
+
 const ftattr_t	ftattrtab[] = {
 	{ FLDT_AGBLOCK, "agblock", fp_num, "%u", SI(bitsz(xfs_agblock_t)),
 	  FTARG_DONULL, fa_agblock, NULL },
@@ -439,6 +458,16 @@ const ftattr_t	ftattrtab[] = {
 	  0, NULL, NULL },
 	{ FLDT_RGSUMMARY, "rgsummary", NULL, (char *)rgsummary_flds,
 	  btblock_size, FTARG_SIZE, NULL, rgsummary_flds },
+
+	{ FLDT_UINT64D_LE, "uint64d_le", fp_num, "%llu", SI(bitsz(uint64_t)),
+	  FTARG_LE, NULL, NULL },
+
+#ifdef HAVE_FSVERITY_DESCR
+	{ FLDT_FSVERITY_DESCR, "verity", NULL, (char *)vdesc_flds,
+	  SI(bitsz(struct fsverity_descriptor)), 0, NULL, vdesc_flds },
+#else
+	{ FLDT_FSVERITY_DESCR, "verity", NULL, NULL, 0, 0, NULL, NULL },
+#endif
 
 	{ FLDT_ZZZ, NULL }
 };

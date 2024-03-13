@@ -211,6 +211,9 @@ typedef enum fldt	{
 	FLDT_SUMINFO,
 	FLDT_RGSUMMARY,
 
+	FLDT_UINT64D_LE,
+	FLDT_FSVERITY_DESCR,
+
 	FLDT_ZZZ			/* mark last entry */
 } fldt_t;
 
