@@ -26,15 +26,15 @@ static void		attrset_help(void);
 
 static const cmdinfo_t	attr_set_cmd =
 	{ "attr_set", "aset", attr_set_f, 1, -1, 0,
-	  N_("[-r|-s|-u|-p] [-n] [-R|-C] [-v n] name"),
+	  N_("[-r|-s|-u|-p|-f] [-n] [-R|-C] [-v n] name"),
 	  N_("set the named attribute on the current inode"), attrset_help };
 static const cmdinfo_t	attr_remove_cmd =
 	{ "attr_remove", "aremove", attr_remove_f, 1, -1, 0,
-	  N_("[-r|-s|-u|-p] [-n] name"),
+	  N_("[-r|-s|-u|-p|-f] [-n] name"),
 	  N_("remove the named attribute from the current inode"), attrset_help };
 static const cmdinfo_t	attr_modify_cmd =
 	{ "attr_modify", "amodify", attr_modify_f, 1, -1, 0,
-	  N_("[-r|-s|-u] [-o n] [-v n] [-m n] name value"),
+	  N_("[-r|-s|-u|-f] [-o n] [-v n] [-m n] name value"),
 	  N_("modify value of the named attribute of the current inode"),
 		attrset_help };
 
@@ -53,6 +53,7 @@ attrset_help(void)
 "  -u -- 'user'		(default)\n"
 "  -s -- 'secure'\n"
 "  -p -- 'parent'\n"
+"  -f -- 'fs-verity'\n"
 "\n"
 " For attr_set, these options further define the type of set operation:\n"
 "  -C -- 'create'    - create attribute, fail if it already exists\n"
@@ -116,7 +117,8 @@ out_free:
 
 #define LIBXFS_ATTR_NS		(LIBXFS_ATTR_SECURE | \
 				 LIBXFS_ATTR_ROOT | \
-				 LIBXFS_ATTR_PARENT)
+				 LIBXFS_ATTR_PARENT | \
+				 LIBXFS_ATTR_VERITY)
 
 static int
 attr_set_f(
@@ -138,7 +140,7 @@ attr_set_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "ruspCRnN:v:V:")) != EOF) {
+	while ((c = getopt(argc, argv, "fruspCRnN:v:V:")) != EOF) {
 		switch (c) {
 		/* namespaces */
 		case 'r':
@@ -155,6 +157,10 @@ attr_set_f(
 		case 'p':
 			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= XFS_ATTR_PARENT;
+			break;
+		case 'f':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
+			args.attr_filter |= LIBXFS_ATTR_VERITY;
 			break;
 
 		/* modifiers */
@@ -303,7 +309,7 @@ attr_remove_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "ruspnN:")) != EOF) {
+	while ((c = getopt(argc, argv, "fruspnN:")) != EOF) {
 		switch (c) {
 		/* namespaces */
 		case 'r':
@@ -320,6 +326,10 @@ attr_remove_f(
 		case 'p':
 			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= XFS_ATTR_PARENT;
+			break;
+		case 'f':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
+			args.attr_filter |= LIBXFS_ATTR_VERITY;
 			break;
 
 		case 'N':
@@ -423,7 +433,7 @@ attr_modify_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "ruspnv:o:m:")) != EOF) {
+	while ((c = getopt(argc, argv, "fruspnv:o:m:")) != EOF) {
 		switch (c) {
 		/* namespaces */
 		case 'r':
@@ -440,6 +450,10 @@ attr_modify_f(
 		case 'p':
 			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= XFS_ATTR_PARENT;
+			break;
+		case 'f':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
+			args.attr_filter |= LIBXFS_ATTR_VERITY;
 			break;
 
 		case 'n':
