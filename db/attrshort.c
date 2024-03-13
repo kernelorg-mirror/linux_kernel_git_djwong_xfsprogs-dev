@@ -20,6 +20,9 @@ static int	attr_shortform_list_offset(void *obj, int startoff, int idx);
 
 static int	attr_sf_entry_pptr_count(void *obj, int startoff);
 
+static int	attr_sf_entry_merkleoff_count(void *obj, int startoff);
+static int	attr_sf_entry_merkledata_count(void *obj, int startoff);
+
 const field_t	attr_shortform_flds[] = {
 	{ "hdr", FLDT_ATTR_SF_HDR, OI(0), C1, 0, TYP_NONE },
 	{ "list", FLDT_ATTR_SF_ENTRY, attr_shortform_list_offset,
@@ -35,6 +38,8 @@ const field_t	attr_sf_hdr_flds[] = {
 };
 
 #define	EOFF(f)	bitize(offsetof(struct xfs_attr_sf_entry, f))
+#define	MKOFF(f) bitize(offsetof(struct xfs_attr_sf_entry, nameval) + \
+			offsetof(struct xfs_merkle_key, f))
 const field_t	attr_sf_entry_flds[] = {
 	{ "namelen", FLDT_UINT8D, OI(EOFF(namelen)), C1, 0, TYP_NONE },
 	{ "valuelen", FLDT_UINT8D, OI(EOFF(valuelen)), C1, 0, TYP_NONE },
@@ -48,10 +53,17 @@ const field_t	attr_sf_entry_flds[] = {
 	{ "parent", FLDT_UINT1,
 	  OI(EOFF(flags) + bitsz(uint8_t) - XFS_ATTR_PARENT_BIT - 1), C1, 0,
 	  TYP_NONE },
+	{ "verity", FLDT_UINT1,
+	  OI(EOFF(flags) + bitsz(uint8_t) - XFS_ATTR_VERITY_BIT - 1), C1, 0,
+	  TYP_NONE },
 	{ "name", FLDT_CHARNS, OI(EOFF(nameval)), attr_sf_entry_name_count,
 	  FLD_COUNT, TYP_NONE },
 	{ "parent_dir", FLDT_PARENT_REC, attr_sf_entry_value_offset,
 	  attr_sf_entry_pptr_count, FLD_COUNT | FLD_OFFSET, TYP_NONE },
+	{ "merkle_pos", FLDT_UINT32X, OI(MKOFF(mk_pos)),
+	  attr_sf_entry_merkleoff_count, FLD_COUNT, TYP_NONE },
+	{ "merkle_data", FLDT_HEXSTRING, attr_sf_entry_value_offset,
+	  attr_sf_entry_merkledata_count, FLD_COUNT | FLD_OFFSET, TYP_NONE },
 	{ "value", FLDT_CHARNS, attr_sf_entry_value_offset,
 	  attr_sf_entry_value_count, FLD_COUNT|FLD_OFFSET, TYP_NONE },
 	{ NULL }
@@ -98,6 +110,10 @@ attr_sf_entry_value_count(
 	e = (struct xfs_attr_sf_entry *)((char *)obj + byteize(startoff));
 
 	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_PARENT)
+		return 0;
+
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY &&
+	    e->namelen == sizeof(struct xfs_merkle_key))
 		return 0;
 
 	return e->valuelen;
@@ -182,4 +198,38 @@ attr_sf_entry_pptr_count(
 		return 0;
 
 	return 1;
+}
+
+static int
+attr_sf_entry_merkleoff_count(
+	void				*obj,
+	int				startoff)
+{
+	struct xfs_attr_sf_entry	*e;
+
+	ASSERT(bitoffs(startoff) == 0);
+	e = (struct xfs_attr_sf_entry *)((char *)obj + byteize(startoff));
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) != XFS_ATTR_VERITY)
+		return 0;
+
+	if (e->namelen != sizeof(struct xfs_merkle_key))
+		return 0;
+
+	return 1;
+}
+
+static int
+attr_sf_entry_merkledata_count(
+	void				*obj,
+	int				startoff)
+{
+	struct xfs_attr_sf_entry	*e;
+
+	ASSERT(bitoffs(startoff) == 0);
+	e = (struct xfs_attr_sf_entry *)((char *)obj + byteize(startoff));
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY &&
+	    e->namelen == sizeof(struct xfs_merkle_key))
+		return e->valuelen;
+
+	return 0;
 }
