@@ -546,6 +546,7 @@ attr_modify_f(
 			(unsigned long long)iocur_top->ino);
 		goto out;
 	}
+	args.owner = iocur_top->ino;
 
 	if (libxfs_attr_get(&args)) {
 		dbprintf(_("failed to get attr '%s' from inode %llu\n"),
