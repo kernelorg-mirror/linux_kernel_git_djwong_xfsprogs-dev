@@ -405,6 +405,28 @@ set_rtgroups(
 	return true;
 }
 
+static bool
+set_verity(
+	struct xfs_mount	*mp,
+	struct xfs_sb		*new_sb)
+{
+	if (xfs_has_verity(mp)) {
+		printf(_("Filesystem already supports verity.\n"));
+		exit(0);
+	}
+
+	if (!xfs_has_crc(mp)) {
+		printf(
+	_("Verity feature only supported on V5 filesystems.\n"));
+		exit(0);
+	}
+
+	printf(_("Adding verity to filesystem.\n"));
+	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_VERITY;
+	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+	return true;
+}
+
 struct check_state {
 	struct xfs_sb		sb;
 	uint64_t		features;
@@ -842,6 +864,8 @@ upgrade_filesystem(
 		dirty |= set_metadir(mp, &new_sb);
 	if (add_rtgroups)
 		dirty |= set_rtgroups(mp, &new_sb);
+	if (add_verity)
+		dirty |= set_verity(mp, &new_sb);
 	if (!dirty)
 		return;
 
