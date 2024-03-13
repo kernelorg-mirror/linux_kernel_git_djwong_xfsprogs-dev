@@ -209,6 +209,12 @@ The filesystem cannot be downgraded after this feature is enabled.
 This upgrade is not possible if a realtime volume has already been added to the
 filesystem.
 This feature is not upstream yet.
+.TP 0.4i
+.B verity
+Enable fs-verity on the filesystem, which allows for sealing of regular file
+data with signed hashes.
+The filesystem cannot be downgraded after this feature is enabled.
+This feature is not upstream yet.
 .RE
 .TP
 .BI \-U " uuid"
