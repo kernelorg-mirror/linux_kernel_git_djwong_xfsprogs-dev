@@ -511,7 +511,7 @@ convert_oct(
  * are adjusted in the buffer so that the first input bit is to be be written to
  * the first bit in the output.
  */
-static char *
+char *
 convert_arg(
 	char		*arg,
 	int		bit_length)
