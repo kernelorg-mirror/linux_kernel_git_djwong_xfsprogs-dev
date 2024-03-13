@@ -69,7 +69,8 @@ HFILES = \
 	xfs_shared.h \
 	xfs_trans_resv.h \
 	xfs_trans_space.h \
-	xfs_dir2_priv.h
+	xfs_dir2_priv.h \
+	xfs_verity.h
 
 CFILES = buf_mem.c \
 	cache.c \
@@ -131,7 +132,8 @@ CFILES = buf_mem.c \
 	xfs_trans_inode.c \
 	xfs_trans_resv.c \
 	xfs_trans_space.c \
-	xfs_types.c
+	xfs_types.c \
+	xfs_verity.c
 
 #
 # Tracing flags:
