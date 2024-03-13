@@ -14,6 +14,7 @@
 
 static int	attr_sf_entry_name_count(void *obj, int startoff);
 static int	attr_sf_entry_merkle_count(void *obj, int startoff);
+static int	attr_sf_entry_vdesc_count(void *obj, int startoff);
 static int	attr_sf_entry_pptr_count(void *obj, int startoff);
 static int	attr_sf_entry_pptr_namelen(void *obj, int startoff);
 static int	attr_sf_entry_value_count(void *obj, int startoff);
@@ -70,6 +71,8 @@ const field_t	attr_sf_entry_flds[] = {
 	  attr_sf_entry_merkle_count, FLD_COUNT, TYP_NONE },
 	{ "value", FLDT_CHARNS, attr_sf_entry_value_offset,
 	  attr_sf_entry_value_count, FLD_COUNT|FLD_OFFSET, TYP_NONE },
+	{ "verity", FLDT_FSVERITY_DESCR, attr_sf_entry_value_offset,
+	  attr_sf_entry_vdesc_count, FLD_COUNT|FLD_OFFSET, TYP_NONE },
 	{ NULL }
 };
 
@@ -85,6 +88,24 @@ attr_sf_entry_merkle_count(
 	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY)
 		return 1;
 	return 0;
+}
+
+static int
+attr_sf_entry_vdesc_count(
+	void				*obj,
+	int				startoff)
+{
+	struct xfs_attr_sf_entry	*e;
+
+	ASSERT(bitoffs(startoff) == 0);
+	e = (struct xfs_attr_sf_entry *)((char *)obj + byteize(startoff));
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) != XFS_ATTR_VERITY)
+		return 0;
+
+	if (e->namelen != XFS_VERITY_DESCRIPTOR_NAME_LEN)
+		return 0;
+
+	return 1;
 }
 
 static int
