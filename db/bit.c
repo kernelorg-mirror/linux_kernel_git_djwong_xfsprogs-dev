@@ -55,39 +55,34 @@ getbitval(
 	char		*p;
 	int64_t		rval;
 	int		signext;
-	int		z1, z2, z3, z4;
 
 	ASSERT(nbits<=64);
 
 	p = (char *)obj + byteize(bitoff);
 	bit = bitoffs(bitoff);
 	signext = (flags & BVSIGNED) != 0;
-	z4 = ((intptr_t)p & 0xf) == 0 && bit == 0;
-	if (nbits == 64 && z4)
-		return be64_to_cpu(*(__be64 *)p);
-	z3 = ((intptr_t)p & 0x7) == 0 && bit == 0;
-	if (nbits == 32 && z3) {
+
+	if (bit != 0)
+		goto scrape_bits;
+
+	switch (nbits) {
+	case 64:
+		return get_unaligned_be64(p);
+	case 32:
 		if (signext)
-			return (__s32)be32_to_cpu(*(__be32 *)p);
-		else
-			return (__u32)be32_to_cpu(*(__be32 *)p);
-	}
-	z2 = ((intptr_t)p & 0x3) == 0 && bit == 0;
-	if (nbits == 16 && z2) {
+			return (__s32)get_unaligned_be32(p);
+		return (__u32)get_unaligned_be32(p);
+	case 16:
 		if (signext)
-			return (__s16)be16_to_cpu(*(__be16 *)p);
-		else
-			return (__u16)be16_to_cpu(*(__be16 *)p);
-	}
-	z1 = ((intptr_t)p & 0x1) == 0 && bit == 0;
-	if (nbits == 8 && z1) {
+			return (__s16)get_unaligned_be16(p);
+		return (__u16)get_unaligned_be16(p);
+	case 8:
 		if (signext)
 			return *(__s8 *)p;
-		else
-			return *(__u8 *)p;
+		return *(__u8 *)p;
 	}
 
-
+scrape_bits:
 	for (i = 0, rval = 0LL; i < nbits; i++) {
 		if (getbit_l(p, bit + i)) {
 			/* If the last bit is on and we care about sign
