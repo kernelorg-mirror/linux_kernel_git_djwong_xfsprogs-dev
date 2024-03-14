@@ -62,31 +62,30 @@ getbitval(
 	p = (char *)obj + byteize(bitoff);
 	bit = bitoffs(bitoff);
 	signext = (flags & BVSIGNED) != 0;
-	z4 = ((intptr_t)p & 0xf) == 0 && bit == 0;
+	z4 = ((intptr_t)p & (sizeof(uint64_t) - 1)) == 0 && bit == 0;
 	if (nbits == 64 && z4)
 		return be64_to_cpu(*(__be64 *)p);
-	z3 = ((intptr_t)p & 0x7) == 0 && bit == 0;
+	z3 = ((intptr_t)p & (sizeof(uint32_t) - 1)) == 0 && bit == 0;
 	if (nbits == 32 && z3) {
 		if (signext)
 			return (__s32)be32_to_cpu(*(__be32 *)p);
 		else
 			return (__u32)be32_to_cpu(*(__be32 *)p);
 	}
-	z2 = ((intptr_t)p & 0x3) == 0 && bit == 0;
+	z2 = ((intptr_t)p & (sizeof(uint16_t) - 1)) == 0 && bit == 0;
 	if (nbits == 16 && z2) {
 		if (signext)
 			return (__s16)be16_to_cpu(*(__be16 *)p);
 		else
 			return (__u16)be16_to_cpu(*(__be16 *)p);
 	}
-	z1 = ((intptr_t)p & 0x1) == 0 && bit == 0;
+	z1 = bit == 0;
 	if (nbits == 8 && z1) {
 		if (signext)
 			return *(__s8 *)p;
 		else
 			return *(__u8 *)p;
 	}
-
 
 	for (i = 0, rval = 0LL; i < nbits; i++) {
 		if (getbit_l(p, bit + i)) {
