@@ -743,7 +743,17 @@ phase6_estimate(
 
 	*items = cvt_off_fsb_to_b(&ctx->mnt,
 			(d_blocks - d_bfree) + (r_blocks - r_bfree));
+
+	/*
+	 * Each read-verify pool starts a thread pool, and each worker thread
+	 * can contribute to the progress counter.  Hence we need to set
+	 * nr_threads appropriately to handle that many threads.
+	 */
 	*nr_threads = disk_heads(ctx->datadev);
+	if (ctx->rtdev)
+		*nr_threads += disk_heads(ctx->rtdev);
+	if (ctx->logdev)
+		*nr_threads += disk_heads(ctx->logdev);
 	*rshift = 20;
 	return 0;
 }
