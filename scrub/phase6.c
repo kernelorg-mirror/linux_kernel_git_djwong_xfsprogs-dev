@@ -25,6 +25,7 @@
 #include "libfrog/bulkstat.h"
 #include "descr.h"
 #include "progress.h"
+#include <sys/mman.h>
 
 /*
  * Phase 6: Verify data file integrity.
@@ -759,6 +760,97 @@ record_verity_success(
 	*fail_len = 0;
 }
 
+/* Map at most this many bytes at a time. */
+#define MMAP_LENGTH		(4194304)
+
+/*
+ * Use MADV_POPULATE_READ to validate verity file contents.  Returns @length if
+ * the entire region validated ok; 0 to signal to the caller that they should
+ * fall back to regular reads; or a negative errno if some other error
+ * happened.
+ */
+static ssize_t
+validate_mmap(
+	int		fd,
+	off_t		pos,
+	size_t		length)
+{
+	void		*addr;
+	int		ret;
+
+	/*
+	 * Try to map this file into the address space.  If that fails, we can
+	 * fall back to reading the file contents with read(), so collapse all
+	 * error codes to EFAULT.
+	 */
+	addr = mmap(NULL, length, PROT_READ, MAP_SHARED, fd, pos);
+	if (addr == MAP_FAILED)
+		return 0;
+
+	/* Returns EFAULT for read IO errors. */
+	ret = madvise(addr, length, MADV_POPULATE_READ);
+	if (ret) {
+		munmap(addr, length);
+		if (errno == EFAULT)
+			return 0;
+		return -errno;
+	}
+
+	ret = munmap(addr, length);
+	if (ret)
+		return -errno;
+
+	return length;
+}
+
+/*
+ * Use pread to validate verity file contents.  Returns the number of bytes
+ * validated; 0 to signal to the caller that EOF was encountered; or a negative
+ * errno if some other error happened.
+ */
+static ssize_t
+validate_pread(
+	struct scrub_ctx	*ctx,
+	struct descr		*dsc,
+	int			fd,
+	const struct stat	*statbuf,
+	off_t			pos,
+	size_t			length,
+	off_t			*fail_pos,
+	off_t			*fail_len)
+{
+	ssize_t			validated;
+
+	for (validated = 0;
+	     validated < length;
+	     validated += statbuf->st_blksize, pos += statbuf->st_blksize) {
+		char	c;
+		ssize_t	bytes_read;
+
+		bytes_read = pread(fd, &c, 1, pos);
+		if (!bytes_read)
+			break;
+		if (bytes_read > 0) {
+			record_verity_success(ctx, dsc, fail_pos, fail_len);
+			continue;
+		}
+
+		if (errno == EIO) {
+			size_t	length = min(statbuf->st_size - pos,
+					     statbuf->st_blksize);
+
+			record_verity_error(ctx, dsc, pos, length, fail_pos,
+					fail_len);
+			continue;
+		}
+
+		str_errno(ctx, descr_render(dsc));
+		return -errno;
+	}
+
+	return validated;
+}
+
 /* Scan a verity file's data looking for validation errors. */
 static void
 scan_verity_file(
@@ -770,10 +862,15 @@ scan_verity_file(
 	struct verity_file_ctx	*vf = arg;
 	struct scrub_ctx	*ctx = vf->vc->ctx;
 	off_t			pos;
+	off_t			max_map_pos;
 	off_t			fail_pos = -1, fail_len = 0;
 	int			fd;
 	int			ret;
 	DEFINE_DESCR(dsc, ctx, render_ino_from_handle);
+	static long		pagesize;
+
+	if (!pagesize)
+		pagesize = sysconf(_SC_PAGESIZE);
 
 	descr_set(&dsc, &vf->handle);
 
@@ -818,30 +915,30 @@ scan_verity_file(
 		goto out_fd;
 	}
 
-	/* Read a single byte from each block in the file to validate. */
-	for (pos = 0; pos < sb.st_size; pos += sb.st_blksize) {
-		char	c;
-		ssize_t	bytes_read;
+	/* Validate the file contents with MADV_POPULATE_READ and pread */
+	max_map_pos = roundup(sb.st_size, pagesize);
+	for (pos = 0; pos < max_map_pos; pos += MMAP_LENGTH) {
+		size_t	length = min(max_map_pos - pos, MMAP_LENGTH);
+		ssize_t	validated;
 
-		bytes_read = pread(fd, &c, 1, pos);
-		if (!bytes_read)
-			break;
-		if (bytes_read > 0) {
+		validated = validate_mmap(fd, pos, length);
+		if (validated > 0) {
 			record_verity_success(ctx, &dsc, &fail_pos, &fail_len);
-			progress_add(sb.st_blksize);
+			progress_add(validated);
 			continue;
 		}
-
-		if (errno == EIO) {
-			size_t	length = min(sb.st_size - pos, sb.st_blksize);
-
-			record_verity_error(ctx, &dsc, pos, length, &fail_pos,
-					&fail_len);
-			continue;
+		if (validated < 0) {
+			errno = -validated;
+			str_errno(ctx, descr_render(&dsc));
+			goto out_fd;
 		}
 
-		str_errno(ctx, descr_render(&dsc));
-		break;
+		validated = validate_pread(ctx, &dsc, fd, &sb, pos, length,
+				&fail_pos, &fail_len);
+		if (validated <= 0)
+			break;
+
+		progress_add(validated);
 	}
 	report_verity_error(ctx, &dsc, fail_pos, fail_len);
 
