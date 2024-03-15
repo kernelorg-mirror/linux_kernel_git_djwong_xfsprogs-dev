@@ -1327,6 +1327,32 @@ want_obfuscate_pptr(
 	return false;
 }
 
+static inline bool
+want_obfuscate_verity(
+	unsigned int	nsp_flags,
+	unsigned int	namelen,
+	bool		is_meta)
+{
+	if (!metadump.obfuscate || is_meta)
+		return false;
+
+	/* Ignore if verity isn't enabled. */
+	if (!xfs_has_verity(mp))
+		return false;
+
+	/* Ignore anything not claiming to be verity metadata. */
+	if (!(nsp_flags & XFS_ATTR_VERITY))
+		return false;
+
+	/* Obfuscate this verity metadata if it passes basic checks. */
+	if (namelen == XFS_VERITY_DESCRIPTOR_NAME_LEN ||
+	    namelen == sizeof(struct xfs_verity_merkle_key))
+		return true;
+
+	/* Ignore otherwise. */
+	return false;
+}
+
 static void
 obfuscate_parent_pointer(
 	const struct xfs_parent_name_rec *rec,
@@ -1469,6 +1495,9 @@ process_sf_attr(
 		if (want_obfuscate_pptr(asfep->flags, name, namelen,
 					value, asfep->valuelen, is_meta)) {
 			obfuscate_parent_pointer(name, value, asfep->valuelen);
+		} else if (want_obfuscate_verity(asfep->flags, namelen,
+					is_meta)) {
+			/* empty */
 		} else if (want_obfuscate_attr(asfep->flags, name, namelen,
 					value, asfep->valuelen, is_meta)) {
 			generate_obfuscated_name(0, asfep->flags,
@@ -1865,6 +1894,9 @@ process_attr_block(
 						local->namelen, value,
 						valuelen, is_meta)) {
 				obfuscate_parent_pointer(name, value, valuelen);
+			} else if (want_obfuscate_verity(entry->flags,
+						local->namelen, is_meta)) {
+				/* empty */
 			} else if (want_obfuscate_attr(entry->flags, name,
 						local->namelen, value,
 						valuelen, is_meta)) {
@@ -1889,7 +1921,10 @@ process_attr_block(
 						(long long)metadump.cur_ino);
 				break;
 			}
-			if (want_obfuscate_dirents(is_meta)) {
+			if (want_obfuscate_verity(entry->flags,
+						remote->namelen, is_meta)) {
+				/* empty */
+			} else if (want_obfuscate_dirents(is_meta)) {
 				generate_obfuscated_name(0, entry->flags,
 						remote->namelen,
 						&remote->name[0]);
