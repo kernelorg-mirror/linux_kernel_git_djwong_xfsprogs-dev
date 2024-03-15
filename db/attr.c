@@ -33,6 +33,9 @@ static int	attr_remote_data_count(void *obj, int startoff);
 static int	attr3_remote_hdr_count(void *obj, int startoff);
 static int	attr3_remote_data_count(void *obj, int startoff);
 
+static int	attr_leaf_name_local_merkle_count(void *obj, int startoff);
+static int	attr_leaf_name_remote_merkle_count(void *obj, int startoff);
+
 const field_t	attr_hfld[] = {
 	{ "", FLDT_ATTR, OI(0), C1, 0, TYP_NONE },
 	{ NULL }
@@ -82,6 +85,9 @@ const field_t	attr_leaf_entry_flds[] = {
 	{ "local", FLDT_UINT1,
 	  OI(LEOFF(flags) + bitsz(uint8_t) - XFS_ATTR_LOCAL_BIT - 1), C1, 0,
 	  TYP_NONE },
+	{ "verity", FLDT_UINT1,
+	  OI(LEOFF(flags) + bitsz(uint8_t) - XFS_ATTR_VERITY_BIT - 1), C1, 0,
+	  TYP_NONE },
 	{ "pad2", FLDT_UINT8X, OI(LEOFF(pad2)), C1, FLD_SKIPALL, TYP_NONE },
 	{ NULL }
 };
@@ -108,6 +114,10 @@ const field_t	attr_leaf_map_flds[] = {
 
 #define	LNOFF(f)	bitize(offsetof(xfs_attr_leaf_name_local_t, f))
 #define	LVOFF(f)	bitize(offsetof(xfs_attr_leaf_name_remote_t, f))
+#define	MKLOFF(f)	bitize(offsetof(xfs_attr_leaf_name_local_t, nameval) + \
+			       offsetof(struct xfs_verity_merkle_key, f))
+#define	MKROFF(f)	bitize(offsetof(xfs_attr_leaf_name_remote_t, name) + \
+			       offsetof(struct xfs_verity_merkle_key, f))
 const field_t	attr_leaf_name_flds[] = {
 	{ "valuelen", FLDT_UINT16D, OI(LNOFF(valuelen)),
 	  attr_leaf_name_local_count, FLD_COUNT, TYP_NONE },
@@ -115,6 +125,8 @@ const field_t	attr_leaf_name_flds[] = {
 	  attr_leaf_name_local_count, FLD_COUNT, TYP_NONE },
 	{ "name", FLDT_CHARNS, OI(LNOFF(nameval)),
 	  attr_leaf_name_local_name_count, FLD_COUNT, TYP_NONE },
+	{ "merkle_off", FLDT_UINT64X, OI(MKLOFF(vi_merkleoff)),
+	  attr_leaf_name_local_merkle_count, FLD_COUNT, TYP_NONE },
 	{ "value", FLDT_CHARNS, attr_leaf_name_local_value_offset,
 	  attr_leaf_name_local_value_count, FLD_COUNT|FLD_OFFSET, TYP_NONE },
 	{ "valueblk", FLDT_UINT32X, OI(LVOFF(valueblk)),
@@ -125,6 +137,8 @@ const field_t	attr_leaf_name_flds[] = {
 	  attr_leaf_name_remote_count, FLD_COUNT, TYP_NONE },
 	{ "name", FLDT_CHARNS, OI(LVOFF(name)),
 	  attr_leaf_name_remote_name_count, FLD_COUNT, TYP_NONE },
+	{ "merkle_off", FLDT_UINT64X, OI(MKROFF(vi_merkleoff)),
+	  attr_leaf_name_remote_merkle_count, FLD_COUNT, TYP_NONE },
 	{ NULL }
 };
 
@@ -258,7 +272,19 @@ __attr_leaf_name_local_count(
 	struct xfs_attr_leaf_entry      *e,
 	int				i)
 {
-	return (e->flags & XFS_ATTR_LOCAL) != 0;
+	struct xfs_attr_leaf_name_local	*l;
+
+	if (!(e->flags & XFS_ATTR_LOCAL))
+		return 0;
+
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY) {
+		l = xfs_attr3_leaf_name_local(leaf, i);
+
+		if (l->namelen == sizeof(struct xfs_verity_merkle_key))
+			return 0;
+	}
+
+	return 1;
 }
 
 static int
@@ -268,6 +294,64 @@ attr_leaf_name_local_count(
 {
 	return attr_leaf_entry_walk(obj, startoff,
 				    __attr_leaf_name_local_count);
+}
+
+static int
+__attr_leaf_name_local_merkle_count(
+	struct xfs_attr_leafblock	*leaf,
+	struct xfs_attr_leaf_entry      *e,
+	int				i)
+{
+	struct xfs_attr_leaf_name_local	*l;
+
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) != XFS_ATTR_VERITY)
+		return 0;
+	if (!(e->flags & XFS_ATTR_LOCAL))
+		return 0;
+
+	l = xfs_attr3_leaf_name_local(leaf, i);
+	if (l->namelen != sizeof(struct xfs_verity_merkle_key))
+		return 0;
+
+	return 1;
+}
+
+static int
+attr_leaf_name_local_merkle_count(
+	void				*obj,
+	int				startoff)
+{
+	return attr_leaf_entry_walk(obj, startoff,
+			__attr_leaf_name_local_merkle_count);
+}
+
+static int
+__attr_leaf_name_remote_merkle_count(
+	struct xfs_attr_leafblock	*leaf,
+	struct xfs_attr_leaf_entry      *e,
+	int				i)
+{
+	struct xfs_attr_leaf_name_remote	*r;
+
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) != XFS_ATTR_VERITY)
+		return 0;
+	if (e->flags & XFS_ATTR_LOCAL)
+		return 0;
+
+	r = xfs_attr3_leaf_name_remote(leaf, i);
+	if (r->namelen != sizeof(struct xfs_verity_merkle_key))
+		return 0;
+
+	return 1;
+}
+
+static int
+attr_leaf_name_remote_merkle_count(
+	void				*obj,
+	int				startoff)
+{
+	return attr_leaf_entry_walk(obj, startoff,
+			__attr_leaf_name_remote_merkle_count);
 }
 
 static int
@@ -282,6 +366,10 @@ __attr_leaf_name_local_name_count(
 		return 0;
 
 	l = xfs_attr3_leaf_name_local(leaf, i);
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY &&
+	    l->namelen == sizeof(struct xfs_verity_merkle_key))
+		return 0;
+
 	return l->namelen;
 }
 
@@ -373,6 +461,10 @@ __attr_leaf_name_remote_name_count(
 		return 0;
 
 	r = xfs_attr3_leaf_name_remote(leaf, i);
+	if ((e->flags & XFS_ATTR_NSP_ONDISK_MASK) == XFS_ATTR_VERITY &&
+	    r->namelen == sizeof(struct xfs_verity_merkle_key))
+		return 0;
+
 	return r->namelen;
 }
 
