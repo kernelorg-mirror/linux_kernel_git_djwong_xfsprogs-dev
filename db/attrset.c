@@ -423,20 +423,23 @@ attr_modify_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "rusnv:o:m:")) != EOF) {
+	while ((c = getopt(argc, argv, "ruspnv:o:m:")) != EOF) {
 		switch (c) {
 		/* namespaces */
 		case 'r':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= LIBXFS_ATTR_ROOT;
-			args.attr_filter &= ~LIBXFS_ATTR_SECURE;
 			break;
 		case 'u':
-			args.attr_filter &= ~(LIBXFS_ATTR_ROOT |
-					      LIBXFS_ATTR_SECURE);
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			break;
 		case 's':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
 			args.attr_filter |= LIBXFS_ATTR_SECURE;
-			args.attr_filter &= ~LIBXFS_ATTR_ROOT;
+			break;
+		case 'p':
+			args.attr_filter &= ~LIBXFS_ATTR_NS;
+			args.attr_filter |= XFS_ATTR_PARENT;
 			break;
 
 		case 'n':
