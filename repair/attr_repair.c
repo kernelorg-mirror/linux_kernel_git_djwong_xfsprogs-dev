@@ -313,6 +313,13 @@ process_shortform_attr(
 					NULL, currententry->namelen,
 					currententry->valuelen);
 
+		if ((currententry->flags & XFS_ATTR_VERITY) &&
+		    !xfs_has_verity(mp)) {
+			do_warn(
+ _("verity metadata found on filesystem that doesn't support verity\n"));
+			junkit |= 1;
+		}
+
 		remainingspace = remainingspace -
 					xfs_attr_sf_entsize(currententry);
 
@@ -513,6 +520,15 @@ process_leaf_attr_local(
 			return -1;
 		}
 	}
+
+	if ((entry->flags & XFS_ATTR_VERITY) && !xfs_has_verity(mp)) {
+		do_warn(
+ _("verity metadata found in attribute entry %d in attr block %u, inode %"
+   PRIu64 " on filesystem that doesn't support verity\n"),
+				i, da_bno, ino);
+		return -1;
+	}
+
 	return xfs_attr_leaf_entsize_local(local->namelen,
 						be16_to_cpu(local->valuelen));
 }
@@ -546,6 +562,14 @@ process_leaf_attr_remote(
 	    be32_to_cpu(remotep->valueblk) == 0) {
 		do_warn(
 	_("inconsistent remote attribute entry %d in attr block %u, ino %" PRIu64 "\n"), i, da_bno, ino);
+		return -1;
+	}
+
+	if ((entry->flags & XFS_ATTR_VERITY) && !xfs_has_verity(mp)) {
+		do_warn(
+ _("verity metadata found in attribute entry %d in attr block %u, inode %"
+   PRIu64 " on filesystem that doesn't support verity\n"),
+				i, da_bno, ino);
 		return -1;
 	}
 
