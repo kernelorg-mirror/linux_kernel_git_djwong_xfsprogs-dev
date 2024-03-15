@@ -26,15 +26,15 @@ static void		attrset_help(void);
 
 static const cmdinfo_t	attr_set_cmd =
 	{ "attr_set", "aset", attr_set_f, 1, -1, 0,
-	  N_("[-r|-s|-u] [-n] [-R|-C] [-v n] name"),
+	  N_("[-r|-s|-u|-f] [-n] [-R|-C] [-v n] name"),
 	  N_("set the named attribute on the current inode"), attrset_help };
 static const cmdinfo_t	attr_remove_cmd =
 	{ "attr_remove", "aremove", attr_remove_f, 1, -1, 0,
-	  N_("[-r|-s|-u] [-n] name"),
+	  N_("[-r|-s|-u|-f] [-n] name"),
 	  N_("remove the named attribute from the current inode"), attrset_help };
 static const cmdinfo_t	attr_modify_cmd =
 	{ "attr_modify", "amodify", attr_modify_f, 1, -1, 0,
-	  N_("[-r|-s|-u] [-o n] [-v n] [-m n] name value"),
+	  N_("[-r|-s|-u|-f] [-o n] [-v n] [-m n] name value"),
 	  N_("modify value of the named attribute of the current inode"),
 		attrset_help };
 
@@ -52,6 +52,7 @@ attrset_help(void)
 "  -r -- 'root'\n"
 "  -u -- 'user'		(default)\n"
 "  -s -- 'secure'\n"
+"  -f -- 'fs-verity'\n"
 "\n"
 " For attr_set, these options further define the type of set operation:\n"
 "  -C -- 'create'    - create attribute, fail if it already exists\n"
@@ -92,7 +93,7 @@ attr_set_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "rusCRnv:")) != EOF) {
+	while ((c = getopt(argc, argv, "rusfCRnv:")) != EOF) {
 		switch (c) {
 		/* namespaces */
 		case 'r':
@@ -106,6 +107,11 @@ attr_set_f(
 		case 's':
 			args.attr_filter |= LIBXFS_ATTR_SECURE;
 			args.attr_filter &= ~LIBXFS_ATTR_ROOT;
+			break;
+		case 'f':
+			args.attr_filter |= LIBXFS_ATTR_VERITY;
+			args.attr_filter &= ~(LIBXFS_ATTR_ROOT |
+					      LIBXFS_ATTR_SECURE);
 			break;
 
 		/* modifiers */
@@ -208,7 +214,7 @@ attr_remove_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "rusn")) != EOF) {
+	while ((c = getopt(argc, argv, "rusfn")) != EOF) {
 		switch (c) {
 		/* namespaces */
 		case 'r':
@@ -222,6 +228,11 @@ attr_remove_f(
 		case 's':
 			args.attr_filter |= LIBXFS_ATTR_SECURE;
 			args.attr_filter &= ~LIBXFS_ATTR_ROOT;
+			break;
+		case 'f':
+			args.attr_filter |= LIBXFS_ATTR_VERITY;
+			args.attr_filter &= ~(LIBXFS_ATTR_ROOT |
+					      LIBXFS_ATTR_SECURE);
 			break;
 
 		case 'n':
@@ -301,7 +312,7 @@ attr_modify_f(
 		return 0;
 	}
 
-	while ((c = getopt(argc, argv, "rusnv:o:m:")) != EOF) {
+	while ((c = getopt(argc, argv, "rusfnv:o:m:")) != EOF) {
 		switch (c) {
 		/* namespaces */
 		case 'r':
@@ -315,6 +326,11 @@ attr_modify_f(
 		case 's':
 			args.attr_filter |= LIBXFS_ATTR_SECURE;
 			args.attr_filter &= ~LIBXFS_ATTR_ROOT;
+			break;
+		case 'f':
+			args.attr_filter |= LIBXFS_ATTR_VERITY;
+			args.attr_filter &= ~(LIBXFS_ATTR_ROOT |
+					      LIBXFS_ATTR_SECURE);
 			break;
 
 		case 'n':
