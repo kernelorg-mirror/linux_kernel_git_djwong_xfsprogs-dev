@@ -73,7 +73,7 @@ hash_f(
 		if (use_dir2_hash)
 			hashval = libxfs_dir2_hashname(mp, &xname);
 		else
-			hashval = libxfs_da_hashname(xname.name, xname.len);
+			hashval = libxfs_attr_hashname(0, xname.name, xname.len);
 		dbprintf("0x%x\n", hashval);
 	}
 
@@ -306,7 +306,7 @@ collide_xattrs(
 	unsigned long		i;
 	int			error;
 
-	old_hash = libxfs_da_hashname((uint8_t *)name, namelen);
+	old_hash = libxfs_attr_hashname(0, (uint8_t *)name, namelen);
 
 	if (fd >= 0) {
 		/*

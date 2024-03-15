@@ -492,8 +492,10 @@ process_leaf_attr_local(
 	 * ordering anyway in case both the name value and the
 	 * hashvalue were wrong but matched. Unlikely, however.
 	 */
-	if (be32_to_cpu(entry->hashval) != libxfs_da_hashname(
-				&local->nameval[0], local->namelen) ||
+	if (be32_to_cpu(entry->hashval) !=
+			libxfs_attr_hashname(entry->flags,
+					     &local->nameval[0],
+					     local->namelen) ||
 				be32_to_cpu(entry->hashval) < last_hashval) {
 		do_warn(
 	_("bad hashvalue for attribute entry %d in attr block %u, inode %" PRIu64 "\n"),
@@ -537,7 +539,8 @@ process_leaf_attr_remote(
 	    !libxfs_attr_namecheck(mp, remotep->name,
 				   remotep->namelen, flags) ||
 	    be32_to_cpu(entry->hashval) !=
-			libxfs_da_hashname((unsigned char *)&remotep->name[0],
+			libxfs_attr_hashname(entry->flags,
+					   (unsigned char *)&remotep->name[0],
 					   remotep->namelen) ||
 	    be32_to_cpu(entry->hashval) < last_hashval ||
 	    be32_to_cpu(remotep->valueblk) == 0) {

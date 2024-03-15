@@ -823,6 +823,7 @@ handle_duplicate_name(xfs_dahash_t hash, size_t name_len, unsigned char *name)
 static inline xfs_dahash_t
 dirattr_hashname(
 	bool		is_dirent,
+	unsigned int	attr_flags,
 	const uint8_t	*name,
 	int		namelen)
 {
@@ -835,12 +836,13 @@ dirattr_hashname(
 		return libxfs_dir2_hashname(mp, &xname);
 	}
 
-	return libxfs_da_hashname(name, namelen);
+	return libxfs_attr_hashname(attr_flags, name, namelen);
 }
 
 static void
 generate_obfuscated_name(
 	xfs_ino_t		ino,
+	unsigned int		attr_flags,
 	int			namelen,
 	unsigned char		*name)
 {
@@ -866,9 +868,9 @@ generate_obfuscated_name(
 
 	/* Obfuscate the name (if possible) */
 
-	hash = dirattr_hashname(ino != 0, name, namelen);
+	hash = dirattr_hashname(ino != 0, attr_flags, name, namelen);
 	obfuscate_name(hash, namelen, name, ino != 0);
-	ASSERT(hash == dirattr_hashname(ino != 0, name, namelen));
+	ASSERT(hash == dirattr_hashname(ino != 0, attr_flags, name, namelen));
 
 	/*
 	 * Make sure the name is not something already seen.  If we
@@ -945,7 +947,7 @@ process_sf_dir(
 		if (metadump.obfuscate)
 			generate_obfuscated_name(
 					 libxfs_dir2_sf_get_ino(mp, sfp, sfep),
-					 namelen, &sfep->name[0]);
+					 0, namelen, &sfep->name[0]);
 
 		sfep = (xfs_dir2_sf_entry_t *)((char *)sfep +
 				libxfs_dir2_sf_entsize(mp, sfp, namelen));
@@ -1071,8 +1073,8 @@ process_sf_attr(
 		}
 
 		if (metadump.obfuscate) {
-			generate_obfuscated_name(0, asfep->namelen,
-						 &asfep->nameval[0]);
+			generate_obfuscated_name(0, asfep->flags,
+					asfep->namelen, &asfep->nameval[0]);
 			memset(&asfep->nameval[asfep->namelen], 'v',
 			       asfep->valuelen);
 		}
@@ -1283,7 +1285,7 @@ process_dir_data_block(
 
 		if (metadump.obfuscate)
 			generate_obfuscated_name(be64_to_cpu(dep->inumber),
-					 dep->namelen, &dep->name[0]);
+					 0, dep->namelen, &dep->name[0]);
 		dir_offset += length;
 		ptr += length;
 		/* Zero the unused space after name, up to the tag */
@@ -1452,8 +1454,9 @@ process_attr_block(
 				break;
 			}
 			if (metadump.obfuscate) {
-				generate_obfuscated_name(0, local->namelen,
-					&local->nameval[0]);
+				generate_obfuscated_name(0, entry->flags,
+						local->namelen,
+						&local->nameval[0]);
 				memset(&local->nameval[local->namelen], 'v',
 					be16_to_cpu(local->valuelen));
 			}
@@ -1475,8 +1478,9 @@ process_attr_block(
 				break;
 			}
 			if (metadump.obfuscate) {
-				generate_obfuscated_name(0, remote->namelen,
-							 &remote->name[0]);
+				generate_obfuscated_name(0, entry->flags,
+						remote->namelen,
+						&remote->name[0]);
 				add_remote_vals(be32_to_cpu(remote->valueblk),
 						be32_to_cpu(remote->valuelen));
 			}

@@ -44,6 +44,7 @@
 #define xfs_attr_set			libxfs_attr_set
 #define xfs_attr_sf_firstentry		libxfs_attr_sf_firstentry
 #define xfs_attr_shortform_verify	libxfs_attr_shortform_verify
+#define xfs_attr_hashname		libxfs_attr_hashname
 
 #define __xfs_bmap_add_free		__libxfs_bmap_add_free
 #define xfs_bmap_validate_extent	libxfs_bmap_validate_extent
