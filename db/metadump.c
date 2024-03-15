@@ -1448,6 +1448,8 @@ process_sf_attr(
 		if (asfep->flags & XFS_ATTR_PARENT) {
 			maybe_obfuscate_pptr(asfep->flags, name, namelen,
 					value, asfep->valuelen, is_meta);
+		} else if (asfep->flags & XFS_ATTR_VERITY) {
+			; /* never obfuscate verity metadata */
 		} else if (want_obfuscate_attr(asfep->flags, name, namelen,
 					value, asfep->valuelen, is_meta)) {
 			generate_obfuscated_name(0, asfep->namelen, name);
@@ -1843,6 +1845,8 @@ process_attr_block(
 				maybe_obfuscate_pptr(entry->flags, name,
 						local->namelen, value,
 						valuelen, is_meta);
+			} else if (entry->flags & XFS_ATTR_VERITY) {
+				; /* never obfuscate verity metadata */
 			} else if (want_obfuscate_attr(entry->flags, name,
 						local->namelen, value,
 						valuelen, is_meta)) {
@@ -1869,6 +1873,10 @@ process_attr_block(
 			}
 			if (entry->flags & XFS_ATTR_PARENT) {
 				/* do not obfuscate obviously busted pptr */
+				add_remote_vals(be32_to_cpu(remote->valueblk),
+						be32_to_cpu(remote->valuelen));
+			} else if (entry->flags & XFS_ATTR_VERITY) {
+				/* never obfuscate verity metadata */
 				add_remote_vals(be32_to_cpu(remote->valueblk),
 						be32_to_cpu(remote->valuelen));
 			} else if (want_obfuscate_dirents(is_meta)) {
