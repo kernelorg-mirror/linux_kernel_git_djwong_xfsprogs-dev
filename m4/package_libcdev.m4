@@ -322,3 +322,20 @@ struct fsverity_descriptor m = { };
     AC_SUBST(have_fsverity_descr)
   ])
 
+#
+# Check if asm/mman.h can be included
+#
+AC_DEFUN([AC_HAVE_KERNEL_MADVISE_FLAGS],
+  [ AC_MSG_CHECKING([for kernel madvise flags in asm/mman.h ])
+    AC_COMPILE_IFELSE(
+    [	AC_LANG_PROGRAM([[
+#include <asm/mman.h>
+	]], [[
+int moo = MADV_COLLAPSE;
+	]])
+    ], have_kernel_madvise=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_kernel_madvise)
+  ])
+

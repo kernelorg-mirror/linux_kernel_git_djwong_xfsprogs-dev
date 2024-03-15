@@ -120,6 +120,7 @@ HAVE_O_TMPFILE = @have_o_tmpfile@
 HAVE_MKOSTEMP_CLOEXEC = @have_mkostemp_cloexec@
 USE_RADIX_TREE_FOR_INUMS = @use_radix_tree_for_inums@
 HAVE_FSVERITY_DESCR = @have_fsverity_descr@
+HAVE_KERNEL_MADVISE = @have_kernel_madvise@
 
 GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall
 #	   -Wbitwise -Wno-transparent-union -Wno-old-initializer -Wno-decl

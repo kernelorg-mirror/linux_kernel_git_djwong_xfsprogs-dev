@@ -9,6 +9,9 @@
 #include <sys/mman.h>
 #include "init.h"
 #include "io.h"
+#ifdef HAVE_KERNEL_MADVISE
+# include <asm/mman.h>
+#endif
 
 static cmdinfo_t madvise_cmd;
 
@@ -26,6 +29,47 @@ madvise_help(void)
 " -r -- expect random page references (POSIX_MADV_RANDOM)\n"
 " -s -- expect sequential page references (POSIX_MADV_SEQUENTIAL)\n"
 " -w -- will need these pages (POSIX_MADV_WILLNEED) [*]\n"
+"\n"
+"The following Linux-specific advise values are available:\n"
+#ifdef MADV_COLLAPSE
+" -c -- try to collapse range into transparent hugepages (MADV_COLLAPSE)\n"
+#endif
+#ifdef MADV_COLD
+" -D -- deactivate the range (MADV_COLD)\n"
+#endif
+#ifdef MADV_FREE
+" -f -- free the range (MADV_FREE)\n"
+#endif
+#ifdef MADV_NOHUGEPAGE
+" -h -- disable transparent hugepages (MADV_NOHUGEPAGE)\n"
+#endif
+#ifdef MADV_HUGEPAGE
+" -H -- enable transparent hugepages (MADV_HUGEPAGE)\n"
+#endif
+#ifdef MADV_MERGEABLE
+" -m -- mark the range mergeable (MADV_MERGEABLE)\n"
+#endif
+#ifdef MADV_UNMERGEABLE
+" -M -- mark the range unmergeable (MADV_UNMERGEABLE)\n"
+#endif
+#ifdef MADV_SOFT_OFFLINE
+" -o -- mark the range offline (MADV_SOFT_OFFLINE)\n"
+#endif
+#ifdef MADV_REMOVE
+" -p -- punch a hole in the file (MADV_REMOVE)\n"
+#endif
+#ifdef MADV_HWPOISON
+" -P -- poison the page cache (MADV_HWPOISON)\n"
+#endif
+#ifdef MADV_POPULATE_READ
+" -R -- prefault in the range for read (MADV_POPULATE_READ)\n"
+#endif
+#ifdef MADV_POPULATE_WRITE
+" -W -- prefault in the range for write (MADV_POPULATE_WRITE)\n"
+#endif
+#ifdef MADV_PAGEOUT
+" -X -- reclaim the range (MADV_PAGEOUT)\n"
+#endif
 " Notes:\n"
 "   NORMAL sets the default readahead setting on the file.\n"
 "   RANDOM sets the readahead setting on the file to zero.\n"
@@ -45,20 +89,85 @@ madvise_f(
 	int		advise = MADV_NORMAL, c;
 	size_t		blocksize, sectsize;
 
-	while ((c = getopt(argc, argv, "drsw")) != EOF) {
+	while ((c = getopt(argc, argv, "cdDfhHmMopPrRswWX")) != EOF) {
 		switch (c) {
+#ifdef MADV_COLLAPSE
+		case 'c':	/* collapse to thp */
+			advise = MADV_COLLAPSE;
+			break;
+#endif
 		case 'd':	/* Don't need these pages */
 			advise = MADV_DONTNEED;
 			break;
+#ifdef MADV_COLD
+		case 'D':	/* make more likely to be reclaimed */
+			advise = MADV_COLD;
+			break;
+#endif
+#ifdef MADV_FREE
+		case 'f':	/* page range out of memory */
+			advise = MADV_FREE;
+			break;
+#endif
+#ifdef MADV_HUGEPAGE
+		case 'h':	/* enable thp memory */
+			advise = MADV_HUGEPAGE;
+			break;
+#endif
+#ifdef MADV_NOHUGEPAGE
+		case 'H':	/* disable thp memory */
+			advise = MADV_NOHUGEPAGE;
+			break;
+#endif
+#ifdef MADV_MERGEABLE
+		case 'm':	/* enable merging */
+			advise = MADV_MERGEABLE;
+			break;
+#endif
+#ifdef MADV_UNMERGEABLE
+		case 'M':	/* disable merging */
+			advise = MADV_UNMERGEABLE;
+			break;
+#endif
+#ifdef MADV_SOFT_OFFLINE
+		case 'o':	/* offline */
+			advise = MADV_SOFT_OFFLINE;
+			break;
+#endif
+#ifdef MADV_REMOVE
+		case 'p':	/* punch hole */
+			advise = MADV_REMOVE;
+			break;
+#endif
+#ifdef MADV_HWPOISON
+		case 'P':	/* poison */
+			advise = MADV_HWPOISON;
+			break;
+#endif
 		case 'r':	/* Expect random page references */
 			advise = MADV_RANDOM;
 			break;
+#ifdef MADV_POPULATE_READ
+		case 'R':	/* fault in pages for read */
+			advise = MADV_POPULATE_READ;
+			break;
+#endif
 		case 's':	/* Expect sequential page references */
 			advise = MADV_SEQUENTIAL;
 			break;
 		case 'w':	/* Will need these pages */
 			advise = MADV_WILLNEED;
 			break;
+#ifdef MADV_POPULATE_WRITE
+		case 'W':	/* fault in pages for write */
+			advise = MADV_POPULATE_WRITE;
+			break;
+#endif
+#ifdef MADV_PAGEOUT
+		case 'X':	/* reclaim memory */
+			advise = MADV_PAGEOUT;
+			break;
+#endif
 		default:
 			exitcode = 1;
 			return command_usage(&madvise_cmd);

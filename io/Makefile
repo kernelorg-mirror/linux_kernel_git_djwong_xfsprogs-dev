@@ -84,6 +84,10 @@ ifeq ($(HAVE_GETFSMAP),yes)
 CFILES += fsmap.c
 endif
 
+ifeq ($(HAVE_KERNEL_MADVISE),yes)
+LCFLAGS += -DHAVE_KERNEL_MADVISE
+endif
+
 default: depend $(LTCOMMAND)
 
 include $(BUILDRULES)
