@@ -90,6 +90,7 @@ enum {
 	I_PROJID32BIT,
 	I_SPINODES,
 	I_NREXT64,
+	I_VERITY,
 	I_MAX_OPTS,
 };
 
@@ -469,6 +470,7 @@ static struct opt_params iopts = {
 		[I_PROJID32BIT] = "projid32bit",
 		[I_SPINODES] = "sparse",
 		[I_NREXT64] = "nrext64",
+		[I_VERITY] = "verity",
 		[I_MAX_OPTS] = NULL,
 	},
 	.subopt_params = {
@@ -523,7 +525,13 @@ static struct opt_params iopts = {
 		  .minval = 0,
 		  .maxval = 1,
 		  .defaultval = 1,
-		}
+		},
+		{ .index = I_VERITY,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
 	},
 };
 
@@ -889,6 +897,7 @@ struct sb_feat_args {
 	bool	nodalign;
 	bool	nortalign;
 	bool	nrext64;
+	bool	verity;			/* XFS_SB_FEAT_RO_COMPAT_VERITY */
 };
 
 struct cli_params {
@@ -1024,7 +1033,7 @@ usage( void )
 			    sectsize=num,concurrency=num]\n\
 /* force overwrite */	[-f]\n\
 /* inode size */	[-i perblock=n|size=num,maxpct=n,attr=0|1|2,\n\
-			    projid32bit=0|1,sparse=0|1,nrext64=0|1]\n\
+			    projid32bit=0|1,sparse=0|1,nrext64=0|1,verity=0|1]\n\
 /* no discard */	[-K]\n\
 /* log subvol */	[-l agnum=n,internal,size=num,logdev=xxx,version=n\n\
 			    sunit=value|su=num,sectsize=num,lazy-count=0|1,\n\
@@ -1721,6 +1730,9 @@ inode_opts_parser(
 		break;
 	case I_NREXT64:
 		cli->sb_feat.nrext64 = getnum(value, opts, subopt);
+		break;
+	case I_VERITY:
+		cli->sb_feat.verity = getnum(value, opts, subopt);
 		break;
 	default:
 		return -EINVAL;
@@ -3478,6 +3490,8 @@ sb_set_features(
 		sbp->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_REFLINK;
 	if (fp->inobtcnt)
 		sbp->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_INOBTCNT;
+	if (fp->verity)
+		sbp->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_VERITY;
 	if (fp->bigtime)
 		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_BIGTIME;
 
@@ -4339,6 +4353,7 @@ main(
 			.nortalign = false,
 			.bigtime = true,
 			.nrext64 = true,
+			.verity = false,
 			/*
 			 * When we decide to enable a new feature by default,
 			 * please remember to update the mkfs conf files.
