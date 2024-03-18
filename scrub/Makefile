@@ -109,6 +109,10 @@ CFILES += unicrash.c
 LCFLAGS += -DHAVE_LIBICU $(LIBICU_CFLAGS)
 endif
 
+ifeq ($(HAVE_FSVERITY_DESCR),yes)
+LCFLAGS += -DHAVE_FSVERITY_DESCR
+endif
+
 # Automatically trigger a media scan once per month
 XFS_SCRUB_ALL_AUTO_MEDIA_SCAN_INTERVAL=1mo
 
