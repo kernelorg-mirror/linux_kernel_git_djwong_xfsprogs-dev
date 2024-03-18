@@ -28,6 +28,7 @@
 #include "descr.h"
 #include "unicrash.h"
 #include "repair.h"
+#include "atomic.h"
 
 /* Phase 5: Full inode scans and check directory connectivity. */
 
@@ -359,6 +360,183 @@ check_dir_connection(
 	return EADDRNOTAVAIL;
 }
 
+#ifdef HAVE_FSVERITY_DESCR
+struct fsverity_object {
+	const char		*name;
+	int			type;
+};
+
+struct fsverity_object fsverity_objects[] = {
+	{
+		.name		= "descriptor",
+		.type		= FS_VERITY_METADATA_TYPE_DESCRIPTOR,
+	},
+	{
+		.name		= "merkle tree",
+		.type		= FS_VERITY_METADATA_TYPE_MERKLE_TREE,
+	},
+	{
+		.name		= "signature",
+		.type		= FS_VERITY_METADATA_TYPE_SIGNATURE,
+	},
+};
+
+static void *fsverity_buf;
+#define FSVERITY_BUFSIZE	(32768)
+
+static inline void *
+get_fsverity_buf(void)
+{
+	static pthread_mutex_t	buf_lock = PTHREAD_MUTEX_INITIALIZER;
+	void			*new_buf;
+
+	if (!fsverity_buf) {
+		new_buf = malloc(FSVERITY_BUFSIZE);
+		if (!new_buf)
+			return NULL;
+
+		pthread_mutex_lock(&buf_lock);
+		if (!fsverity_buf) {
+			fsverity_buf = new_buf;
+			new_buf = NULL;
+		}
+		pthread_mutex_unlock(&buf_lock);
+		if (new_buf)
+			free(new_buf);
+	}
+
+	return fsverity_buf;
+}
+
+static int
+read_fsverity_object(
+	struct scrub_ctx		*ctx,
+	struct descr			*dsc,
+	int				fd,
+	const struct fsverity_object	*verity_obj)
+{
+	struct fsverity_read_metadata_arg arg = {
+		.buf_ptr		= (uintptr_t)get_fsverity_buf(),
+		.metadata_type		= verity_obj->type,
+		.length			= FSVERITY_BUFSIZE,
+	};
+	int				ret;
+
+	if (!arg.buf_ptr) {
+		str_liberror(ctx, ENOMEM, descr_render(dsc));
+		return ENOMEM;
+	}
+
+	do {
+		ret = ioctl(fd, FS_IOC_READ_VERITY_METADATA, &arg);
+		if (ret < 0) {
+			ret = errno;
+			switch (ret) {
+			case ENODATA:
+				/* No fsverity metadata found.  We're done. */
+				return 0;
+			case ENOTTY:
+			case EOPNOTSUPP:
+				/* not a verity file or object doesn't exist */
+				str_error(ctx, descr_render(dsc),
+ _("fsverity %s not supported at data offset %llu length %llu?"),
+					verity_obj->name,
+					arg.offset, arg.length);
+				return ret;
+			default:
+				/* some other error */
+				str_error(ctx, descr_render(dsc),
+ _("fsverity %s read error at data offset %llu length %llu."),
+					verity_obj->name,
+					arg.offset, arg.length);
+				return ret;
+			}
+		}
+		arg.offset += ret;
+	} while (ret > 0);
+
+	return 0;
+}
+
+/* Read all the fsverity metadata. */
+static int
+check_fsverity_metadata(
+	struct scrub_ctx	*ctx,
+	struct descr		*dsc,
+	int			fd)
+{
+	unsigned int		i;
+	int			error;
+
+	for (i = 0; i < ARRAY_SIZE(fsverity_objects); i++) {
+		error = read_fsverity_object(ctx, dsc, fd,
+				&fsverity_objects[i]);
+		if (error)
+			return error;
+	}
+
+	return 0;
+}
+
+/* Open this verity file and check its merkle tree and verity descriptor. */
+static int
+check_verity_file(
+	struct scrub_ctx	*ctx,
+	struct xfs_handle	*handle,
+	struct xfs_bulkstat	*bstat,
+	struct descr		*dsc,
+	int			*fdp)
+{
+	int			error;
+
+	/* Only regular files can have fsverity set. */
+	if (!S_ISREG(bstat->bs_mode)) {
+		str_error(ctx, descr_render(dsc),
+				_("fsverity cannot be set on a regular file."));
+		return 0;
+	}
+
+	*fdp = scrub_open_handle(handle);
+	if (*fdp >= 0)
+		return check_fsverity_metadata(ctx, dsc, *fdp);
+
+	/* Handle is stale, try again. */
+	if (errno == ESTALE)
+		return ESTALE;
+
+	/*
+	 * If the fsverity metadata is missing, inform the user and move on to
+	 * the next file.
+	 */
+	if (fsverity_meta_is_missing(errno)) {
+		str_error(ctx, descr_render(dsc),
+				_("fsverity metadata missing."));
+		return 0;
+	}
+
+	/* Some other runtime error. */
+	error = errno;
+	str_errno(ctx, descr_render(dsc));
+	return error;
+}
+#else
+static int
+check_verity_file(
+	struct scrub_ctx	*ctx,
+	struct xfs_handle	*handle,
+	struct xfs_bulkstat	*bstat,
+	struct descr		*dsc,
+	int			*fdp)
+{
+	static atomic_t		warned;
+
+	if (!atomic_inc_return(&warned))
+		str_warn(ctx, descr_render(dsc),
+				_("fsverity metadata checking not supported\n"));
+	return 0;
+}
+#endif /* HAVE_FSVERITY_DESCR */
+
 /*
  * Verify the connectivity of the directory tree.
  * We know that the kernel's open-by-handle function will try to reconnect
@@ -420,6 +598,10 @@ check_inode_names(
 		}
 
 		error = check_dirent_names(ctx, &dsc, &fd, bstat);
+		if (error)
+			goto err_fd;
+	} else if (bstat->bs_xflags & FS_XFLAG_VERITY) {
+		error = check_verity_file(ctx, handle, bstat, &dsc, &fd);
 		if (error)
 			goto err_fd;
 	}
