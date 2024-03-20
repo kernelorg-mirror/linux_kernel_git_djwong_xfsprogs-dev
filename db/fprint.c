@@ -55,6 +55,30 @@ fp_charns(
 }
 
 int
+fp_hexstr(
+	void	*obj,
+	int	bit,
+	int	count,
+	char	*fmtstr,
+	int	size,
+	int	arg,
+	int	base,
+	int	array)
+{
+	int	i;
+	char	*p;
+
+	ASSERT(bitoffs(bit) == 0);
+	ASSERT(size == bitsz(char));
+	for (i = 0, p = (char *)obj + byteize(bit);
+	     i < count && !seenint();
+	     i++, p++) {
+		dbprintf("%02x", *p & 0xff);
+	}
+	return 1;
+}
+
+int
 fp_num(
 	void		*obj,
 	int		bit,
