@@ -19,6 +19,7 @@
 static struct cmdinfo scrub_cmd;
 static struct cmdinfo repair_cmd;
 static const struct cmdinfo scrubv_cmd;
+static const struct cmdinfo noverity_cmd;
 
 static void
 scrub_help(void)
@@ -356,6 +357,7 @@ scrub_init(void)
 
 	add_command(&scrub_cmd);
 	add_command(&scrubv_cmd);
+	add_command(&noverity_cmd);
 }
 
 static void
@@ -729,4 +731,49 @@ static const struct cmdinfo scrubv_cmd = {
 	.flags		= CMD_NOMAP_OK,
 	.oneline	= N_("vectored metadata scrub"),
 	.help		= scrubv_help,
+};
+
+static void
+noverity_help(void)
+{
+	printf(_(
+"\n"
+" Disable fsverity on a file.\n"));
+}
+
+#ifndef FS_IOC_DISABLE_VERITY
+# define FS_IOC_DISABLE_VERITY _IO('f', 136)
+#endif
+
+static int
+noverity_f(
+	int		argc,
+	char		**argv)
+{
+	int		c;
+	int		error;
+
+	while ((c = getopt(argc, argv, "")) != EOF) {
+		switch (c) {
+		default:
+			noverity_help();
+			return 0;
+		}
+	}
+
+	error = ioctl(file->fd, FS_IOC_DISABLE_VERITY);
+	if (error)
+		perror("noverity");
+
+	return 0;
+}
+
+static const struct cmdinfo noverity_cmd = {
+	.name		= "noverity",
+	.cfunc		= noverity_f,
+	.argmin		= -1,
+	.argmax		= -1,
+	.flags		= CMD_NOMAP_OK,
+	.oneline	= N_("disable fsverity"),
+	.help		= noverity_help,
 };
