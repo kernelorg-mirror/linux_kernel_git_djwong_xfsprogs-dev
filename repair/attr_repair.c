@@ -428,8 +428,14 @@ process_shortform_attr(
  * many blocks per remote value, so one by one is sufficient.
  */
 static int
-rmtval_get(xfs_mount_t *mp, xfs_ino_t ino, blkmap_t *blkmap,
-		xfs_dablk_t blocknum, int valuelen, char* value)
+rmtval_get(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino,
+	unsigned int		attrns,
+	blkmap_t		*blkmap,
+	xfs_dablk_t		blocknum,
+	int			valuelen,
+	char*			value)
 {
 	xfs_fsblock_t	bno;
 	struct xfs_buf	*bp;
@@ -437,12 +443,14 @@ rmtval_get(xfs_mount_t *mp, xfs_ino_t ino, blkmap_t *blkmap,
 	int		hdrsize = 0;
 	int		error;
 
-	if (xfs_has_crc(mp))
+	if (xfs_has_crc(mp) && !(attrns & XFS_ATTR_VERITY))
 		hdrsize = sizeof(struct xfs_attr3_rmt_hdr);
 
 	/* ASSUMPTION: valuelen is a valid number, so use it for looping */
 	/* Note that valuelen is not a multiple of blocksize */
 	while (amountdone < valuelen) {
+		const struct xfs_buf_ops	*ops;
+
 		bno = blkmap_get(blkmap, blocknum + i);
 		if (bno == NULLFSBLOCK) {
 			do_warn(
@@ -450,9 +458,11 @@ rmtval_get(xfs_mount_t *mp, xfs_ino_t ino, blkmap_t *blkmap,
 			clearit = 1;
 			break;
 		}
+
+		ops = libxfs_attr3_remote_buf_ops(attrns);
 		error = -libxfs_buf_read(mp->m_dev, XFS_FSB_TO_DADDR(mp, bno),
 				XFS_FSB_TO_BB(mp, 1), LIBXFS_READBUF_SALVAGE,
-				&bp, &xfs_attr3_rmt_buf_ops);
+				&bp, ops);
 		if (error) {
 			do_warn(
 	_("can't read remote block for attributes of inode %" PRIu64 "\n"), ino);
@@ -623,7 +633,8 @@ process_leaf_attr_remote(
 		do_warn(_("SKIPPING this remote attribute\n"));
 		goto out;
 	}
-	if (rmtval_get(mp, ino, blkmap, be32_to_cpu(remotep->valueblk),
+	if (rmtval_get(mp, ino, entry->flags, blkmap,
+				be32_to_cpu(remotep->valueblk),
 				be32_to_cpu(remotep->valuelen), value)) {
 		do_warn(
 	_("remote attribute get failed for entry %d, inode %" PRIu64 "\n"),
