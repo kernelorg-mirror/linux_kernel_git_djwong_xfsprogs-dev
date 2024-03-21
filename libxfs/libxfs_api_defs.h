@@ -45,6 +45,7 @@
 
 #define xfs_attr3_leaf_hdr_from_disk	libxfs_attr3_leaf_hdr_from_disk
 #define xfs_attr3_leaf_read		libxfs_attr3_leaf_read
+#define xfs_attr3_remote_buf_ops	libxfs_attr3_remote_buf_ops
 #define xfs_attr_get			libxfs_attr_get
 #define xfs_attr_is_leaf		libxfs_attr_is_leaf
 #define xfs_attr_leaf_newentsize	libxfs_attr_leaf_newentsize
