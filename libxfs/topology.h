@@ -10,12 +10,16 @@
 /*
  * Device topology information.
  */
+struct device_topology {
+	int	logical_sector_size;	/* logical sector size */
+	int	physical_sector_size;	/* physical sector size */
+	int	sunit;		/* stripe unit */
+	int	swidth;		/* stripe width  */
+};
+
 struct fs_topology {
-	int	dsunit;		/* stripe unit - data subvolume */
-	int	dswidth;	/* stripe width - data subvolume */
-	int	rtswidth;	/* stripe width - rt subvolume */
-	int	lsectorsize;	/* logical sector size &*/
-	int	psectorsize;	/* physical sector size */
+	struct device_topology	data;
+	struct device_topology	rt;
 };
 
 void
