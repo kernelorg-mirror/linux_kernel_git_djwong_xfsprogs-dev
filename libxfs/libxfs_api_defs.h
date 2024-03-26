@@ -36,6 +36,7 @@
 
 #define xfs_ascii_ci_hashname		libxfs_ascii_ci_hashname
 
+#define xfs_attr_check_namespace	libxfs_attr_check_namespace
 #define xfs_attr_get			libxfs_attr_get
 #define xfs_attr_hashname		libxfs_attr_hashname
 #define xfs_attr_hashval		libxfs_attr_hashval
