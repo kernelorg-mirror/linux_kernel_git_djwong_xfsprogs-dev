@@ -292,7 +292,8 @@ process_shortform_attr(
 		}
 
 		/* namecheck checks for null chars in attr names. */
-		if (!libxfs_attr_namecheck(currententry->nameval,
+		if (!libxfs_attr_namecheck(currententry->flags,
+					   currententry->nameval,
 					   currententry->namelen)) {
 			do_warn(
 	_("entry contains illegal character in shortform attribute name\n"));
@@ -474,7 +475,7 @@ process_leaf_attr_local(
 
 	local = xfs_attr3_leaf_name_local(leaf, i);
 	if (local->namelen == 0 ||
-	    !libxfs_attr_namecheck(local->nameval,
+	    !libxfs_attr_namecheck(entry->flags, local->nameval,
 				   local->namelen)) {
 		do_warn(
 	_("attribute entry %d in attr block %u, inode %" PRIu64 " has bad name (namelen = %d)\n"),
@@ -537,7 +538,7 @@ process_leaf_attr_remote(
 				       remotep->namelen, NULL,
 				       be32_to_cpu(remotep->valuelen));
 	if (remotep->namelen == 0 ||
-	    !libxfs_attr_namecheck(remotep->name,
+	    !libxfs_attr_namecheck(entry->flags, remotep->name,
 				   remotep->namelen) ||
 	    be32_to_cpu(entry->hashval) != computed ||
 	    be32_to_cpu(entry->hashval) < last_hashval ||
