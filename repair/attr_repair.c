@@ -470,6 +470,7 @@ process_leaf_attr_local(
 	xfs_ino_t		ino)
 {
 	xfs_attr_leaf_name_local_t *local;
+	xfs_dahash_t		computed;
 
 	local = xfs_attr3_leaf_name_local(leaf, i);
 	if (local->namelen == 0 ||
@@ -489,9 +490,12 @@ process_leaf_attr_local(
 	 * ordering anyway in case both the name value and the
 	 * hashvalue were wrong but matched. Unlikely, however.
 	 */
-	if (be32_to_cpu(entry->hashval) != libxfs_da_hashname(
-				&local->nameval[0], local->namelen) ||
-				be32_to_cpu(entry->hashval) < last_hashval) {
+	computed = libxfs_attr_hashval(mp, entry->flags, local->nameval,
+				       local->namelen,
+				       local->nameval + local->namelen,
+				       be16_to_cpu(local->valuelen));
+	if (be32_to_cpu(entry->hashval) != computed ||
+	    be32_to_cpu(entry->hashval) < last_hashval) {
 		do_warn(
 	_("bad hashvalue for attribute entry %d in attr block %u, inode %" PRIu64 "\n"),
 			i, da_bno, ino);
@@ -525,15 +529,17 @@ process_leaf_attr_remote(
 {
 	xfs_attr_leaf_name_remote_t *remotep;
 	char*			value;
+	xfs_dahash_t		computed;
 
 	remotep = xfs_attr3_leaf_name_remote(leaf, i);
 
+	computed = libxfs_attr_hashval(mp, entry->flags, remotep->name,
+				       remotep->namelen, NULL,
+				       be32_to_cpu(remotep->valuelen));
 	if (remotep->namelen == 0 ||
 	    !libxfs_attr_namecheck(remotep->name,
 				   remotep->namelen) ||
-	    be32_to_cpu(entry->hashval) !=
-			libxfs_da_hashname((unsigned char *)&remotep->name[0],
-					   remotep->namelen) ||
+	    be32_to_cpu(entry->hashval) != computed ||
 	    be32_to_cpu(entry->hashval) < last_hashval ||
 	    be32_to_cpu(remotep->valueblk) == 0) {
 		do_warn(
