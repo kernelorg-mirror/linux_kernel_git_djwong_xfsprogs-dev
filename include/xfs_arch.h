@@ -270,4 +270,22 @@ static inline void put_unaligned_be64(uint64_t val, void *p)
 	put_unaligned_be32(val, p + 4);
 }
 
+static inline uint16_t get_unaligned_le16(const void *p)
+{
+	const uint8_t *__p = p;
+	return __p[1] << 8 | __p[0];
+}
+
+static inline uint32_t get_unaligned_le32(const void *p)
+{
+	const uint8_t *__p = p;
+        return (uint32_t)__p[3] << 24 | __p[2] << 16 | __p[1] << 8 | __p[0];
+}
+
+static inline uint64_t get_unaligned_le64(const void *p)
+{
+	return (uint64_t)get_unaligned_le32(p + 4) << 32 |
+			   get_unaligned_le32(p);
+}
+
 #endif	/* __XFS_ARCH_H__ */
