@@ -3324,6 +3324,34 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 				*dirty = 1;
 		}
 
+		if ((flags2 & XFS_DIFLAG2_VERITY) &&
+		    !xfs_has_verity(mp)) {
+			if (!uncertain) {
+				do_warn(
+	_("inode %" PRIu64 " is marked verity but file system does not support fs-verity\n"),
+					lino);
+			}
+
+			flags2 &= ~XFS_DIFLAG2_VERITY;
+			if (!no_modify)
+				*dirty = 1;
+		}
+
+		if (flags2 & XFS_DIFLAG2_VERITY) {
+			/* must be a file */
+			if (di_mode && !S_ISREG(di_mode)) {
+				if (!uncertain) {
+					do_warn(
+	_("verity flag set on non-file inode %" PRIu64 "\n"),
+						lino);
+				}
+
+				flags2 &= ~XFS_DIFLAG2_VERITY;
+				if (!no_modify)
+					*dirty = 1;
+			}
+		}
+
 		if (xfs_dinode_has_large_extent_counts(dino)) {
 			if (dino->di_nrext64_pad) {
 				if (!no_modify) {
