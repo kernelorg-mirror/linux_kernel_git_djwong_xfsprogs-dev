@@ -291,6 +291,13 @@ process_shortform_attr(
 			}
 		}
 
+		if (!libxfs_attr_check_namespace(currententry->flags)) {
+			do_warn(
+	_("multiple namespaces for shortform attribute %d in inode %" PRIu64 "\n"),
+				i, ino);
+			return -1;
+		}
+
 		/* namecheck checks for null chars in attr names. */
 		if (!libxfs_attr_namecheck(currententry->flags,
 					   currententry->nameval,
@@ -502,6 +509,12 @@ process_leaf_attr_local(
 			i, da_bno, ino);
 		return -1;
 	}
+	if (!libxfs_attr_check_namespace(entry->flags)) {
+		do_warn(
+	_("multiple namespaces for attribute entry %d in attr block %u, inode %" PRIu64 "\n"),
+			i, da_bno, ino);
+		return -1;
+	}
 
 	/* Only check values for root security attributes */
 	if (entry->flags & XFS_ATTR_ROOT) {
@@ -533,6 +546,13 @@ process_leaf_attr_remote(
 	xfs_dahash_t		computed;
 
 	remotep = xfs_attr3_leaf_name_remote(leaf, i);
+
+	if (!libxfs_attr_check_namespace(entry->flags)) {
+		do_warn(
+	_("multiple namespaces for attribute entry %d in attr block %u, inode %" PRIu64 "\n"),
+			i, da_bno, ino);
+		return -1;
+	}
 
 	computed = libxfs_attr_hashval(mp, entry->flags, remotep->name,
 				       remotep->namelen, NULL,
