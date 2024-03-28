@@ -36,7 +36,7 @@ hash_help(void)
 " 'hash' prints out the calculated hash value for a string using the\n"
 "directory/attribute code hash function.\n"
 "\n"
-" Usage:  \"hash [-d|-p parent_ino] <string>\"\n"
+" Usage:  \"hash [-d|-p parent_ino|-m merkle_blkno] <string>\"\n"
 "\n"
 ));
 
@@ -46,6 +46,7 @@ enum hash_what {
 	ATTR,
 	DIRECTORY,
 	PPTR,
+	MERKLE,
 };
 
 /* ARGSUSED */
@@ -54,15 +55,27 @@ hash_f(
 	int		argc,
 	char		**argv)
 {
+	struct xfs_merkle_key mk = { };
 	xfs_ino_t	p_ino = 0;
 	xfs_dahash_t	hashval;
+	unsigned long long mk_pos;
 	enum hash_what	what = ATTR;
 	int		c;
 
-	while ((c = getopt(argc, argv, "dp:")) != EOF) {
+	while ((c = getopt(argc, argv, "dm:p:")) != EOF) {
 		switch (c) {
 		case 'd':
 			what = DIRECTORY;
+			break;
+		case 'm':
+			errno = 0;
+			mk_pos = strtoull(optarg, NULL, 0);
+			if (errno) {
+				perror(optarg);
+				return 1;
+			}
+			mk.mk_pos = cpu_to_be64(mk_pos << XFS_VERITY_HASH_SHIFT);
+			what = MERKLE;
 			break;
 		case 'p':
 			errno = 0;
@@ -97,6 +110,10 @@ hash_f(
 		case ATTR:
 			hashval = libxfs_attr_hashname(xname.name, xname.len);
 			break;
+		case MERKLE:
+			hashval = libxfs_verity_hashname((void *)&mk, sizeof(mk));
+			break;
+
 		}
 		dbprintf("0x%x\n", hashval);
 	}
