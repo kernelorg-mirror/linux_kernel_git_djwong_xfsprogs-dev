@@ -204,6 +204,7 @@
 #define xfs_mkdir_space_res		libxfs_mkdir_space_res
 #define xfs_parent_add			libxfs_parent_add
 #define xfs_parent_finish		libxfs_parent_finish
+#define xfs_parent_hashval		libxfs_parent_hashval
 #define xfs_parent_irec_from_disk	libxfs_parent_irec_from_disk
 #define xfs_parent_remove		libxfs_parent_remove
 #define xfs_parent_set			libxfs_parent_set
