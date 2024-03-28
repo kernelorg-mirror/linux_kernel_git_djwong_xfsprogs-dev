@@ -393,6 +393,7 @@
 #define xfs_verify_fsbno		libxfs_verify_fsbno
 #define xfs_verify_ino			libxfs_verify_ino
 #define xfs_verify_rtbno		libxfs_verify_rtbno
+#define xfs_verity_hashname		libxfs_verity_hashname
 #define xfs_zero_extent			libxfs_zero_extent
 
 /* Please keep this list alphabetized. */
