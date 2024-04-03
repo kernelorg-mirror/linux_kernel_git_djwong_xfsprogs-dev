@@ -12,17 +12,21 @@
 #include "libfrog/getparents.h"
 
 /* Allocate a buffer large enough for some parent pointer records. */
-static inline struct xfs_getparents *
-alloc_pptr_buf(
-	size_t			bufsize)
+static inline struct xfs_getparents_by_handle *
+alloc_request_buffer(
+	size_t				bufsize)
 {
-	struct xfs_getparents	*pi;
+	struct xfs_getparents_by_handle	*gph;
+	const size_t			overhead =
+		sizeof(struct xfs_getparents_by_handle) -
+		sizeof(struct xfs_getparents);
 
-	pi = calloc(bufsize, 1);
-	if (!pi)
+	gph = calloc(overhead + bufsize, 1);
+	if (!gph)
 		return NULL;
-	pi->gp_bufsize = bufsize;
-	return pi;
+
+	gph->gph_request.gp_bufsize = bufsize;
+	return gph;
 }
 
 static inline void
@@ -44,51 +48,60 @@ call_getparents(
 	walk_parent_fn			fn,
 	void				*arg)
 {
-	struct xfs_getparents		*pi;
-	struct xfs_getparents_rec	*p;
+	struct xfs_getparents_by_handle	*gph;
+	struct xfs_getparents		*gp;
+	struct xfs_getparents_rec	*gpr;
 	unsigned int			i;
 	ssize_t				ret = -1;
 
-	pi = alloc_pptr_buf(XFS_XATTR_LIST_MAX);
-	if (!pi)
+	gph = alloc_request_buffer(XFS_XATTR_LIST_MAX);
+	if (!gph)
 		return errno;
+	gp = &gph->gph_request;
 
-	if (handle)
-		copy_handle(&pi->gp_handle, handle);
+	if (handle) {
+		copy_handle(&gph->gph_handle, handle);
+		ret = ioctl(fd, XFS_IOC_GETPARENTS_BY_HANDLE, gph);
+	} else {
+		ret = ioctl(fd, XFS_IOC_GETPARENTS, gp);
+	}
 
-	ret = ioctl(fd, XFS_IOC_GETPARENTS, pi);
 	while (!ret) {
-		if (pi->gp_flags & XFS_GETPARENTS_OFLAG_ROOT) {
+		if (gp->gp_flags & XFS_GETPARENTS_OFLAG_ROOT) {
 			struct parent_rec	rec = {
 				.p_flags	= PARENT_IS_ROOT,
 			};
 
 			ret = fn(&rec, arg);
-			goto out_pi;
+			goto out_gph;
 		}
 
-		for (i = 0; i < pi->gp_count; i++) {
+		for (i = 0, gpr = &gp->gp_records[0];
+		     i < gp->gp_count;
+		     i++, gpr = xfs_getparents_next_rec(gpr)) {
 			struct parent_rec	rec = { };
 
-			p = xfs_getparents_rec(pi, i);
-			copy_handle(&rec.p_handle, &p->gpr_parent);
-			rec.p_name = p->gpr_name;
+			copy_handle(&rec.p_handle, &gpr->gpr_parent);
+			rec.p_name = gpr->gpr_name;
 
 			ret = fn(&rec, arg);
 			if (ret)
-				goto out_pi;
+				goto out_gph;
 		}
 
-		if (pi->gp_flags & XFS_GETPARENTS_OFLAG_DONE)
+		if (gp->gp_flags & XFS_GETPARENTS_OFLAG_DONE)
 			break;
 
-		ret = ioctl(fd, XFS_IOC_GETPARENTS, pi);
+		if (handle)
+			ret = ioctl(fd, XFS_IOC_GETPARENTS_BY_HANDLE, gph);
+		else
+			ret = ioctl(fd, XFS_IOC_GETPARENTS, gp);
 	}
 	if (ret)
 		ret = errno;
 
-out_pi:
-	free(pi);
+out_gph:
+	free(gph);
 	return ret;
 }
 

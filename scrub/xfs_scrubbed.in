@@ -338,22 +338,6 @@ class xfs_attrlist_cursor(ctypes.Structure):
 		("_opaque3",	ctypes.c_uint)
 	]
 
-def xfs_getparents_sized(nr_offsets):
-	'''Return a type for the getparents flexarray with the given number of offsets.'''
-	class xfs_getparents(ctypes.Structure):
-		_fields_ = [
-			("gp_handle",		xfs_handle),
-			("_gp_cursor",		xfs_attrlist_cursor),
-			("gp_flags",		ctypes.c_uint),
-			("_pad",		ctypes.c_uint),
-			("gp_bufsize",		ctypes.c_uint),
-			("gp_count",		ctypes.c_uint),
-			("_pad2",		ctypes.c_ulonglong * 5),
-			("gp_offsets",		ctypes.c_uint * int(nr_offsets))
-		]
-	return xfs_getparents
-xfs_getparents = xfs_getparents_sized(0)
-
 def xfs_getparents_rec_sized(namelen):
 	'''Return a type for the getparents record flexarray with the given name length.'''
 	class xfs_getparents_rec(ctypes.Structure):
@@ -366,70 +350,125 @@ def xfs_getparents_rec_sized(namelen):
 	return xfs_getparents_rec
 xfs_getparents_rec = xfs_getparents_rec_sized(0)
 
-assert ctypes.sizeof(xfs_getparents) == 96
+def xfs_getparents_rec_array(nr_bytes):
+	'''Return a fake type that will generate xfs_getparents_rec objects.'''
+	class xfs_getparents_rec_array(ctypes.Structure):
+		_pack_ = 1
+		_fields_ = [
+			("_records",		ctypes.c_byte * int(nr_bytes))
+		]
+
+		def iterate(self, nr_records):
+			off = 0
+			nr = 0
+			buf = bytes(self._records)
+			count = len(buf)
+			while off < count and nr < nr_records:
+				bufslice = buf[off:count]
+
+				# Figure out the record length
+				rec = ctypes.cast(bufslice, \
+						ctypes.POINTER(xfs_getparents_rec))
+				reclen = rec.contents.gpr_reclen
+
+				# Now create a custom type for this
+				rec = ctypes.cast(bufslice, \
+						ctypes.POINTER(xfs_getparents_rec_sized(reclen)))
+				yield rec.contents
+				off += ctypes.sizeof(rec.contents)
+				nr += 1
+
+	return xfs_getparents_rec_array
+
+def xfs_getparents_sized(nr_bytes):
+	'''Return a type for the getparents flexarray with some buffer space.'''
+	class xfs_getparents(ctypes.Structure):
+		_fields_ = [
+			("_gp_cursor",		xfs_attrlist_cursor),
+			("gp_flags",		ctypes.c_uint),
+			("gp_count",		ctypes.c_uint),
+			("gp_bufsize",		ctypes.c_uint),
+			("_pad",		ctypes.c_uint),
+			("_records",		xfs_getparents_rec_array(nr_bytes))
+		]
+
+		def __invoke(self, fd):
+			if self.gp_flags & XFS_GETPARENTS_OFLAG_DONE:
+				return False
+
+			ret = fcntl.ioctl(fd, XFS_IOC_GETPARENTS, self)
+			return ret == 0 and self.gp_count > 0
+
+		def iterate(self, fd):
+			while self.__invoke(fd):
+				for i in self._records.iterate(self.gp_count):
+					yield i
+
+	return xfs_getparents
+xfs_getparents = xfs_getparents_sized(0)
+
+def xfs_getparents_by_handle_sized(nr_bytes):
+	'''Return a type for the getparents-by-handle flexarray with some buffer space.'''
+	class xfs_getparents_by_handle(ctypes.Structure):
+		_fields_ = [
+			("gph_handle",		xfs_handle),
+			("gph_request",		xfs_getparents_sized(nr_bytes))
+		]
+
+		def __invoke(self, fd):
+			if self.gph_request.gp_flags & XFS_GETPARENTS_OFLAG_DONE:
+				return False
+
+			ret = fcntl.ioctl(fd, XFS_IOC_GETPARENTS_BY_HANDLE, self)
+			return ret == 0 and self.gph_request.gp_count > 0
+
+		def iterate(self, fd):
+			while self.__invoke(fd):
+				g = self.gph_request
+				for i in g._records.iterate(g.gp_count):
+					yield i
+
+	return xfs_getparents_by_handle
+xfs_getparents_by_handle = xfs_getparents_by_handle_sized(0)
+
+assert ctypes.sizeof(xfs_getparents) == 32
+assert ctypes.sizeof(xfs_getparents_by_handle) == 56
 assert ctypes.sizeof(xfs_getparents_rec) == 26
 
 XFS_GETPARENTS_OFLAG_ROOT	= 1 << 0
 XFS_GETPARENTS_OFLAG_DONE	= 1 << 1
 
 XFS_IOC_GETPARENTS		= _IOWR(0x58, 62, xfs_getparents)
+XFS_IOC_GETPARENTS_BY_HANDLE	= _IOWR(0x58, 62, xfs_getparents_by_handle)
 
 def fgetparents(fd, fh = None, bufsize = 1024):
 	'''Return all the parent pointers for a given fd and/or handle.'''
 
-	def invoke(arg):
-		if arg.gp_flags & XFS_GETPARENTS_OFLAG_DONE:
-			return False
+	def alloc_getparents(bufsize, fh):
+		'''Allocate the ioctl buffer with the given buffer size.'''
+		if fh is not None:
+			realtype = xfs_getparents_by_handle_sized(bufsize - \
+					ctypes.sizeof(xfs_getparents_by_handle))
+			ret = realtype()
+			ret.gph_handle = fh.handle
+			ret.gph_request.gp_bufsize = bufsize
+			return ret
 
-		ret = fcntl.ioctl(fd, XFS_IOC_GETPARENTS, arg)
-		return ret == 0 and arg.gp_count > 0
-
-	def alloc_getparents(bufsize):
-		'''Allocate the args array with the given buffer size.'''
-
-		# We cheat here by declaring an absurdly long gp_offsets array
-		# to get the buffer size we want, even though gp_count will
-		# never come close to nr_offsets.
-		nr_offsets = (bufsize - ctypes.sizeof(xfs_getparents)) / ctypes.sizeof(ctypes.c_uint)
-		realtype = xfs_getparents_sized(int(nr_offsets))
+		realtype = xfs_getparents_sized(bufsize - \
+				ctypes.sizeof(xfs_getparents))
 		ret = realtype()
 		ret.gp_bufsize = bufsize
 		return ret
 
-	def sliced_rec_type(bufslice):
-		'''Return a getparents record type that is exactly the size of a buffer slice.'''
+	arg = alloc_getparents(bufsize, fh)
+	for i in arg.iterate(fd):
+		yield i
 
-		bufsize = len(bufslice)
-		namelen = (bufsize - ctypes.sizeof(xfs_getparents_rec)) / ctypes.sizeof(ctypes.c_char)
-		if namelen > 255:
-			namelen = 255
-		return xfs_getparents_rec_sized(namelen)
-
-	arg = alloc_getparents(bufsize)
-	lowest_off = bufsize
-
-	if fh is not None:
-		arg.gp_handle = fh.handle
-
-	while invoke(arg):
-		buf = bytes(arg)
-		for i in range(0, arg.gp_count):
-			off = arg.gp_offsets[i]
-			reclen = lowest_off - off
-
-			bufslice = buf[off:lowest_off]
-			if lowest_off > off:
-				lowest_off = off
-
-			rectype = sliced_rec_type(bufslice)
-			rec = ctypes.cast(bufslice, ctypes.POINTER(rectype))
-			yield rec.contents
-
-def fgetpath(fd, fh = None):
+def fgetpath(fd, fh = None, mountpoint = None):
 	'''Return a list of path components up to the root dir of the filesystem for a given fd.'''
 	ret = []
 	if fh is None:
-		nfh = fshandle(fd)
+		nfh = fshandle(fd, mountpoint)
 	else:
 		# Don't subst into the caller's handle
 		nfh = fshandle(fh)
