@@ -52,7 +52,7 @@ walk_parent_records(
 	void			*arg)
 {
 	struct xfs_getparents_rec *gpr;
-	unsigned int		i;
+	struct xfs_getparents_rec *end = (void *)gp->gp_buffer + gp->gp_bufsize;
 	int			ret;
 
 	if (gp->gp_oflags & XFS_GETPARENTS_OFLAG_ROOT) {
@@ -63,10 +63,13 @@ walk_parent_records(
 		return fn(&rec, arg);
 	}
 
-	for (i = 0, gpr = xfs_getparents_first_rec(gp);
-	     i < gp->gp_count;
-	     i++, gpr = xfs_getparents_next_rec(gpr)) {
+	for (gpr = xfs_getparents_first_rec(gp);
+	     gpr < end;
+	     gpr = xfs_getparents_next_rec(gpr)) {
 		struct parent_rec	rec = { };
+
+		if (gpr->gpr_name[0] == 0)
+			break;
 
 		copy_handle(&rec.p_handle, &gpr->gpr_parent);
 		rec.p_name = gpr->gpr_name;
