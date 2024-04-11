@@ -260,7 +260,7 @@ attr_set_f(
 	args.owner = iocur_top->ino;
 	libxfs_attr_sethash(&args);
 
-	if (libxfs_attr_set(&args, op)) {
+	if (libxfs_attr_set(&args, op, false)) {
 		dbprintf(_("failed to set attr %s on inode %llu\n"),
 			args.name, (unsigned long long)iocur_top->ino);
 		goto out;
@@ -379,7 +379,7 @@ attr_remove_f(
 	args.owner = iocur_top->ino;
 	libxfs_attr_sethash(&args);
 
-	if (libxfs_attr_set(&args, XFS_ATTRUPDATE_REMOVE)) {
+	if (libxfs_attr_set(&args, XFS_ATTRUPDATE_REMOVE, false)) {
 		dbprintf(_("failed to remove attr %s from inode %llu\n"),
 			(unsigned char *)args.name,
 			(unsigned long long)iocur_top->ino);
