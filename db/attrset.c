@@ -247,7 +247,7 @@ attr_remove_f(
 		goto out;
 	}
 
-	if (libxfs_attr_set(&args, XFS_ATTRUPDATE_UPSERT)) {
+	if (libxfs_attr_set(&args, XFS_ATTRUPDATE_REMOVE)) {
 		dbprintf(_("failed to remove attr %s from inode %llu\n"),
 			(unsigned char *)args.name,
 			(unsigned long long)iocur_top->ino);
