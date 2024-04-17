@@ -171,8 +171,8 @@ libxfs_device_close(
 	if (ret) {
 		ret = -errno;
 		fprintf(stderr,
-	_("%s: flush of device %lld failed, err=%d"),
-			progname, (long long)dev, ret);
+	_("%s: flush of device %s failed, err=%d"),
+			progname, dev->name, ret);
 	}
 	close(dev->fd);
 
