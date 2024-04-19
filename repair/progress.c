@@ -435,6 +435,9 @@ duration(time_t length, char *buf)
 	int seconds;
 	char temp[128];
 
+	if (!buf)
+		return NULL;
+
 	*buf = '\0';
 	weeks = days = hours = minutes = seconds = sum = 0;
 	if (length >= ONEWEEK) {
