@@ -301,7 +301,7 @@ bulkstat_single_f(
 
 	for (i = optind; i < argc; i++) {
 		struct single_map	*sm = tags;
-		uint64_t		ino;
+		uint64_t		ino = NULLFSINO;
 		unsigned int		flags = 0;
 
 		/* Try to look up our tag... */
@@ -314,7 +314,7 @@ bulkstat_single_f(
 		}
 
 		/* ...or else it's an inode number. */
-		if (sm->tag == NULL) {
+		if (ino == NULLFSINO) {
 			errno = 0;
 			ino = strtoull(argv[i], NULL, 10);
 			if (errno) {
