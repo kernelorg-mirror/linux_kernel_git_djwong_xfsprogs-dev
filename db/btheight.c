@@ -12,6 +12,35 @@
 #include "input.h"
 #include "libfrog/convert.h"
 
+#ifdef HAVE_LIBSSL_SHA2
+#include <openssl/sha.h>
+
+static unsigned int
+merkle_maxlevels(void)
+{
+	/* As of Linux 6.9, FS_VERITY_MAX_LEVELS is 8 */
+	return 8;
+}
+
+static unsigned int
+merkle_sha256_maxrecs(
+	struct xfs_mount	*mp,
+	unsigned int		blocklen,
+	bool			leaf)
+{
+	return blocklen / SHA256_DIGEST_LENGTH;
+}
+
+static unsigned int
+merkle_sha512_maxrecs(
+	struct xfs_mount	*mp,
+	unsigned int		blocklen,
+	bool			leaf)
+{
+	return blocklen / SHA512_DIGEST_LENGTH;
+}
+#endif /* HAVE_LIBSSL_SHA2 */
+
 struct btmap {
 	const char	*tag;
 	unsigned int	(*maxlevels)(void);
@@ -63,6 +92,18 @@ struct btmap {
 		.maxlevels	= libxfs_rtrefcountbt_maxlevels_ondisk,
 		.maxrecs	= libxfs_rtrefcountbt_maxrecs,
 	},
+#ifdef HAVE_LIBSSL_SHA2
+	{
+		.tag		= "merkle_sha256",
+		.maxlevels	= merkle_maxlevels,
+		.maxrecs	= merkle_sha256_maxrecs,
+	},
+	{
+		.tag		= "merkle_sha512",
+		.maxlevels	= merkle_maxlevels,
+		.maxrecs	= merkle_sha512_maxrecs,
+	},
+#endif
 };
 
 static void
