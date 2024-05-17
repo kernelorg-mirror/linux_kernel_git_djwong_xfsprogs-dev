@@ -18,6 +18,7 @@ import ctypes
 import ctypes.util
 import collections
 import time
+from concurrent.futures import ProcessPoolExecutor
 
 debug = False
 log = False
@@ -574,7 +575,7 @@ def report_shutdown(event):
 	print(f"{printf_prefix}: Filesystem shut down due to {', '.join(reasons)}.")
 	sys.stdout.flush()
 
-def monitor(mountpoint):
+def monitor(mountpoint, repair_queue):
 	'''Monitor the given mountpoint for health events.'''
 	global log, printf_prefix, everything, want_repair, has_parent
 
@@ -645,7 +646,7 @@ def monitor(mountpoint):
 			elif event['type'] == 'shutdown':
 				report_shutdown(event)
 			elif want_repair and event['type'] == 'sick':
-				repair_metadata(event, fh)
+				repair_queue.submit(repair_metadata, event, fh)
 
 	return 0
 
@@ -840,6 +841,9 @@ def main():
 		everything = True
 	if args.repair:
 		want_repair = True
+		repair_queue = ProcessPoolExecutor(max_workers = 1)
+	else:
+		repair_queue = None
 
 	printf_prefix = args.mountpoint
 	ret = 0
@@ -847,10 +851,13 @@ def main():
 		if args.check:
 			ret = check_monitor(args.mountpoint)
 		else:
-			ret = monitor(args.mountpoint)
+			ret = monitor(args.mountpoint, repair_queue)
 	except KeyboardInterrupt:
 		# Consider SIGINT to be a clean exit.
 		pass
+
+	if repair_queue:
+		repair_queue.shutdown()
 
 	# See the service mode comments in xfs_scrub.c for why we sleep and
 	# compress all nonzero exit codes to 1.
