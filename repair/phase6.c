@@ -2266,12 +2266,12 @@ longform_dir2_entry_check(
 	xfs_dablk_t		da_bno;
 	freetab_t		*freetab;
 	int			i;
-	bool			isblock;
-	bool			isleaf;
+	enum xfs_dir2_fmt	fmt;
 	xfs_fileoff_t		next_da_bno;
 	int			seeval;
 	int			fixit = 0;
 	struct xfs_da_args	args;
+	int			error;
 
 	*need_dot = 1;
 	freetab = malloc(FREETAB_SIZE(ip->i_disk_size / mp->m_dir_geo->blksize));
@@ -2291,8 +2291,7 @@ longform_dir2_entry_check(
 	/* is this a block, leaf, or node directory? */
 	args.dp = ip;
 	args.geo = mp->m_dir_geo;
-	libxfs_dir2_isblock(&args, &isblock);
-	libxfs_dir2_isleaf(&args, &isleaf);
+	fmt = libxfs_dir2_format(&args, &error);
 
 	/* check directory "data" blocks (ie. name/inode pairs) */
 	for (da_bno = 0, next_da_bno = 0;
@@ -2315,7 +2314,7 @@ longform_dir2_entry_check(
 			break;
 		}
 
-		if (isblock)
+		if (fmt == XFS_DIR2_FMT_BLOCK)
 			ops = &xfs_dir3_block_buf_ops;
 		else
 			ops = &xfs_dir3_data_buf_ops;
@@ -2332,7 +2331,7 @@ longform_dir2_entry_check(
 			 * block form and we fail, there isn't anything else to
 			 * read, and nothing we can do but trash it.
 			 */
-			if (isblock) {
+			if (fmt == XFS_DIR2_FMT_BLOCK) {
 				fixit++;
 				goto out_fix;
 			}
@@ -2346,7 +2345,7 @@ longform_dir2_entry_check(
 			error = check_dir3_header(mp, bp, ino);
 			if (error) {
 				fixit++;
-				if (isblock)
+				if (fmt == XFS_DIR2_FMT_BLOCK)
 					goto out_fix;
 
 				libxfs_buf_relse(bp);
@@ -2357,8 +2356,8 @@ longform_dir2_entry_check(
 
 		longform_dir2_entry_check_data(mp, ip, num_illegal, need_dot,
 				irec, ino_offset, bp, hashtab,
-				&freetab, da_bno, isblock);
-		if (isblock)
+				&freetab, da_bno, fmt == XFS_DIR2_FMT_BLOCK);
+		if (fmt == XFS_DIR2_FMT_BLOCK)
 			break;
 
 		libxfs_buf_relse(bp);
@@ -2368,7 +2367,7 @@ longform_dir2_entry_check(
 
 	if (!dotdot_update) {
 		/* check btree and freespace */
-		if (isblock) {
+		if (fmt == XFS_DIR2_FMT_BLOCK) {
 			struct xfs_dir2_data_hdr *block;
 			xfs_dir2_block_tail_t	*btp;
 			xfs_dir2_leaf_entry_t	*blp;
@@ -2381,7 +2380,7 @@ longform_dir2_entry_check(
 						be32_to_cpu(btp->stale));
 			if (dir_hash_check(hashtab, ip, seeval))
 				fixit |= 1;
-		} else if (isleaf) {
+		} else if (fmt == XFS_DIR2_FMT_LEAF) {
 			fixit |= longform_dir2_check_leaf(mp, ip, hashtab,
 								freetab);
 		} else {
