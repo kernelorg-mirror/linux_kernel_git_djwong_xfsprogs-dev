@@ -221,6 +221,9 @@ libxfs_imeta_iget(
 	struct xfs_inode	*ip;
 	int			error;
 
+	if (!libxfs_verify_ino(mp, ino))
+		return -EFSCORRUPTED;
+
 	error = libxfs_iget(mp, tp, ino, XFS_IGET_UNTRUSTED, &ip);
 	if (error)
 		return error;
