@@ -106,6 +106,7 @@ CFILES = buf_mem.c \
 	xfs_exchmaps.c \
 	xfs_ialloc.c \
 	xfs_iext_tree.c \
+	xfs_imeta.c \
 	xfs_inode_buf.c \
 	xfs_inode_fork.c \
 	xfs_inode_util.c \
