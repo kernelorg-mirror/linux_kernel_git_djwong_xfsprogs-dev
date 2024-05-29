@@ -215,6 +215,7 @@ static inline bool WARN_ON(bool expr) {
 #define percpu_counter_read(x)		(*x)
 #define percpu_counter_read_positive(x)	((*x) > 0 ? (*x) : 0)
 #define percpu_counter_sum(x)		(*x)
+#define percpu_counter_sum_positive(x)	((*x) > 0 ? (*x) : 0)
 
 #ifdef HAVE_GETRANDOM_NONBLOCK
 uint32_t get_random_u32(void);
