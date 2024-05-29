@@ -32,6 +32,7 @@
 #include "xfs_metafile.h"
 #include "xfs_metadir.h"
 #include "xfs_rtrmap_btree.h"
+#include "xfs_rtrefcount_btree.h"
 
 /*
  * Passive reference counting access wrappers to the rtgroup structures.  If
@@ -579,6 +580,7 @@ static const struct xfs_rtginode_ops xfs_rtginode_ops[XFS_RTG_MAX] = {
 	[XFS_RTG_REFCOUNT] = {
 		.name		= "refcount",
 		.format		= XFS_DINODE_FMT_REFCOUNT,
+		.sick		= XFS_SICK_RG_REFCNTBT,
 		.enabled	= xfs_has_rtreflink,
 		.create		= xfs_rtrefcountbt_create,
 	},
