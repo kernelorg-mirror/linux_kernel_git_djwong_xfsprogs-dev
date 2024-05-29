@@ -26,6 +26,7 @@
 #include "xfs_trans.h"
 #include "xfs_trace.h"
 #include "xfs_inode.h"
+#include "xfs_metafile.h"
 #include "xfs_rtgroup.h"
 #include "xfs_rtbitmap.h"
 #include "xfs_metafile.h"
@@ -500,7 +501,14 @@ xfs_rtginode_ilock_print_fn(
 	const struct xfs_inode *ip =
 		container_of(m, struct xfs_inode, i_lock.dep_map);
 
-	printk(KERN_CONT " rgno=%u", ip->i_projid);
+	switch (ip->i_df.if_format) {
+	case XFS_DINODE_FMT_RMAP:
+		printk(KERN_CONT " rgno=%u rmapbt", ip->i_projid);
+		break;
+	default:
+		printk(KERN_CONT " rgno=%u", ip->i_projid);
+		break;
+	}
 }
 
 /*
@@ -540,6 +548,11 @@ struct xfs_rtginode_ops {
 };
 
 static const struct xfs_rtginode_ops xfs_rtginode_ops[XFS_RTG_MAX] = {
+	[XFS_RTG_RMAP] = {
+		.name		= "rmap",
+		.format		= XFS_DINODE_FMT_RMAP,
+		.enabled	= xfs_has_rtrmapbt,
+	},
 };
 
 /* Return the shortname of this rtgroup inode. */
