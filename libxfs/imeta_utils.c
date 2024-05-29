@@ -21,6 +21,7 @@
 #include "xfs_imeta.h"
 #include "xfs_trace.h"
 #include "xfs_parent.h"
+#include "xfs_health.h"
 #include "imeta_utils.h"
 
 /* Initialize a metadata update structure. */
@@ -50,8 +51,10 @@ xfs_imeta_init_update(
 		return error;
 	error = xfs_imeta_iget_parent(tp, upd->path, &upd->dp);
 	xfs_trans_cancel(tp);
-	if (error == -ENOENT)
+	if (error == -ENOENT) {
+		xfs_fs_mark_sick(mp, XFS_SICK_FS_METADIR);
 		return -EFSCORRUPTED;
+	}
 	if (error)
 		return error;
 
