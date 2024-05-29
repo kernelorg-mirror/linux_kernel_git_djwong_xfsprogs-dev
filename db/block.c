@@ -274,7 +274,7 @@ dblock_f(
 	if (nex > 1)
 		make_bbmap(&bbmap, nex, bmp);
 	if (is_rtfile(iocur_top->data))
-		set_rt_cur(&typtab[type], (int64_t)dfsbno << mp->m_blkbb_log,
+		set_rt_cur(&typtab[type], (int64_t)xfs_rtb_to_daddr(mp, dfsbno),
 				nb * blkbb, DB_RING_ADD,
 				nex > 1 ? &bbmap : NULL);
 	else
