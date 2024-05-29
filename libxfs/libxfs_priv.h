@@ -657,6 +657,7 @@ int xfs_bmap_last_extent(struct xfs_trans *tp, struct xfs_inode *ip,
 
 /* xfs_inode.h */
 #define xfs_iflags_set(ip, flags)	do { } while (0)
+#define xfs_finish_inode_setup(ip)	((void) 0)
 
 /* linux/wordpart.h */
 
