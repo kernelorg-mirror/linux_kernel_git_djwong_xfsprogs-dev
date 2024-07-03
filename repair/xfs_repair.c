@@ -1433,6 +1433,7 @@ main(int argc, char **argv)
 	incore_ino_init(mp);
 	incore_ext_init(mp);
 	rmaps_init(mp);
+	discover_rtgroup_inodes(mp);
 
 	/* initialize random globals now that we know the fs geometry */
 	inodes_per_block = mp->m_sb.sb_inopblock;
@@ -1473,6 +1474,8 @@ main(int argc, char **argv)
 	if (!bad_ino_btree)  {
 		phase6(mp);
 		phase_end(mp, 6);
+
+		free_rtgroup_inodes(mp);
 
 		phase7(mp, phase2_threads);
 		phase_end(mp, 7);

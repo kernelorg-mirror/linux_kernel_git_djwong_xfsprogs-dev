@@ -12,7 +12,11 @@
 #include "dinode.h"
 #include "protos.h"
 #include "err_protos.h"
+#include "libfrog/bitmap.h"
 #include "rt.h"
+
+/* Bitmap of rt group inodes */
+static struct bitmap		*rtg_inodes[XFS_RTG_MAX];
 
 /* Computed rt bitmap/summary data */
 static union xfs_rtword_raw	*btmcompute;
@@ -388,4 +392,130 @@ rewrite_rtsb(
 	libxfs_buf_mark_dirty(rtsb_bp);
 	libxfs_buf_relse(rtsb_bp);
 	libxfs_buf_relse(sb_bp);
+}
+
+bool
+is_rtgroup_inode(
+	xfs_ino_t		ino,
+	enum xfs_rtg_inodes	type)
+{
+	if (!rtg_inodes[type])
+		return false;
+	return bitmap_test(rtg_inodes[type], ino, 1);
+}
+
+xfs_rgnumber_t
+rtgroup_for_rtginode(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino,
+	enum xfs_rtg_inodes	type)
+{
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
+	if (!rtg_inodes[type])
+		return NULLRGNUMBER;
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		if (rtg->rtg_inodes[type] &&
+		    rtg->rtg_inodes[type]->i_ino == ino)
+			return rgno;
+	}
+
+	return NULLRGNUMBER;
+}
+
+void
+rtginode_avoid_check(
+	struct xfs_mount	*mp,
+	enum xfs_rtg_inodes	type)
+{
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
+	for_each_rtgroup(mp, rgno, rtg)
+		libxfs_rtginode_irele(&rtg->rtg_inodes[type]);
+
+	bitmap_clear(rtg_inodes[type], 0, XFS_MAXINUMBER);
+}
+
+static inline int
+set_rtginode(
+	struct xfs_trans	*tp,
+	struct xfs_rtgroup	*rtg,
+	enum xfs_rtg_inodes	type)
+{
+	struct xfs_inode	*ip;
+	int			error;
+
+	error = -libxfs_rtginode_load(rtg, type, tp);
+	if (error)
+		return error;
+
+	ip = rtg->rtg_inodes[type];
+	if (!ip) /* inode type not enabled */
+		return 0;
+
+	if (bitmap_test(rtg_inodes[type], ip->i_ino, 1))
+		return EFSCORRUPTED;
+	return bitmap_set(rtg_inodes[type], ip->i_ino, 1);
+}
+
+void
+discover_rtgroup_inodes(
+	struct xfs_mount	*mp)
+{
+	struct xfs_rtgroup	*rtg;
+	struct xfs_trans	*tp;
+	xfs_rgnumber_t		rgno;
+	int			error, err2;
+	int			i;
+
+	if (!xfs_has_rtgroups(mp))
+		return;
+
+	for (i = 0; i < XFS_RTG_MAX; i++) {
+		error = bitmap_alloc(&rtg_inodes[i]);
+		if (error)
+			goto out;
+	}
+
+	error = -libxfs_trans_alloc_empty(mp, &tp);
+	if (error)
+		goto out;
+	error = -libxfs_rtginode_load_parent(tp);
+	if (error)
+		goto out_cancel;
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		for (i = 0; i < XFS_RTG_MAX; i++) {
+			err2 = set_rtginode(tp, rtg, i);
+			if (err2 && !error)
+				error = err2;
+		}
+	}
+
+out_cancel:
+	libxfs_trans_cancel(tp);
+out:
+	if (error == EFSCORRUPTED)
+		do_warn(
+ _("corruption in metadata directory tree while discovering rt group inodes\n"));
+	if (error)
+		do_warn(
+ _("couldn't discover rt group inodes, err %d\n"),
+				error);
+}
+
+void
+free_rtgroup_inodes(
+	struct xfs_mount	*mp)
+{
+	int			i;
+
+	if (!xfs_has_rtgroups(mp))
+		return;
+
+	for (i = 0; i < XFS_RTG_MAX; i++)
+		bitmap_free(&rtg_inodes[i]);
 }

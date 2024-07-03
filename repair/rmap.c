@@ -15,6 +15,7 @@
 #include "libfrog/bitmap.h"
 #include "libfrog/platform.h"
 #include "rcbag.h"
+#include "rt.h"
 
 #undef RMAP_DEBUG
 
@@ -169,15 +170,6 @@ nomem:
 _("Insufficient memory while allocating realtime reverse mapping btree."));
 }
 
-xfs_rgnumber_t
-rtgroup_for_rtrmap_inode(
-	struct xfs_mount	*mp,
-	xfs_ino_t		ino)
-{
-	/* This will be implemented later. */
-	return NULLRGNUMBER;
-}
-
 /*
  * Initialize per-AG reverse map data.
  */
@@ -203,6 +195,8 @@ rmaps_init(
 
 	for (i = 0; i < mp->m_sb.sb_rgcount; i++)
 		rmaps_init_rt(mp, i, &rg_rmaps[i]);
+
+	discover_rtgroup_inodes(mp);
 }
 
 /*
@@ -1144,11 +1138,14 @@ rmap_record_count(
 }
 
 /*
- * Disable the refcount btree check.
+ * Disable the rmap btree check.
  */
 void
-rmap_avoid_check(void)
+rmap_avoid_check(
+	struct xfs_mount	*mp)
 {
+	if (xfs_has_rtgroups(mp))
+		rtginode_avoid_check(mp, XFS_RTG_RMAP);
 	rmapbt_suspect = true;
 }
 
