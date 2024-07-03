@@ -868,7 +868,8 @@ rtbitmap_create(
 
 	ip->i_disk_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
 	ip->i_diflags |= XFS_DIFLAG_NEWRTBM;
-	inode_set_atime(VFS_I(ip), 0, 0);
+	if (!xfs_has_rtgroups(mp))
+		inode_set_atime(VFS_I(ip), 0, 0);
 
 	mp->m_sb.sb_rbmino = ip->i_ino;
 	mp->m_rbmip = ip;
