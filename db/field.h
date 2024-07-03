@@ -195,6 +195,9 @@ typedef enum fldt	{
 
 	FLDT_PARENT_REC,
 
+	FLDT_RTWORD,
+	FLDT_RGBITMAP,
+
 	FLDT_ZZZ			/* mark last entry */
 } fldt_t;
 
