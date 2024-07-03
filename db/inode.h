@@ -34,6 +34,12 @@ rtgroup_for_rtrmap_ino(struct xfs_mount *mp, xfs_ino_t ino)
 	return rtgroup_for_rtginode(mp, ino, XFS_RTG_RMAP);
 }
 
+static inline xfs_rgnumber_t
+rtgroup_for_rtrefcount_ino(struct xfs_mount *mp, xfs_ino_t ino)
+{
+	return rtgroup_for_rtginode(mp, ino, XFS_RTG_REFCOUNT);
+}
+
 bool is_rtgroup_inode(xfs_ino_t ino, enum xfs_rtg_inodes type);
 
 static inline bool is_rtrmap_inode(xfs_ino_t ino)
