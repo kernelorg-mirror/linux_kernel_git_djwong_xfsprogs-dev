@@ -462,6 +462,7 @@ void xfs_dirattr_mark_sick(struct xfs_inode *ip, int whichfork) { }
 void xfs_da_mark_sick(struct xfs_da_args *args) { }
 void xfs_inode_mark_sick(struct xfs_inode *ip, unsigned int mask) { }
 void xfs_rt_mark_sick(struct xfs_mount *mp, unsigned int mask) { }
+void xfs_rtgroup_mark_sick(struct xfs_rtgroup *rtg, unsigned int mask) { }
 
 #ifdef HAVE_GETRANDOM_NONBLOCK
 uint32_t
