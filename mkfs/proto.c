@@ -1121,8 +1121,29 @@ static void
 rtinit(
 	struct xfs_mount	*mp)
 {
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+	unsigned int		i;
+
 	rtbitmap_create(mp);
 	rtsummary_create(mp);
+
+	if (xfs_has_rtgroups(mp)) {
+		int		error;
+
+		error = -libxfs_rtginode_mkdir_parent(mp);
+		if (error)
+			fail(_("rtgroup directory allocation failed"), error);
+
+		for_each_rtgroup(mp, rgno, rtg) {
+			for (i = 0; i < XFS_RTG_MAX; i++) {
+				error = -libxfs_rtginode_create(rtg, i, true);
+				if (error)
+					fail(_("rt group inode creation failed"),
+							error);
+			}
+		}
+	}
 
 	rtbitmap_init(mp);
 	rtsummary_init(mp);
