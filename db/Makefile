@@ -82,6 +82,10 @@ ifeq ($(HAVE_FSVERITY_DESCR),yes)
 CFLAGS += -DHAVE_FSVERITY_DESCR
 endif
 
+ifeq ($(HAVE_LIBSSL_SHA2),yes)
+CFLAGS += -DHAVE_LIBSSL_SHA2
+endif
+
 default: depend $(LTCOMMAND)
 
 include $(BUILDRULES)
