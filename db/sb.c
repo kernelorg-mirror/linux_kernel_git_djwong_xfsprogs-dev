@@ -832,6 +832,8 @@ version_string(
 		strcat(s, ",RTGROUPS");
 	if (xfs_has_rtsuper(mp))
 		strcat(s, ",RTSUPER");
+	if (xfs_has_verity(mp))
+		strcat(s, ",VERITY");
 	return s;
 }
 
