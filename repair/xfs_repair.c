@@ -76,6 +76,8 @@ enum c_opt_nums {
 	CONVERT_RMAPBT,
 	CONVERT_PARENT,
 	CONVERT_METADIR,
+	CONVERT_RTSB,
+	CONVERT_RTGROUPS,
 	C_MAX_OPTS,
 };
 
@@ -90,6 +92,8 @@ static char *c_opts[] = {
 	[CONVERT_RMAPBT]	= "rmapbt",
 	[CONVERT_PARENT]	= "parent",
 	[CONVERT_METADIR]	= "metadir",
+	[CONVERT_RTSB]		= "rtsb",
+	[CONVERT_RTGROUPS]	= "rtgroups",
 	[C_MAX_OPTS]		= NULL,
 };
 
@@ -426,6 +430,24 @@ process_args(int argc, char **argv)
 						do_abort(
 		_("-c metadir only supports upgrades\n"));
 					add_metadir = true;
+					break;
+				case CONVERT_RTSB:
+					if (!val)
+						do_abort(
+		_("-c rtsb requires a parameter\n"));
+					if (strtol(val, NULL, 0) != 1)
+						do_abort(
+		_("-c rtsb only supports upgrades\n"));
+					add_rtsb = true;
+					break;
+				case CONVERT_RTGROUPS:
+					if (!val)
+						do_abort(
+		_("-c rtgroups requires a parameter\n"));
+					if (strtol(val, NULL, 0) != 1)
+						do_abort(
+		_("-c rtgroups only supports upgrades\n"));
+					add_rtgroups = true;
 					break;
 				default:
 					unknown('c', val);
