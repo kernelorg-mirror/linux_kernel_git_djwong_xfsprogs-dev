@@ -33,7 +33,7 @@ default:
 
 include $(BUILDRULES)
 
-install install-dev install-lib: default
+install install-pkg install-dev install-lib: default
 
 realclean: distclean
 	rm -f $(CONFIGURE)

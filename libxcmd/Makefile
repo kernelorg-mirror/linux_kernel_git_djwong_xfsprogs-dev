@@ -23,6 +23,6 @@ default: ltdepend $(LTLIBRARY)
 
 include $(BUILDRULES)
 
-install install-dev: default
+install install-pkg install-dev: default
 
 -include .ltdep
