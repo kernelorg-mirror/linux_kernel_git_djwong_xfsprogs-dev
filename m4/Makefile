@@ -19,6 +19,7 @@ LSRCFILES = \
 	package_globals.m4 \
 	package_attr.m4 \
 	package_libcdev.m4 \
+	package_libssl.m4 \
 	package_pthread.m4 \
 	package_sanitizer.m4 \
 	package_services.m4 \
