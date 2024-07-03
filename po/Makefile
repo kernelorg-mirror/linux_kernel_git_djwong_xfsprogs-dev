@@ -19,7 +19,9 @@ default: $(POTHEAD) $(LINGUAS:%=%.mo)
 
 include $(BUILDRULES)
 
-install: default
+install: install-pkg
+
+install-pkg: default
 	$(INSTALL_LINGUAS)
 
 install-dev install-lib:

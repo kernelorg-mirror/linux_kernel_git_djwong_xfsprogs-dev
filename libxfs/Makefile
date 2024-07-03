@@ -136,7 +136,9 @@ default: ltdepend $(LTLIBRARY)
 # set up include/xfs header directory
 include $(BUILDRULES)
 
-install: default
+install: install-pkg
+
+install-pkg: default
 	$(INSTALL) -m 755 -d $(PKG_INC_DIR)
 
 install-headers: $(addsuffix -hdrs, $(PKGHFILES))
