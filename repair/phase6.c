@@ -1006,6 +1006,135 @@ zap:
 	libxfs_irele(upd.ip);
 }
 
+static void
+ensure_rtgroup_refcountbt(
+	struct xfs_rtgroup	*rtg,
+	xfs_filblks_t		est_fdblocks)
+{
+	struct xfs_imeta_update	upd = { };
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	struct xfs_imeta_path	*path;
+	xfs_ino_t		ino;
+	int			error;
+
+	if (!xfs_has_rtreflink(mp))
+		return;
+
+	ino = rtgroup_refcount_ino(rtg);
+	if (no_modify) {
+		if (ino == NULLFSINO)
+			do_warn(_("would reset rtgroup %u refcount btree\n"),
+					rtg->rtg_rgno);
+		return;
+	}
+
+	if (ino == NULLFSINO)
+		do_warn(_("resetting rtgroup %u refcount btree\n"),
+				rtg->rtg_rgno);
+
+	path = xfs_rtrefcountbt_create_path(mp, rtg->rtg_rgno);
+	if (!path)
+		do_error(
+ _("Couldn't create rtgroup %u refcount btree file path\n"), rtg->rtg_rgno);
+
+	error = ensure_imeta_dirpath(mp, path);
+	if (error)
+		do_error(
+ _("Couldn't create rtgroup %u metadata directory, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	if (ino != NULLFSINO) {
+		struct xfs_trans	*tp;
+
+		/*
+		 * We're still hanging on to our old inode pointer, so grab it
+		 * and reconnect it to the metadata directory tree.  If it
+		 * can't be grabbed, create a new rtrefcount file.
+		 */
+		error = -libxfs_trans_alloc_empty(mp, &tp);
+		if (error)
+			do_error(
+ _("Couldn't allocate transaction to iget rtgroup %u refcountbt inode 0x%llx, error %d\n"),
+					rtg->rtg_rgno, (unsigned long long)ino,
+					error);
+		error = -libxfs_imeta_iget(tp, ino, S_IFREG, &upd.ip);
+		libxfs_trans_cancel(tp);
+		if (error) {
+			do_warn(
+ _("Couldn't iget rtgroup %u refcountbt inode 0x%llx, error %d\n"),
+					rtg->rtg_rgno,
+					(unsigned long long)ino,
+					error);
+			goto zap;
+		}
+
+		/*
+		 * Since we're reattaching this file to the metadata directory
+		 * tree, try to remove all the parent pointers that might be
+		 * attached.
+		 */
+		try_erase_parent_ptrs(upd.ip);
+
+		error = -libxfs_imeta_start_link(mp, path, upd.ip, &upd);
+		if (error)
+			do_error(
+ _("Couldn't grab resources to reconnect rtgroup %u refcountbt, error %d\n"),
+					rtg->rtg_rgno, error);
+
+		error = -libxfs_imeta_link(&upd);
+		if (error)
+			do_error(
+ _("Failed to link rtgroup %u refcountbt inode 0x%llx, error %d\n"),
+					rtg->rtg_rgno,
+					(unsigned long long)ino,
+					error);
+
+		/* Reset the link count to something sane. */
+		set_nlink(VFS_I(upd.ip), 1);
+		upd.ip->i_df.if_format = XFS_DINODE_FMT_REFCOUNT;
+		libxfs_trans_log_inode(upd.tp, upd.ip, XFS_ILOG_CORE);
+	} else {
+zap:
+		/*
+		 * The rtrefcount inode was bad or gone, so just make a new one
+		 * and give our reference to the rtgroup structure.
+		 */
+		error = -libxfs_imeta_start_create(mp, path, &upd);
+		if (error)
+			do_error(
+ _("Couldn't grab resources to recreate rtgroup %u refcountbt, error %d\n"),
+					rtg->rtg_rgno, error);
+
+		error = -libxfs_rtrefcountbt_create(&upd);
+		if (error)
+			do_error(
+ _("Couldn't create rtgroup %u refcountbt inode, error %d\n"),
+					rtg->rtg_rgno, error);
+	}
+
+	/* Mark the inode in use. */
+	mark_ino_inuse(mp, upd.ip->i_ino, S_IFREG, upd.dp->i_ino);
+	mark_ino_metadata(mp, upd.ip->i_ino);
+
+	error = -libxfs_imeta_commit(&upd);
+	if (error)
+		do_error(
+ _("Couldn't commit new rtgroup %u refcountbt inode %llu, error %d\n"),
+				rtg->rtg_rgno,
+				(unsigned long long)upd.ip->i_ino,
+				error);
+
+	/* Copy our incore refcount data to the ondisk refcount inode. */
+	error = populate_rtgroup_refcountbt(rtg, upd.ip, est_fdblocks);
+	if (error)
+		do_error(
+ _("rtgroup %u refcount btree could not be rebuilt, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	libxfs_imeta_free_path(path);
+	libxfs_irele(upd.ip);
+}
+
 /* Initialize a root directory. */
 static int
 init_fs_root_dir(
@@ -3661,6 +3790,7 @@ reset_rt_metadata_inodes(
 	if (!need_packed_btrees) {
 		for_each_rtgroup(mp, rgno, rtg) {
 			metadata_blocks += estimate_rtrmapbt_blocks(rtg);
+			metadata_blocks += estimate_rtrefcountbt_blocks(rtg);
 		}
 		if (mp->m_sb.sb_fdblocks > metadata_blocks)
 			est_fdblocks = mp->m_sb.sb_fdblocks - metadata_blocks;
@@ -3668,6 +3798,7 @@ reset_rt_metadata_inodes(
 
 	for_each_rtgroup(mp, rgno, rtg) {
 		ensure_rtgroup_rmapbt(rtg, est_fdblocks);
+		ensure_rtgroup_refcountbt(rtg, est_fdblocks);
 	}
 }
 
