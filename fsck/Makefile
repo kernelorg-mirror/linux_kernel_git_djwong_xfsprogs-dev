@@ -11,7 +11,9 @@ default: $(LTCOMMAND)
 
 include $(BUILDRULES)
 
-install: default
+install: install-pkg
+
+install-pkg: default
 	$(INSTALL) -m 755 -d $(PKG_SBIN_DIR)
 	$(INSTALL) -m 755 xfs_fsck.sh $(PKG_SBIN_DIR)/fsck.xfs
 install-dev:
