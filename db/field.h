@@ -267,6 +267,7 @@ extern const ftattr_t	ftattrtab[];
 #define	FTARG_SIZE	16	/* size field is a function */
 #define	FTARG_SKIPNMS	32	/* skip printing names this time */
 #define	FTARG_OKEMPTY	64	/* ok if this (union type) is empty */
+#define FTARG_LE	(1U << 7) /* little endian */
 
 extern int		bitoffset(const field_t *f, void *obj, int startoff,
 				  int idx);
