@@ -15,7 +15,9 @@ default:
 
 include $(BUILDRULES)
 
-install: default
+install: install-pkg
+
+install-pkg: default
 ifeq ($(PKG_DISTRIBUTION), debian)
 	$(INSTALL) -m 755 -d $(PKG_DOC_DIR)
 	$(INSTALL) -m 644 changelog $(PKG_DOC_DIR)/changelog.Debian

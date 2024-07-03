@@ -100,7 +100,7 @@ binary-arch: checkroot built
 	@echo "== dpkg-buildpackage: binary-arch" 1>&2
 	$(checkdir)
 	-rm -rf $(dirme) $(dirdev) $(dirdi)
-	$(pkgme)  $(MAKE) -C . install
+	$(pkgme)  $(MAKE) -C . install-pkg
 	$(pkgdev) $(MAKE) -C . install-dev
 	$(pkgdi)  $(MAKE) -C debian install-d-i
 	$(pkgme)  $(MAKE) dist
