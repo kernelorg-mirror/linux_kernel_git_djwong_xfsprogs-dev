@@ -868,7 +868,8 @@ rtbitmap_create(
 	mp->m_sb.sb_rbmino = rbmip->i_ino;
 	rbmip->i_disk_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
 	rbmip->i_diflags |= XFS_DIFLAG_NEWRTBM;
-	inode_set_atime(VFS_I(rbmip), 0, 0);
+	if (!xfs_has_rtgroups(mp))
+		inode_set_atime(VFS_I(rbmip), 0, 0);
 	libxfs_trans_log_inode(tp, rbmip, XFS_ILOG_CORE);
 	libxfs_log_sb(tp);
 
