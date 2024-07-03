@@ -37,6 +37,10 @@ ifeq ($(HAVE_LIBATTR),yes)
 CFILES += properties.c
 endif
 
+ifeq ($(USE_RADIX_TREE_FOR_INUMS),yes)
+LCFLAGS += -DUSE_RADIX_TREE_FOR_INUMS
+endif
+
 default: depend $(LTCOMMAND)
 
 include $(BUILDRULES)
