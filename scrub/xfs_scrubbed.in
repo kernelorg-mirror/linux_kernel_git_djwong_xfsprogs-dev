@@ -1,0 +1,263 @@
+#!/usr/bin/python3
+
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Copyright (C) 2024 Oracle.  All rights reserved.
+#
+# Author: Darrick J. Wong <djwong@kernel.org>
+
+# Daemon to listen for and react to filesystem health events
+
+import sys
+import os
+import argparse
+import fcntl
+import json
+import datetime
+import errno
+import ctypes
+from concurrent.futures import ProcessPoolExecutor
+
+debug = False
+log = False
+everything = False
+printf_prefix = ''
+
+# ioctl encoding stuff
+_IOC_NRBITS   =  8
+_IOC_TYPEBITS =  8
+_IOC_SIZEBITS = 14
+_IOC_DIRBITS  =  2
+
+_IOC_NRMASK   = (1 << _IOC_NRBITS) - 1
+_IOC_TYPEMASK = (1 << _IOC_TYPEBITS) - 1
+_IOC_SIZEMASK = (1 << _IOC_SIZEBITS) - 1
+_IOC_DIRMASK  = (1 << _IOC_DIRBITS) - 1
+
+_IOC_NRSHIFT   = 0
+_IOC_TYPESHIFT = (_IOC_NRSHIFT   + _IOC_NRBITS)
+_IOC_SIZESHIFT = (_IOC_TYPESHIFT + _IOC_TYPEBITS)
+_IOC_DIRSHIFT  = (_IOC_SIZESHIFT + _IOC_SIZEBITS)
+
+_IOC_NONE  = 0
+_IOC_WRITE = 1
+_IOC_READ  = 2
+
+def _IOC(direction, type, nr, t):
+	assert direction <= _IOC_DIRMASK, direction
+	assert type <= _IOC_TYPEMASK, type
+	assert nr <= _IOC_NRMASK, nr
+
+	size = ctypes.sizeof(t)
+	assert size <= _IOC_SIZEMASK, size
+
+	return (((direction)  << _IOC_DIRSHIFT) |
+		((type) << _IOC_TYPESHIFT) |
+		((nr)   << _IOC_NRSHIFT) |
+		((size) << _IOC_SIZESHIFT))
+
+def _IOR(type, number, size):
+	return _IOC(_IOC_READ, type, number, size)
+
+def _IOW(type, number, size):
+	return _IOC(_IOC_WRITE, type, number, size)
+
+def _IOWR(type, number, size):
+	return _IOC(_IOC_READ | _IOC_WRITE, type, number, size)
+
+# xfs health monitoring ioctl stuff
+XFS_HEALTH_MONITOR_FMT_JSON = 1
+XFS_HEALTH_MONITOR_VERBOSE = 1 << 0
+
+class xfs_health_monitor(ctypes.Structure):
+	_fields_ = [
+		('flags',	ctypes.c_ulonglong),
+		('format',	ctypes.c_ubyte),
+		('_pad0',	ctypes.c_ubyte * 7),
+		('_pad1',	ctypes.c_ulonglong * 2)
+	]
+assert ctypes.sizeof(xfs_health_monitor) == 32
+
+XFS_IOC_HEALTH_MONITOR = _IOW(0x58, 68, xfs_health_monitor)
+
+def open_health_monitor(fd, verbose = False):
+	'''Return a health monitoring fd.'''
+
+	arg = xfs_health_monitor()
+	arg.format = XFS_HEALTH_MONITOR_FMT_JSON
+
+	if verbose:
+		arg.flags |= XFS_HEALTH_MONITOR_VERBOSE
+
+	ret = fcntl.ioctl(fd, XFS_IOC_HEALTH_MONITOR, arg)
+	return ret
+
+# main program
+
+def health_reports(mon_fp):
+	'''Generate python objects describing health events.'''
+	global debug
+	global printf_prefix
+
+	lines = []
+	buf = mon_fp.readline()
+	while buf != '':
+		for line in buf.split('\0'):
+			line = line.strip()
+			if debug:
+				print(f'new line: {line}')
+			if line == '':
+				continue
+
+			lines.append(line)
+			if not '}' in line:
+				continue
+
+			s = ''.join(lines)
+			if debug:
+				print(f'new event: {s}')
+			try:
+				yield json.loads(s)
+			except json.decoder.JSONDecodeError as e:
+				print(f"{printf_prefix}: {e} from {s}",
+						file = sys.stderr)
+				pass
+			lines = []
+		buf = mon_fp.readline()
+
+def log_event(event):
+	'''Log a monitoring event to stdout.'''
+	global printf_prefix
+
+	print(f"{printf_prefix}: {event}")
+	sys.stdout.flush()
+
+def report_lost(event):
+	'''Report that the kernel lost events.'''
+	global printf_prefix
+
+	print(f"{printf_prefix}: Events were lost.")
+	sys.stdout.flush()
+
+def report_shutdown(event):
+	'''Report an abortive shutdown of the filesystem.'''
+	global printf_prefix
+	REASONS = {
+		"meta_ioerr":		"metadata IO error",
+		"log_ioerr":		"log IO error",
+		"force_umount":		"forced unmount",
+		"corrupt_incore":	"in-memory state corruption",
+		"corrupt_ondisk":	"ondisk metadata corruption",
+		"device_removed":	"device removal",
+	}
+
+	reasons = []
+	for reason in event['reasons']:
+		if reason in REASONS:
+			reasons.append(REASONS[reason])
+		else:
+			reasons.append(reason)
+
+	print(f"{printf_prefix}: Filesystem shut down due to {', '.join(reasons)}.")
+	sys.stdout.flush()
+
+def handle_event(event):
+	'''Handle an event asynchronously.'''
+	def stringify_timestamp(event):
+		'''Try to convert a timestamp to something human readable.'''
+		try:
+			ts = datetime.datetime.fromtimestamp(event['time_ns'] / 1e9).astimezone()
+			event['time'] = str(ts)
+			del event['time_ns']
+		except Exception as e:
+			# Not a big deal if we can't format the timestamp, but
+			# let's yell about that loudly
+			print(e)
+
+	global log
+
+	stringify_timestamp(event)
+	if log:
+		log_event(event)
+	if event['type'] == 'lost':
+		report_lost(event)
+	elif event['type'] == 'shutdown':
+		report_shutdown(event)
+
+def monitor(mountpoint, event_queue, **kwargs):
+	'''Monitor the given mountpoint for health events.'''
+	global everything
+
+	fd = os.open(mountpoint, os.O_RDONLY)
+	try:
+		mon_fd = open_health_monitor(fd, verbose = everything)
+	except OSError as e:
+		if e.errno != errno.ENOTTY and e.errno != errno.EOPNOTSUPP:
+			raise e
+		print(f"{mountpoint}: XFS health monitoring not supported.",
+				file = sys.stderr)
+		return 1
+	finally:
+		# Close the mountpoint if opening the health monitor fails
+		os.close(fd)
+
+	# Ownership of mon_fd (and hence responsibility for closing it) is
+	# transferred to the mon_fp object.
+	with os.fdopen(mon_fd) as mon_fp:
+		event_queue.map(handle_event, health_reports(mon_fp))
+
+	return 0
+
+def main():
+	global debug
+	global log
+	global printf_prefix
+	global everything
+
+	parser = argparse.ArgumentParser( \
+			description = "XFS filesystem health monitoring demon.")
+	parser.add_argument("--debug", help = "Enabling debugging messages.", \
+			action = "store_true")
+	parser.add_argument("--log", help = "Log health events to stdout.", \
+			action = "store_true")
+	parser.add_argument("--everything", help = "Capture all events.", \
+			action = "store_true")
+	parser.add_argument("-V", help = "Report version and exit.", \
+			action = "store_true")
+	parser.add_argument('mountpoint', default = None, nargs = '?',
+			help = 'XFS filesystem mountpoint to target.')
+	args = parser.parse_args()
+
+	if args.V:
+		print("xfs_scrubbed version @pkg_version@")
+		return 0
+
+	if args.mountpoint is None:
+		parser.error("the following arguments are required: mountpoint")
+		return 1
+
+	if args.debug:
+		debug = True
+	if args.log:
+		log = True
+	if args.everything:
+		everything = True
+
+	# Use a separate subprocess to handle the events so that the main event
+	# reading process does not block on the GIL of the event handling
+	# subprocess.  The downside is that we cannot pass function pointers
+	# and all data must be pickleable; the upside is not losing events.
+	args.event_queue = ProcessPoolExecutor(max_workers = 1)
+
+	printf_prefix = args.mountpoint
+	ret = 0
+	try:
+		ret = monitor(**vars(args))
+	except KeyboardInterrupt:
+		# Consider SIGINT to be a clean exit.
+		pass
+
+	args.event_queue.shutdown()
+	return ret
+
+if __name__ == '__main__':
+	sys.exit(main())
