@@ -42,5 +42,6 @@ void		fsprops_init(void);
 void		move_inode_init(void);
 void		find_owner_init(void);
 void		resolve_owner_init(void);
+void		relocate_init(void);
 
 #endif /* XFS_SPACEMAN_SPACE_H_ */
