@@ -312,6 +312,39 @@ verify_sb_loginfo(
 	return true;
 }
 
+static int
+verify_sb_rtgroups(
+	struct xfs_sb		*sbp)
+{
+	xfs_rtblock_t		rgblocks;
+	uint64_t		groups;
+
+	if (!(sbp->sb_features_incompat & XFS_SB_FEAT_INCOMPAT_METADIR))
+		return XR_BAD_RT_GEO_DATA;
+
+	if (sbp->sb_rextsize == 0)
+		return XR_BAD_RT_GEO_DATA;
+
+	rgblocks = (xfs_rtxnum_t)sbp->sb_rgextents * sbp->sb_rextsize;
+	if (rgblocks > XFS_MAX_RGBLOCKS)
+		return XR_BAD_RT_GEO_DATA;
+
+	if (sbp->sb_rgextents < XFS_MIN_RGEXTENTS)
+		return XR_BAD_RT_GEO_DATA;
+
+	if (sbp->sb_rgcount > XFS_MAX_RGNUMBER)
+		return XR_BAD_RT_GEO_DATA;
+
+	groups = howmany(sbp->sb_rblocks, rgblocks);
+	if (groups != sbp->sb_rgcount)
+		return XR_BAD_RT_GEO_DATA;
+
+	if (!(sbp->sb_features_incompat & XFS_SB_FEAT_INCOMPAT_EXCHRANGE))
+		return XR_BAD_RT_GEO_DATA;
+
+	return 0;
+}
+
 /*
  * verify a superblock -- does not verify root inode #
  *	can only check that geometry info is internally
@@ -518,6 +551,12 @@ verify_sb(char *sb_buf, xfs_sb_t *sb, int is_primary_sb)
 	/* Directory block log */
 	if (sb->sb_blocklog + sb->sb_dirblklog > XFS_MAX_BLOCKSIZE_LOG)
 		return XR_BAD_DIR_SIZE_DATA;
+
+	if (sb->sb_features_incompat & XFS_SB_FEAT_INCOMPAT_RTGROUPS) {
+		int err = verify_sb_rtgroups(sb);
+		if (err)
+			return err;
+	}
 
 	return(XR_OK);
 }
