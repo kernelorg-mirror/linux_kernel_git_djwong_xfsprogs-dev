@@ -890,16 +890,16 @@ rtsummary_create(
 }
 
 /*
- * Free the whole realtime area using transactions.
- * Do one transaction per bitmap block.
+ * Free the whole realtime area using transactions.  Each transaction may clear
+ * up to 32 rtbitmap blocks.
  */
 static void
 rtfreesp_init(
 	struct xfs_mount	*mp)
 {
 	struct xfs_trans	*tp;
-	xfs_rtxnum_t		rtx;
-	xfs_rtxnum_t		ertx;
+	const xfs_rtxnum_t	max_rtx = mp->m_rtx_per_rbmblock * 32;
+	xfs_rtxnum_t		start_rtx = 0;
 	int			error;
 
 	/*
@@ -918,26 +918,44 @@ rtfreesp_init(
 	/*
 	 * Then free the blocks into the allocator, one bitmap block at a time.
 	 */
-	for (rtx = 0; rtx < mp->m_sb.sb_rextents; rtx = ertx) {
+	while (start_rtx < mp->m_sb.sb_rextents) {
+		xfs_rtxlen_t	nr = min(mp->m_sb.sb_rextents - start_rtx,
+					 max_rtx);
+
+		/*
+		 * The rt superblock, if present, must not be marked free.
+		 * This may be the only rtx in the entire volume.
+		 */
+		if (xfs_has_rtsb(mp) && start_rtx == 0) {
+			start_rtx++;
+			nr--;
+
+			if (start_rtx == mp->m_sb.sb_rextents)
+				break;
+		}
+
 		error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_itruncate,
 				0, 0, 0, &tp);
 		if (error)
 			res_failed(error);
 
 		libxfs_trans_ijoin(tp, mp->m_rbmip, 0);
-		ertx = min(mp->m_sb.sb_rextents,
-			   rtx + NBBY * mp->m_sb.sb_blocksize);
-
-		error = -libxfs_rtfree_extent(tp, rtx,
-				(xfs_rtxlen_t)(ertx - rtx));
+		error = -libxfs_rtfree_extent(tp, start_rtx, nr);
 		if (error) {
-			fail(_("Error initializing the realtime space"),
-				error);
+			fprintf(stderr,
+ _("Error initializing the realtime free space near rtx 0x%llx-0x%llx: %s"),
+					(unsigned long long)start_rtx,
+					(unsigned long long)start_rtx + nr - 1,
+					strerror(error));
+			exit(1);
 		}
+
 		error = -libxfs_trans_commit(tp);
 		if (error)
 			fail(_("Initialization of the realtime space failed"),
 					error);
+
+		start_rtx += nr;
 	}
 }
 

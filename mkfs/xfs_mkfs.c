@@ -133,6 +133,10 @@ enum {
 	R_FILE,
 	R_NAME,
 	R_NOALIGN,
+	R_RTGROUPS,
+	R_RGCOUNT,
+	R_RGSIZE,
+	R_RTSB,
 	R_MAX_OPTS,
 };
 
@@ -728,6 +732,10 @@ static struct opt_params ropts = {
 		[R_FILE] = "file",
 		[R_NAME] = "name",
 		[R_NOALIGN] = "noalign",
+		[R_RTGROUPS] = "rtgroups",
+		[R_RGCOUNT] = "rgcount",
+		[R_RGSIZE] = "rgsize",
+		[R_RTSB] = "rtsb",
 		[R_MAX_OPTS] = NULL,
 	},
 	.subopt_params = {
@@ -766,6 +774,33 @@ static struct opt_params ropts = {
 		  .maxval = 1,
 		  .defaultval = 1,
 		  .conflicts = { { NULL, LAST_CONFLICT } },
+		},
+		{ .index = R_RTGROUPS,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
+		{ .index = R_RGCOUNT,
+		  .conflicts = { { &dopts, R_RGSIZE },
+				 { NULL, LAST_CONFLICT } },
+		  .minval = 1,
+		  .maxval = XFS_MAX_RGNUMBER,
+		  .defaultval = SUBOPT_NEEDS_VAL,
+		},
+		{ .index = R_RGSIZE,
+		  .conflicts = { { &dopts, R_RGCOUNT },
+				 { NULL, LAST_CONFLICT } },
+		  .convert = true,
+		  .minval = 0,
+		  .maxval = (unsigned long long)XFS_MAX_RGBLOCKS << XFS_MAX_BLOCKSIZE_LOG,
+		  .defaultval = SUBOPT_NEEDS_VAL,
+		},
+		{ .index = R_RTSB,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
 		},
 	},
 };
@@ -928,6 +963,7 @@ struct sb_feat_args {
 	bool	nrext64;
 	bool	exchrange;		/* XFS_SB_FEAT_INCOMPAT_EXCHRANGE */
 	bool	rtgroups;		/* XFS_SB_FEAT_INCOMPAT_RTGROUPS */
+	bool	rtsb;			/* XFS_SB_FEAT_RO_COMPAT_RTSB */
 };
 
 struct cli_params {
@@ -942,6 +978,7 @@ struct cli_params {
 	/* parameters that depend on sector/block size being validated. */
 	char	*dsize;
 	char	*agsize;
+	char	*rgsize;
 	char	*dsu;
 	char	*dirblocksize;
 	char	*logsize;
@@ -963,6 +1000,7 @@ struct cli_params {
 
 	/* parameters where 0 is not a valid value */
 	int64_t	agcount;
+	int64_t	rgcount;
 	int	inodesize;
 	int	inopblock;
 	int	imaxpct;
@@ -1018,6 +1056,9 @@ struct mkfs_params {
 
 	uint64_t	agsize;
 	uint64_t	agcount;
+
+	uint64_t	rgsize;
+	uint64_t	rgcount;
 
 	int		imaxpct;
 
@@ -1077,7 +1118,8 @@ usage( void )
 /* no-op info only */	[-N]\n\
 /* prototype file */	[-p fname]\n\
 /* quiet */		[-q]\n\
-/* realtime subvol */	[-r extsize=num,size=num,rtdev=xxx]\n\
+/* realtime subvol */	[-r extsize=num,size=num,rtdev=xxx,rtgroups=0|1,\n\
+			    rgcount=n,rgsize=n,rtsb=0|1]\n\
 /* sectorsize */	[-s size=num]\n\
 /* version */		[-V]\n\
 			devicename\n\
@@ -1991,6 +2033,18 @@ rtdev_opts_parser(
 	case R_NOALIGN:
 		cli->sb_feat.nortalign = getnum(value, opts, subopt);
 		break;
+	case R_RTGROUPS:
+		cli->sb_feat.rtgroups = getnum(value, opts, subopt);
+		break;
+	case R_RGCOUNT:
+		cli->rgcount = getnum(value, opts, subopt);
+		break;
+	case R_RGSIZE:
+		cli->rgsize = getstr(value, opts, subopt);
+		break;
+	case R_RTSB:
+		cli->sb_feat.rtsb = getnum(value, opts, subopt);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2522,6 +2576,15 @@ _("cowextsize not supported without reflink support\n"));
 		usage();
 	}
 
+	if (cli->sb_feat.rtgroups && !cli->sb_feat.metadir) {
+		if (cli_opt_set(&mopts, M_METADIR)) {
+			fprintf(stderr,
+_("realtime groups not supported without metadata directory support\n"));
+			usage();
+		}
+		cli->sb_feat.metadir = true;
+	}
+
 	/*
 	 * Turn on exchange-range if parent pointers are enabled and the caller
 	 * did not provide an explicit exchange-range parameter so that users
@@ -2531,6 +2594,40 @@ _("cowextsize not supported without reflink support\n"));
 	if (cli->sb_feat.parent_pointers && !cli->sb_feat.exchrange &&
 	    !cli_opt_set(&iopts, I_EXCHANGE)) {
 		cli->sb_feat.exchrange = true;
+	}
+
+	/*
+	 * Exchange-range will be needed for space reorganization on
+	 * filesystems with realtime rmap or realtime reflink enabled.
+	 */
+	if (cli->sb_feat.rtgroups && !cli->sb_feat.exchrange) {
+		if (cli_opt_set(&iopts, I_EXCHANGE)) {
+			fprintf(stderr,
+_("realtime groups not supported without exchange-range support\n"));
+			usage();
+		}
+		cli->sb_feat.exchrange = true;
+	}
+
+	/*
+	 * Turn on realtime superblocks if realtime groups are enabled and the
+	 * caller did not provide an explicit rtsb parameter so that users
+	 * can take advantage of labelled rt volumes.  It's not required for
+	 * correct operation, but it costs us nothing to enable it.
+	 */
+	if (cli->sb_feat.rtgroups && !cli->sb_feat.rtsb &&
+	    !cli_opt_set(&ropts, R_RTSB)) {
+		cli->sb_feat.rtsb = true;
+	}
+
+	/* Realtime superblocks require realtime groups. */
+	if (cli->sb_feat.rtsb && !cli->sb_feat.rtgroups) {
+		if (cli_opt_set(&ropts, R_RTSB)) {
+			fprintf(stderr,
+_("realtime superblock not supported without realtime group support\n"));
+			usage();
+		}
+		cli->sb_feat.rtsb = true;
 	}
 
 	/*
@@ -3500,6 +3597,185 @@ validate:
 			     cfg->agsize, cfg->agcount);
 }
 
+static uint64_t
+calc_rgsize_extsize_nonpower(
+	struct mkfs_params	*cfg)
+{
+	uint64_t		try_rgsize, rgsize, rgcount;
+
+	/*
+	 * For non-power-of-two rt extent sizes, round the rtgroup size down to
+	 * the nearest extent.
+	 */
+	calc_default_rtgroup_geometry(cfg->blocklog, cfg->rtblocks, &rgsize,
+			&rgcount);
+	rgsize -= rgsize % cfg->rtextblocks;
+	rgsize = min(XFS_MAX_RGBLOCKS, rgsize);
+
+	/*
+	 * If we would be left with a too-small rtgroup, increase or decrease
+	 * the size of the group until we have a working geometry.
+	 */
+	for (try_rgsize = rgsize;
+	     try_rgsize <= XFS_MAX_RGBLOCKS - cfg->rtextblocks;
+	     try_rgsize += cfg->rtextblocks) {
+		if (cfg->rtblocks % try_rgsize >= (2 * cfg->rtextblocks))
+			return try_rgsize;
+	}
+	for (try_rgsize = rgsize;
+	     try_rgsize > (2 * cfg->rtextblocks);
+	     try_rgsize -= cfg->rtextblocks) {
+		if (cfg->rtblocks % try_rgsize >= (2 * cfg->rtextblocks))
+			return try_rgsize;
+	}
+
+	fprintf(stderr,
+_("realtime group size (%llu) not at all congruent with extent size (%llu)\n"),
+			(unsigned long long)rgsize,
+			(unsigned long long)cfg->rtextblocks);
+	usage();
+	return 0;
+}
+
+static uint64_t
+calc_rgsize_extsize_power(
+	struct mkfs_params	*cfg)
+{
+	uint64_t		try_rgsize, rgsize, rgcount;
+	unsigned int		rgsizelog;
+
+	/*
+	 * Find the rt group size that is both a power of two and yields at
+	 * least as many rt groups as the default geometry specified.
+	 */
+	calc_default_rtgroup_geometry(cfg->blocklog, cfg->rtblocks, &rgsize,
+			&rgcount);
+	rgsizelog = log2_rounddown(rgsize);
+	rgsize = min(XFS_MAX_RGBLOCKS, 1U << rgsizelog);
+
+	/*
+	 * If we would be left with a too-small rtgroup, increase or decrease
+	 * the size of the group by powers of 2 until we have a working
+	 * geometry.  If that doesn't work, try bumping by the extent size.
+	 */
+	for (try_rgsize = rgsize;
+	     try_rgsize <= XFS_MAX_RGBLOCKS - cfg->rtextblocks;
+	     try_rgsize <<= 2) {
+		if (cfg->rtblocks % try_rgsize >= (2 * cfg->rtextblocks))
+			return try_rgsize;
+	}
+	for (try_rgsize = rgsize;
+	     try_rgsize > (2 * cfg->rtextblocks);
+	     try_rgsize >>= 2) {
+		if (cfg->rtblocks % try_rgsize >= (2 * cfg->rtextblocks))
+			return try_rgsize;
+	}
+	for (try_rgsize = rgsize;
+	     try_rgsize <= XFS_MAX_RGBLOCKS - cfg->rtextblocks;
+	     try_rgsize += cfg->rtextblocks) {
+		if (cfg->rtblocks % try_rgsize >= (2 * cfg->rtextblocks))
+			return try_rgsize;
+	}
+	for (try_rgsize = rgsize;
+	     try_rgsize > (2 * cfg->rtextblocks);
+	     try_rgsize -= cfg->rtextblocks) {
+		if (cfg->rtblocks % try_rgsize >= (2 * cfg->rtextblocks))
+			return try_rgsize;
+	}
+
+	fprintf(stderr,
+_("realtime group size (%llu) not at all congruent with extent size (%llu)\n"),
+			(unsigned long long)rgsize,
+			(unsigned long long)cfg->rtextblocks);
+	usage();
+	return 0;
+}
+
+static void
+calculate_rtgroup_geometry(
+	struct mkfs_params	*cfg,
+	struct cli_params	*cli)
+{
+	if (!cli->sb_feat.rtgroups) {
+		cfg->rgcount = 0;
+		cfg->rgsize = 0;
+		return;
+	}
+
+	if (cli->rgsize) {	/* User-specified rtgroup size */
+		cfg->rgsize = getnum(cli->rgsize, &ropts, R_RGSIZE);
+
+		/*
+		 * Check specified agsize is a multiple of blocksize.
+		 */
+		if (cfg->rgsize % cfg->blocksize) {
+			fprintf(stderr,
+_("rgsize (%s) not a multiple of fs blk size (%d)\n"),
+				cli->rgsize, cfg->blocksize);
+			usage();
+		}
+		cfg->rgsize /= cfg->blocksize;
+		cfg->rgcount = cfg->rtblocks / cfg->rgsize +
+				(cfg->rtblocks % cfg->rgsize != 0);
+
+	} else if (cli->rgcount) {	/* User-specified rtgroup count */
+		cfg->rgcount = cli->rgcount;
+		cfg->rgsize = cfg->rtblocks / cfg->rgcount +
+				(cfg->rtblocks % cfg->rgcount != 0);
+	} else if (cfg->rtblocks == 0) {
+		/*
+		 * If nobody specified a realtime device or the rtgroup size,
+		 * try 1TB, rounded down to the nearest rt extent.
+		 */
+		cfg->rgsize = TERABYTES(1, cfg->blocklog);
+		cfg->rgsize -= cfg->rgsize % cfg->rtextblocks;
+		cfg->rgcount = 0;
+	} else if (cfg->rtblocks < cfg->rtextblocks * 2) {
+		/* too small even for a single group */
+		cfg->rgsize = cfg->rtblocks;
+		cfg->rgcount = 0;
+	} else if (!is_power_of_2(cfg->rtextblocks)) {
+		cfg->rgsize = calc_rgsize_extsize_nonpower(cfg);
+		cfg->rgcount = cfg->rtblocks / cfg->rgsize +
+				(cfg->rtblocks % cfg->rgsize != 0);
+	} else {
+		cfg->rgsize = calc_rgsize_extsize_power(cfg);
+		cfg->rgcount = cfg->rtblocks / cfg->rgsize +
+				(cfg->rtblocks % cfg->rgsize != 0);
+	}
+
+	if (cfg->rgsize > XFS_MAX_RGBLOCKS) {
+		fprintf(stderr,
+_("realtime group size (%llu) must be less than the maximum (%u)\n"),
+				(unsigned long long)cfg->rgsize,
+				XFS_MAX_RGBLOCKS);
+		usage();
+	}
+
+	if (cfg->rgsize % cfg->rtextblocks != 0) {
+		fprintf(stderr,
+_("realtime group size (%llu) not a multiple of rt extent size (%llu)\n"),
+				(unsigned long long)cfg->rgsize,
+				(unsigned long long)cfg->rtextblocks);
+		usage();
+	}
+
+	if (cfg->rgsize <= cfg->rtextblocks) {
+		fprintf(stderr,
+_("realtime group size (%llu) must be at least two realtime extents\n"),
+				(unsigned long long)cfg->rgsize);
+		usage();
+	}
+
+	if (cfg->rgcount > XFS_MAX_RGNUMBER) {
+		fprintf(stderr,
+_("realtime group count (%llu) must be less than the maximum (%u)\n"),
+				(unsigned long long)cfg->rgcount,
+				XFS_MAX_RGNUMBER);
+		usage();
+	}
+}
+
 static void
 calculate_imaxpct(
 	struct mkfs_params	*cfg,
@@ -3646,6 +3922,13 @@ sb_set_features(
 	}
 	if (fp->metadir)
 		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_METADIR;
+	if (fp->rtsb)
+		sbp->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_RTSB;
+	if (fp->rtgroups) {
+		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_RTGROUPS;
+		sbp->sb_rgcount = cfg->rgcount;
+		sbp->sb_rgextents = cfg->rgsize / cfg->rtextblocks;
+	}
 }
 
 /*
@@ -4039,6 +4322,7 @@ start_superblock_setup(
 	sbp->sb_rblocks = cfg->rtblocks;
 	sbp->sb_rextsize = cfg->rtextblocks;
 	mp->m_features |= libxfs_sb_version_to_features(sbp);
+	mp->m_rgblocks = cfg->rgsize;
 }
 
 static void
@@ -4099,7 +4383,7 @@ finish_superblock_setup(
 	sbp->sb_unit = cfg->dsunit;
 	sbp->sb_width = cfg->dswidth;
 	mp->m_features |= libxfs_sb_version_to_features(sbp);
-
+	mp->m_rgblocks = cfg->rgsize;
 }
 
 /* Prepare an uncached buffer, ready to write something out. */
@@ -4477,6 +4761,39 @@ set_autofsck(
 	libxfs_irele(args.dp);
 }
 
+/* Write the realtime superblock */
+static void
+write_rtsb(
+	struct xfs_mount	*mp)
+{
+	struct xfs_buf		*rtsb_bp;
+	struct xfs_buf		*sb_bp = libxfs_getsb(mp);
+	int			error;
+
+	if (!sb_bp) {
+		fprintf(stderr,
+  _("%s: couldn't grab primary superblock buffer\n"), progname);
+		exit(1);
+	}
+
+	error = -libxfs_buf_get_uncached(mp->m_rtdev_targp,
+				XFS_FSB_TO_BB(mp, 1), XFS_RTSB_DADDR,
+				&rtsb_bp);
+	if (error) {
+		fprintf(stderr,
+ _("%s: couldn't grab realtime superblock buffer\n"), progname);
+			exit(1);
+	}
+
+	rtsb_bp->b_maps[0].bm_bn = XFS_RTSB_DADDR;
+	rtsb_bp->b_ops = &xfs_rtsb_buf_ops;
+
+	libxfs_rtgroup_update_super(rtsb_bp, sb_bp);
+	libxfs_buf_mark_dirty(rtsb_bp);
+	libxfs_buf_relse(rtsb_bp);
+	libxfs_buf_relse(sb_bp);
+}
+
 int
 main(
 	int			argc,
@@ -4693,6 +5010,7 @@ main(
 	 */
 	calculate_initial_ag_geometry(&cfg, &cli, &xi);
 	align_ag_geometry(&cfg);
+	calculate_rtgroup_geometry(&cfg, &cli);
 
 	calculate_imaxpct(&cfg, &cli);
 
@@ -4792,6 +5110,9 @@ main(
 				progname, error);
 		exit(1);
 	}
+
+	if (xfs_has_rtsb(mp) && cfg.rtblocks > 0)
+		write_rtsb(mp);
 
 	/*
 	 * Initialise the freespace freelists (i.e. AGFLs) in each AG.
