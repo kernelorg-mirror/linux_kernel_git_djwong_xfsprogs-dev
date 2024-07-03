@@ -37,6 +37,7 @@ init_commands(void)
 	health_init();
 	fsprops_init();
 	clearfree_init();
+	move_inode_init();
 }
 
 static int
