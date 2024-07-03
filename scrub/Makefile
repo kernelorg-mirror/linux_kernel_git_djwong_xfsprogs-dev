@@ -19,6 +19,7 @@ XFS_SCRUB_FAIL_PROG = xfs_scrub_fail
 XFS_SCRUB_ARGS = -p
 XFS_SCRUB_SERVICE_ARGS = -b -o fsprops_advise
 XFS_SCRUBBED_PROG = xfs_scrubbed
+XFS_SCRUBBED_HELPER = xfs_scrubbed_start
 ifeq ($(HAVE_SYSTEMD),yes)
 INSTALL_SCRUB += install-systemd
 INSTALL_SELFHEAL += install-systemd-selfheal
@@ -29,10 +30,11 @@ SYSTEMD_SERVICES=\
 	xfs_scrub_media_fail@.service \
 	xfs_scrub_all.service \
 	xfs_scrub_all_fail.service \
-	system-xfs_scrub.slice
+	system-xfs_scrub.slice \
+	xfs_scrubbed@.service
 SYSTEMD_SERVICES_SELFHEAL=\
 	xfs_scrub_all.timer
-OPTIONAL_TARGETS += $(SYSTEMD_SERVICES) $(SYSTEMD_SERVICES_SELFHEAL)
+OPTIONAL_TARGETS += $(SYSTEMD_SERVICES) $(SYSTEMD_SERVICES_SELFHEAL) $(XFS_SCRUBBED_HELPER)
 endif
 ifeq ($(HAVE_CROND),yes)
 INSTALL_SCRUB += install-crond
@@ -45,8 +47,10 @@ endif
 endif	# scrub_prereqs
 
 UDEV_RULES = xfs.rules
+UDEV_RULES_SELFHEAL = xfs_scrubbed.rules
 ifeq ($(HAVE_UDEV),yes)
 	INSTALL_SCRUB += install-udev
+	INSTALL_SELFHEAL += install-udev-selfheal
 endif
 
 HFILES = \
@@ -193,8 +197,16 @@ install-scrub: default
 	$(INSTALL) -m 755 -d $(PKG_STATE_DIR)
 
 install-udev: $(UDEV_RULES)
+	$(INSTALL) -m 755 -d $(UDEV_DIR)
+	$(INSTALL) -m 755 $(XFS_SCRUBBED_HELPER) $(UDEV_DIR)
 	$(INSTALL) -m 755 -d $(UDEV_RULE_DIR)
 	for i in $(UDEV_RULES); do \
+		$(INSTALL) -m 644 $$i $(UDEV_RULE_DIR)/64-$$i; \
+	done
+
+install-udev-selfheal: $(UDEV_RULES_SELFHEAL)
+	$(INSTALL) -m 755 -d $(UDEV_RULE_DIR)
+	for i in $(UDEV_RULES_SELFHEAL); do \
 		$(INSTALL) -m 644 $$i $(UDEV_RULE_DIR)/64-$$i; \
 	done
 
