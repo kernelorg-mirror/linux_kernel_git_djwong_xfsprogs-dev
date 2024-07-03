@@ -926,6 +926,41 @@ rtrmapbt_create(
 	rtg->rtg_rmapip = upd.ip;
 }
 
+/* Create the realtime refcount btree inode. */
+static void
+rtrefcountbt_create(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_imeta_update	upd = { };
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	struct xfs_imeta_path	*path;
+	int			error;
+
+	path = xfs_rtrefcountbt_create_path(mp, rtg->rtg_rgno);
+	if (!path)
+		fail( _("rtrefcount inode path creation failed"), ENOMEM);
+
+	error = -libxfs_imeta_ensure_dirpath(mp, path);
+	if (error)
+		fail(_("rtgroup allocation failed"),
+				error);
+
+	error = -libxfs_imeta_start_create(mp, path, &upd);
+	if (error)
+		res_failed(error);
+
+	error = -libxfs_rtrefcountbt_create(&upd);
+	if (error)
+		fail(_("rtrefcount inode creation failed"), error);
+
+	error = -libxfs_imeta_commit(&upd);
+	if (error)
+		fail(_("rtrefcountbt commit failed"), error);
+
+	libxfs_imeta_free_path(path);
+	rtg->rtg_refcountip = upd.ip;
+}
+
 /* Initialize block headers of rt free space files. */
 static int
 init_rtblock_headers(
@@ -1099,6 +1134,8 @@ rtinit(
 	for_each_rtgroup(mp, rgno, rtg) {
 		if (xfs_has_rtrmapbt(mp))
 			rtrmapbt_create(rtg);
+		if (xfs_has_rtreflink(mp))
+			rtrefcountbt_create(rtg);
 	}
 
 	if (mp->m_sb.sb_rbmblocks == 0)
