@@ -17,6 +17,7 @@ static void fail(char *msg, int i);
 static struct xfs_trans * getres(struct xfs_mount *mp, uint blocks);
 static void rsvfile(xfs_mount_t *mp, xfs_inode_t *ip, long long len);
 static char *newregfile(char **pp, int *len);
+static int metadir_create(struct xfs_mount *mp);
 static void rtinit(xfs_mount_t *mp);
 static void rtfreesp_init(struct xfs_mount *mp);
 static long filesize(int fd);
@@ -710,8 +711,15 @@ parseproto(
 		 * RT initialization.  Do this here to ensure that
 		 * the RT inodes get placed after the root inode.
 		 */
-		if (isroot)
+		if (isroot) {
+			error = metadir_create(mp);
+			if (error)
+				fail(
+	_("Creation of the metadata directory inode failed"),
+					error);
+
 			rtinit(mp);
+		}
 		tp = NULL;
 		for (;;) {
 			name = getdirentname(pp);
@@ -749,6 +757,65 @@ parse_proto(
 	parseproto(mp, NULL, fsx, pp, NULL);
 }
 
+/* Create a new metadata root directory. */
+static int
+metadir_create(
+	struct xfs_mount	*mp)
+{
+	struct xfs_inode	*ip = NULL;
+	struct xfs_trans	*tp;
+	int			error;
+	struct xfs_icreate_args	args = {
+		.mode		= S_IFDIR,
+		.flags		= XFS_ICREATE_UNLINKABLE,
+	};
+	xfs_ino_t		ino;
+
+	if (!xfs_has_metadir(mp))
+		return 0;
+
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_create,
+			libxfs_create_space_res(mp, MAXNAMELEN), 0, 0, &tp);
+	if (error)
+		return error;
+
+	/*
+	 * Create a new inode and set the sb pointer.  The primary super is
+	 * still marked inprogress, so we do not need to log the metadirino
+	 * change ourselves.
+	 */
+	error = -libxfs_dialloc(&tp, &args, &ino);
+	if (error)
+		goto out_cancel;
+	error = -libxfs_icreate(tp, ino, &args, &ip);
+	if (error)
+		goto out_cancel;
+	mp->m_sb.sb_metadirino = ino;
+
+	/*
+	 * Initialize the root directory.  There are no ILOCKs in userspace
+	 * so we do not need to drop it here.
+	 */
+	libxfs_metafile_set_iflag(tp, ip);
+	error = -libxfs_dir_init(tp, ip, ip);
+	if (error)
+		goto out_cancel;
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		goto out_rele;
+
+	mp->m_metadirip = ip;
+	return 0;
+
+out_cancel:
+	libxfs_trans_cancel(tp);
+out_rele:
+	if (ip)
+		libxfs_irele(ip);
+	return error;
+}
+
 static int
 create_sb_metadata_file(
 	struct xfs_trans	**tpp,
@@ -759,6 +826,7 @@ create_sb_metadata_file(
 		.mode		= mode,
 		.flags		= XFS_ICREATE_UNLINKABLE,
 	};
+	struct xfs_mount	*mp = (*tpp)->t_mountp;
 	xfs_ino_t		ino;
 	int			error;
 
@@ -770,7 +838,14 @@ create_sb_metadata_file(
 	if (error)
 		return error;
 
-	return -libxfs_icreate(*tpp, ino, &args, ipp);
+	error = -libxfs_icreate(*tpp, ino, &args, ipp);
+	if (error)
+		return error;
+
+	if (xfs_has_metadir(mp))
+		libxfs_metafile_set_iflag(*tpp, *ipp);
+
+	return 0;
 }
 
 /* Create the realtime bitmap inode. */
