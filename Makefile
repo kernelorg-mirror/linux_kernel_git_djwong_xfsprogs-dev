@@ -116,15 +116,17 @@ configure: configure.ac
 include/builddefs: configure
 	./configure $$LOCAL_CONFIGURE_OPTIONS
 
-install: $(addsuffix -install,$(SUBDIRS))
+install: install-pkg
+
+install-pkg: $(addsuffix -install-pkg,$(SUBDIRS))
 	$(INSTALL) -m 755 -d $(PKG_DOC_DIR)
 	$(INSTALL) -m 644 README $(PKG_DOC_DIR)
 
 install-dev: $(addsuffix -install-dev,$(SUBDIRS))
 
-%-install:
+%-install-pkg:
 	@echo "Installing $@"
-	$(Q)$(MAKE) $(MAKEOPTS) -C $* install
+	$(Q)$(MAKE) $(MAKEOPTS) -C $* install-pkg
 
 %-install-dev:
 	@echo "Installing $@"

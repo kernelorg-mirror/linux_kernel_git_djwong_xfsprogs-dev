@@ -9,12 +9,14 @@ SUBDIRS = man2 man3 man5 man8
 
 default : $(SUBDIRS)
 
-install : $(addsuffix -install,$(SUBDIRS))
+install : install-pkg
+
+install-pkg : $(addsuffix -install-pkg,$(SUBDIRS))
 
 install-dev : $(addsuffix -install-dev,$(SUBDIRS))
 
-%-install:
-	$(Q)$(MAKE) $(MAKEOPTS) -C $* install
+%-install-pkg:
+	$(Q)$(MAKE) $(MAKEOPTS) -C $* install-pkg
 
 %-install-dev:
 	$(Q)$(MAKE) $(MAKEOPTS) -C $* install-dev
