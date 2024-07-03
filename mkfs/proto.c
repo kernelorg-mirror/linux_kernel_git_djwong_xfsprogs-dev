@@ -428,7 +428,6 @@ creatproto(
 	};
 	struct xfs_inode	*ip;
 	struct inode		*inode;
-	xfs_ino_t		parent_ino = dp ? dp->i_ino : 0;
 	xfs_ino_t		ino;
 	int			error;
 
@@ -440,7 +439,7 @@ creatproto(
 	 * Call the space management code to pick the on-disk inode to be
 	 * allocated.
 	 */
-	error = -libxfs_dialloc(tpp, parent_ino, mode, &ino);
+	error = -libxfs_dialloc(tpp, &args, &ino);
 	if (error)
 		return error;
 
@@ -767,7 +766,7 @@ create_sb_metadata_file(
 	 * Call the space management code to pick the on-disk inode to be
 	 * allocated.
 	 */
-	error = -libxfs_dialloc(tpp, 0, mode, &ino);
+	error = -libxfs_dialloc(tpp, &args, &ino);
 	if (error)
 		return error;
 
