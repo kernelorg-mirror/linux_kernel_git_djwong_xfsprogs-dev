@@ -688,6 +688,12 @@ Online repair uses this functionality to rebuild extended attributes,
 directories, symbolic links, and realtime metadata files.
 This feature is disabled by default.
 This feature is only available for filesystems formatted with -m crc=1.
+.TP
+.BI verity[= value]
+This flag activates verity support, which enables sealing of regular file data
+with hashes and cryptographic signatures.
+This feature is disabled by default.
+This feature is only available for filesystems formatted with -m crc=1.
 .RE
 .PP
 .PD 0
