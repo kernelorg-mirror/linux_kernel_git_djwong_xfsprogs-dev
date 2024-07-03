@@ -754,6 +754,38 @@ def monitor(mountpoint, event_queue, **kwargs):
 
 	return 0
 
+def check_monitor(mountpoint):
+	'''Check if the kernel can send us health events for the given mountpoint.'''
+	global log
+	global printf_prefix
+	global everything
+	global want_repair
+	global has_parent
+
+	try:
+		fd = os.open(mountpoint, os.O_RDONLY)
+	except OSError as e:
+		# Can't open mountpoint; monitor not available.
+		print(f"{mountpoint}: {e}")
+		return 1
+
+	try:
+		mon_fd = open_health_monitor(fd, verbose = everything)
+	except OSError as e:
+		# Error opening monitor (or it's simply not there); monitor
+		# not available.
+		if e.errno == errno.ENOTTY or e.errno == errno.EOPNOTSUPP:
+			print(f"{mountpoint}: XFS health monitoring not supported.",
+					file = sys.stderr)
+		return 1
+	finally:
+		# Close the mountpoint if opening the health monitor fails;
+		# the handle object will free its own memory.
+		os.close(fd)
+
+	# Monitor available; success!
+	return 0
+
 def __scrub_type(code):
 	'''Convert a "structures" json list to a scrub type code.'''
 	SCRUB_TYPES = {
@@ -885,6 +917,8 @@ def main():
 
 	parser = argparse.ArgumentParser( \
 			description = "XFS filesystem health monitoring demon.")
+	parser.add_argument("--check", help = "Check presense of health monitor.", \
+			action = "store_true")
 	parser.add_argument("--debug", help = "Enabling debugging messages.", \
 			action = "store_true")
 	parser.add_argument("--log", help = "Log health events to stdout.", \
@@ -940,7 +974,10 @@ def main():
 	printf_prefix = args.mountpoint
 	ret = 0
 	try:
-		ret = monitor(**vars(args))
+		if args.check:
+			ret = check_monitor(args.mountpoint)
+		else:
+			ret = monitor(**vars(args))
 	except KeyboardInterrupt:
 		# Consider SIGINT to be a clean exit.
 		pass
