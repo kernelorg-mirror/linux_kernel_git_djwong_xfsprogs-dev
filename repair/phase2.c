@@ -249,14 +249,19 @@ set_reflink(
 		exit(0);
 	}
 
-	if (xfs_has_realtime(mp)) {
-		printf(_("Reflink feature not supported with realtime.\n"));
+	if (xfs_has_realtime(mp) && !xfs_has_rtgroups(mp)) {
+		printf(_("Reference count btree requires realtime groups.\n"));
 		exit(0);
 	}
 
 	printf(_("Adding reflink support to filesystem.\n"));
 	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_REFLINK;
 	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+
+	/* Quota counts will be wrong once we add the refcount inodes. */
+	if (xfs_has_realtime(mp))
+		quotacheck_skip();
+
 	return true;
 }
 
@@ -548,6 +553,38 @@ reserve_rtrmap_inode(
 	return -libxfs_metafile_resv_init(ip, ask);
 }
 
+/*
+ * Reserve space to handle rt refcount btree expansion.
+ *
+ * If the refcount inode for this group already exists, we assume that we're
+ * adding some other feature.  Note that we have not validated the metadata
+ * directory tree, so we must perform the lookup by hand and abort the upgrade
+ * if there are errors.  If the inode does not exist, the amount of space
+ * needed to handle a new maximally sized refcount btree is added to @new_resv.
+ */
+static int
+reserve_rtrefcount_inode(
+	struct xfs_rtgroup	*rtg,
+	xfs_rfsblock_t		*new_resv)
+{
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	struct xfs_inode	*ip = rtg->rtg_inodes[XFS_RTG_REFCOUNT];
+	xfs_filblks_t		ask;
+
+	if (!xfs_has_rtreflink(mp))
+		return 0;
+
+	ask = libxfs_rtrefcountbt_calc_reserves(mp);
+
+	/* failed to load the rtdir inode? */
+	if (!ip) {
+		*new_resv += ask;
+		return 0;
+	}
+
+	return -libxfs_metafile_resv_init(ip, ask);
+}
+
 static void
 check_fs_free_space(
 	struct xfs_mount		*mp,
@@ -647,6 +684,18 @@ _("Not enough free space would remain for rtgroup %u rmap inode.\n"),
 			do_error(
 _("Error %d while checking rtgroup %u rmap inode space reservation.\n"),
 					error, rtg->rtg_rgno);
+
+		error = reserve_rtrefcount_inode(rtg, &new_resv);
+		if (error == ENOSPC) {
+			printf(
+_("Not enough free space would remain for rtgroup %u refcount inode.\n"),
+					rtg->rtg_rgno);
+			exit(0);
+		}
+		if (error)
+			do_error(
+_("Error %d while checking rtgroup %u refcount inode space reservation.\n"),
+					error, rtg->rtg_rgno);
 	}
 
 	/*
@@ -676,6 +725,7 @@ _("Error %d while checking rtgroup %u rmap inode space reservation.\n"),
 	/* Unreserve the realtime metadata reservations. */
 	for_each_rtgroup(mp, rgno, rtg) {
 		libxfs_metafile_resv_free(rtg->rtg_inodes[XFS_RTG_RMAP]);
+		libxfs_metafile_resv_free(rtg->rtg_inodes[XFS_RTG_REFCOUNT]);
 	}
 
 	/*
