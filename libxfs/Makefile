@@ -50,6 +50,7 @@ HFILES = \
 	xfs_exchmaps.h \
 	xfs_ialloc.h \
 	xfs_ialloc_btree.h \
+	xfs_imeta.h \
 	xfs_inode_buf.h \
 	xfs_inode_fork.h \
 	xfs_inode_util.h \
