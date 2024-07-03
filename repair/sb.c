@@ -504,6 +504,8 @@ verify_sb(char *sb_buf, xfs_sb_t *sb, int is_primary_sb)
 		if (sb->sb_frextents != 0)
 			return(XR_BAD_RT_GEO_DATA);
 	} else  {
+		unsigned int	rbmblock_bytes = sb->sb_blocksize;
+
 		/*
 		 * if we have a real-time partition, sanity-check geometry
 		 */
@@ -516,8 +518,11 @@ verify_sb(char *sb_buf, xfs_sb_t *sb, int is_primary_sb)
 		if (sb->sb_rextslog != libxfs_compute_rextslog(sb->sb_rextents))
 			return(XR_BAD_RT_GEO_DATA);
 
+		if (xfs_sb_version_hasrtgroups(sb))
+			rbmblock_bytes -= sizeof(struct xfs_rtbuf_blkinfo);
+
 		if (sb->sb_rbmblocks != (xfs_extlen_t) howmany(sb->sb_rextents,
-						NBBY * sb->sb_blocksize))
+						NBBY * rbmblock_bytes))
 			return(XR_BAD_RT_GEO_DATA);
 	}
 
