@@ -27,7 +27,7 @@ LLDLIBS += $(LIBEDITLINE) $(LIBTERMCAP)
 endif
 
 ifeq ($(HAVE_GETFSMAP),yes)
-CFILES += freesp.c
+CFILES += freesp.c clearfree.c
 endif
 
 ifeq ($(HAVE_LIBATTR),yes)
