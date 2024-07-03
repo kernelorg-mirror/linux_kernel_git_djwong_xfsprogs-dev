@@ -13,4 +13,7 @@ void check_rtsummary(struct xfs_mount *mp);
 void fill_rtbitmap(struct xfs_mount *mp);
 void fill_rtsummary(struct xfs_mount *mp);
 
+void check_rtsb(struct xfs_mount *mp);
+void rewrite_rtsb(struct xfs_mount *mp);
+
 #endif /* _XFS_REPAIR_RT_H_ */
