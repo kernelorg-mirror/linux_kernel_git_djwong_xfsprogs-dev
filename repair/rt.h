@@ -41,6 +41,11 @@ static inline bool is_rtrmap_inode(xfs_ino_t ino)
 	return is_rtgroup_inode(ino, XFS_RTG_RMAP);
 }
 
+static inline bool is_rtrefcount_inode(xfs_ino_t ino)
+{
+	return is_rtgroup_inode(ino, XFS_RTG_REFCOUNT);
+}
+
 void rtginode_avoid_check(struct xfs_mount *mp, enum xfs_rtg_inodes type);
 
 #endif /* _XFS_REPAIR_RT_H_ */
