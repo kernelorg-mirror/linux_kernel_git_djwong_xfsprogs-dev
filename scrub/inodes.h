@@ -25,4 +25,26 @@ int scrub_scan_all_inodes(struct scrub_ctx *ctx, scrub_inode_iter_fn fn,
 
 int scrub_open_handle(struct xfs_handle *handle);
 
+/*
+ * Might this be a file that's missing its fsverity metadata?  When this is the
+ * case, an open() call will return ENODATA.
+ */
+static inline bool fsverity_meta_is_missing(int error)
+{
+	switch (error) {
+	case ENODATA:
+	case EMSGSIZE:
+	case EINVAL:
+	case EFSCORRUPTED:
+	case EFBIG:
+		/*
+		 * The nonzero errno codes above are the error codes that can
+		 * be returned from fsverity on metadata validation errors.
+		 */
+		return true;
+	}
+
+	return false;
+}
+
 #endif /* XFS_SCRUB_INODES_H_ */
