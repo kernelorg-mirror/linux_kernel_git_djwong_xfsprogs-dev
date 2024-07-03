@@ -40,3 +40,8 @@ static inline bool is_rtrmap_inode(xfs_ino_t ino)
 {
 	return is_rtgroup_inode(ino, XFS_RTG_RMAP);
 }
+
+static inline bool is_rtrefcount_inode(xfs_ino_t ino)
+{
+	return is_rtgroup_inode(ino, XFS_RTG_REFCOUNT);
+}
