@@ -177,6 +177,7 @@
 #define xfs_iallocbt_calc_size		libxfs_iallocbt_calc_size
 #define xfs_iallocbt_maxlevels_ondisk	libxfs_iallocbt_maxlevels_ondisk
 #define xfs_ialloc_read_agi		libxfs_ialloc_read_agi
+#define xfs_icreate			libxfs_icreate
 #define xfs_idata_realloc		libxfs_idata_realloc
 #define xfs_idestroy_fork		libxfs_idestroy_fork
 #define xfs_iext_first			libxfs_iext_first
@@ -187,6 +188,10 @@
 #define xfs_imap_to_bp			libxfs_imap_to_bp
 
 #define xfs_imeta_iget			libxfs_imeta_iget
+#define xfs_imeta_link			libxfs_imeta_link
+#define xfs_imeta_lookup		libxfs_imeta_lookup
+#define xfs_imeta_start_create		libxfs_imeta_start_create
+#define xfs_imeta_start_link		libxfs_imeta_start_link
 
 #define xfs_initialize_perag		libxfs_initialize_perag
 #define xfs_initialize_perag_data	libxfs_initialize_perag_data
@@ -284,6 +289,7 @@
 #define xfs_trans_add_item		libxfs_trans_add_item
 #define xfs_trans_alloc_empty		libxfs_trans_alloc_empty
 #define xfs_trans_alloc			libxfs_trans_alloc
+#define xfs_trans_alloc_dir		libxfs_trans_alloc_dir
 #define xfs_trans_alloc_inode		libxfs_trans_alloc_inode
 #define xfs_trans_bdetach		libxfs_trans_bdetach
 #define xfs_trans_bhold			libxfs_trans_bhold
