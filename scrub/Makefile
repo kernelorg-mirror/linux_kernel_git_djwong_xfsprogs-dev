@@ -138,7 +138,9 @@ phase5.o unicrash.o xfs.o: $(builddefs)
 
 include $(BUILDRULES)
 
-install: $(INSTALL_SCRUB)
+install: install-pkg
+
+install-pkg: $(INSTALL_SCRUB)
 
 %.service: %.service.in $(builddefs)
 	@echo "    [SED]    $@"

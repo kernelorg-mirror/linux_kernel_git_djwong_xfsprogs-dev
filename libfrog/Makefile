@@ -70,6 +70,6 @@ crc32table.h: gen_crc32table.c crc32defs.h
 
 include $(BUILDRULES)
 
-install install-dev: default
+install install-pkg install-dev: default
 
 -include .ltdep
