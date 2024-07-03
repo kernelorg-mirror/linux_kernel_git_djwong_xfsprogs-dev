@@ -959,6 +959,30 @@ rtfreesp_init(
 	}
 }
 
+/* Allocate rtgroup inodes and directory tree. */
+static void
+rtgroups_create(
+	struct xfs_mount	*mp)
+{
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+	unsigned int		i;
+	int			error;
+
+	error = -libxfs_rtginode_mkdir_parent(mp);
+	if (error)
+		fail(_("rtgroup directory allocation failed"), error);
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		for (i = 0; i < XFS_RTG_MAX; i++) {
+			error = -libxfs_rtginode_create(rtg, i, true);
+			if (error)
+				fail(_("rt group inode creation failed"),
+						error);
+		}
+	}
+}
+
 /*
  * Allocate the realtime bitmap and summary inodes, and fill in data if any.
  */
@@ -968,6 +992,9 @@ rtinit(
 {
 	create_sb_metadata_file(mp, rtbitmap_create);
 	create_sb_metadata_file(mp, rtsummary_create);
+
+	if (xfs_has_rtgroups(mp))
+		rtgroups_create(mp);
 
 	rtfreesp_init(mp);
 }
