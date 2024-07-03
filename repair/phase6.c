@@ -19,6 +19,8 @@
 #include "progress.h"
 #include "versions.h"
 #include "repair/pptr.h"
+#include "slab.h"
+#include "rmap.h"
 
 static xfs_ino_t		orphanage_ino;
 
@@ -833,6 +835,233 @@ mk_rsumino(
 			error);
 	}
 	libxfs_irele(ip);
+}
+
+/* Mark a newly allocated inode in use in the incore bitmap. */
+static void
+mark_ino_inuse(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino,
+	int			mode,
+	xfs_ino_t		parent)
+{
+	struct ino_tree_node	*irec;
+	int			ino_offset;
+	int			i;
+
+	irec = find_inode_rec(mp, XFS_INO_TO_AGNO(mp, ino),
+			XFS_INO_TO_AGINO(mp, ino));
+
+	if (irec == NULL) {
+		/*
+		 * This inode is allocated from a newly created inode
+		 * chunk and therefore did not exist when inode chunks
+		 * were processed in phase3. Add this group of inodes to
+		 * the entry avl tree as if they were discovered in phase3.
+		 */
+		irec = set_inode_free_alloc(mp,
+				XFS_INO_TO_AGNO(mp, ino),
+				XFS_INO_TO_AGINO(mp, ino));
+		alloc_ex_data(irec);
+
+		for (i = 0; i < XFS_INODES_PER_CHUNK; i++)
+			set_inode_free(irec, i);
+	}
+
+	ino_offset = get_inode_offset(mp, ino, irec);
+
+	/*
+	 * Mark the inode allocated so it is not skipped in phase 7.  We'll
+	 * find it with the directory traverser soon, so we don't need to
+	 * mark it reached.
+	 */
+	set_inode_used(irec, ino_offset);
+	set_inode_ftype(irec, ino_offset, libxfs_mode_to_ftype(mode));
+	set_inode_parent(irec, ino_offset, parent);
+	if (S_ISDIR(mode))
+		set_inode_isadir(irec, ino_offset);
+}
+
+/* Make sure this metadata directory path exists. */
+static int
+ensure_imeta_dirpath(
+	struct xfs_mount		*mp,
+	const struct xfs_imeta_path	*path)
+{
+	struct xfs_imeta_path		temp_path = {
+		.im_path		= path->im_path,
+		.im_ftype		= XFS_DIR3_FT_DIR,
+	};
+	struct xfs_trans		*tp;
+	xfs_ino_t			parent;
+	int				error;
+
+	if (!xfs_has_metadir(mp))
+		return 0;
+
+	error = -libxfs_imeta_ensure_dirpath(mp, path);
+	if (error)
+		return error;
+
+	error = -libxfs_trans_alloc_empty(mp, &tp);
+	if (error)
+		return error;
+
+	/* Mark all directories in this path as inuse. */
+	parent = mp->m_metadirip->i_ino;
+	for (temp_path.im_depth = 1;
+	     temp_path.im_depth < path->im_depth;
+	     temp_path.im_depth++) {
+		xfs_ino_t		ino;
+
+		error = -libxfs_imeta_lookup(tp, &temp_path, &ino);
+		if (error)
+			break;
+		if (ino == NULLFSINO) {
+			error = ENOENT;
+			break;
+		}
+		if (!libxfs_verify_ino(mp, ino)) {
+			error = EFSCORRUPTED;
+			break;
+		}
+
+		mark_ino_inuse(mp, ino, S_IFDIR, parent);
+		mark_ino_metadata(mp, ino);
+		parent = ino;
+	}
+
+	libxfs_trans_cancel(tp);
+	return error;
+}
+
+static void
+ensure_rtgroup_rmapbt(
+	struct xfs_rtgroup	*rtg,
+	xfs_filblks_t		est_fdblocks)
+{
+	struct xfs_imeta_update	upd = { };
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	struct xfs_imeta_path	*path;
+	xfs_ino_t		ino;
+	int			error;
+
+	if (!xfs_has_rtrmapbt(mp))
+		return;
+
+	ino = rtgroup_rmap_ino(rtg);
+	if (no_modify) {
+		if (ino == NULLFSINO)
+			do_warn(_("would reset rtgroup %u rmap btree\n"),
+					rtg->rtg_rgno);
+		return;
+	}
+
+	if (ino == NULLFSINO)
+		do_warn(_("resetting rtgroup %u rmap btree\n"),
+				rtg->rtg_rgno);
+
+	path = xfs_rtrmapbt_create_path(mp, rtg->rtg_rgno);
+	if (!path)
+		do_error(
+ _("Couldn't create rtgroup %u rmap file path\n"),
+				rtg->rtg_rgno);
+
+	error = ensure_imeta_dirpath(mp, path);
+	if (error)
+		do_error(
+ _("Couldn't create rtgroup %u metadata directory, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	if (ino != NULLFSINO) {
+		struct xfs_trans	*tp;
+
+		/*
+		 * We're still hanging on to our old inode pointer, so grab it
+		 * and reconnect it to the metadata directory tree.  If it
+		 * can't be grabbed, create a new rtrmap file.
+		 */
+		error = -libxfs_trans_alloc_empty(mp, &tp);
+		if (error)
+			do_error(
+ _("Couldn't allocate transaction to iget rtgroup %u rmap inode 0x%llx, error %d\n"),
+					rtg->rtg_rgno, (unsigned long long)ino,
+					error);
+		error = -libxfs_imeta_iget(tp, ino, S_IFREG, &upd.ip);
+		libxfs_trans_cancel(tp);
+		if (error) {
+			do_warn(
+ _("Couldn't iget rtgroup %u rmap inode 0x%llx, error %d\n"),
+					rtg->rtg_rgno, (unsigned long long)ino,
+					error);
+			goto zap;
+		}
+
+		/*
+		 * Since we're reattaching this file to the metadata directory
+		 * tree, try to remove all the parent pointers that might be
+		 * attached.
+		 */
+		try_erase_parent_ptrs(upd.ip);
+
+		error = -libxfs_imeta_start_link(mp, path, upd.ip, &upd);
+		if (error)
+			do_error(
+ _("Couldn't grab resources to reconnect rtgroup %u rmapbt, error %d\n"),
+					rtg->rtg_rgno, error);
+
+		error = -libxfs_imeta_link(&upd);
+		if (error)
+			do_error(
+ _("Failed to link rtgroup %u rmapbt inode 0x%llx, error %d\n"),
+					rtg->rtg_rgno,
+					(unsigned long long)upd.ip->i_ino,
+					error);
+
+		/* Reset the link count to something sane. */
+		set_nlink(VFS_I(upd.ip), 1);
+		upd.ip->i_df.if_format = XFS_DINODE_FMT_RMAP;
+		libxfs_trans_log_inode(upd.tp, upd.ip, XFS_ILOG_CORE);
+	} else {
+zap:
+		/*
+		 * The rtrmap inode was bad or gone, so just make a new one
+		 * and give our reference to the rtgroup structure.
+		 */
+		error = -libxfs_imeta_start_create(mp, path, &upd);
+		if (error)
+			do_error(
+ _("Couldn't grab resources to recreate rtgroup %u rmapbt, error %d\n"),
+					rtg->rtg_rgno, error);
+
+		error = -libxfs_rtrmapbt_create(&upd);
+		if (error)
+			do_error(
+ _("Couldn't create rtgroup %u rmap inode, error %d\n"),
+					rtg->rtg_rgno, error);
+	}
+
+	/* Mark the inode in use. */
+	mark_ino_inuse(mp, upd.ip->i_ino, S_IFREG, upd.dp->i_ino);
+	mark_ino_metadata(mp, upd.ip->i_ino);
+
+	error = -libxfs_imeta_commit(&upd);
+	if (error)
+		do_error(
+ _("Couldn't commit new rtgroup %u rmap inode %llu, error %d\n"),
+				rtg->rtg_rgno,
+				(unsigned long long)upd.ip->i_ino,
+				error);
+
+	/* Copy our incore rmap data to the ondisk rmap inode. */
+	error = populate_rtgroup_rmapbt(rtg, upd.ip, est_fdblocks);
+	if (error)
+		do_error(
+ _("rtgroup %u rmap btree could not be rebuilt, error %d\n"),
+				rtg->rtg_rgno, error);
+
+	libxfs_imeta_free_path(path);
+	libxfs_irele(upd.ip);
 }
 
 /* Initialize a root directory. */
@@ -3473,6 +3702,27 @@ traverse_ags(
 	do_inode_prefetch(mp, ag_stride, traverse_function, false, true);
 }
 
+static void
+reset_rt_metadata_inodes(
+	struct xfs_mount	*mp)
+{
+	struct xfs_rtgroup	*rtg;
+	xfs_filblks_t		metadata_blocks = 0;
+	xfs_filblks_t		est_fdblocks = 0;
+	xfs_rgnumber_t		rgno;
+
+	/* Estimate how much free space will be left after building btrees */
+	for_each_rtgroup(mp, rgno, rtg) {
+		metadata_blocks += estimate_rtrmapbt_blocks(rtg);
+	}
+	if (mp->m_sb.sb_fdblocks > metadata_blocks)
+		est_fdblocks = mp->m_sb.sb_fdblocks - metadata_blocks;
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		ensure_rtgroup_rmapbt(rtg, est_fdblocks);
+	}
+}
+
 void
 phase6(xfs_mount_t *mp)
 {
@@ -3540,6 +3790,8 @@ phase6(xfs_mount_t *mp)
 			do_warn(_("would reinitialize realtime summary inode\n"));
 		}
 	}
+
+	reset_rt_metadata_inodes(mp);
 
 	if (!no_modify)  {
 		do_log(
