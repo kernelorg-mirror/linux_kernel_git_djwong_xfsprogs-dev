@@ -72,4 +72,6 @@ include $(BUILDRULES)
 
 install install-pkg install-dev: default
 
+install-selfheal:
+
 -include .ltdep

@@ -21,4 +21,6 @@ install-dev : $(addsuffix -install-dev,$(SUBDIRS))
 %-install-dev:
 	$(Q)$(MAKE) $(MAKEOPTS) -C $* install-dev
 
+install-selfheal:
+
 include $(BUILDRULES)
