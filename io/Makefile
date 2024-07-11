@@ -95,4 +95,6 @@ install-pkg: default
 	$(LTINSTALL) -m 755 xfs_mkfile.sh $(PKG_SBIN_DIR)/xfs_mkfile
 install-dev:
 
+install-selfheal:
+
 -include .dep

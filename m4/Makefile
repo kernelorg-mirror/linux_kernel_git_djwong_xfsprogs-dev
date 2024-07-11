@@ -35,5 +35,7 @@ include $(BUILDRULES)
 
 install install-pkg install-dev install-lib: default
 
+install-selfheal:
+
 realclean: distclean
 	rm -f $(CONFIGURE)
