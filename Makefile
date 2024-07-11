@@ -116,13 +116,15 @@ configure: configure.ac
 include/builddefs: configure
 	./configure $$LOCAL_CONFIGURE_OPTIONS
 
-install: install-pkg
+install: install-pkg install-selfheal
 
 install-pkg: $(addsuffix -install-pkg,$(SUBDIRS))
 	$(INSTALL) -m 755 -d $(PKG_DOC_DIR)
 	$(INSTALL) -m 644 README $(PKG_DOC_DIR)
 
 install-dev: $(addsuffix -install-dev,$(SUBDIRS))
+
+install-selfheal: $(addsuffix -install-selfheal,$(SUBDIRS))
 
 %-install-pkg:
 	@echo "Installing $@"
@@ -131,6 +133,10 @@ install-dev: $(addsuffix -install-dev,$(SUBDIRS))
 %-install-dev:
 	@echo "Installing $@"
 	$(Q)$(MAKE) $(MAKEOPTS) -C $* install-dev
+
+%-install-selfheal:
+	@echo "Installing $@"
+	$(Q)$(MAKE) $(MAKEOPTS) -C $* install-selfheal
 
 distclean: clean
 	$(Q)rm -f $(LDIRT)

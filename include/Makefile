@@ -64,3 +64,6 @@ install-pkg: default
 
 install-dev: install
 	$(INSTALL) -m 644 $(HFILES) $(PKG_INC_DIR)
+
+install-selfheal:
+

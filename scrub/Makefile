@@ -20,6 +20,7 @@ XFS_SCRUB_ARGS = -p
 XFS_SCRUB_SERVICE_ARGS = -b -o fsprops_advise
 ifeq ($(HAVE_SYSTEMD),yes)
 INSTALL_SCRUB += install-systemd
+INSTALL_SELFHEAL += install-systemd-selfheal
 SYSTEMD_SERVICES=\
 	$(scrub_svcname) \
 	xfs_scrub_fail@.service \
@@ -27,9 +28,10 @@ SYSTEMD_SERVICES=\
 	xfs_scrub_media_fail@.service \
 	xfs_scrub_all.service \
 	xfs_scrub_all_fail.service \
-	xfs_scrub_all.timer \
 	system-xfs_scrub.slice
-OPTIONAL_TARGETS += $(SYSTEMD_SERVICES)
+SYSTEMD_SERVICES_SELFHEAL=\
+	xfs_scrub_all.timer
+OPTIONAL_TARGETS += $(SYSTEMD_SERVICES) $(SYSTEMD_SERVICES_SELFHEAL)
 endif
 ifeq ($(HAVE_CROND),yes)
 INSTALL_SCRUB += install-crond
@@ -163,6 +165,10 @@ install-systemd: default $(SYSTEMD_SERVICES)
 	$(INSTALL) -m 755 -d $(PKG_LIBEXEC_DIR)
 	$(INSTALL) -m 755 $(XFS_SCRUB_FAIL_PROG) $(PKG_LIBEXEC_DIR)
 
+install-systemd-selfheal: default $(SYSTEMD_SERVICES_SELFHEAL)
+	$(INSTALL) -m 755 -d $(SYSTEMD_SYSTEM_UNIT_DIR)
+	$(INSTALL) -m 644 $(SYSTEMD_SERVICES_SELFHEAL) $(SYSTEMD_SYSTEM_UNIT_DIR)
+
 install-crond: default $(CRONTABS)
 	$(INSTALL) -m 755 -d $(CROND_DIR)
 	$(INSTALL) -m 644 $(CRONTABS) $(CROND_DIR)
@@ -180,5 +186,7 @@ install-udev: $(UDEV_RULES)
 	done
 
 install-dev:
+
+install-selfheal: $(INSTALL_SELFHEAL)
 
 -include .dep
