@@ -34,4 +34,6 @@ install-pkg: default
 	$(INSTALL) -m 755 xfs_info.sh $(PKG_SBIN_DIR)/xfs_info
 install-dev:
 
+install-selfheal:
+
 -include .dep
