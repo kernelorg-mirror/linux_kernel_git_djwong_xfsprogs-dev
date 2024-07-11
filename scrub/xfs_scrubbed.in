@@ -17,6 +17,52 @@ import errno
 import ctypes
 from concurrent.futures import ProcessPoolExecutor
 
+try:
+	# Not all systems will have this json schema validation libarary,
+	# so we make it optional.
+	import jsonschema
+
+	def init_validation(args):
+		'''Initialize event json validation.'''
+		try:
+			with open(args.event_schema) as fp:
+				schema_js = json.load(fp)
+		except Exception as e:
+			print(f"{args.event_schema}: {e}", file = sys.stderr)
+			return
+
+		try:
+			vcls = jsonschema.validators.validator_for(schema_js)
+			vcls.check_schema(schema_js)
+			validator = vcls(schema_js)
+		except jsonschema.exceptions.SchemaError as e:
+			print(f"{args.event_schema}: {e.message}",
+					file = sys.stderr)
+			return
+		except Exception as e:
+			print(f"{args.event_schema}: {e}", file = sys.stderr)
+			return
+
+		def v(i):
+			e = jsonschema.exceptions.best_match(validator.iter_errors(i))
+			if e:
+				print(f"{printf_prefix}: {e.message}",
+						file = sys.stderr)
+				return False
+			return True
+
+		return v
+
+except:
+	def init_validation(args):
+		if args.require_validation:
+			print("JSON schema validation not available.",
+					file = sys.stderr)
+			return
+
+		return lambda instance: True
+
+validator_fn = None
 debug = False
 log = False
 everything = False
@@ -175,6 +221,12 @@ def handle_event(event):
 
 	global log
 
+	# Ignore any event that doesn't pass our schema.  This program must
+	# not try to handle a newer kernel that say things that it is not
+	# prepared to handle.
+	if not validator_fn(event):
+		return
+
 	stringify_timestamp(event)
 	if log:
 		log_event(event)
@@ -212,6 +264,7 @@ def main():
 	global log
 	global printf_prefix
 	global everything
+	global validator_fn
 
 	parser = argparse.ArgumentParser( \
 			description = "XFS filesystem health monitoring demon.")
@@ -225,6 +278,11 @@ def main():
 			action = "store_true")
 	parser.add_argument('mountpoint', default = None, nargs = '?',
 			help = 'XFS filesystem mountpoint to target.')
+	parser.add_argument('--require-validation', action = 'store_true', \
+			help = argparse.SUPPRESS)
+	parser.add_argument('--event-schema', type = str, \
+			default = '@pkg_data_dir@/xfs_healthmon.schema.json', \
+			help = argparse.SUPPRESS)
 	args = parser.parse_args()
 
 	if args.V:
@@ -233,6 +291,10 @@ def main():
 
 	if args.mountpoint is None:
 		parser.error("the following arguments are required: mountpoint")
+		return 1
+
+	validator_fn = init_validation(args)
+	if not validator_fn:
 		return 1
 
 	if args.debug:

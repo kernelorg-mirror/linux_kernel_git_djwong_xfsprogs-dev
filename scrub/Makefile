@@ -135,6 +135,7 @@ xfs_scrubbed: xfs_scrubbed.in $(builddefs)
 	$(Q)$(SED) -e "s|@sbindir@|$(PKG_SBIN_DIR)|g" \
 		   -e "s|@scrub_svcname@|$(scrub_svcname)|g" \
 		   -e "s|@pkg_version@|$(PKG_VERSION)|g" \
+		   -e "s|@pkg_data_dir@|$(PKG_DATA_DIR)|g" \
 		   < $< > $@
 	$(Q)chmod a+x $@
 
