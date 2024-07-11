@@ -26,3 +26,6 @@ ifeq ($(PKG_DISTRIBUTION), debian)
 endif
 
 install-dev:
+
+install-selfheal:
+

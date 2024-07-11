@@ -27,6 +27,14 @@ Description: Utilities for managing the XFS filesystem
  Refer to the documentation at https://xfs.wiki.kernel.org/
  for complete details.
 
+Package: xfsprogs-self-healing
+Depends: ${shlibs:Depends}, ${misc:Depends}, xfsprogs, systemd, udev
+Architecture: linux-any
+Description: Automatic self healing for the XFS filesystem
+ A set of background services for the XFS filesystem to make it
+ find and fix corruptions automatically.  These services are activated
+ automatically upon installation of this package.
+
 Package: xfslibs-dev
 Section: libdevel
 Depends: libc6-dev | libc-dev, uuid-dev, xfsprogs (>= 3.0.0), ${misc:Depends}

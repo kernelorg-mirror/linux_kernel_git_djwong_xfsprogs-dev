@@ -37,4 +37,6 @@ install-pkg: default
 
 install-dev:
 
+install-selfheal:
+
 -include .dep
