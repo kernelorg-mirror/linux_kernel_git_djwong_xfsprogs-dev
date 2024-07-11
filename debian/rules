@@ -14,6 +14,7 @@ endif
 package = xfsprogs
 develop = xfslibs-dev
 bootpkg = xfsprogs-udeb
+healpkg = xfsprogs-self-healing
 
 DEB_BUILD_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
 DEB_HOST_GNU_TYPE ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
@@ -26,9 +27,11 @@ udebpkg = $(bootpkg)_$(version)_$(target).udeb
 dirme  = debian/$(package)
 dirdev = debian/$(develop)
 dirdi  = debian/$(bootpkg)
-pkgme  = DIST_ROOT=`pwd`/$(dirme);  export DIST_ROOT;
-pkgdev = DIST_ROOT=`pwd`/$(dirdev); export DIST_ROOT;
-pkgdi  = DIST_ROOT=`pwd`/$(dirdi); export DIST_ROOT;
+dirheal= debian/$(healpkg)
+pkgme  = DIST_ROOT=`pwd`/$(dirme);   export DIST_ROOT;
+pkgdev = DIST_ROOT=`pwd`/$(dirdev);  export DIST_ROOT;
+pkgdi  = DIST_ROOT=`pwd`/$(dirdi);   export DIST_ROOT;
+pkgheal= DIST_ROOT=`pwd`/$(dirheal); export DIST_ROOT;
 stdenv = @GZIP=-q; export GZIP;
 
 configure_options = \
@@ -103,7 +106,7 @@ binary-arch: checkroot built
 	$(pkgme)  $(MAKE) -C . install-pkg
 	$(pkgdev) $(MAKE) -C . install-dev
 	$(pkgdi)  $(MAKE) -C debian install-d-i
-	$(pkgme)  $(MAKE) dist
+	$(pkgheal) $(MAKE) -C . install-selfheal
 	install -D -m 0755 debian/local/initramfs.hook debian/xfsprogs/usr/share/initramfs-tools/hooks/xfs
 	rmdir debian/xfslibs-dev/usr/share/doc/xfsprogs
 	rm -f debian/xfslibs-dev/usr/lib/$(DEB_HOST_MULTIARCH)/libhandle.la
@@ -114,7 +117,8 @@ binary-arch: checkroot built
 	dh_compress
 	dh_fixperms
 	dh_makeshlibs
-	dh_installsystemd -p xfsprogs --no-enable --no-start --no-restart-after-upgrade --no-stop-on-upgrade
+	dh_installsystemd -p xfsprogs --no-restart-after-upgrade --no-stop-on-upgrade system-xfs_scrub.slice
+	dh_installsystemd -p xfsprogs-self-healing --no-restart-after-upgrade --no-stop-on-upgrade xfs_scrub_all.timer
 	dh_installdeb
 	dh_shlibdeps
 	dh_gencontrol
