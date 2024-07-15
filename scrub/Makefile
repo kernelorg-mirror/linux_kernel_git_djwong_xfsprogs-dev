@@ -136,6 +136,7 @@ xfs_scrubbed: xfs_scrubbed.in $(builddefs)
 		   -e "s|@scrub_svcname@|$(scrub_svcname)|g" \
 		   -e "s|@pkg_version@|$(PKG_VERSION)|g" \
 		   -e "s|@pkg_data_dir@|$(PKG_DATA_DIR)|g" \
+		   -e "s|@libhandle_major@|$(LIBHANDLE_MAJOR)|g" \
 		   < $< > $@
 	$(Q)chmod a+x $@
 
