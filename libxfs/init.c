@@ -910,13 +910,27 @@ out_da:
 }
 
 void
-libxfs_rtmount_destroy(xfs_mount_t *mp)
+libxfs_rtmount_destroy(
+	struct xfs_mount	*mp)
 {
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+	unsigned int		i;
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		for (i = 0; i < XFS_RTG_MAX; i++) {
+			if (rtg->rtg_inodes[i])
+				libxfs_irele(rtg->rtg_inodes[i]);
+			rtg->rtg_inodes[i] = NULL;
+		}
+	}
+	if (mp->m_rtdirip)
+		libxfs_irele(mp->m_rtdirip);
 	if (mp->m_rsumip)
 		libxfs_irele(mp->m_rsumip);
 	if (mp->m_rbmip)
 		libxfs_irele(mp->m_rbmip);
-	mp->m_rsumip = mp->m_rbmip = NULL;
+	mp->m_rsumip = mp->m_rbmip = mp->m_rtdirip = NULL;
 }
 
 /* Flush a device and report on writes that didn't make it to stable storage. */
