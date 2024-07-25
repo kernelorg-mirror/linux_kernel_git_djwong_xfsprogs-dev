@@ -217,3 +217,30 @@ Do not trim free space extents shorter than this length.
 Units can be appended to this argument.
 .PD
 .RE
+
+.SH FILESYSTEM PROPERTIES
+If the opened file is the root directory of a filesystem, the following
+commands can be used to read and write filesystem properties.
+These properties allow system administrators to express their preferences for
+the filesystem in question.
+.TP
+.BI "getfsprops name [ " names "... ]"
+Retrieve the values of the given filesystem properties.
+.TP
+.BI "listfsprops"
+List all filesystem properties that have been stored in the filesystem.
+.TP
+.BI "setfsprops " name = value " [ " name = value "... ]"
+Set the given filesystem properties to the specified values.
+.TP
+.BI "removefsprops name [ " names "... ]"
+Remove the given filesystem properties.
+
+.RE
+Currently supported filesystem properties are:
+.TP
+.B self_healing
+See the
+.BR xfs_scrub (8)
+manual for more information.
+.RE
