@@ -30,6 +30,10 @@ ifeq ($(HAVE_GETFSMAP),yes)
 CFILES += freesp.c
 endif
 
+ifeq ($(HAVE_LIBATTR),yes)
+CFILES += properties.c
+endif
+
 default: depend $(LTCOMMAND)
 
 include $(BUILDRULES)
