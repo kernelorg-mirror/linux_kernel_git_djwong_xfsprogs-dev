@@ -47,4 +47,17 @@ bool fsprop_validate(const char *name, const char *value);
 
 /* Specific Filesystem Properties */
 
+#define FSPROP_SELF_HEALING_NAME	"self_healing"
+
+enum fsprop_self_healing {
+	FSPROP_SELFHEAL_UNSET = 0,	/* do not set property */
+	FSPROP_SELFHEAL_NONE,		/* no background scrubs */
+	FSPROP_SELFHEAL_CHECK,		/* allow only background checking */
+	FSPROP_SELFHEAL_OPTIMIZE,	/* allow background optimization */
+	FSPROP_SELFHEAL_REPAIR,		/* allow background repair & optimization */
+};
+
+const char *fsprop_write_self_healing(enum fsprop_self_healing x);
+enum fsprop_self_healing fsprop_read_self_healing(const char *value);
+
 #endif /* __LIBFROG_FSPROPERTIES_H__ */
