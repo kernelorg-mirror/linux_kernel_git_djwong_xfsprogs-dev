@@ -526,6 +526,10 @@ _("Scrub aborted after phase %d."),
 		if (ret)
 			break;
 
+		/* Did background scrub get canceled on us? */
+		if (ctx->mode == SCRUB_MODE_NONE)
+			break;
+
 		/* Too many errors? */
 		if (scrub_excessive_errors(ctx)) {
 			ret = ECANCELED;
@@ -630,12 +634,14 @@ report_outcome(
 enum o_opt_nums {
 	IWARN = 0,
 	FSTRIM_PCT,
+	FSPROPS_ADVISE,
 	O_MAX_OPTS,
 };
 
 static char *o_opts[] = {
 	[IWARN]			= "iwarn",
 	[FSTRIM_PCT]		= "fstrim_pct",
+	[FSPROPS_ADVISE]	= "fsprops_advise",
 	[O_MAX_OPTS]		= NULL,
 };
 
@@ -687,6 +693,14 @@ parse_o_opts(
 			}
 
 			ctx->fstrim_block_pct = dval / 100.0;
+			break;
+		case FSPROPS_ADVISE:
+			if (val) {
+				fprintf(stderr,
+ _("-o fsprops_advise does not take an argument\n"));
+				usage();
+			}
+			ctx->mode = SCRUB_MODE_NONE;
 			break;
 		default:
 			usage();
