@@ -12,6 +12,7 @@
 #include "libfrog/convert.h"
 #include "libfrog/crc32cselftest.h"
 #include "libfrog/dahashselftest.h"
+#include "libfrog/fsproperties.h"
 #include "proto.h"
 #include <ini.h>
 
@@ -148,6 +149,7 @@ enum {
 	M_REFLINK,
 	M_INOBTCNT,
 	M_BIGTIME,
+	M_SELFHEAL,
 	M_MAX_OPTS,
 };
 
@@ -809,6 +811,7 @@ static struct opt_params mopts = {
 		[M_REFLINK] = "reflink",
 		[M_INOBTCNT] = "inobtcount",
 		[M_BIGTIME] = "bigtime",
+		[M_SELFHEAL] = "self_healing",
 		[M_MAX_OPTS] = NULL,
 	},
 	.subopt_params = {
@@ -847,6 +850,12 @@ static struct opt_params mopts = {
 		  .defaultval = 1,
 		},
 		{ .index = M_BIGTIME,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
+		{ .index = M_SELFHEAL,
 		  .conflicts = { { NULL, LAST_CONFLICT } },
 		  .minval = 0,
 		  .maxval = 1,
@@ -916,6 +925,8 @@ struct cli_params {
 
 	char	*cfgfile;
 	char	*protofile;
+
+	enum fsprop_self_healing self_healing;
 
 	/* parameters that depend on sector/block size being validated. */
 	char	*dsize;
@@ -1037,7 +1048,7 @@ usage( void )
 /* blocksize */		[-b size=num]\n\
 /* config file */	[-c options=xxx]\n\
 /* metadata */		[-m crc=0|1,finobt=0|1,uuid=xxx,rmapbt=0|1,reflink=0|1,\n\
-			    inobtcount=0|1,bigtime=0|1]\n\
+			    inobtcount=0|1,bigtime=0|1,self_healing=xxx]\n\
 /* data subvol */	[-d agcount=n,agsize=n,file,name=xxx,size=num,\n\
 			    (sunit=value,swidth=value|su=num,sw=num|noalign),\n\
 			    sectsize=num,concurrency=num]\n\
@@ -1858,6 +1869,20 @@ meta_opts_parser(
 	case M_BIGTIME:
 		cli->sb_feat.bigtime = getnum(value, opts, subopt);
 		break;
+	case M_SELFHEAL:
+		if (!value || value[0] == 0 || isdigit(value[0])) {
+			long long	ival = getnum(value, opts, subopt);
+
+			if (ival)
+				cli->self_healing = FSPROP_SELFHEAL_REPAIR;
+			else
+				cli->self_healing = FSPROP_SELFHEAL_NONE;
+		} else {
+			cli->self_healing = fsprop_read_self_healing(value);
+			if (cli->self_healing == FSPROP_SELFHEAL_UNSET)
+				illegal(value, "m self_heal");
+		}
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2323,6 +2348,32 @@ _("Directory ftype field always enabled on CRC enabled filesystems\n"));
 			usage();
 		}
 
+		/*
+		 * Self-healing through online fsck relies heavily on back
+		 * reference metadata, so we really want to try to enable rmap
+		 * and parent pointers.
+		 */
+		if (cli->self_healing >= FSPROP_SELFHEAL_CHECK) {
+			if (!cli->sb_feat.rmapbt) {
+				if (cli_opt_set(&mopts, M_RMAPBT)) {
+					fprintf(stdout,
+_("self-healing=%s is less effective without reverse mapping\n"),
+						fsprop_write_self_healing(cli->self_healing));
+				} else {
+					cli->sb_feat.rmapbt = true;
+				}
+			}
+			if (!cli->sb_feat.parent_pointers) {
+				if (cli_opt_set(&nopts, N_PARENT)) {
+					fprintf(stdout,
+_("self-healing=%s is less effective without parent pointers\n"),
+						fsprop_write_self_healing(cli->self_healing));
+				} else {
+					cli->sb_feat.parent_pointers = true;
+				}
+			}
+		}
+
 	} else {	/* !crcs_enabled */
 		/*
 		 * The V4 filesystem format is deprecated in the upstream Linux
@@ -2406,6 +2457,14 @@ _("parent pointers not supported without CRC support\n"));
 			usage();
 		}
 		cli->sb_feat.parent_pointers = false;
+
+		if (cli->self_healing != FSPROP_SELFHEAL_UNSET &&
+		    cli_opt_set(&mopts, M_SELFHEAL)) {
+			fprintf(stderr,
+_("self-healing not supported without CRC support\n"));
+			usage();
+		}
+		cli->self_healing = FSPROP_SELFHEAL_UNSET;
 	}
 
 	if (!cli->sb_feat.finobt) {
@@ -4332,6 +4391,63 @@ cfgfile_parse(
 		cli->cfgfile);
 }
 
+static void
+set_self_healing(
+	struct xfs_mount	*mp,
+	struct cli_params	*cli)
+{
+	struct xfs_da_args	args = {
+		.geo		= mp->m_attr_geo,
+		.whichfork	= XFS_ATTR_FORK,
+		.op_flags	= XFS_DA_OP_OKNOENT,
+		.attr_filter	= LIBXFS_ATTR_ROOT,
+		.owner		= mp->m_sb.sb_rootino,
+	};
+	const char		*word;
+	char			*p;
+	int			error;
+
+	error = fsprop_name_to_attr_name(FSPROP_SELF_HEALING_NAME, &p);
+	if (error < 0) {
+		fprintf(stderr,
+ _("%s: error %d while allocating fs property name\n"),
+				progname, error);
+		exit(1);
+	}
+	args.namelen = error;
+	args.name = p;
+
+	word = fsprop_write_self_healing(cli->self_healing);
+	if (!word) {
+		fprintf(stderr,
+ _("%s: not sure what to do with self_healing value %u\n"),
+				progname, cli->self_healing);
+		exit(1);
+	}
+	args.value = (void *)word;
+	args.valuelen = strlen(word);
+
+	error = -libxfs_iget(mp, NULL, mp->m_sb.sb_rootino, 0, &args.dp);
+	if (error) {
+		fprintf(stderr,
+ _("%s: error %d while opening root directory\n"),
+				progname, error);
+		exit(1);
+	}
+
+	libxfs_attr_sethash(&args);
+
+	error = -libxfs_attr_set(&args, XFS_ATTRUPDATE_UPSERT, false);
+	if (error) {
+		fprintf(stderr,
+ _("%s: error %d while setting self_healing property\n"),
+				progname, error);
+		exit(1);
+	}
+
+	libxfs_irele(args.dp);
+}
+
 int
 main(
 	int			argc,
@@ -4361,6 +4477,7 @@ main(
 		.is_supported	= 1,
 		.data_concurrency = -1, /* auto detect non-mechanical storage */
 		.log_concurrency = -1, /* auto detect non-mechanical ddev */
+		.self_healing = FSPROP_SELFHEAL_UNSET,
 	};
 	struct mkfs_params	cfg = {};
 
@@ -4668,6 +4785,9 @@ main(
 	 */
 	if (mp->m_sb.sb_agcount > 1)
 		rewrite_secondary_superblocks(mp);
+
+	if (cli.self_healing != FSPROP_SELFHEAL_UNSET)
+		set_self_healing(mp, &cli);
 
 	/*
 	 * Dump all inodes and buffers before marking us all done.
