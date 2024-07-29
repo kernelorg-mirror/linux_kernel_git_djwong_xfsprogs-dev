@@ -561,6 +561,15 @@ def fgetpath(fd, fh = None, mountpoint = None):
 			break
 	return ret
 
+# Filesystem properties
+
+FSPROP_NAMESPACE = "trusted."
+FSPROP_NAME_PREFIX = "xfs:"
+FSPROP_AUTOFSCK_NAME = "autofsck"
+
+def fsprop_attrname(n):
+	return f"{FSPROP_NAMESPACE}{FSPROP_NAME_PREFIX}{n}"
+
 # main program
 
 def health_reports(mon_fp, fh):
@@ -724,6 +733,31 @@ def monitor(mountpoint, event_queue, **kwargs):
 	except Exception as e:
 		# Don't care if we can't detect parent pointers or rmap
 		print(e)
+
+	# Does the sysadmin have any advice for us about whether or not to
+	# background scrub?
+	if want_repair is None:
+		try:
+			attrname = fsprop_attrname(FSPROP_AUTOFSCK_NAME)
+			advice = os.getxattr(fd, attrname).decode('utf-8')
+			if advice == "repair":
+				want_repair = True
+			elif advice == "check" or advice == "optimize":
+				want_repair = False
+		except:
+			# Any OS error (including ENODATA) or string parsing
+			# error is treated as a desire not to repair things.
+			want_repair = False
+
+		if want_repair is None:
+			print(f"{mountpoint}: Disabling self healing per autofsck directive.")
+			os.close(fd)
+			return 0
+		elif want_repair:
+			print(f"{mountpoint}: Automatically repairing per autofsck directive.")
+		else:
+			print(f"{mountpoint}: Only logging errors per autofsck directive.")
+
 
 	# Check for the backref metadata that makes repair effective.
 	if want_repair:
@@ -925,7 +959,11 @@ def main():
 			action = "store_true")
 	parser.add_argument("--everything", help = "Capture all events.", \
 			action = "store_true")
-	parser.add_argument("--repair", help = "Automatically repair corrupt metadata.", \
+	action_group = parser.add_mutually_exclusive_group()
+	action_group.add_argument("--repair", \
+			help = "Automatically repair corrupt metadata.", \
+			action = "store_true")
+	action_group.add_argument("--fsprops_advise", help = argparse.SUPPRESS, \
 			action = "store_true")
 	parser.add_argument("-V", help = "Report version and exit.", \
 			action = "store_true")
@@ -962,6 +1000,8 @@ def main():
 		log = True
 	if args.everything:
 		everything = True
+	if args.fsprops_advise:
+		want_repair = None
 	if args.repair:
 		want_repair = True
 
