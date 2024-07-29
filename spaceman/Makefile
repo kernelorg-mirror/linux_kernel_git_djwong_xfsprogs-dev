@@ -47,4 +47,6 @@ install-pkg: default
 	$(INSTALL) -m 755 xfs_property $(PKG_SBIN_DIR)/xfs_property
 install-dev:
 
+install-selfheal:
+
 -include .dep

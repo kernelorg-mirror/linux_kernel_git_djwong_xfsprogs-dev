@@ -23,4 +23,6 @@ install-pkg: default
 	$(LTINSTALL) -m 755 $(LTCOMMAND) $(PKG_SBIN_DIR)
 install-dev:
 
+install-selfheal:
+
 -include .dep

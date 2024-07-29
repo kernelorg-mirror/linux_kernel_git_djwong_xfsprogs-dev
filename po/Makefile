@@ -25,3 +25,6 @@ install-pkg: default
 	$(INSTALL_LINGUAS)
 
 install-dev install-lib:
+
+install-selfheal:
+

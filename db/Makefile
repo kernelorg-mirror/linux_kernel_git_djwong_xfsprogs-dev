@@ -91,4 +91,6 @@ install-pkg: default
 	$(INSTALL) -m 755 xfs_metadump.sh $(PKG_SBIN_DIR)/xfs_metadump
 install-dev:
 
+install-selfheal:
+
 -include .dep
