@@ -15,7 +15,10 @@ default : $(MAN_PAGES)
 
 include $(BUILDRULES)
 
-install : default
+install : install-pkg
+
+install-pkg : default
 	$(INSTALL) -m 755 -d $(MAN_DEST)
 	$(INSTALL_MAN)
+
 install-dev :

@@ -16,7 +16,9 @@ CHANGES.gz:
 	@echo "    [ZIP]    $@"
 	$(Q)$(ZIP) --best -c < CHANGES > $@
 
-install: default
+install: install-pkg
+
+install-pkg: default
 	$(INSTALL) -m 755 -d $(PKG_DOC_DIR)
 	$(INSTALL) -m 644 CHANGES.gz CREDITS $(PKG_DOC_DIR)
 ifeq ($(PKG_DISTRIBUTION), debian)

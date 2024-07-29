@@ -57,7 +57,9 @@ install-headers: $(addsuffix -hdrs, $(DKHFILES) $(HFILES))
 %-hdrs:
 	$(Q)$(LN_S) -f $(CURDIR)/$* xfs/$*
 
-install: default
+install: install-pkg
+
+install-pkg: default
 	$(INSTALL) -m 755 -d $(PKG_INC_DIR)
 
 install-dev: install
