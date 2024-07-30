@@ -173,16 +173,28 @@ check_rtwords(
 static void
 check_rtfile_contents(
 	struct xfs_mount	*mp,
-	const char		*filename,
-	xfs_ino_t		ino,
-	void			*buf,
-	xfs_fileoff_t		filelen)
+	bool			is_summary)
 {
-	struct xfs_bmbt_irec	map;
-	struct xfs_buf		*bp;
 	struct xfs_inode	*ip;
+	const struct xfs_buf_ops *buf_ops = xfs_rtblock_ops(mp, is_summary);
+	const char		*filename;
+	xfs_ino_t		ino;
+	void			*buf;
+	xfs_filblks_t		filelen;
 	xfs_fileoff_t		bno = 0;
 	int			error;
+
+	if (is_summary) {
+		filename = _("rtsummary");
+		ino = mp->m_sb.sb_rsumino;
+		buf = sumcompute;
+		filelen = XFS_B_TO_FSB(mp, mp->m_rsumsize);
+	} else {
+		filename = _("rtbitmap");
+		ino = mp->m_sb.sb_rbmino;
+		buf = btmcompute;
+		filelen = mp->m_sb.sb_rbmblocks;
+	}
 
 	error = -libxfs_iget(mp, NULL, ino, 0, &ip);
 	if (error) {
@@ -198,12 +210,11 @@ check_rtfile_contents(
 	}
 
 	while (bno < filelen)  {
-		xfs_filblks_t	maplen;
-		int		nmap = 1;
+		struct xfs_bmbt_irec	map;
+		struct xfs_buf		*bp;
+		int			nmap = 1;
 
-		/* Read up to 1MB at a time. */
-		maplen = min(filelen - bno, XFS_B_TO_FSBT(mp, 1048576));
-		error = -libxfs_bmapi_read(ip, bno, maplen, &map, &nmap, 0);
+		error = -libxfs_bmapi_read(ip, bno, 1, &map, &nmap, 0);
 		if (error) {
 			do_warn(_("unable to read %s mapping, err %d\n"),
 					filename, error);
@@ -218,8 +229,8 @@ check_rtfile_contents(
 
 		error = -libxfs_buf_read_uncached(mp->m_dev,
 				XFS_FSB_TO_DADDR(mp, map.br_startblock),
-				XFS_FSB_TO_BB(mp, map.br_blockcount),
-				0, &bp, NULL);
+				XFS_FSB_TO_BB(mp, 1),
+				0, &bp, buf_ops);
 		if (error) {
 			do_warn(_("unable to read %s at dblock 0x%llx, err %d\n"),
 					filename, (unsigned long long)bno, error);
@@ -228,8 +239,8 @@ check_rtfile_contents(
 
 		check_rtwords(mp, filename, bno, bp->b_addr, buf);
 
-		buf += XFS_FSB_TO_B(mp, map.br_blockcount);
-		bno += map.br_blockcount;
+		buf += mp->m_blockwsize << XFS_WORDLOG;
+		bno++;
 		libxfs_buf_relse(bp);
 	}
 
@@ -243,8 +254,7 @@ check_rtbitmap(
 	if (need_rbmino)
 		return;
 
-	check_rtfile_contents(mp, "rtbitmap", mp->m_sb.sb_rbmino, btmcompute,
-			mp->m_sb.sb_rbmblocks);
+	check_rtfile_contents(mp, false);
 }
 
 void
@@ -254,8 +264,7 @@ check_rtsummary(
 	if (need_rsumino)
 		return;
 
-	check_rtfile_contents(mp, "rtsummary", mp->m_sb.sb_rsumino, sumcompute,
-			XFS_B_TO_FSB(mp, mp->m_rsumsize));
+	check_rtfile_contents(mp, true);
 }
 
 void
