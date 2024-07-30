@@ -641,6 +641,14 @@ phase5(xfs_mount_t *mp)
 	xfs_agnumber_t		agno;
 	int			error;
 
+	if (no_modify) {
+		printf(_("No modify flag set, skipping phase 5\n"));
+
+		if (mp->m_sb.sb_rblocks > 0)
+			check_rtmetadata(mp);
+		return;
+	}
+
 	do_log(_("Phase 5 - rebuild AG headers and trees...\n"));
 	set_progress_msg(PROG_FMT_REBUILD_AG, (uint64_t)glob_agcount);
 

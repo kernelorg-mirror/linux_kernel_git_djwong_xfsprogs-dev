@@ -1437,14 +1437,7 @@ main(int argc, char **argv)
 	phase4(mp);
 	phase_end(mp, 4);
 
-	if (no_modify) {
-		printf(_("No modify flag set, skipping phase 5\n"));
-
-		if (mp->m_sb.sb_rblocks > 0)
-			check_rtmetadata(mp);
-	} else {
-		phase5(mp);
-	}
+	phase5(mp);
 	phase_end(mp, 5);
 	rcbagbt_destroy_cur_cache();
 
