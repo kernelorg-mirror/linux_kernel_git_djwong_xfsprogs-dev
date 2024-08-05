@@ -28,6 +28,8 @@
 #include "repair.h"
 #include "libfrog/fsgeom.h"
 #include "xfs_errortag.h"
+#include "libfrog/fsprops.h"
+#include "libfrog/fsproperties.h"
 
 /* Phase 1: Find filesystem geometry (and clean up after) */
 
@@ -131,6 +133,76 @@ enable_force_repair(
 }
 
 /*
+ * Decide the operating mode from filesystem properties.  No fs property or
+ * system errors means we only check.
+ */
+static void
+mode_from_fsprops(
+	struct scrub_ctx	*ctx)
+{
+	struct fsprops_handle	fph = { };
+	char			valuebuf[FSPROP_MAX_VALUELEN + 1] = { 0 };
+	size_t			valuelen = FSPROP_MAX_VALUELEN;
+	enum fsprop_autofsck	shval;
+	int			ret;
+
+	ret = fsprops_open_handle(&ctx->mnt, &ctx->fsinfo, &fph);
+	if (ret) {
+		ctx->mode = SCRUB_MODE_DRY_RUN;
+		goto summarize;
+	}
+
+	ret = fsprops_get(&fph, FSPROP_AUTOFSCK_NAME, valuebuf, &valuelen);
+	if (ret) {
+		ctx->mode = SCRUB_MODE_DRY_RUN;
+		goto summarize;
+	}
+
+	shval = fsprop_autofsck_read(valuebuf);
+	switch (shval) {
+	case FSPROP_AUTOFSCK_NONE:
+		ctx->mode = SCRUB_MODE_NONE;
+		break;
+	case FSPROP_AUTOFSCK_OPTIMIZE:
+		ctx->mode = SCRUB_MODE_PREEN;
+		break;
+	case FSPROP_AUTOFSCK_REPAIR:
+		ctx->mode = SCRUB_MODE_REPAIR;
+		break;
+	case FSPROP_AUTOFSCK_UNSET:
+		str_info(ctx, ctx->mntpoint,
+ _("Unknown autofsck directive \"%s\"."),
+				valuebuf);
+		fallthrough;
+	case FSPROP_AUTOFSCK_CHECK:
+		ctx->mode = SCRUB_MODE_DRY_RUN;
+		break;
+	}
+
+	fsprops_free_handle(&fph);
+
+summarize:
+	switch (ctx->mode) {
+	case SCRUB_MODE_NONE:
+		str_info(ctx, ctx->mntpoint,
+ _("Disabling scrub per autofsck directive."));
+		break;
+	case SCRUB_MODE_DRY_RUN:
+		str_info(ctx, ctx->mntpoint,
+ _("Checking per autofsck directive."));
+		break;
+	case SCRUB_MODE_PREEN:
+		str_info(ctx, ctx->mntpoint,
+ _("Optimizing per autofsck directive."));
+		break;
+	case SCRUB_MODE_REPAIR:
+		str_info(ctx, ctx->mntpoint,
+ _("Checking and repairing per autofsck directive."));
+		break;
+	}
+}
+
+/*
  * Bind to the mountpoint, read the XFS geometry, bind to the block devices.
  * Anything we've already built will be cleaned up by scrub_cleanup.
  */
@@ -205,6 +277,14 @@ _("Not an XFS filesystem."));
 		str_errno(ctx, _("getting fshandle"));
 		return error;
 	}
+
+	/*
+	 * If we've been instructed to decide the operating mode from the
+	 * fs properties set on the mount point, do that now before we start
+	 * downgrading based on actual fs/kernel capabilities.
+	 */
+	if (ctx->mode == SCRUB_MODE_NONE)
+		mode_from_fsprops(ctx);
 
 	/* Do we have kernel-assisted metadata scrubbing? */
 	if (!can_scrub_fs_metadata(ctx) || !can_scrub_inode(ctx) ||
