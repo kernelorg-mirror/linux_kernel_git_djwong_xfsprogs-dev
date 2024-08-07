@@ -50,6 +50,30 @@ sb_init(void)
 	add_command(&version_cmd);
 }
 
+/*
+ * Counts superblock fields that only exist when the metadata directory feature
+ * is enabled.
+ */
+static int
+metadirfld_count(
+	void		*obj,
+	int		startoff)
+{
+	return xfs_has_metadir(mp) ? 1 : 0;
+}
+
+/*
+ * Counts superblock fields that do not exist when the metadata directory
+ * feature is enabled.
+ */
+static int
+premetadirfld_count(
+	void		*obj,
+	int		startoff)
+{
+	return xfs_has_metadir(mp) ? 0 : 1;
+}
+
 #define	OFF(f)	bitize(offsetof(struct xfs_dsb, sb_ ## f))
 #define	SZC(f)	szcount(struct xfs_dsb, sb_ ## f)
 const field_t	sb_flds[] = {
@@ -99,7 +123,9 @@ const field_t	sb_flds[] = {
 	{ "logsunit", FLDT_UINT32D, OI(OFF(logsunit)), C1, 0, TYP_NONE },
 	{ "features2", FLDT_UINT32X, OI(OFF(features2)), C1, 0, TYP_NONE },
 	{ "bad_features2", FLDT_UINT32X, OI(OFF(bad_features2)),
-		C1, 0, TYP_NONE },
+		premetadirfld_count, FLD_COUNT, TYP_NONE },
+	{ "metadirpad", FLDT_UINT32X, OI(OFF(metadirpad)), metadirfld_count,
+		FLD_COUNT, TYP_NONE },
 	{ "features_compat", FLDT_UINT32X, OI(OFF(features_compat)),
 		C1, 0, TYP_NONE },
 	{ "features_ro_compat", FLDT_UINT32X, OI(OFF(features_ro_compat)),
@@ -113,6 +139,8 @@ const field_t	sb_flds[] = {
 	{ "pquotino", FLDT_INO, OI(OFF(pquotino)), C1, 0, TYP_INODE },
 	{ "lsn", FLDT_UINT64X, OI(OFF(lsn)), C1, 0, TYP_NONE },
 	{ "meta_uuid", FLDT_UUID, OI(OFF(meta_uuid)), C1, 0, TYP_NONE },
+	{ "metadirino", FLDT_INO, OI(OFF(metadirino)), metadirfld_count,
+	  FLD_COUNT, TYP_INODE },
 	{ NULL }
 };
 
