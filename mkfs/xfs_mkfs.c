@@ -3591,6 +3591,10 @@ sb_set_features(
 	 */
 	sbp->sb_bad_features2 = sbp->sb_features2;
 
+	/* This will be overriden later for real rtgroup file systems: */
+	sbp->sb_rgcount = 1;
+	sbp->sb_rgextents = 0;
+
 	if (!fp->crcs_enabled)
 		return;
 
