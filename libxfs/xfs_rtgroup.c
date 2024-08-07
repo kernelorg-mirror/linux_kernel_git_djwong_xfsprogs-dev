@@ -3,7 +3,7 @@
  * Copyright (c) 2022-2024 Oracle.  All Rights Reserved.
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
-#include "xfs.h"
+#include "libxfs_priv.h"
 #include "xfs_fs.h"
 #include "xfs_shared.h"
 #include "xfs_format.h"
@@ -20,14 +20,12 @@
 #include "xfs_ag.h"
 #include "xfs_ag_resv.h"
 #include "xfs_health.h"
-#include "xfs_error.h"
 #include "xfs_bmap.h"
 #include "xfs_defer.h"
 #include "xfs_log_format.h"
 #include "xfs_trans.h"
 #include "xfs_trace.h"
 #include "xfs_inode.h"
-#include "xfs_icache.h"
 #include "xfs_rtgroup.h"
 #include "xfs_rtbitmap.h"
 
