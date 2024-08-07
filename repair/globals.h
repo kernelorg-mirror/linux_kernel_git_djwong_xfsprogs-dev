@@ -134,11 +134,6 @@ extern int		chunks_pblock;	/* # of 64-ino chunks per allocation */
 extern int		max_symlink_blocks;
 extern int64_t		fs_max_file_offset;
 
-/* realtime info */
-
-extern union xfs_rtword_raw		*btmcompute;
-extern union xfs_suminfo_raw		*sumcompute;
-
 /* inode tree records have full or partial backptr fields ? */
 
 extern int		full_ino_ex_data;/*
