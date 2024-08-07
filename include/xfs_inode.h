@@ -224,6 +224,7 @@ typedef struct xfs_inode {
 	struct xfs_ifork	*i_cowfp;	/* copy on write extents */
 	struct xfs_ifork	i_df;		/* data fork */
 	struct xfs_ifork	i_af;		/* attribute fork */
+	enum xfs_metafile_type	i_metatype;	/* XFS_METAFILE_* */
 	struct xfs_inode_log_item *i_itemp;	/* logging information */
 	unsigned int		i_delayed_blks;	/* count of delay alloc blks */
 	xfs_fsize_t		i_disk_size;	/* number of bytes in file */
@@ -403,6 +404,11 @@ static inline bool xfs_inode_has_bigrtalloc(struct xfs_inode *ip)
 static inline bool xfs_is_always_cow_inode(struct xfs_inode *ip)
 {
 	return false;
+}
+
+static inline bool xfs_is_metadir_inode(const struct xfs_inode *ip)
+{
+	return ip->i_diflags2 & XFS_DIFLAG2_METADATA;
 }
 
 extern void	libxfs_trans_inode_alloc_buf (struct xfs_trans *,
