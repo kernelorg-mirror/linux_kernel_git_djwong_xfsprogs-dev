@@ -576,7 +576,7 @@ mk_rsumino(
 		_("couldn't iget realtime summary inode -- error - %d\n"),
 			error);
 	}
-	ip->i_disk_size = mp->m_rsumsize;
+	ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
 	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	error = -libxfs_trans_commit(tp);
 	if (error)

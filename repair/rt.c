@@ -63,7 +63,7 @@ generate_rtinfo(
 _("couldn't allocate memory for incore realtime bitmap.\n"));
 	words = btmcompute;
 
-	wordcnt = mp->m_rsumsize >> XFS_WORDLOG;
+	wordcnt = XFS_FSB_TO_B(mp, mp->m_rsumblocks) >> XFS_WORDLOG;
 	sumcompute = calloc(wordcnt, sizeof(union xfs_suminfo_raw));
 	if (!sumcompute)
 		do_error(
@@ -237,7 +237,7 @@ check_rtsummary(
 		return;
 
 	check_rtfile_contents(mp, XFS_METAFILE_RTSUMMARY,
-			XFS_B_TO_FSB(mp, mp->m_rsumsize));
+			mp->m_rsumblocks);
 }
 
 void
@@ -288,8 +288,7 @@ _("couldn't iget realtime summary inode, error - %d\n"), error);
 	libxfs_trans_cancel(tp);
 
 	mp->m_rsumip = ip;
-	error = -libxfs_rtfile_initialize_blocks(ip, 0,
-			mp->m_rsumsize >> mp->m_sb.sb_blocklog,
+	error = -libxfs_rtfile_initialize_blocks(ip, 0, mp->m_rsumblocks,
 			sumcompute);
 	mp->m_rsumip = NULL;
 	if (error)
