@@ -812,7 +812,7 @@ rtsummary_create(
 {
 	struct xfs_mount	*mp = ip->i_mount;
 
-	ip->i_disk_size = mp->m_rsumsize;
+	ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
 
 	mp->m_sb.sb_rsumino = ip->i_ino;
 	mp->m_rsumip = ip;
@@ -841,7 +841,7 @@ rtfreesp_init(
 		fail(_("Initialization of rtbitmap inode failed"), error);
 
 	error = -libxfs_rtfile_initialize_blocks(mp->m_rsumip, 0,
-			XFS_B_TO_FSB(mp, mp->m_rsumsize), NULL);
+			mp->m_rsumblocks, NULL);
 	if (error)
 		fail(_("Initialization of rtsummary inode failed"), error);
 
