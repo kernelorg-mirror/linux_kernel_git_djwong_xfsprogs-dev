@@ -817,10 +817,15 @@ inode_next_type(void)
 		    is_rtgroup_inode(iocur_top->ino, XFS_RTG_BITMAP))
 			return TYP_RGBITMAP;
 
+		if (xfs_has_rtgroups(mp) &&
+		    is_rtgroup_inode(iocur_top->ino, XFS_RTG_SUMMARY))
+			return TYP_RGSUMMARY;
+
 		if (iocur_top->ino == mp->m_sb.sb_rbmino) {
 			return TYP_RTBITMAP;
-		} else if (iocur_top->ino == mp->m_sb.sb_rsumino)
+		} else if (iocur_top->ino == mp->m_sb.sb_rsumino) {
 			return TYP_RTSUMMARY;
+		}
 		else if (iocur_top->ino == mp->m_sb.sb_uquotino ||
 			 iocur_top->ino == mp->m_sb.sb_gquotino ||
 			 iocur_top->ino == mp->m_sb.sb_pquotino)
