@@ -813,16 +813,22 @@ inode_next_type(void)
 	case S_IFLNK:
 		return TYP_SYMLINK;
 	case S_IFREG:
+		if (xfs_has_rtgroups(mp) &&
+		    is_rtgroup_inode(iocur_top->ino, XFS_RTG_BITMAP))
+			return TYP_RGBITMAP;
+
 		if (iocur_top->ino == mp->m_sb.sb_rbmino)
 			return TYP_RTBITMAP;
-		else if (iocur_top->ino == mp->m_sb.sb_rsumino)
+
+		if (iocur_top->ino == mp->m_sb.sb_rsumino)
 			return TYP_RTSUMMARY;
-		else if (iocur_top->ino == mp->m_sb.sb_uquotino ||
-			 iocur_top->ino == mp->m_sb.sb_gquotino ||
-			 iocur_top->ino == mp->m_sb.sb_pquotino)
+
+		if (iocur_top->ino == mp->m_sb.sb_uquotino ||
+		    iocur_top->ino == mp->m_sb.sb_gquotino ||
+		    iocur_top->ino == mp->m_sb.sb_pquotino)
 			return TYP_DQBLK;
-		else
-			return TYP_DATA;
+
+		return TYP_DATA;
 	default:
 		return TYP_NONE;
 	}
