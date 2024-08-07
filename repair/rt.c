@@ -53,17 +53,18 @@ generate_rtinfo(
 	int			bmbno = 0;
 	int			start_bmbno = 0;
 	bool			in_extent = false;
+	unsigned long long	wordcnt;
 	union xfs_rtword_raw	*words;
 
-	btmcompute = calloc(libxfs_rtbitmap_wordcount(mp, mp->m_sb.sb_rextents),
-			sizeof(union xfs_rtword_raw));
+	wordcnt = XFS_FSB_TO_B(mp, mp->m_sb.sb_rbmblocks) >> XFS_WORDLOG;
+	btmcompute = calloc(wordcnt, sizeof(union xfs_rtword_raw));
 	if (!btmcompute)
 		do_error(
 _("couldn't allocate memory for incore realtime bitmap.\n"));
 	words = btmcompute;
 
-	sumcompute = calloc(libxfs_rtsummary_wordcount(mp, mp->m_rsumlevels,
-			mp->m_sb.sb_rbmblocks), sizeof(union xfs_suminfo_raw));
+	wordcnt = mp->m_rsumsize >> XFS_WORDLOG;
+	sumcompute = calloc(wordcnt, sizeof(union xfs_suminfo_raw));
 	if (!sumcompute)
 		do_error(
 _("couldn't allocate memory for incore realtime summary info.\n"));
