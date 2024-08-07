@@ -813,9 +813,13 @@ inode_next_type(void)
 	case S_IFLNK:
 		return TYP_SYMLINK;
 	case S_IFREG:
-		if (iocur_top->ino == mp->m_sb.sb_rbmino)
+		if (xfs_has_rtgroups(mp) &&
+		    is_rtgroup_inode(iocur_top->ino, XFS_RTG_BITMAP))
+			return TYP_RGBITMAP;
+
+		if (iocur_top->ino == mp->m_sb.sb_rbmino) {
 			return TYP_RTBITMAP;
-		else if (iocur_top->ino == mp->m_sb.sb_rsumino)
+		} else if (iocur_top->ino == mp->m_sb.sb_rsumino)
 			return TYP_RTSUMMARY;
 		else if (iocur_top->ino == mp->m_sb.sb_uquotino ||
 			 iocur_top->ino == mp->m_sb.sb_gquotino ||
