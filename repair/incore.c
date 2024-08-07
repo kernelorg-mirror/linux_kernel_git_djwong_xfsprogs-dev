@@ -232,7 +232,8 @@ free_rt_bmap(xfs_mount_t *mp)
 void
 reset_bmaps(xfs_mount_t *mp)
 {
-	xfs_agnumber_t	agno;
+	unsigned int	nr_groups = mp->m_sb.sb_agcount + mp->m_sb.sb_rgcount;
+	unsigned int	agno;
 	xfs_agblock_t	ag_size;
 	int		ag_hdr_block;
 
@@ -264,6 +265,22 @@ reset_bmaps(xfs_mount_t *mp)
 		btree_insert(ag_bmap[agno], ag_size, &states[XR_E_BAD_STATE]);
 	}
 
+	for ( ; agno < nr_groups; agno++) {
+		btree_clear(ag_bmap[agno]);
+		if (agno == mp->m_sb.sb_agcount && xfs_has_rtsb(mp)) {
+			btree_insert(ag_bmap[agno], 0, &states[XR_E_INUSE_FS]);
+			btree_insert(ag_bmap[agno], mp->m_sb.sb_rextsize,
+					&states[XR_E_FREE]);
+		} else {
+			btree_insert(ag_bmap[agno], 0, &states[XR_E_FREE]);
+		}
+
+		btree_insert(ag_bmap[agno],
+			xfs_rtgroup_extents(mp, (agno - mp->m_sb.sb_agcount)) <<
+				mp->m_sb.sb_rextslog,
+			&states[XR_E_BAD_STATE]);
+	}
+
 	if (mp->m_sb.sb_logstart != 0) {
 		set_bmap_ext(XFS_FSB_TO_AGNO(mp, mp->m_sb.sb_logstart),
 			     XFS_FSB_TO_AGBNO(mp, mp->m_sb.sb_logstart),
@@ -274,19 +291,22 @@ reset_bmaps(xfs_mount_t *mp)
 }
 
 void
-init_bmaps(xfs_mount_t *mp)
+init_bmaps(
+	struct xfs_mount	*mp)
 {
-	xfs_agnumber_t i;
+	unsigned int		nr_groups =
+		mp->m_sb.sb_agcount + mp->m_sb.sb_rgcount;
+	unsigned int		i;
 
-	ag_bmap = calloc(mp->m_sb.sb_agcount, sizeof(struct btree_root *));
+	ag_bmap = calloc(nr_groups, sizeof(struct btree_root *));
 	if (!ag_bmap)
 		do_error(_("couldn't allocate block map btree roots\n"));
 
-	ag_locks = calloc(mp->m_sb.sb_agcount, sizeof(struct aglock));
+	ag_locks = calloc(nr_groups, sizeof(struct aglock));
 	if (!ag_locks)
 		do_error(_("couldn't allocate block map locks\n"));
 
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)  {
+	for (i = 0; i < nr_groups; i++)  {
 		btree_init(&ag_bmap[i]);
 		pthread_mutex_init(&ag_locks[i].lock, NULL);
 	}
@@ -297,19 +317,22 @@ init_bmaps(xfs_mount_t *mp)
 }
 
 void
-free_bmaps(xfs_mount_t *mp)
+free_bmaps(
+	struct xfs_mount	*mp)
 {
-	xfs_agnumber_t i;
+	unsigned int		nr_groups =
+		mp->m_sb.sb_agcount + mp->m_sb.sb_rgcount;
+	unsigned int		i;
 
 	pthread_mutex_destroy(&rt_lock.lock);
 
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)
+	for (i = 0; i < nr_groups; i++)
 		pthread_mutex_destroy(&ag_locks[i].lock);
 
 	free(ag_locks);
 	ag_locks = NULL;
 
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)
+	for (i = 0; i < nr_groups; i++)
 		btree_destroy(ag_bmap[i]);
 
 	free(ag_bmap);
