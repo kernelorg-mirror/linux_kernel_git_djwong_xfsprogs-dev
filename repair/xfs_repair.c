@@ -27,6 +27,7 @@
 #include "bulkload.h"
 #include "quotacheck.h"
 #include "rcbag_btree.h"
+#include "rt.h"
 
 /*
  * option tables for getsubopt calls
@@ -791,13 +792,14 @@ _("sb root inode value %" PRIu64 " valid but in unaligned location (expected %"P
 		 * directory.
 		 */
 		check_metadir_inode(mp, rootino);
-		rootino++;
 	}
 
-	validate_sb_ino(&mp->m_sb.sb_rbmino, rootino + 1,
-			_("realtime bitmap"));
-	validate_sb_ino(&mp->m_sb.sb_rsumino, rootino + 2,
-			_("realtime summary"));
+	if (!xfs_has_rtgroups(mp)) {
+		validate_sb_ino(&mp->m_sb.sb_rbmino, rootino + 1,
+				_("realtime bitmap"));
+		validate_sb_ino(&mp->m_sb.sb_rsumino, rootino + 2,
+				_("realtime summary"));
+	}
 }
 
 /*
@@ -1410,6 +1412,7 @@ main(int argc, char **argv)
 	incore_ino_init(mp);
 	incore_ext_init(mp);
 	rmaps_init(mp);
+	discover_rtgroup_inodes(mp);
 
 	/* initialize random globals now that we know the fs geometry */
 	inodes_per_block = mp->m_sb.sb_inopblock;
@@ -1450,6 +1453,8 @@ main(int argc, char **argv)
 	if (!bad_ino_btree)  {
 		phase6(mp);
 		phase_end(mp, 6);
+
+		free_rtgroup_inodes(mp);
 
 		phase7(mp, phase2_threads);
 		phase_end(mp, 7);

@@ -5,6 +5,7 @@
  */
 
 #include "libxfs.h"
+#include "xfs_rtgroup.h"
 #include "avl.h"
 #include "globals.h"
 #include "agheader.h"
@@ -12,11 +13,18 @@
 #include "dinode.h"
 #include "protos.h"
 #include "err_protos.h"
+#include "libfrog/bitmap.h"
 #include "rt.h"
 
+/* Bitmap of rt group inodes */
+static struct bitmap	*rtg_inodes[XFS_RTG_MAX];
+
 /* Computed rt bitmap/summary data */
-static union xfs_rtword_raw	*btmcompute;
-static union xfs_suminfo_raw	*sumcompute;
+struct rtg_computed {
+	union xfs_rtword_raw	*bmp;
+	union xfs_suminfo_raw	*sum;
+};
+struct rtg_computed *rt_computed;
 
 static inline void
 set_rtword(
@@ -44,14 +52,13 @@ inc_sumcount(
 		p->old++;
 }
 
-/*
- * generate the real-time bitmap and summary info based on the
- * incore realtime extent map.
- */
-void
-generate_rtinfo(
-	struct xfs_mount	*mp)
+static void
+generate_rtg_rtinfo(
+	struct xfs_rtgroup	*rtg)
 {
+	struct rtg_computed	*comp = &rt_computed[rtg->rtg_rgno];
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	unsigned int		idx = mp->m_sb.sb_agcount + rtg->rtg_rgno;
 	unsigned int		bitsperblock =
 		mp->m_blockwsize << XFS_NBWORDLOG;
 	xfs_rtxnum_t		extno = 0;
@@ -63,15 +70,15 @@ generate_rtinfo(
 	union xfs_rtword_raw	*words;
 
 	wordcnt = XFS_FSB_TO_B(mp, mp->m_sb.sb_rbmblocks) >> XFS_WORDLOG;
-	btmcompute = calloc(wordcnt, sizeof(union xfs_rtword_raw));
-	if (!btmcompute)
+	comp->bmp = calloc(wordcnt, sizeof(union xfs_rtword_raw));
+	if (!comp->bmp)
 		do_error(
 _("couldn't allocate memory for incore realtime bitmap.\n"));
-	words = btmcompute;
+	words = comp->bmp;
 
 	wordcnt = XFS_FSB_TO_B(mp, mp->m_rsumblocks) >> XFS_WORDLOG;
-	sumcompute = calloc(wordcnt, sizeof(union xfs_suminfo_raw));
-	if (!sumcompute)
+	comp->sum = calloc(wordcnt, sizeof(union xfs_suminfo_raw));
+	if (!comp->sum)
 		do_error(
 _("couldn't allocate memory for incore realtime summary info.\n"));
 
@@ -81,15 +88,27 @@ _("couldn't allocate memory for incore realtime summary info.\n"));
 	 * end (size) of each range of free extents to set the summary info
 	 * properly.
 	 */
-	while (extno < mp->m_sb.sb_rextents)  {
+	while (extno < rtg->rtg_extents) {
 		xfs_rtword_t		freebit = 1;
 		xfs_rtword_t		bits = 0;
-		int			i;
+		int			state, i;
 
 		set_rtword(mp, words, 0);
-		for (i = 0; i < sizeof(xfs_rtword_t) * NBBY &&
-				extno < mp->m_sb.sb_rextents; i++, extno++)  {
-			if (get_rtbmap(extno) == XR_E_FREE)  {
+		for (i = 0; i < sizeof(xfs_rtword_t) * NBBY; i++) {
+			if (extno == rtg->rtg_extents)
+				break;
+
+			/*
+			 * Note: for the RTG case it might make sense to use
+			 * get_bmap_ext here and generate multiple bitmap
+			 * entries per lookup.
+			 */
+			if (xfs_has_rtgroups(mp))
+				state = get_bmap(idx,
+					extno * mp->m_sb.sb_rextsize);
+			else
+				state = get_rtbmap(extno);
+			if (state == XR_E_FREE)  {
 				sb_frextents++;
 				bits |= freebit;
 
@@ -104,11 +123,12 @@ _("couldn't allocate memory for incore realtime summary info.\n"));
 
 				offs = xfs_rtsumoffs(mp, libxfs_highbit64(len),
 						start_bmbno);
-				inc_sumcount(mp, sumcompute, offs);
+				inc_sumcount(mp, comp->sum, offs);
 				in_extent = false;
 			}
 
 			freebit <<= 1;
+			extno++;
 		}
 		set_rtword(mp, words, bits);
 		words++;
@@ -122,8 +142,28 @@ _("couldn't allocate memory for incore realtime summary info.\n"));
 		xfs_rtsumoff_t	offs;
 
 		offs = xfs_rtsumoffs(mp, libxfs_highbit64(len), start_bmbno);
-		inc_sumcount(mp, sumcompute, offs);
+		inc_sumcount(mp, comp->sum, offs);
 	}
+}
+
+/*
+ * generate the real-time bitmap and summary info based on the
+ * incore realtime extent map.
+ */
+void
+generate_rtinfo(
+	struct xfs_mount	*mp)
+{
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
+	rt_computed = calloc(mp->m_sb.sb_rgcount, sizeof(struct rtg_computed));
+	if (!rt_computed)
+		do_error(
+	_("couldn't allocate memory for incore realtime info.\n"));
+
+	for_each_rtgroup(mp, rgno, rtg)
+		generate_rtg_rtinfo(rtg);
 
 	if (mp->m_sb.sb_frextents != sb_frextents) {
 		do_warn(_("sb_frextents %" PRIu64 ", counted %" PRIu64 "\n"),
@@ -133,12 +173,13 @@ _("couldn't allocate memory for incore realtime summary info.\n"));
 
 static void
 check_rtwords(
-	struct xfs_mount	*mp,
+	struct xfs_rtgroup	*rtg,
 	const char		*filename,
 	unsigned long long	bno,
 	void			*ondisk,
 	void			*incore)
 {
+	struct xfs_mount	*mp = rtg->rtg_mount;
 	unsigned int		wordcnt = mp->m_blockwsize;
 	union xfs_rtword_raw	*o = ondisk, *i = incore;
 	int			badstart = -1;
@@ -152,8 +193,9 @@ check_rtwords(
 			/* Report a range of inconsistency that just ended. */
 			if (badstart >= 0)
 				do_warn(
- _("discrepancy in %s at dblock 0x%llx words 0x%x-0x%x/0x%x\n"),
-					filename, bno, badstart, j - 1, wordcnt);
+ _("discrepancy in %s (%u) at dblock 0x%llx words 0x%x-0x%x/0x%x\n"),
+					filename, rtg->rtg_rgno, bno,
+					badstart, j - 1, wordcnt);
 			badstart = -1;
 			continue;
 		}
@@ -164,28 +206,26 @@ check_rtwords(
 
 	if (badstart >= 0)
 		do_warn(
- _("discrepancy in %s at dblock 0x%llx words 0x%x-0x%x/0x%x\n"),
-					filename, bno, badstart, wordcnt,
-					wordcnt);
+ _("discrepancy in %s (%u) at dblock 0x%llx words 0x%x-0x%x/0x%x\n"),
+			filename, rtg->rtg_rgno, bno,
+			badstart, wordcnt, wordcnt);
 }
 
 static void
 check_rtfile_contents(
-	struct xfs_mount	*mp,
-	const char		*filename,
-	xfs_ino_t		ino,
+	struct xfs_rtgroup	*rtg,
+	enum xfs_rtg_inodes	type,
 	void			*buf,
 	xfs_fileoff_t		filelen)
 {
-	struct xfs_bmbt_irec	map;
-	struct xfs_buf		*bp;
-	struct xfs_inode	*ip;
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	const char		*filename = xfs_rtginode_name(type);
+	struct xfs_inode	*ip = rtg->rtg_inodes[type];
 	xfs_fileoff_t		bno = 0;
 	int			error;
 
-	error = -libxfs_iget(mp, NULL, ino, 0, &ip);
-	if (error) {
-		do_warn(_("unable to open %s file, err %d\n"), filename, error);
+	if (!ip) {
+		do_warn(_("unable to open %s file\n"), filename);
 		return;
 	}
 
@@ -197,12 +237,11 @@ check_rtfile_contents(
 	}
 
 	while (bno < filelen)  {
-		xfs_filblks_t	maplen;
-		int		nmap = 1;
+		struct xfs_bmbt_irec	map;
+		struct xfs_buf		*bp;
+		int			nmap = 1;
 
-		/* Read up to 1MB at a time. */
-		maplen = min(filelen - bno, XFS_B_TO_FSBT(mp, 1048576));
-		error = -libxfs_bmapi_read(ip, bno, maplen, &map, &nmap, 0);
+		error = -libxfs_bmapi_read(ip, bno, 1, &map, &nmap, 0);
 		if (error) {
 			do_warn(_("unable to read %s mapping, err %d\n"),
 					filename, error);
@@ -217,44 +256,54 @@ check_rtfile_contents(
 
 		error = -libxfs_buf_read_uncached(mp->m_dev,
 				XFS_FSB_TO_DADDR(mp, map.br_startblock),
-				XFS_FSB_TO_BB(mp, map.br_blockcount),
-				0, &bp, NULL);
+				XFS_FSB_TO_BB(mp, 1), 0, &bp,
+				xfs_rtblock_ops(mp, type));
 		if (error) {
 			do_warn(_("unable to read %s at dblock 0x%llx, err %d\n"),
 					filename, (unsigned long long)bno, error);
 			break;
 		}
 
-		check_rtwords(mp, filename, bno, bp->b_addr, buf);
+		check_rtwords(rtg, filename, bno, bp->b_addr, buf);
 
-		buf += XFS_FSB_TO_B(mp, map.br_blockcount);
-		bno += map.br_blockcount;
+		buf += mp->m_blockwsize << XFS_WORDLOG;
+		bno++;
 		libxfs_buf_relse(bp);
 	}
-
-	libxfs_irele(ip);
 }
 
 void
 check_rtbitmap(
 	struct xfs_mount	*mp)
 {
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
 	if (need_rbmino)
 		return;
 
-	check_rtfile_contents(mp, "rtbitmap", mp->m_sb.sb_rbmino, btmcompute,
-			mp->m_sb.sb_rbmblocks);
+	for_each_rtgroup(mp, rgno, rtg) {
+		check_rtfile_contents(rtg, XFS_RTG_BITMAP,
+				rt_computed[rtg->rtg_rgno].bmp,
+				mp->m_sb.sb_rbmblocks);
+	}
 }
 
 void
 check_rtsummary(
 	struct xfs_mount	*mp)
 {
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
 	if (need_rsumino)
 		return;
 
-	check_rtfile_contents(mp, "rtsummary", mp->m_sb.sb_rsumino, sumcompute,
-			mp->m_rsumblocks);
+	for_each_rtgroup(mp, rgno, rtg) {
+		check_rtfile_contents(rtg, XFS_RTG_SUMMARY,
+				rt_computed[rtg->rtg_rgno].sum,
+				mp->m_rsumblocks);
+	}
 }
 
 void
@@ -263,8 +312,17 @@ fill_rtbitmap(
 {
 	int			error;
 
+	/*
+	 * For file systems without a RT subvolume we have the bitmap and
+	 * summary files, but they are empty.  In that case rt_computed is
+	 * NULL.
+	 */
+	if (!rt_computed)
+		return;
+
 	error = -libxfs_rtfile_initialize_blocks(rtg, XFS_RTG_BITMAP,
-			0, rtg->rtg_mount->m_sb.sb_rbmblocks, btmcompute);
+			0, rtg->rtg_mount->m_sb.sb_rbmblocks,
+			rt_computed[rtg->rtg_rgno].bmp);
 	if (error)
 		do_error(
 _("couldn't re-initialize realtime bitmap inode, error %d\n"), error);
@@ -276,9 +334,141 @@ fill_rtsummary(
 {
 	int			error;
 
+	/*
+	 * For file systems without a RT subvolume we have the bitmap and
+	 * summary files, but they are empty.  In that case rt_computed is
+	 * NULL.
+	 */
+	if (!rt_computed)
+		return;
+
 	error = -libxfs_rtfile_initialize_blocks(rtg, XFS_RTG_SUMMARY,
-			0, rtg->rtg_mount->m_rsumblocks, sumcompute);
+			0, rtg->rtg_mount->m_rsumblocks,
+			rt_computed[rtg->rtg_rgno].sum);
 	if (error)
 		do_error(
 _("couldn't re-initialize realtime summary inode, error %d\n"), error);
+}
+
+bool
+is_rtgroup_inode(
+	xfs_ino_t		ino,
+	enum xfs_rtg_inodes	type)
+{
+	if (!rtg_inodes[type])
+		return false;
+	return bitmap_test(rtg_inodes[type], ino, 1);
+}
+
+xfs_rgnumber_t
+rtgroup_for_rtginode(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino,
+	enum xfs_rtg_inodes	type)
+{
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
+	if (!rtg_inodes[type])
+		return NULLRGNUMBER;
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		if (rtg->rtg_inodes[type] &&
+		    rtg->rtg_inodes[type]->i_ino == ino)
+			return rgno;
+	}
+
+	return NULLRGNUMBER;
+}
+
+void
+rtginode_avoid_check(
+	struct xfs_mount	*mp,
+	enum xfs_rtg_inodes	type)
+{
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
+	for_each_rtgroup(mp, rgno, rtg)
+		libxfs_rtginode_irele(&rtg->rtg_inodes[type]);
+
+	bitmap_clear(rtg_inodes[type], 0, XFS_MAXINUMBER);
+}
+
+static inline int
+set_rtginode(
+	struct xfs_trans	*tp,
+	struct xfs_rtgroup	*rtg,
+	enum xfs_rtg_inodes	type)
+{
+	struct xfs_inode	*ip;
+	int			error;
+
+	error = -libxfs_rtginode_load(rtg, type, tp);
+	if (error)
+		return error;
+
+	ip = rtg->rtg_inodes[type];
+	if (!ip /* inode type not enabled */ ||
+	    !xfs_has_rtgroups(rtg->rtg_mount))
+		return 0;
+
+	if (bitmap_test(rtg_inodes[type], ip->i_ino, 1))
+		return EFSCORRUPTED;
+	return bitmap_set(rtg_inodes[type], ip->i_ino, 1);
+}
+
+void
+discover_rtgroup_inodes(
+	struct xfs_mount	*mp)
+{
+	struct xfs_rtgroup	*rtg;
+	struct xfs_trans	*tp;
+	xfs_rgnumber_t		rgno;
+	int			error, err2;
+	int			i;
+
+	for (i = 0; i < XFS_RTG_MAX; i++) {
+		error = bitmap_alloc(&rtg_inodes[i]);
+		if (error)
+			goto out;
+	}
+
+	error = -libxfs_trans_alloc_empty(mp, &tp);
+	if (error)
+		goto out;
+	if (xfs_has_rtgroups(mp) && mp->m_sb.sb_rgcount > 0) {
+		error = -libxfs_rtginode_load_parent(tp);
+		if (error)
+			goto out_cancel;
+	}
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		for (i = 0; i < XFS_RTG_MAX; i++) {
+			err2 = set_rtginode(tp, rtg, i);
+			if (err2 && !error)
+				error = err2;
+		}
+	}
+
+out_cancel:
+	libxfs_trans_cancel(tp);
+out:
+	if (error == EFSCORRUPTED)
+		do_warn(
+ _("corruption in metadata directory tree while discovering rt group inodes\n"));
+	if (error)
+		do_warn(
+ _("couldn't discover rt group inodes, err %d\n"),
+				error);
+}
+
+void
+free_rtgroup_inodes(
+	struct xfs_mount	*mp)
+{
+	int			i;
+
+	for (i = 0; i < XFS_RTG_MAX; i++)
+		bitmap_free(&rtg_inodes[i]);
 }

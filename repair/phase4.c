@@ -398,7 +398,15 @@ phase4(xfs_mount_t *mp)
 	}
 	print_final_rpt();
 
-	process_dup_rt_extents(mp);
+	if (xfs_has_rtgroups(mp)) {
+		for (i = 0; i < mp->m_sb.sb_rgcount; i++)  {
+			process_dup_extents(mp->m_sb.sb_agcount + i, 0,
+				xfs_rtgroup_extents(mp, i) <<
+					mp->m_sb.sb_rextslog);
+		}
+	} else {
+		process_dup_rt_extents(mp);
+	}
 
 	/*
 	 * initialize bitmaps for all AGs
