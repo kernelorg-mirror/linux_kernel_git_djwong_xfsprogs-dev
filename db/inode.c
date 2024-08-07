@@ -817,6 +817,10 @@ inode_next_type(void)
 		    is_rtgroup_inode(iocur_top->ino, XFS_RTG_BITMAP))
 			return TYP_RGBITMAP;
 
+		if (xfs_has_rtgroups(mp) &&
+		    is_rtgroup_inode(iocur_top->ino, XFS_RTG_SUMMARY))
+			return TYP_RGSUMMARY;
+
 		if (iocur_top->ino == mp->m_sb.sb_rbmino)
 			return TYP_RTBITMAP;
 
