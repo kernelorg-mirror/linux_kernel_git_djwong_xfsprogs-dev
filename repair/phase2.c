@@ -121,7 +121,7 @@ set_inobtcount(
 		exit(0);
 	}
 
-	if (!xfs_has_finobt(mp)) {
+	if (!xfs_has_finobt(mp) && !add_finobt) {
 		printf(
 	_("Inode btree count feature requires free inode btree.\n"));
 		exit(0);
@@ -206,6 +206,28 @@ set_exchrange(
 
 	printf(_("Adding file exchange-range support to filesystem.\n"));
 	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_INCOMPAT_EXCHRANGE;
+	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+	return true;
+}
+
+static bool
+set_finobt(
+	struct xfs_mount	*mp,
+	struct xfs_sb		*new_sb)
+{
+	if (xfs_has_finobt(mp)) {
+		printf(_("Filesystem already supports free inode btrees.\n"));
+		exit(0);
+	}
+
+	if (!xfs_has_crc(mp)) {
+		printf(
+	_("Free inode btree feature only supported on V5 filesystems.\n"));
+		exit(0);
+	}
+
+	printf(_("Adding free inode btrees to filesystem.\n"));
+	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_FINOBT;
 	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
 	return true;
 }
@@ -376,6 +398,8 @@ need_check_fs_free_space(
 	struct xfs_mount		*mp,
 	const struct check_state	*old)
 {
+	if (xfs_has_finobt(mp) && !(old->features & XFS_FEAT_FINOBT))
+		return true;
 	return false;
 }
 
@@ -453,6 +477,8 @@ upgrade_filesystem(
 		dirty |= set_nrext64(mp, &new_sb);
 	if (add_exchrange)
 		dirty |= set_exchrange(mp, &new_sb);
+	if (add_finobt)
+		dirty |= set_finobt(mp, &new_sb);
 	if (!dirty)
 		return;
 
