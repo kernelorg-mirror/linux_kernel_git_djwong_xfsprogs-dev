@@ -632,8 +632,8 @@ libxfs_mount_setup_metadir(
 	if (error)
 		return;
 
-	error = -libxfs_metafile_iget(tp, mp->m_sb.sb_metadirino, S_IFDIR,
-			&mp->m_metadirip);
+	error = -libxfs_metafile_iget(tp, mp->m_sb.sb_metadirino,
+			XFS_METAFILE_DIR, &mp->m_metadirip);
 	if (error) {
 		fprintf(stderr,
  _("%s: Failed to load metadir root directory, error %d\n"),
