@@ -11,6 +11,7 @@
 #include "xfs_trace.h"
 #include "xfs_group.h"
 #include "xfs_ag.h"
+#include "xfs_rtgroup.h"
 
 /*
  * Groups can have passive and active references.
