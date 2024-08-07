@@ -493,78 +493,67 @@ mark_ino_metadata(
 	set_inode_is_meta(irec, ino_offset);
 }
 
-/* Load a realtime freespace metadata inode from disk and reset it. */
-static int
-ensure_rtino(
-	struct xfs_trans		*tp,
-	xfs_ino_t			ino,
-	struct xfs_inode		**ipp)
-{
-	struct xfs_mount		*mp = tp->t_mountp;
-	int				error;
-
-	error = -libxfs_iget(mp, tp, ino, 0, ipp);
-	if (error)
-		return error;
-
-	reset_sbroot_ino(tp, S_IFREG, *ipp);
-	if (xfs_has_metadir(mp))
-		libxfs_metafile_set_iflag(tp, *ipp);
-	return 0;
-}
-
+/* (Re)create a missing sb-rooted rt freespace inode. */
 static void
-mk_rbmino(
-	struct xfs_mount	*mp)
+mk_rtino(
+	struct xfs_rtgroup	*rtg,
+	enum xfs_rtg_inodes	type)
 {
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	struct xfs_inode	*ip = rtg->rtg_inodes[type];
 	struct xfs_trans	*tp;
-	struct xfs_inode	*ip;
 	int			error;
 
 	error = -libxfs_trans_alloc_rollable(mp, 10, &tp);
 	if (error)
 		res_failed(error);
 
-	/* Reset the realtime bitmap inode. */
-	error = ensure_rtino(tp, mp->m_sb.sb_rbmino, &ip);
-	if (error) {
-		do_error(
-		_("couldn't iget realtime bitmap inode -- error - %d\n"),
-			error);
+	if (!ip) {
+		xfs_ino_t	ino = NULLFSINO;
+
+		switch (type) {
+		case XFS_RTG_BITMAP:
+			ino = mp->m_sb.sb_rbmino;
+			break;
+		case XFS_RTG_SUMMARY:
+			ino = mp->m_sb.sb_rsumino;
+			break;
+		default:
+			break;
+		}
+
+		error = -libxfs_iget(mp, tp, ino, 0, &ip);
+		if (error) {
+			do_error(
+_("couldn't iget realtime bitmap inode -- error - %d\n"),
+					error);
+		}
+
+		rtg->rtg_inodes[type] = ip;
 	}
-	ip->i_disk_size = mp->m_sb.sb_rbmblocks * mp->m_sb.sb_blocksize;
-	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
+
+	reset_sbroot_ino(tp, S_IFREG, ip);
+	if (xfs_has_metadir(mp))
+		libxfs_metafile_set_iflag(tp, ip);
+
+	switch (type) {
+	case XFS_RTG_BITMAP:
+		error = -libxfs_rtbitmap_create(rtg, ip, tp, false);
+		break;
+	case XFS_RTG_SUMMARY:
+		error = -libxfs_rtsummary_create(rtg, ip, tp, false);
+		break;
+	default:
+		error = EINVAL;
+	}
+
+	if (error)
+		do_error(_("%s inode re-initialization failed for rtgroup %u\n"),
+			xfs_rtginode_name(type), rtg->rtg_rgno);
+
 	error = -libxfs_trans_commit(tp);
 	if (error)
 		do_error(_("%s: commit failed, error %d\n"), __func__, error);
-	libxfs_irele(ip);
-}
-
-static void
-mk_rsumino(
-	struct xfs_mount	*mp)
-{
-	struct xfs_trans	*tp;
-	struct xfs_inode	*ip;
-	int			error;
-
-	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_ichange, 10, 0, 0, &tp);
-	if (error)
-		res_failed(error);
-
-	/* Reset the rt summary inode. */
-	error = ensure_rtino(tp, mp->m_sb.sb_rsumino, &ip);
-	if (error) {
-		do_error(
-		_("couldn't iget realtime summary inode -- error - %d\n"),
-			error);
-	}
-	ip->i_disk_size = mp->m_rsumblocks * mp->m_sb.sb_blocksize;
-	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
-	error = -libxfs_trans_commit(tp);
-	if (error)
-		do_error(_("%s: commit failed, error %d\n"), __func__, error);
-	libxfs_irele(ip);
 }
 
 /* Initialize a root directory. */
@@ -3205,6 +3194,43 @@ traverse_ags(
 	do_inode_prefetch(mp, ag_stride, traverse_function, false, true);
 }
 
+static void
+reset_rt_sb_inodes(
+	struct xfs_mount	*mp)
+{
+	struct xfs_rtgroup	*rtg;
+
+	if (no_modify) {
+		if (need_rbmino)
+			do_warn(_("would reinitialize realtime bitmap inode\n"));
+		if (need_rsumino)
+			do_warn(_("would reinitialize realtime summary inode\n"));
+		return;
+	}
+
+	rtg = xfs_rtgroup_grab(mp, 0);
+
+	if (need_rbmino)  {
+		do_warn(_("reinitializing realtime bitmap inode\n"));
+		mk_rtino(rtg, XFS_RTG_BITMAP);
+		need_rbmino = 0;
+	}
+
+	if (need_rsumino)  {
+		do_warn(_("reinitializing realtime summary inode\n"));
+		mk_rtino(rtg, XFS_RTG_SUMMARY);
+		need_rsumino = 0;
+	}
+
+	do_log(
+_("        - resetting contents of realtime bitmap and summary inodes\n"));
+
+	fill_rtbitmap(rtg);
+	fill_rtsummary(rtg);
+
+	xfs_rtgroup_rele(rtg);
+}
+
 void
 phase6(xfs_mount_t *mp)
 {
@@ -3253,32 +3279,7 @@ phase6(xfs_mount_t *mp)
 		do_warn(_("would reinitialize metadata root directory\n"));
 	}
 
-	if (need_rbmino)  {
-		if (!no_modify)  {
-			do_warn(_("reinitializing realtime bitmap inode\n"));
-			mk_rbmino(mp);
-			need_rbmino = 0;
-		} else  {
-			do_warn(_("would reinitialize realtime bitmap inode\n"));
-		}
-	}
-
-	if (need_rsumino)  {
-		if (!no_modify)  {
-			do_warn(_("reinitializing realtime summary inode\n"));
-			mk_rsumino(mp);
-			need_rsumino = 0;
-		} else  {
-			do_warn(_("would reinitialize realtime summary inode\n"));
-		}
-	}
-
-	if (!no_modify)  {
-		do_log(
-_("        - resetting contents of realtime bitmap and summary inodes\n"));
-		fill_rtbitmap(mp);
-		fill_rtsummary(mp);
-	}
+	reset_rt_sb_inodes(mp);
 
 	mark_standalone_inodes(mp);
 
