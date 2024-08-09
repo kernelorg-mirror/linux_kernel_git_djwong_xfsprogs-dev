@@ -214,17 +214,22 @@ int
 libxfs_metafile_iget(
 	struct xfs_trans	*tp,
 	xfs_ino_t		ino,
-	umode_t			mode,
+	enum xfs_metafile_type	metafile_type,
 	struct xfs_inode	**ipp)
 {
 	struct xfs_mount	*mp = tp->t_mountp;
 	struct xfs_inode	*ip;
+	umode_t			mode;
 	int			error;
 
 	error = libxfs_iget(mp, tp, ino, XFS_IGET_UNTRUSTED, &ip);
 	if (error)
 		return error;
 
+	if (metafile_type == XFS_METAFILE_DIR)
+		mode = S_IFDIR;
+	else
+		mode = S_IFREG;
 	if (inode_wrong_type(VFS_I(ip), mode))
 		goto bad_rele;
 
