@@ -17,6 +17,7 @@
 #include "bit.h"
 #include "output.h"
 #include "init.h"
+#include "libfrog/bitmap.h"
 
 static int	inode_a_bmbt_count(void *obj, int startoff);
 static int	inode_a_bmx_count(void *obj, int startoff);
@@ -696,9 +697,116 @@ inode_init(void)
 	add_command(&inode_cmd);
 }
 
+/* Per-type bitmaps of rt group inodes */
+static struct bitmap	*rtg_inodes[XFS_RTG_MAX];
+
+static inline int
+set_rtginode(
+	struct xfs_trans	*tp,
+	struct xfs_rtgroup	*rtg,
+	enum xfs_rtg_inodes	type)
+{
+	struct xfs_inode	*ip;
+	int			error;
+
+	error = -libxfs_rtginode_load(rtg, type, tp);
+	if (error)
+		return error;
+
+	ip = rtg->rtg_inodes[type];
+	if (!ip) /* inode type not enabled */
+		return 0;
+
+	if (bitmap_test(rtg_inodes[type], ip->i_ino, 1))
+		return EFSCORRUPTED;
+	return bitmap_set(rtg_inodes[type], ip->i_ino, 1);
+}
+
+int
+init_rtmeta_inode_bitmaps(
+	struct xfs_mount	*mp)
+{
+	struct xfs_trans	*tp;
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+	int			error, err2;
+	int			i;
+
+	if (!xfs_has_rtgroups(mp))
+		return 0;
+
+	if (rtg_inodes[0])
+		return 0;
+
+	for (i = 0; i < XFS_RTG_MAX; i++) {
+		error = bitmap_alloc(&rtg_inodes[i]);
+		if (error)
+			return error;
+	}
+
+	error = -libxfs_trans_alloc_empty(mp, &tp);
+	if (error)
+		return error;
+
+	error = -libxfs_rtginode_load_parent(tp);
+	if (error)
+		goto out_cancel;
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		for (i = 0; i < XFS_RTG_MAX; i++) {
+			err2 = set_rtginode(tp, rtg, i);
+			if (err2 && !error)
+				error = err2;
+		}
+	}
+
+out_cancel:
+	libxfs_trans_cancel(tp);
+	return error;
+}
+
+xfs_rgnumber_t
+rtgroup_for_rtginode(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino,
+	enum xfs_rtg_inodes	type)
+{
+	struct xfs_rtgroup	*rtg;
+	xfs_rgnumber_t		rgno;
+
+	if (!rtg_inodes[type])
+		return NULLRGNUMBER;
+
+	for_each_rtgroup(mp, rgno, rtg) {
+		if (rtg->rtg_inodes[type] &&
+		    rtg->rtg_inodes[type]->i_ino == ino)
+			return rgno;
+	}
+
+	return NULLRGNUMBER;
+}
+
+bool
+is_rtgroup_inode(
+	xfs_ino_t		ino,
+	enum xfs_rtg_inodes	type)
+{
+	if (!rtg_inodes[type])
+		return false;
+	return bitmap_test(rtg_inodes[type], ino, 1);
+}
+
 typnm_t
 inode_next_type(void)
 {
+	int		error;
+
+	error = init_rtmeta_inode_bitmaps(mp);
+	if (error) {
+		dbprintf(_("error %d setting up rt metadata inode bitmaps\n"),
+				error);
+	}
+
 	switch (iocur_top->mode & S_IFMT) {
 	case S_IFDIR:
 		return TYP_DIR2;

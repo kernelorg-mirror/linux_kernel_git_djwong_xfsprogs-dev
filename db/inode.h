@@ -25,3 +25,9 @@ extern int	inode_size(void *obj, int startoff, int idx);
 extern int	inode_u_size(void *obj, int startoff, int idx);
 extern void	xfs_inode_set_crc(struct xfs_buf *);
 extern void	set_cur_inode(xfs_ino_t ino);
+
+int init_rtmeta_inode_bitmaps(struct xfs_mount *mp);
+xfs_rgnumber_t rtgroup_for_rtginode(struct xfs_mount *mp, xfs_ino_t ino,
+		enum xfs_rtg_inodes type);
+
+bool is_rtgroup_inode(xfs_ino_t ino, enum xfs_rtg_inodes type);
