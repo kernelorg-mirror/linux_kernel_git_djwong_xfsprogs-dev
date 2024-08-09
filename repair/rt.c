@@ -145,18 +145,41 @@ generate_rtinfo(
 static void
 check_rtfile_contents(
 	struct xfs_mount	*mp,
-	const char		*filename,
-	xfs_ino_t		ino,
-	void			*buf,
+	enum xfs_metafile_type	metafile_type,
 	xfs_fileoff_t		filelen)
 {
 	struct xfs_bmbt_irec	map;
 	struct xfs_buf		*bp;
 	struct xfs_inode	*ip;
+	const char		*filename;
+	void			*buf;
+	struct xfs_trans	*tp;
+	xfs_ino_t		ino;
 	xfs_fileoff_t		bno = 0;
 	int			error;
 
-	error = -libxfs_iget(mp, NULL, ino, 0, &ip);
+	switch (metafile_type) {
+	case XFS_METAFILE_RTBITMAP:
+		ino = mp->m_sb.sb_rbmino;
+		filename = "rtbitmap";
+		buf = btmcompute;
+		break;
+	case XFS_METAFILE_RTSUMMARY:
+		ino = mp->m_sb.sb_rsumino;
+		filename = "rtsummary";
+		buf = sumcompute;
+		break;
+	default:
+		return;
+	}
+
+	error = -libxfs_trans_alloc_empty(mp, &tp);
+	if (error)
+		do_error(_("cannot alloc transaction to check rt%s file"),
+				filename);
+
+	error = -libxfs_metafile_iget(tp, ino, metafile_type, &ip);
+	libxfs_trans_cancel(tp);
 	if (error) {
 		do_warn(_("unable to open %s file, err %d\n"), filename, error);
 		return;
@@ -217,7 +240,7 @@ check_rtbitmap(
 	if (need_rbmino)
 		return;
 
-	check_rtfile_contents(mp, "rtbitmap", mp->m_sb.sb_rbmino, btmcompute,
+	check_rtfile_contents(mp, XFS_METAFILE_RTBITMAP,
 			mp->m_sb.sb_rbmblocks);
 }
 
@@ -228,6 +251,6 @@ check_rtsummary(
 	if (need_rsumino)
 		return;
 
-	check_rtfile_contents(mp, "rtsummary", mp->m_sb.sb_rsumino, sumcompute,
+	check_rtfile_contents(mp, XFS_METAFILE_RTSUMMARY,
 			XFS_B_TO_FSB(mp, mp->m_rsumsize));
 }
