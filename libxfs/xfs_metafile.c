@@ -17,9 +17,7 @@
 #include "xfs_metafile.h"
 #include "xfs_trace.h"
 #include "xfs_inode.h"
-#include "xfs_quota.h"
 #include "xfs_errortag.h"
-#include "xfs_error.h"
 #include "xfs_alloc.h"
 
 /* Set up an inode to be recognized as a metadata directory inode. */
