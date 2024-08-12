@@ -692,6 +692,15 @@ ensure_rtgroup_rmapbt(
 		populate_rtgroup_rmapbt(rtg, est_fdblocks);
 }
 
+static void
+ensure_rtgroup_refcountbt(
+	struct xfs_rtgroup	*rtg,
+	xfs_filblks_t		est_fdblocks)
+{
+	if (ensure_rtgroup_file(rtg, XFS_RTG_REFCOUNT))
+		populate_rtgroup_refcountbt(rtg, est_fdblocks);
+}
+
 /* Initialize a root directory. */
 static int
 init_fs_root_dir(
@@ -3408,6 +3417,7 @@ reset_rt_metadata_inodes(
 	if (!need_packed_btrees) {
 		for_each_rtgroup(mp, rgno, rtg) {
 			metadata_blocks += estimate_rtrmapbt_blocks(rtg);
+			metadata_blocks += estimate_rtrefcountbt_blocks(rtg);
 		}
 		if (mp->m_sb.sb_fdblocks > metadata_blocks)
 			est_fdblocks = mp->m_sb.sb_fdblocks - metadata_blocks;
@@ -3425,6 +3435,7 @@ _("        - resetting contents of realtime bitmap and summary inodes\n"));
 		ensure_rtgroup_bitmap(rtg);
 		ensure_rtgroup_summary(rtg);
 		ensure_rtgroup_rmapbt(rtg, est_fdblocks);
+		ensure_rtgroup_refcountbt(rtg, est_fdblocks);
 	}
 }
 
