@@ -1691,8 +1691,11 @@ init_refcount_cursor(
  * Disable the refcount btree check.
  */
 void
-refcount_avoid_check(void)
+refcount_avoid_check(
+	struct xfs_mount	*mp)
 {
+	if (xfs_has_rtgroups(mp))
+		mark_rtgroup_inodes_bad(mp, XFS_RTG_REFCOUNT);
 	refcbt_suspect = true;
 }
 
