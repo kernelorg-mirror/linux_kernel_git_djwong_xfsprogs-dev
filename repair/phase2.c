@@ -277,9 +277,8 @@ set_rmapbt(
 		exit(0);
 	}
 
-	if (xfs_has_realtime(mp)) {
-		printf(
-	_("Reverse mapping btree feature not supported with realtime.\n"));
+	if (xfs_has_realtime(mp) && !xfs_has_rtgroups(mp)) {
+		printf(_("Reverse mapping btree requires realtime groups.\n"));
 		exit(0);
 	}
 
@@ -292,6 +291,11 @@ set_rmapbt(
 	printf(_("Adding reverse mapping btrees to filesystem.\n"));
 	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_RMAPBT;
 	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+
+	/* Quota counts will be wrong once we add the rmap inodes. */
+	if (xfs_has_realtime(mp))
+		quotacheck_skip();
+
 	return true;
 }
 
@@ -452,6 +456,37 @@ check_free_space(
 	return avail > GIGABYTES(10, mp->m_sb.sb_blocklog);
 }
 
+/*
+ * Reserve space to handle rt rmap btree expansion.
+ *
+ * If the rmap inode for this group already exists, we assume that we're adding
+ * some other feature.  Note that we have not validated the metadata directory
+ * tree, so we must perform the lookup by hand and abort the upgrade if there
+ * are errors.  Otherwise, the amount of space needed to handle a new maximally
+ * sized rmap btree is added to @new_resv.
+ */
+static int
+reserve_rtrmap_inode(
+	struct xfs_rtgroup	*rtg,
+	xfs_rfsblock_t		*new_resv)
+{
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	struct xfs_inode	*ip = rtg->rtg_inodes[XFS_RTGI_RMAP];
+	xfs_filblks_t		ask;
+
+	if (!xfs_has_rtrmapbt(mp))
+		return 0;
+
+	ask = libxfs_rtrmapbt_calc_reserves(mp);
+
+	/* failed to load the rtdir inode? */
+	if (!ip) {
+		*new_resv += ask;
+		return 0;
+	}
+	return -libxfs_metafile_resv_init(ip, ask);
+}
+
 static void
 check_fs_free_space(
 	struct xfs_mount		*mp,
@@ -459,7 +494,10 @@ check_fs_free_space(
 	struct xfs_sb			*new_sb)
 {
 	struct xfs_perag		*pag;
+	struct xfs_rtgroup		*rtg;
+	xfs_rfsblock_t			new_resv = 0;
 	xfs_agnumber_t			agno;
+	xfs_rgnumber_t			rgno;
 	int				error;
 
 	/* Make sure we have enough space for per-AG reservations. */
@@ -535,6 +573,21 @@ check_fs_free_space(
 		libxfs_trans_cancel(tp);
 	}
 
+	/* Realtime metadata btree inodes */
+	for_each_rtgroup(mp, rgno, rtg) {
+		error = reserve_rtrmap_inode(rtg, &new_resv);
+		if (error == ENOSPC) {
+			printf(
+_("Not enough free space would remain for rtgroup %u rmap inode.\n"),
+					rtg->rtg_rgno);
+			exit(0);
+		}
+		if (error)
+			do_error(
+_("Error %d while checking rtgroup %u rmap inode space reservation.\n"),
+					error, rtg->rtg_rgno);
+	}
+
 	/*
 	 * If we're adding parent pointers, we need at least 25% free since
 	 * scanning the entire filesystem to guesstimate the overhead is
@@ -550,11 +603,18 @@ check_fs_free_space(
 
 	/*
 	 * Would the post-upgrade filesystem have enough free space on the data
-	 * device after making per-AG reservations?
+	 * device after making per-AG reservations and reserving rt metadata
+	 * inode blocks?
 	 */
-	if (!check_free_space(mp, mp->m_sb.sb_fdblocks, mp->m_sb.sb_dblocks)) {
+	if (new_resv > mp->m_sb.sb_fdblocks ||
+	    !check_free_space(mp, mp->m_sb.sb_fdblocks, mp->m_sb.sb_dblocks)) {
 		printf(_("Filesystem will be low on space after upgrade.\n"));
 		exit(1);
+	}
+
+	/* Unreserve the realtime metadata reservations. */
+	for_each_rtgroup(mp, rgno, rtg) {
+		libxfs_metafile_resv_free(rtg->rtg_inodes[XFS_RTGI_RMAP]);
 	}
 
 	/*
