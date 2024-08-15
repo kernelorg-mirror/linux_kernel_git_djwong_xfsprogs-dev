@@ -765,6 +765,9 @@ unicrash_complain(
 	char			*bad1 = NULL;
 	char			*bad2 = NULL;
 
+	if (!should_warn_about_name(uc->ctx))
+		return;
+
 	bad1 = string_escape(entry->name);
 	if (dup_entry)
 		bad2 = string_escape(dup_entry->name);

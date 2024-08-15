@@ -346,6 +346,9 @@ should_warn_about_name(
 	bool			whine;
 	bool			res;
 
+	if (ctx->naming_warnings > TOO_MANY_NAME_WARNINGS)
+		return debug || verbose;
+
 	pthread_mutex_lock(&ctx->lock);
 	ctx->naming_warnings++;
 	whine = ctx->naming_warnings == TOO_MANY_NAME_WARNINGS;
