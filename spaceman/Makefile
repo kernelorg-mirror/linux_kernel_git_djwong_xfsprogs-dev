@@ -17,6 +17,7 @@ CFILES = \
 	init.c \
 	move_inode.c \
 	prealloc.c \
+	relocation.c \
 	trim.c
 LSRCFILES = xfs_info.sh
 
