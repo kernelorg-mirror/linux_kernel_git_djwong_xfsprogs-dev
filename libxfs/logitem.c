@@ -15,6 +15,7 @@
 #include "xfs_inode_fork.h"
 #include "xfs_inode.h"
 #include "xfs_trans.h"
+#include "xfs_group.h"
 #include "xfs_rtbitmap.h"
 
 struct kmem_cache	*xfs_buf_item_cache;
