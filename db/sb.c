@@ -141,6 +141,10 @@ const field_t	sb_flds[] = {
 	{ "meta_uuid", FLDT_UUID, OI(OFF(meta_uuid)), C1, 0, TYP_NONE },
 	{ "metadirino", FLDT_INO, OI(OFF(metadirino)), metadirfld_count,
 	  FLD_COUNT, TYP_INODE },
+	{ "rgcount", FLDT_RGNUMBER, OI(OFF(rgcount)), metadirfld_count,
+	  FLD_COUNT, TYP_NONE },
+	{ "rgextents", FLDT_RTXLEN, OI(OFF(rgextents)), metadirfld_count,
+	  FLD_COUNT, TYP_NONE },
 	{ NULL }
 };
 
