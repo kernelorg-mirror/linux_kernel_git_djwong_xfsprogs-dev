@@ -69,6 +69,8 @@ log = False
 everything = False
 printf_prefix = ''
 want_repair = False
+has_parent = False
+has_rmapbt = False
 libhandle = None
 repair_queue = None # placeholder for event queue worker
 
@@ -341,6 +343,57 @@ def xfs_repair_inode_metadata(fd, type, ino, gen):
 	'''Call the kernel to repair some inode metadata.'''
 	return __xfs_repair_metadata(fd, type, 0, ino, gen)
 
+# fsgeometry ioctl
+class xfs_fsop_geom(ctypes.Structure):
+	_fields_ = [
+		("blocksize",		ctypes.c_uint),
+		("rtextesize",		ctypes.c_uint),
+		("agblocks",		ctypes.c_uint),
+		("agcount",		ctypes.c_uint),
+		("logblocks",		ctypes.c_uint),
+		("sectsize",		ctypes.c_uint),
+		("inodesize",		ctypes.c_uint),
+		("imaxpct",		ctypes.c_uint),
+		("datablocks",		ctypes.c_ulonglong),
+		("rtblocks",		ctypes.c_ulonglong),
+		("rtextents",		ctypes.c_ulonglong),
+		("logstart",		ctypes.c_ulonglong),
+		("uuid",		ctypes.c_ubyte * 16),
+		("sunit",		ctypes.c_uint),
+		("swidth",		ctypes.c_uint),
+		("version",		ctypes.c_uint),
+		("flags",		ctypes.c_uint),
+		("logsectsize",		ctypes.c_uint),
+		("rtsectsize",		ctypes.c_uint),
+		("dirblocksize",	ctypes.c_uint),
+		("logsunit",		ctypes.c_uint),
+		("sick",		ctypes.c_uint),
+		("checked",		ctypes.c_uint),
+		("rgblocks",		ctypes.c_uint),
+		("rgcount",		ctypes.c_uint),
+		("_pad",		ctypes.c_ulonglong * 16),
+	]
+assert ctypes.sizeof(xfs_fsop_geom) == 256
+
+XFS_FSOP_GEOM_FLAGS_RMAPBT	= 1 << 19
+XFS_FSOP_GEOM_FLAGS_PARENT	= 1 << 25
+
+XFS_IOC_FSGEOMETRY		= _IOR (0x58, 126, xfs_fsop_geom)
+
+def xfs_has_parent(fd):
+	'''Does this filesystem have parent pointers?'''
+
+	arg = xfs_fsop_geom()
+	fcntl.ioctl(fd, XFS_IOC_FSGEOMETRY, arg)
+	return arg.flags & XFS_FSOP_GEOM_FLAGS_PARENT != 0
+
+def xfs_has_rmapbt(fd):
+	'''Does this filesystem have reverse mapping?'''
+
+	arg = xfs_fsop_geom()
+	fcntl.ioctl(fd, XFS_IOC_FSGEOMETRY, arg)
+	return arg.flags & XFS_FSOP_GEOM_FLAGS_RMAPBT != 0
+
 # main program
 
 def health_reports(mon_fp, fh):
@@ -458,9 +511,28 @@ def monitor(mountpoint, event_queue, **kwargs):
 	global log
 	global printf_prefix
 	global want_repair
+	global has_parent
+	global has_rmapbt
 
 	fh = None
 	fd = os.open(mountpoint, os.O_RDONLY)
+	try:
+		has_parent = xfs_has_parent(fd)
+		has_rmapbt = xfs_has_rmapbt(fd)
+	except Exception as e:
+		# Don't care if we can't detect parent pointers or rmap
+		print(e, file = sys.stderr)
+
+	# Check for the backref metadata that makes repair effective.
+	if want_repair:
+		if not has_rmapbt:
+			print(f"{mountpoint}: XFS online repair is less effective without rmap btrees.")
+		if not has_parent:
+			print(f"{mountpoint}: XFS online repair is less effective without parent pointers.")
+
+	# Flush anything that we may have printed about operational state.
+	sys.stdout.flush()
+
 	try:
 		if want_repair:
 			fh = fshandle(fd, mountpoint)
