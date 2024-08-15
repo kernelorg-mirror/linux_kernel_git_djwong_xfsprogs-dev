@@ -124,7 +124,11 @@ const field_t	sb_flds[] = {
 	{ "features2", FLDT_UINT32X, OI(OFF(features2)), C1, 0, TYP_NONE },
 	{ "bad_features2", FLDT_UINT32X, OI(OFF(bad_features2)),
 		premetadirfld_count, FLD_COUNT, TYP_NONE },
+	{ "rgblklog", FLDT_UINT8D, OI(OFF(rgblklog)), metadirfld_count,
+		FLD_COUNT, TYP_NONE },
 	{ "metadirpad0", FLDT_UINT8X, OI(OFF(metadirpad0)), metadirfld_count,
+		FLD_COUNT, TYP_NONE },
+	{ "metadirpad1", FLDT_UINT16X, OI(OFF(metadirpad1)), metadirfld_count,
 		FLD_COUNT, TYP_NONE },
 	{ "features_compat", FLDT_UINT32X, OI(OFF(features_compat)),
 		C1, 0, TYP_NONE },
@@ -141,6 +145,10 @@ const field_t	sb_flds[] = {
 	{ "meta_uuid", FLDT_UUID, OI(OFF(meta_uuid)), C1, 0, TYP_NONE },
 	{ "metadirino", FLDT_INO, OI(OFF(metadirino)), metadirfld_count,
 	  FLD_COUNT, TYP_INODE },
+	{ "rgcount", FLDT_RGNUMBER, OI(OFF(rgcount)), metadirfld_count,
+	  FLD_COUNT, TYP_NONE },
+	{ "rgextents", FLDT_RTXLEN, OI(OFF(rgextents)), metadirfld_count,
+	  FLD_COUNT, TYP_NONE },
 	{ NULL }
 };
 
