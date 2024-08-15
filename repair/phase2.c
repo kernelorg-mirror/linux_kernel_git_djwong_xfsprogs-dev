@@ -363,11 +363,13 @@ set_metadir(
 	doomed_gquotino = mp->m_sb.sb_gquotino;
 	doomed_pquotino = mp->m_sb.sb_pquotino;
 
-	new_sb->sb_rbmino = new_sb->sb_metadirino + 1;
-	new_sb->sb_rsumino = new_sb->sb_rbmino + 1;
+	new_sb->sb_rbmino = NULLFSINO;
+	new_sb->sb_rsumino = NULLFSINO;
 	new_sb->sb_uquotino = NULLFSINO;
 	new_sb->sb_gquotino = NULLFSINO;
 	new_sb->sb_pquotino = NULLFSINO;
+	new_sb->sb_rgextents = 0;
+	new_sb->sb_rgcount = 0;
 
 	/* Indicate that we need a rebuild. */
 	need_metadir_inode = 1;
