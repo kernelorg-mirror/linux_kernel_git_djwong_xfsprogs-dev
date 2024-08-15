@@ -593,7 +593,6 @@ release_rt_extent_tree()
 void
 free_rt_dup_extent_tree(xfs_mount_t *mp)
 {
-	ASSERT(mp->m_sb.sb_rblocks != 0);
 	free(rt_ext_tree_ptr);
 	rt_ext_tree_ptr = NULL;
 }
@@ -726,8 +725,8 @@ static avl64ops_t avl64_extent_tree_ops = {
 void
 incore_ext_init(xfs_mount_t *mp)
 {
+	xfs_agnumber_t agcount = mp->m_sb.sb_agcount + mp->m_sb.sb_rgcount;
 	int i;
-	xfs_agnumber_t agcount = mp->m_sb.sb_agcount;
 
 	pthread_mutex_init(&rt_ext_tree_lock, NULL);
 
@@ -779,9 +778,10 @@ incore_ext_init(xfs_mount_t *mp)
 void
 incore_ext_teardown(xfs_mount_t *mp)
 {
+	xfs_agnumber_t agcount = mp->m_sb.sb_agcount + mp->m_sb.sb_rgcount;
 	xfs_agnumber_t i;
 
-	for (i = 0; i < mp->m_sb.sb_agcount; i++)  {
+	for (i = 0; i < agcount; i++)  {
 		btree_destroy(dup_extent_trees[i]);
 		free(extent_bno_ptrs[i]);
 		free(extent_bcnt_ptrs[i]);
