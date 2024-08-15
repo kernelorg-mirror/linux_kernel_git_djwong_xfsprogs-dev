@@ -254,7 +254,8 @@ free_rt_bmap(xfs_mount_t *mp)
 void
 reset_bmaps(xfs_mount_t *mp)
 {
-	xfs_agnumber_t	agno;
+	unsigned int	nr_groups = mp->m_sb.sb_agcount + mp->m_sb.sb_rgcount;
+	unsigned int	agno;
 	xfs_agblock_t	ag_size;
 	int		ag_hdr_block;
 
@@ -285,6 +286,25 @@ reset_bmaps(xfs_mount_t *mp)
 		btree_insert(bmap, 0, &states[XR_E_INUSE_FS]);
 		btree_insert(bmap, ag_hdr_block, &states[XR_E_UNKNOWN]);
 		btree_insert(bmap, ag_size, &states[XR_E_BAD_STATE]);
+	}
+
+	for ( ; agno < nr_groups; agno++) {
+		struct btree_root	*bmap = ag_bmaps[agno].root;
+		uint64_t		rblocks;
+
+		btree_clear(bmap);
+		if (agno == mp->m_sb.sb_agcount && xfs_has_rtsb(mp)) {
+			btree_insert(bmap, 0, &states[XR_E_INUSE_FS]);
+			btree_insert(bmap, mp->m_sb.sb_rextsize,
+					&states[XR_E_FREE]);
+		} else {
+			btree_insert(bmap, 0, &states[XR_E_FREE]);
+		}
+
+		rblocks = xfs_rtbxlen_to_blen(mp,
+				xfs_rtgroup_extents(mp,
+					(agno - mp->m_sb.sb_agcount)));
+		btree_insert(bmap, rblocks, &states[XR_E_BAD_STATE]);
 	}
 
 	if (mp->m_sb.sb_logstart != 0) {
