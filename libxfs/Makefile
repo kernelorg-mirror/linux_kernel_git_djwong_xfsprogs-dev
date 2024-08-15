@@ -154,20 +154,24 @@ LTLIBS = $(LIBPTHREAD) $(LIBRT)
 # don't try linking xfs_repair with a debug libxfs.
 DEBUG = -DNDEBUG
 
-default: ltdepend $(LTLIBRARY)
+JSON_SCHEMAS=xfs_healthmon.schema.json
+
+default: ltdepend $(LTLIBRARY) $(JSON_SCHEMAS)
 
 # set up include/xfs header directory
 include $(BUILDRULES)
 
 install: default
-	$(INSTALL) -m 755 -d $(PKG_INC_DIR)
+	$(INSTALL) -m 755 -d $(PKG_DATA_DIR)
+	$(INSTALL) -m 644 $(JSON_SCHEMAS) $(PKG_DATA_DIR)
 
 install-headers: $(addsuffix -hdrs, $(PKGHFILES))
 
 %-hdrs:
 	$(Q)$(LN_S) -f $(CURDIR)/$* $(TOPDIR)/include/xfs/$*
 
-install-dev: install
+install-dev: default
+	$(INSTALL) -m 755 -d $(PKG_INC_DIR)
 	$(INSTALL) -m 644 $(PKGHFILES) $(PKG_INC_DIR)
 
 # We need to install the headers before building the dependencies.  If we
