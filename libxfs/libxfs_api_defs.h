@@ -326,6 +326,7 @@
 #define xfs_rtrmapbt_droot_maxrecs	libxfs_rtrmapbt_droot_maxrecs
 #define xfs_rtrmapbt_maxlevels_ondisk	libxfs_rtrmapbt_maxlevels_ondisk
 #define xfs_rtrmapbt_init_cursor	libxfs_rtrmapbt_init_cursor
+#define xfs_rtrmapbt_init_rtsb		libxfs_rtrmapbt_init_rtsb
 #define xfs_rtrmapbt_maxrecs		libxfs_rtrmapbt_maxrecs
 #define xfs_rtrmapbt_mem_init		libxfs_rtrmapbt_mem_init
 #define xfs_rtrmapbt_mem_cursor		libxfs_rtrmapbt_mem_cursor

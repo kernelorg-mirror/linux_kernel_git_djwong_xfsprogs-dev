@@ -966,6 +966,28 @@ rtfreesp_init(
 	}
 }
 
+static int
+init_rtrmap_for_rtsb(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg->rtg_mount;
+	struct xfs_trans	*tp;
+	int			error;
+
+	error = -libxfs_trans_alloc_inode(rtg->rtg_inodes[XFS_RTGI_RMAP],
+			&M_RES(mp)->tr_itruncate, 0, 0, false, &tp);
+	if (error)
+		return error;
+
+	error = -libxfs_rtrmapbt_init_rtsb(mp, rtg, tp);
+	if (error) {
+		libxfs_trans_cancel(tp);
+		return error;
+	}
+
+	return -libxfs_trans_commit(tp);
+}
+
 /*
  * Allocate the realtime bitmap and summary inodes, and fill in data if any.
  */
@@ -991,11 +1013,18 @@ rtinit(
 			create_sb_metadata_file(rtg, XFS_RTGI_SUMMARY,
 					rtsummary_create);
 		} else {
-
 			for (i = 0; i < XFS_RTGI_MAX; i++) {
 				error = -libxfs_rtginode_create(rtg, i, true);
 				if (error)
 					fail(_("rt group inode creation failed"),
+							error);
+			}
+
+			if (xfs_has_rtsb(mp) && xfs_has_rtrmapbt(mp) &&
+			    rtg->rtg_rgno == 0) {
+				error = init_rtrmap_for_rtsb(rtg);
+				if (error)
+					fail(_("rtrmap rtsb init failed"),
 							error);
 			}
 		}
