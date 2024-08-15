@@ -294,6 +294,7 @@
 #define xfs_rtginode_name		libxfs_rtginode_name
 #define xfs_rtsummary_create		libxfs_rtsummary_create
 
+#define xfs_rtginode_irele		libxfs_rtginode_irele
 #define xfs_rtginode_load		libxfs_rtginode_load
 #define xfs_rtginode_load_parent	libxfs_rtginode_load_parent
 #define xfs_rtgroup_alloc		libxfs_rtgroup_alloc
@@ -301,6 +302,7 @@
 #define xfs_rtgroup_grab		libxfs_rtgroup_grab
 #define xfs_rtgroup_rele		libxfs_rtgroup_rele
 #define xfs_rtgroup_next		libxfs_rtgroup_next
+#define xfs_rtgroup_next_range		libxfs_rtgroup_next_range
 
 #define xfs_suminfo_add			libxfs_suminfo_add
 #define xfs_suminfo_get			libxfs_suminfo_get
@@ -310,8 +312,10 @@
 #define xfs_rtfree_extent		libxfs_rtfree_extent
 #define xfs_rtfree_blocks		libxfs_rtfree_blocks
 #define xfs_update_rtsb			libxfs_update_rtsb
+#define xfs_rtgroup_put			libxfs_rtgroup_put
 #define xfs_rtrmapbt_droot_maxrecs	libxfs_rtrmapbt_droot_maxrecs
 #define xfs_rtrmapbt_maxlevels_ondisk	libxfs_rtrmapbt_maxlevels_ondisk
+#define xfs_rtrmapbt_init_cursor	libxfs_rtrmapbt_init_cursor
 #define xfs_rtrmapbt_maxrecs		libxfs_rtrmapbt_maxrecs
 
 #define xfs_sb_from_disk		libxfs_sb_from_disk
