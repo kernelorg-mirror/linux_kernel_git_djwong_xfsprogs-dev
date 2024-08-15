@@ -395,7 +395,7 @@ rtextent_f(
 	char		**argv)
 {
 	xfs_rtblock_t	rtbno;
-	xfs_rtxnum_t	rtx;
+	uint64_t	rtx;
 	char		*p;
 
 	if (argc == 1) {
@@ -419,7 +419,11 @@ rtextent_f(
 		return 0;
 	}
 
-	rtbno = xfs_rtx_to_rtb(mp, rtx);
+	/*
+	 * The user interface assumes a global RT extent number, while the
+	 * in-kernel rtx is per-RTG now, thus the open coded conversion here.
+	 */
+	rtbno = rtx * mp->m_sb.sb_rextsize;
 	ASSERT(typtab[TYP_DATA].typnm == TYP_DATA);
 	set_rt_cur(&typtab[TYP_DATA], XFS_FSB_TO_BB(mp, rtbno),
 			mp->m_sb.sb_rextsize * blkbb, DB_RING_ADD, NULL);
