@@ -172,4 +172,6 @@ extern int		fail_after_phase;
 
 extern struct libxfs_init x;
 
+extern bool		need_packed_btrees;
+
 #endif /* _XFS_REPAIR_GLOBAL_H */
