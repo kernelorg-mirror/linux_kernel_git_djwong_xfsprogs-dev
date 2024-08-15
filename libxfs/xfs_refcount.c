@@ -2194,6 +2194,8 @@ xfs_refcount_recover_rtcow_leftovers(
 	struct xfs_mount		*mp,
 	struct xfs_rtgroup		*rtg)
 {
+	if (!xfs_has_rtgroups(mp))
+		return 0;
 	return xfs_refcount_recover_group_cow_leftovers(mp, NULL, rtg);
 }
 
