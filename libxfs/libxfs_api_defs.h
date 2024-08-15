@@ -78,6 +78,7 @@
 #define xfs_btree_bload			libxfs_btree_bload
 #define xfs_btree_bload_compute_geometry libxfs_btree_bload_compute_geometry
 #define xfs_btree_calc_size		libxfs_btree_calc_size
+#define xfs_btree_compute_maxlevels	libxfs_btree_compute_maxlevels
 #define xfs_btree_decrement		libxfs_btree_decrement
 #define xfs_btree_del_cursor		libxfs_btree_del_cursor
 #define xfs_btree_delete		libxfs_btree_delete
@@ -229,6 +230,8 @@
 
 #define xfs_metafile_iget		libxfs_metafile_iget
 #define xfs_trans_metafile_iget		libxfs_trans_metafile_iget
+#define xfs_metafile_resv_free		libxfs_metafile_resv_free
+#define xfs_metafile_resv_init		libxfs_metafile_resv_init
 #define xfs_metafile_set_iflag		libxfs_metafile_set_iflag
 #define xfs_metadir_cancel		libxfs_metadir_cancel
 #define xfs_metadir_commit		libxfs_metadir_commit
@@ -333,6 +336,7 @@
 #define xfs_rtrefcountbt_maxrecs	libxfs_rtrefcountbt_maxrecs
 #define xfs_rtrefcountbt_stage_cursor	libxfs_rtrefcountbt_stage_cursor
 
+#define xfs_rtrmapbt_calc_reserves	libxfs_rtrmapbt_calc_reserves
 #define xfs_rtrmapbt_calc_size		libxfs_rtrmapbt_calc_size
 #define xfs_rtrmapbt_commit_staged_btree	libxfs_rtrmapbt_commit_staged_btree
 #define xfs_rtrmapbt_create		libxfs_rtrmapbt_create
