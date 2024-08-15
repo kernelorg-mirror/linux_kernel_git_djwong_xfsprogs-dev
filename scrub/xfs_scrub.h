@@ -24,6 +24,7 @@ extern bool			stdout_isatty;
 extern bool			is_service;
 extern bool			use_force_rebuild;
 extern bool			info_is_warning;
+extern bool			report_case_collisions;
 
 enum scrub_mode {
 	/*

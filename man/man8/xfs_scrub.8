@@ -115,6 +115,13 @@ See the
 .B filesystem properties
 section for more details.
 .TP
+.B case_collision
+If Unicode name checking is enabled, report collisions between case-folded
+names in a namespace.
+These collisions could cause confusion for users if the directory tree is
+copied to a filesystem that supports case-folded lookups or archived and
+unpacked onto such a filesystem.
+.TP
 .BI fstrim_pct= percentage
 To constrain the amount of time spent on fstrim activities during phase 8,
 this program tries to balance estimated runtime against completeness of the
