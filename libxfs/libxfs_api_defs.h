@@ -319,6 +319,7 @@
 #define xfs_rtgroup_put			libxfs_rtgroup_put
 
 #define xfs_rtrefcountbt_absolute_maxlevels	libxfs_rtrefcountbt_absolute_maxlevels
+#define xfs_rtrefcountbt_calc_reserves	libxfs_rtrefcountbt_calc_reserves
 #define xfs_rtrefcountbt_calc_size		libxfs_rtrefcountbt_calc_size
 #define xfs_rtrefcountbt_commit_staged_btree	libxfs_rtrefcountbt_commit_staged_btree
 #define xfs_rtrefcountbt_create		libxfs_rtrefcountbt_create
