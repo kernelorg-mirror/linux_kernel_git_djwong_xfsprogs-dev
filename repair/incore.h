@@ -698,6 +698,8 @@ static inline unsigned int
 xfs_rootrec_inodes_inuse(
 	struct xfs_mount	*mp)
 {
+	if (xfs_has_rtgroups(mp))
+		return 2; /* sb_rootino, sb_metadirino */
 	if (xfs_has_metadir(mp))
 		return 4; /* sb_rootino, sb_rbmino, sb_rsumino, sb_metadirino */
 	return 3; /* sb_rootino, sb_rbmino, sb_rsumino */
