@@ -290,6 +290,7 @@
 #define xfs_rtgroup_alloc		libxfs_rtgroup_alloc
 #define xfs_rtgroup_grab		libxfs_rtgroup_grab
 #define xfs_rtgroup_rele		libxfs_rtgroup_rele
+#define xfs_rtgroup_next		libxfs_rtgroup_next
 
 #define xfs_suminfo_add			libxfs_suminfo_add
 #define xfs_suminfo_get			libxfs_suminfo_get
