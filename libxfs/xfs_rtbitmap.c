@@ -20,8 +20,6 @@
 #include "xfs_rtbitmap.h"
 #include "xfs_health.h"
 #include "xfs_sb.h"
-#include "xfs_log.h"
-#include "xfs_buf_item.h"
 
 /*
  * Realtime allocator bitmap functions shared with userspace.
