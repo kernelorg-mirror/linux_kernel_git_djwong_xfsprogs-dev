@@ -6664,6 +6664,10 @@ xfs_bmapi_freesp(
 	 * reservations.
 	 */
 	if (isrt) {
+#ifdef CONFIG_XFS_RT_XXX_BROKEN
+		struct xfs_rtgroup *rtg;
+		xfs_rtblock_t	rtbno;
+		xfs_extlen_t	rtblen;
 		xfs_rtxnum_t	rtx_in, rtx_out = 0;
 		xfs_extlen_t	rtxlen_in, rtxlen_out = 0;
 		uint32_t	mod;
@@ -6682,16 +6686,25 @@ xfs_bmapi_freesp(
 			return -EFSCORRUPTED;
 		}
 
-		error = xfs_rtallocate_extent(tp, rtx_in, rtxlen_in,
-				&rtxlen_out, &rtx_out);
+		rtg = xfs_rtgroup_grab(mp, xfs_rtb_to_rgno(mp, fsbno));
+		if (!rtg)
+			return -ENOSPC;
+
+		error = xfs_rtallocate_rtgs(ap->tp, rtg, fsbno, 1, rtxlen_in,
+				1, ap->wasdel, false, &rtlocked, &rtbno,
+				&rtblen);
+		xfs_rtgroup_rele(rtg);
 		if (error)
 			return error;
-		if (rtx_out != rtx_in) {
+		if (fsbno != rtbno) {
 			ASSERT(0);
 			xfs_bmap_mark_sick(ip, XFS_DATA_FORK);
 			return -EFSCORRUPTED;
 		}
-		mval->br_blockcount = rtxlen_out * mp->m_sb.sb_rextsize;
+		mval->br_blockcount = rtblen;
+#else
+		return -ENOSPC;
+#endif
 	} else {
 		struct xfs_alloc_arg	args = {
 			.mp		= mp,
