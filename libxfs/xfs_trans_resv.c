@@ -18,6 +18,7 @@
 #include "xfs_trans.h"
 #include "xfs_trans_space.h"
 #include "xfs_quota_defs.h"
+#include "xfs_group.h"
 #include "xfs_rtbitmap.h"
 
 #define _ALLOC	true
