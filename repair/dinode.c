@@ -548,15 +548,8 @@ _("Fatal error: inode %" PRIu64 " - blkmap_set_ext(): %s\n"
 			}
 		}
 
-		/*
-		 * XXX: For rtgroup enabled file systems we treat the RTGs as
-		 * basically another set of AGs tacked on at the end, but
-		 * otherwise reuse all the existing code.  That's why we'll
-		 * see odd "agno" value here.
-		 */
 		if (isrt) {
-			agno = mp->m_sb.sb_agcount +
-				xfs_rtb_to_rgno(mp, irec.br_startblock);
+			agno = xfs_rtb_to_rgno(mp, irec.br_startblock);
 			first_agbno = xfs_rtb_to_rgbno(mp, irec.br_startblock);
 		} else {
 			agno = XFS_FSB_TO_AGNO(mp, irec.br_startblock);
@@ -566,9 +559,9 @@ _("Fatal error: inode %" PRIu64 " - blkmap_set_ext(): %s\n"
 		ebno = first_agbno + irec.br_blockcount;
 		if (agno != locked_agno) {
 			if (locked_agno != -1)
-				unlock_ag(locked_agno);
+				unlock_group(locked_agno, isrt);
 			locked_agno = agno;
-			lock_ag(locked_agno);
+			lock_group(locked_agno, isrt);
 		}
 
 		/*
@@ -578,7 +571,7 @@ _("Fatal error: inode %" PRIu64 " - blkmap_set_ext(): %s\n"
 		for (b = irec.br_startblock;
 		     agbno < ebno;
 		     b += blen, agbno += blen) {
-			state = get_bmap_ext(agno, agbno, ebno, &blen);
+			state = get_bmap_ext(agno, agbno, ebno, &blen, isrt);
 			switch (state)  {
 			case XR_E_FREE:
 				/*
@@ -664,7 +657,7 @@ _("illegal state %d in block map %" PRIu64 "\n"),
 		agbno = first_agbno;
 		ebno = first_agbno + irec.br_blockcount;
 		for (; agbno < ebno; agbno += blen) {
-			state = get_bmap_ext(agno, agbno, ebno, &blen);
+			state = get_bmap_ext(agno, agbno, ebno, &blen, isrt);
 			switch (state)  {
 			case XR_E_METADATA:
 				/*
@@ -679,15 +672,16 @@ _("illegal state %d in block map %" PRIu64 "\n"),
 			case XR_E_FREE1:
 			case XR_E_INUSE1:
 			case XR_E_UNKNOWN:
-				set_bmap_ext(agno, agbno, blen, zap_metadata ?
-						XR_E_METADATA : XR_E_INUSE);
+				set_bmap_ext(agno, agbno, blen,
+					zap_metadata ?
+					XR_E_METADATA : XR_E_INUSE, isrt);
 				break;
 
 			case XR_E_INUSE:
 			case XR_E_MULT:
 				if (!zap_metadata)
 					set_bmap_ext(agno, agbno, blen,
-							XR_E_MULT);
+							XR_E_MULT, isrt);
 				break;
 			default:
 				break;
@@ -700,7 +694,7 @@ _("illegal state %d in block map %" PRIu64 "\n"),
 	error = 0;
 done:
 	if (locked_agno != -1)
-		unlock_ag(locked_agno);
+		unlock_group(locked_agno, isrt);
 
 	if (i != *numrecs) {
 		ASSERT(i < *numrecs);
