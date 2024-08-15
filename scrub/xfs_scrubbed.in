@@ -18,6 +18,7 @@ import ctypes
 from concurrent.futures import ProcessPoolExecutor
 import ctypes.util
 import collections
+import time
 
 try:
 	# Not all systems will have this json schema validation libarary,
@@ -958,6 +959,14 @@ def main():
 		pass
 
 	args.event_queue.shutdown()
+
+	# See the service mode comments in xfs_scrub.c for why we sleep and
+	# compress all nonzero exit codes to 1.
+	if 'SERVICE_MODE' in os.environ:
+		time.sleep(2)
+		if ret != 0:
+			ret = 1
+
 	return ret
 
 if __name__ == '__main__':
