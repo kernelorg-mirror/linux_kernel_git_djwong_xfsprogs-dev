@@ -3,7 +3,7 @@
  * Copyright (c) 2018-2024 Oracle.  All Rights Reserved.
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
-#include "xfs.h"
+#include "libxfs_priv.h"
 #include "xfs_fs.h"
 #include "xfs_shared.h"
 #include "xfs_format.h"
@@ -21,8 +21,7 @@
 #include "xfs_rtrmap_btree.h"
 #include "xfs_trace.h"
 #include "xfs_cksum.h"
-#include "xfs_error.h"
-#include "xfs_extent_busy.h"
+#include "xfs_group.h"
 #include "xfs_rtgroup.h"
 
 static struct kmem_cache	*xfs_rtrmapbt_cur_cache;
