@@ -388,9 +388,9 @@ set_metadir(
 	need_metadir_inode = 1;
 	need_rbmino = 1;
 	need_rsumino = 1;
-	have_uquotino = 0;
-	have_gquotino = 0;
-	have_pquotino = 0;
+	clear_quota_inode(XFS_DQTYPE_USER);
+	clear_quota_inode(XFS_DQTYPE_GROUP);
+	clear_quota_inode(XFS_DQTYPE_PROJ);
 	quotacheck_skip();
 
 	/* Dump incore rt freespace inodes. */

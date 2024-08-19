@@ -1485,7 +1485,9 @@ _("Inode allocation btrees are too corrupted, skipping phases 6 and 7\n"));
 		free_rtgroup_inodes();
 	}
 
-	if (lost_quotas && !have_uquotino && !have_gquotino && !have_pquotino) {
+	if (lost_quotas && !has_quota_inode(XFS_DQTYPE_USER) &&
+	    !has_quota_inode(XFS_DQTYPE_GROUP) &&
+	    !has_quota_inode(XFS_DQTYPE_PROJ)) {
 		if (!no_modify)  {
 			do_warn(
 _("Warning:  no quota inodes were found.  Quotas disabled.\n"));
@@ -1502,7 +1504,7 @@ _("Warning:  quota inodes were cleared.  Quotas disabled.\n"));
 _("Warning:  quota inodes would be cleared.  Quotas would be disabled.\n"));
 		}
 	} else  {
-		if (lost_uquotino)  {
+		if (lost_quota_inode(XFS_DQTYPE_USER))  {
 			if (!no_modify)  {
 				do_warn(
 _("Warning:  user quota information was cleared.\n"
@@ -1514,7 +1516,7 @@ _("Warning:  user quota information would be cleared.\n"
 			}
 		}
 
-		if (lost_gquotino)  {
+		if (lost_quota_inode(XFS_DQTYPE_GROUP))  {
 			if (!no_modify)  {
 				do_warn(
 _("Warning:  group quota information was cleared.\n"
@@ -1526,7 +1528,7 @@ _("Warning:  group quota information would be cleared.\n"
 			}
 		}
 
-		if (lost_pquotino)  {
+		if (lost_quota_inode(XFS_DQTYPE_PROJ))  {
 			if (!no_modify)  {
 				do_warn(
 _("Warning:  project quota information was cleared.\n"
@@ -1565,6 +1567,8 @@ _("Warning:  project quota information would be cleared.\n"
 	sbp = libxfs_getsb(mp);
 	if (!sbp)
 		do_error(_("couldn't get superblock\n"));
+
+	update_sb_quotinos(mp, sbp);
 
 	if ((mp->m_sb.sb_qflags & XFS_ALL_QUOTA_CHKD) != quotacheck_results()) {
 		do_warn(_("Note - quota info will be regenerated on next "
