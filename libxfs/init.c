@@ -1004,8 +1004,6 @@ libxfs_umount(
 	int			error;
 
 	libxfs_rtmount_destroy(mp);
-	if (mp->m_qdirip)
-		libxfs_irele(mp->m_qdirip);
 	if (mp->m_metadirip)
 		libxfs_irele(mp->m_metadirip);
 

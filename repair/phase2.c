@@ -955,6 +955,8 @@ phase2(
 	}
 
 	discover_rtgroup_inodes(mp);
+	if (xfs_has_metadir(mp) && xfs_has_quota(mp))
+		discover_quota_inodes(mp);
 
 	/*
 	 * Upgrade the filesystem now that we've done a preliminary check of
