@@ -472,6 +472,65 @@ creatproto(
 	return 0;
 }
 
+/* Create a new metadata root directory. */
+static int
+create_metadir(
+	struct xfs_mount	*mp)
+{
+	struct xfs_inode	*ip = NULL;
+	struct xfs_trans	*tp;
+	int			error;
+	struct xfs_icreate_args	args = {
+		.mode		= S_IFDIR,
+		.flags		= XFS_ICREATE_UNLINKABLE,
+	};
+	xfs_ino_t		ino;
+
+	if (!xfs_has_metadir(mp))
+		return 0;
+
+	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_create,
+			libxfs_create_space_res(mp, MAXNAMELEN), 0, 0, &tp);
+	if (error)
+		return error;
+
+	/*
+	 * Create a new inode and set the sb pointer.  The primary super is
+	 * still marked inprogress, so we do not need to log the metadirino
+	 * change ourselves.
+	 */
+	error = -libxfs_dialloc(&tp, &args, &ino);
+	if (error)
+		goto out_cancel;
+	error = -libxfs_icreate(tp, ino, &args, &ip);
+	if (error)
+		goto out_cancel;
+	mp->m_sb.sb_metadirino = ino;
+
+	/*
+	 * Initialize the root directory.  There are no ILOCKs in userspace
+	 * so we do not need to drop it here.
+	 */
+	libxfs_metafile_set_iflag(tp, ip, XFS_METAFILE_DIR);
+	error = -libxfs_dir_init(tp, ip, ip);
+	if (error)
+		goto out_cancel;
+
+	error = -libxfs_trans_commit(tp);
+	if (error)
+		goto out_rele;
+
+	mp->m_metadirip = ip;
+	return 0;
+
+out_cancel:
+	libxfs_trans_cancel(tp);
+out_rele:
+	if (ip)
+		libxfs_irele(ip);
+	return error;
+}
+
 static void
 parseproto(
 	xfs_mount_t	*mp,
@@ -710,8 +769,15 @@ parseproto(
 		 * RT initialization.  Do this here to ensure that
 		 * the RT inodes get placed after the root inode.
 		 */
-		if (isroot)
+		if (isroot) {
+			error = create_metadir(mp);
+			if (error)
+				fail(
+	_("Creation of the metadata directory inode failed"),
+					error);
+
 			rtinit(mp);
+		}
 		tp = NULL;
 		for (;;) {
 			name = getdirentname(pp);
@@ -753,6 +819,7 @@ parse_proto(
 static void
 create_sb_metadata_file(
 	struct xfs_mount	*mp,
+	enum xfs_metafile_type	metafile_type,
 	void			(*create)(struct xfs_inode *ip))
 {
 	struct xfs_icreate_args	args = {
@@ -777,6 +844,9 @@ create_sb_metadata_file(
 		goto fail;
 
 	create(ip);
+
+	if (xfs_has_metadir(mp))
+		libxfs_metafile_set_iflag(tp, ip, metafile_type);
 
 	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
 	libxfs_log_sb(tp);
@@ -953,8 +1023,8 @@ static void
 rtinit(
 	struct xfs_mount	*mp)
 {
-	create_sb_metadata_file(mp, rtbitmap_create);
-	create_sb_metadata_file(mp, rtsummary_create);
+	create_sb_metadata_file(mp, XFS_METAFILE_RTBITMAP, rtbitmap_create);
+	create_sb_metadata_file(mp, XFS_METAFILE_RTSUMMARY, rtsummary_create);
 
 	rtbitmap_init(mp);
 	rtsummary_init(mp);
