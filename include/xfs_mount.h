@@ -55,7 +55,6 @@ typedef struct xfs_mount {
 	uint32_t		m_rgblocks;	/* size of rtgroup in rtblocks */
 	struct xfs_inode	*m_metadirip;	/* ptr to metadata directory */
 	struct xfs_inode	*m_rtdirip;	/* ptr to realtime metadir */
-	struct xfs_inode	*m_qdirip;	/* ptr to quota metadir */
 	struct xfs_buftarg	*m_ddev_targp;
 	struct xfs_buftarg	*m_logdev_targp;
 	struct xfs_buftarg	*m_rtdev_targp;
