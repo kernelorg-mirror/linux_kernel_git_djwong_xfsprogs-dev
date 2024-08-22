@@ -22,6 +22,48 @@ getbit_l(
 	return (*ptr & mask) >> shift;
 }
 
+/*
+ * Extract a big-endian integer value from some bits in the middle of a buffer
+ * and return it as an int64_t in host-endian format.
+ *
+ * @p points to the start of the buffer
+ * @bit is the bit offset beyond @p
+ * @nbits is the number of bits to extract
+ * @signext enables sign extension of the return value
+ */
+static int64_t
+scrape_bits_be(
+	char	*p,
+	int	nbits,
+	int	bit,
+	bool	signext)
+{
+	int	i;
+	int64_t	rval = 0LL;
+
+	for (i = 0; i < nbits; i++) {
+		if (getbit_l(p, bit + i)) {
+			/* If the last bit is on and we care about sign bits
+			 * and we don't have a full 64 bit container, turn all
+			 * bits on between the sign bit and the most sig bit.
+			 */
+
+			/* handle endian swap here */
+#if __BYTE_ORDER == LITTLE_ENDIAN
+			if (i == 0 && signext && nbits < 64)
+				rval = (~0ULL) << nbits;
+			rval |= 1ULL << (nbits - i - 1);
+#else
+			if ((i == (nbits - 1)) && signext && nbits < 64)
+				rval |= ((~0ULL) << nbits);
+			rval |= 1ULL << (nbits - i - 1);
+#endif
+		}
+	}
+
+	return rval;
+}
+
 void
 setbit_l(
 	char *ptr,
@@ -51,9 +93,7 @@ getbitval(
 	int		flags)
 {
 	int		bit;
-	int		i;
 	char		*p;
-	int64_t		rval;
 	int		signext;
 
 	ASSERT(nbits<=64);
@@ -83,27 +123,7 @@ getbitval(
 	}
 
 scrape_bits:
-	for (i = 0, rval = 0LL; i < nbits; i++) {
-		if (getbit_l(p, bit + i)) {
-			/* If the last bit is on and we care about sign
-			 * bits and we don't have a full 64 bit
-			 * container, turn all bits on between the
-			 * sign bit and the most sig bit.
-			 */
-
-			/* handle endian swap here */
-#if __BYTE_ORDER == LITTLE_ENDIAN
-			if (i == 0 && signext && nbits < 64)
-				rval = (~0ULL) << nbits;
-			rval |= 1ULL << (nbits - i - 1);
-#else
-			if ((i == (nbits - 1)) && signext && nbits < 64)
-				rval |= ((~0ULL) << nbits);
-			rval |= 1ULL << (nbits - i - 1);
-#endif
-		}
-	}
-	return rval;
+	return scrape_bits_be(p, nbits, bit, signext);
 }
 
 /*
