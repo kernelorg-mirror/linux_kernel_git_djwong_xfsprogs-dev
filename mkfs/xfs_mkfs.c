@@ -2676,12 +2676,6 @@ _("metadir not supported without exchange-range support\n"));
 		cli->sb_feat.exchrange = true;
 	}
 
-	if (cli->sb_feat.qflags && cli->xi->rt.name) {
-		fprintf(stderr,
-_("persistent quota flags not supported with realtime volumes\n"));
-				usage();
-	}
-
 	if (cli->sb_feat.qflags && !cli->sb_feat.metadir) {
 		if (cli_opt_set(&mopts, M_METADIR)) {
 			fprintf(stderr,
