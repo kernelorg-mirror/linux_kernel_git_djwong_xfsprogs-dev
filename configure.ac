@@ -163,8 +163,6 @@ AC_HAVE_DEVMAPPER
 AC_HAVE_MALLINFO
 AC_HAVE_MALLINFO2
 AC_HAVE_GETRANDOM_NONBLOCK
-AC_PACKAGE_WANT_ATTRIBUTES_H
-AC_HAVE_LIBATTR
 if test "$enable_scrub" = "yes"; then
         if test "$enable_libicu" = "yes" || test "$enable_libicu" = "probe"; then
                 AC_HAVE_LIBICU
