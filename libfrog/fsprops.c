@@ -10,8 +10,7 @@
 #include "libfrog/bulkstat.h"
 #include "libfrog/fsprops.h"
 #include "libfrog/fsproperties.h"
-
-#include <attr/attributes.h>
+#include "libfrog/fakelibattr.h"
 
 /*
  * Given an xfd and a mount table path, get us the handle for the root dir so
@@ -68,20 +67,22 @@ fsprops_walk_names(
 	fsprops_name_walk_fn	walk_fn,
 	void			*priv)
 {
-	struct attrlist_cursor	cur = { };
-	char			attrbuf[XFS_XATTR_LIST_MAX];
-	struct attrlist		*attrlist = (struct attrlist *)attrbuf;
-	int			ret;
+	struct xfs_attrlist_cursor	cur = { };
+	char				attrbuf[XFS_XATTR_LIST_MAX];
+	struct xfs_attrlist		*attrlist =
+				(struct xfs_attrlist *)attrbuf;
+	int				ret;
 
 	memset(attrbuf, 0, XFS_XATTR_LIST_MAX);
 
-	while ((ret = attr_list_by_handle(fph->hanp, fph->hlen, attrbuf,
+	while ((ret = libfrog_attr_list_by_handle(fph->hanp, fph->hlen, attrbuf,
 				XFS_XATTR_LIST_MAX, XFS_IOC_ATTR_ROOT,
 				&cur)) == 0) {
 		unsigned int	i;
 
 		for (i = 0; i < attrlist->al_count; i++) {
-			struct attrlist_ent	*ent = ATTR_ENTRY(attrlist, i);
+			struct xfs_attrlist_ent	*ent =
+				libfrog_attr_entry(attrlist, i);
 			const char		*p =
 				attr_name_to_fsprop_name(ent->a_name);
 
