@@ -3171,7 +3171,7 @@ xfs_btree_new_iroot(
 
 	xfs_btree_copy_ptrs(cur, pp, &nptr, 1);
 
-	xfs_iroot_realloc(cur->bc_ino.ip, xfs_btree_ifork_ptr(cur), 1);
+	cur->bc_ops->broot_realloc(cur, 1);
 
 	xfs_btree_setbuf(cur, level, cbp);
 
@@ -3355,8 +3355,7 @@ xfs_btree_make_block_unfull(
 
 		if (numrecs < cur->bc_ops->get_dmaxrecs(cur, level)) {
 			/* A root block that can be made bigger. */
-			xfs_iroot_realloc(ip, xfs_btree_ifork_ptr(cur),
-					numrecs + 1);
+			cur->bc_ops->broot_realloc(cur, numrecs + 1);
 			*stat = 1;
 		} else {
 			/* A root block that needs replacing */
@@ -3751,8 +3750,7 @@ xfs_btree_kill_iroot(
 	ASSERT(xfs_btree_ptr_is_null(cur, &ptr));
 #endif
 
-	block = xfs_iroot_realloc(cur->bc_ino.ip, xfs_btree_ifork_ptr(cur),
-			numrecs);
+	block = cur->bc_ops->broot_realloc(cur, numrecs);
 
 	block->bb_numrecs = be16_to_cpu(numrecs);
 	ASSERT(block->bb_numrecs == cblock->bb_numrecs);
@@ -3937,8 +3935,7 @@ xfs_btree_delrec(
 	 * nothing left to do.  numrecs was decremented above.
 	 */
 	if (xfs_btree_at_iroot(cur, level)) {
-		xfs_iroot_realloc(cur->bc_ino.ip, xfs_btree_ifork_ptr(cur),
-				numrecs);
+		cur->bc_ops->broot_realloc(cur, numrecs);
 
 		error = xfs_btree_kill_iroot(cur);
 		if (error)
