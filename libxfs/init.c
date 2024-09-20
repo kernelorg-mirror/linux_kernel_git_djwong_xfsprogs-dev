@@ -925,7 +925,7 @@ libxfs_umount(
 	 * first place.
 	 */
 	if (xfs_is_perag_data_loaded(mp))
-		libxfs_free_perag(mp);
+		libxfs_free_perag_range(mp, 0, mp->m_sb.sb_agcount);
 
 	xfs_da_unmount(mp);
 
