@@ -167,6 +167,7 @@
 #define xfs_free_extent			libxfs_free_extent
 #define xfs_free_extent_later		libxfs_free_extent_later
 #define xfs_free_perag			libxfs_free_perag
+#define xfs_free_perag_range		libxfs_free_perag_range
 #define xfs_fs_geometry			libxfs_fs_geometry
 #define xfs_get_initial_prid		libxfs_get_initial_prid
 #define xfs_highbit32			libxfs_highbit32
