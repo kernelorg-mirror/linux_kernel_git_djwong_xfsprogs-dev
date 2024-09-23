@@ -205,6 +205,61 @@ out_destroy:
 	return error;
 }
 
+/*
+ * Get a metadata inode.  The file type part of @mode must match the inode
+ * exactly.  Caller must supply a transaction (even if empty) to avoid
+ * livelocking if the inobt has a cycle.
+ */
+int
+libxfs_trans_metafile_iget(
+	struct xfs_trans	*tp,
+	xfs_ino_t		ino,
+	enum xfs_metafile_type	metafile_type,
+	struct xfs_inode	**ipp)
+{
+	struct xfs_mount	*mp = tp->t_mountp;
+	struct xfs_inode	*ip;
+	umode_t			mode;
+	int			error;
+
+	error = libxfs_iget(mp, tp, ino, XFS_IGET_UNTRUSTED, &ip);
+	if (error)
+		return error;
+
+	if (metafile_type == XFS_METAFILE_DIR)
+		mode = S_IFDIR;
+	else
+		mode = S_IFREG;
+	if (inode_wrong_type(VFS_I(ip), mode))
+		goto bad_rele;
+
+	*ipp = ip;
+	return 0;
+bad_rele:
+	libxfs_irele(ip);
+	return -EFSCORRUPTED;
+}
+
+/* Grab a metadata file if the caller doesn't already have a transaction. */
+int
+libxfs_metafile_iget(
+	struct xfs_mount	*mp,
+	xfs_ino_t		ino,
+	enum xfs_metafile_type	metafile_type,
+	struct xfs_inode	**ipp)
+{
+	struct xfs_trans	*tp;
+	int			error;
+
+	error = libxfs_trans_alloc_empty(mp, &tp);
+	if (error)
+		return error;
+
+	error = libxfs_trans_metafile_iget(tp, ino, metafile_type, ipp);
+	libxfs_trans_cancel(tp);
+	return error;
+}
+
 static void
 libxfs_idestroy(
 	struct xfs_inode	*ip)
