@@ -169,6 +169,7 @@
 #define xfs_free_perag			libxfs_free_perag
 #define xfs_free_perag_range		libxfs_free_perag_range
 #define xfs_fs_geometry			libxfs_fs_geometry
+#define xfs_gbno_to_fsb			libxfs_gbno_to_fsb
 #define xfs_get_initial_prid		libxfs_get_initial_prid
 #define xfs_highbit32			libxfs_highbit32
 #define xfs_highbit64			libxfs_highbit64
