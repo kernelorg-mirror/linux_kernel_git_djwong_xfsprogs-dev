@@ -30,6 +30,7 @@
 #include "xfs_rtbitmap.h"
 #include "xfs_metafile.h"
 #include "xfs_metadir.h"
+#include "xfs_rtrmap_btree.h"
 
 int
 xfs_rtgroup_alloc(
@@ -310,6 +311,7 @@ static const struct xfs_rtginode_ops xfs_rtginode_ops[XFS_RTGI_MAX] = {
 		 * rtrmapbt predicate here.
 		 */
 		.enabled	= xfs_has_rmapbt,
+		.create		= xfs_rtrmapbt_create,
 	},
 };
 
