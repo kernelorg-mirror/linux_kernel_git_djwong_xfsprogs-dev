@@ -104,7 +104,7 @@ xrep_bmap_check_fork_rmap(
 		return EFSCORRUPTED;
 
 	/* Check that this is within the AG. */
-	if (!xfs_verify_agbext(cur->bc_ag.pag, rec->rm_startblock,
+	if (!xfs_verify_agbext(to_perag(cur->bc_group), rec->rm_startblock,
 				rec->rm_blockcount))
 		return EFSCORRUPTED;
 
@@ -155,8 +155,8 @@ xrep_bmap_walk_rmap(
 	    !(rec->rm_flags & XFS_RMAP_ATTR_FORK))
 		return 0;
 
-	fsbno = XFS_AGB_TO_FSB(mp, pag_agno(cur->bc_ag.pag),
-			       rec->rm_startblock);
+	fsbno = XFS_AGB_TO_FSB(mp, cur->bc_group->xg_index,
+			rec->rm_startblock);
 
 	if (rec->rm_flags & XFS_RMAP_BMBT_BLOCK) {
 		rb->old_bmbt_block_count += rec->rm_blockcount;
