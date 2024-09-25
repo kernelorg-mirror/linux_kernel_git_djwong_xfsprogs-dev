@@ -86,8 +86,9 @@ phase1(xfs_mount_t *mp)
 	 * set so older kernels can still use it and not mount unsupported
 	 * filesystems when it reads bad_features2.
 	 */
-	if (sb->sb_bad_features2 != 0 &&
-			sb->sb_bad_features2 != sb->sb_features2) {
+	if (!xfs_sb_version_hasmetadir(sb) &&
+	    sb->sb_bad_features2 != 0 &&
+	    sb->sb_bad_features2 != sb->sb_features2) {
 		sb->sb_features2 |= sb->sb_bad_features2;
 		sb->sb_bad_features2 = sb->sb_features2;
 		primary_sb_modified = 1;
@@ -104,6 +105,8 @@ phase1(xfs_mount_t *mp)
 	 */
 	if (convert_lazy_count) {
 		if (lazy_count && !xfs_sb_version_haslazysbcount(sb)) {
+			ASSERT(!xfs_sb_version_hasmetadir(sb));
+
 			sb->sb_versionnum |= XFS_SB_VERSION_MOREBITSBIT;
 			sb->sb_features2 |= XFS_SB_VERSION2_LAZYSBCOUNTBIT;
 			sb->sb_bad_features2 |= XFS_SB_VERSION2_LAZYSBCOUNTBIT;
@@ -115,6 +118,9 @@ phase1(xfs_mount_t *mp)
 _("Cannot disable lazy-counters on V5 fs\n"));
 				exit(1);
 			}
+
+			ASSERT(!xfs_sb_version_hasmetadir(sb));
+
 			sb->sb_features2 &= ~XFS_SB_VERSION2_LAZYSBCOUNTBIT;
 			sb->sb_bad_features2 &= ~XFS_SB_VERSION2_LAZYSBCOUNTBIT;
 			printf(_("Disabling lazy-counters\n"));
