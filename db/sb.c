@@ -625,7 +625,8 @@ do_version(xfs_agnumber_t agno, uint16_t version, uint32_t features)
 
 	tsb.sb_versionnum = version;
 	tsb.sb_features2 = features;
-	tsb.sb_bad_features2 = features;
+	if (!xfs_sb_version_hasmetadir(&tsb))
+		tsb.sb_bad_features2 = features;
 	libxfs_sb_to_disk(iocur_top->data, &tsb);
 	write_cur();
 	return 1;
