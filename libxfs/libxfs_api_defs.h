@@ -114,6 +114,7 @@
 #define xfs_calc_dquots_per_chunk	libxfs_calc_dquots_per_chunk
 #define xfs_cntbt_init_cursor		libxfs_cntbt_init_cursor
 #define xfs_compute_rextslog		libxfs_compute_rextslog
+#define xfs_compute_rgblklog		libxfs_compute_rgblklog
 #define xfs_create_space_res		libxfs_create_space_res
 #define xfs_da3_node_hdr_from_disk	libxfs_da3_node_hdr_from_disk
 #define xfs_da3_node_read		libxfs_da3_node_read
@@ -350,6 +351,7 @@
 #define xfs_rtrmapbt_stage_cursor	libxfs_rtrmapbt_stage_cursor
 
 #define xfs_sb_from_disk		libxfs_sb_from_disk
+#define xfs_sb_mount_rextsize		libxfs_sb_mount_rextsize
 #define xfs_sb_quota_from_disk		libxfs_sb_quota_from_disk
 #define xfs_sb_read_secondary		libxfs_sb_read_secondary
 #define xfs_sb_to_disk			libxfs_sb_to_disk

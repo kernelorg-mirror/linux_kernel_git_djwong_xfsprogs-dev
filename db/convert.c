@@ -483,26 +483,6 @@ rt_daddr_to_rsuminfo(
 	return xfs_rtsumoffs_to_infoword(mp, rsumoff);
 }
 
-static inline xfs_rgnumber_t
-xfs_daddr_to_rgno(
-	struct xfs_mount	*mp,
-	xfs_daddr_t		daddr)
-{
-	xfs_rtblock_t		rtb = daddr >> mp->m_blkbb_log;
-
-	return xfs_rtb_to_rgno(mp, rtb);
-}
-
-static inline xfs_rgblock_t
-xfs_daddr_to_rgbno(
-	struct xfs_mount	*mp,
-	xfs_daddr_t		daddr)
-{
-	xfs_rtblock_t		rtb = daddr >> mp->m_blkbb_log;
-
-	return xfs_rtb_to_rgbno(mp, rtb);
-}
-
 static int
 rtconvert_f(int argc, char **argv)
 {

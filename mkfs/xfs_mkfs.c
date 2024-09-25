@@ -4013,6 +4013,8 @@ sb_set_features(
 		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_METADIR;
 		sbp->sb_rgcount = cfg->rgcount;
 		sbp->sb_rgextents = cfg->rgsize / cfg->rtextblocks;
+		sbp->sb_rgblklog = libxfs_compute_rgblklog(sbp->sb_rgextents,
+							   cfg->rtextblocks);
 	}
 }
 
@@ -4407,7 +4409,7 @@ start_superblock_setup(
 	sbp->sb_rblocks = cfg->rtblocks;
 	sbp->sb_rextsize = cfg->rtextblocks;
 	mp->m_features |= libxfs_sb_version_to_features(sbp);
-	mp->m_rgblocks = cfg->rgsize;
+	libxfs_sb_mount_rextsize(mp, sbp);
 }
 
 static void
@@ -4468,7 +4470,7 @@ finish_superblock_setup(
 	sbp->sb_unit = cfg->dsunit;
 	sbp->sb_width = cfg->dswidth;
 	mp->m_features |= libxfs_sb_version_to_features(sbp);
-	mp->m_rgblocks = cfg->rgsize;
+	libxfs_sb_mount_rextsize(mp, sbp);
 }
 
 /* Prepare an uncached buffer, ready to write something out. */

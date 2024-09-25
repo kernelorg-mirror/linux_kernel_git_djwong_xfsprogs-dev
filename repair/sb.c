@@ -342,6 +342,10 @@ verify_sb_rtgroups(
 	if (!(sbp->sb_features_incompat & XFS_SB_FEAT_INCOMPAT_EXCHRANGE))
 		return XR_BAD_RT_GEO_DATA;
 
+	if (sbp->sb_rgblklog != libxfs_compute_rgblklog(sbp->sb_rgextents,
+							sbp->sb_rextsize))
+		return XR_BAD_RT_GEO_DATA;
+
 	return 0;
 }
 
@@ -517,7 +521,7 @@ verify_sb(char *sb_buf, xfs_sb_t *sb, int is_primary_sb)
 		return XR_BAD_DIR_SIZE_DATA;
 
 	if (xfs_sb_version_hasmetadir(sb)) {
-		if (sb->sb_metadirpad)
+		if (sb->sb_metadirpad0 || sb->sb_metadirpad1)
 			return XR_SB_GEO_MISMATCH;
 
 		ret = verify_sb_rtgroups(sb);
