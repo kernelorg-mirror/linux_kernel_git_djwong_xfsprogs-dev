@@ -385,6 +385,8 @@ set_metadir(
 	rgsize -= rgsize % new_sb->sb_rextsize;
 	new_sb->sb_rgextents = rgsize;
 	new_sb->sb_rgcount = 0;
+	new_sb->sb_rgblklog = libxfs_compute_rgblklog(new_sb->sb_rgextents,
+						      new_sb->sb_rextsize);
 
 	/* Indicate that we need a rebuild. */
 	need_metadir_inode = 1;
