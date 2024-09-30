@@ -124,7 +124,7 @@ const field_t	sb_flds[] = {
 	{ "features2", FLDT_UINT32X, OI(OFF(features2)), C1, 0, TYP_NONE },
 	{ "bad_features2", FLDT_UINT32X, OI(OFF(bad_features2)),
 		premetadirfld_count, FLD_COUNT, TYP_NONE },
-	{ "metadirpad", FLDT_UINT32X, OI(OFF(metadirpad)), metadirfld_count,
+	{ "metadirpad0", FLDT_UINT8X, OI(OFF(metadirpad0)), metadirfld_count,
 		FLD_COUNT, TYP_NONE },
 	{ "features_compat", FLDT_UINT32X, OI(OFF(features_compat)),
 		C1, 0, TYP_NONE },
