@@ -483,7 +483,7 @@ verify_sb(char *sb_buf, xfs_sb_t *sb, int is_primary_sb)
 		return XR_BAD_DIR_SIZE_DATA;
 
 	if (xfs_sb_version_hasmetadir(sb)) {
-		if (sb->sb_metadirpad)
+		if (sb->sb_metadirpad0 || sb->sb_metadirpad1)
 			return XR_SB_GEO_MISMATCH;
 	}
 
