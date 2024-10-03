@@ -27,6 +27,9 @@ enum {
 
 struct xfs_groups {
 	struct xarray		xa;
+	uint64_t		blkmask;/* bitmask of group blkno */
+	uint32_t		blocks;	/* size of group in fsblocks */
+	uint8_t			blklog; /* log2 of blocks (rounded up) */
 };
 
 /*
@@ -57,7 +60,6 @@ typedef struct xfs_mount {
         struct xfs_ino_geometry	m_ino_geo;	/* inode geometry */
 	uint			m_rsumlevels;	/* rt summary levels */
 	xfs_filblks_t		m_rsumblocks;	/* size of rt summary, FSBs */
-	uint32_t		m_rgblocks;	/* size of rtgroup in rtblocks */
 	struct xfs_inode	*m_metadirip;	/* ptr to metadata directory */
 	struct xfs_inode	*m_rtdirip;	/* ptr to realtime metadir */
 	struct xfs_buftarg	*m_ddev_targp;
@@ -97,7 +99,6 @@ typedef struct xfs_mount {
 	uint64_t		m_features;	/* active filesystem features */
 	uint64_t		m_low_space[XFS_LOWSP_MAX];
 	uint64_t		m_rtxblkmask;	/* rt extent block mask */
-	uint64_t		m_rgblkmask;	/* rt group block mask */
 	unsigned long		m_opstate;	/* dynamic state flags */
 	bool			m_finobt_nores; /* no per-AG finobt resv. */
 	uint			m_qflags;	/* quota status flags */
