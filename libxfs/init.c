@@ -668,7 +668,6 @@ libxfs_mount(
 {
 	struct xfs_buf		*bp;
 	struct xfs_sb		*sbp;
-	struct xfs_rtgroup	*rtg = NULL;
 	xfs_daddr_t		d;
 	int			i;
 	int			error;
@@ -830,10 +829,6 @@ libxfs_mount(
 			progname);
 		exit(1);
 	}
-
-	while ((rtg = xfs_rtgroup_next(mp, rtg)))
-		rtg->rtg_extents = xfs_rtgroup_extents(mp,
-						rtg->rtg_group.xg_index);
 
 	xfs_set_rtgroup_data_loaded(mp);
 
