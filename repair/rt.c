@@ -58,7 +58,6 @@ generate_rtgroup_rtinfo(
 {
 	struct rtg_computed	*comp = &rt_computed[rtg_rgno(rtg)];
 	struct xfs_mount	*mp = rtg_mount(rtg);
-	unsigned int		idx = mp->m_sb.sb_agcount + rtg_rgno(rtg);
 	unsigned int		bitsperblock =
 		mp->m_blockwsize << XFS_NBWORDLOG;
 	xfs_rtxnum_t		extno = 0;
@@ -100,11 +99,11 @@ _("couldn't allocate memory for incore realtime summary info.\n"));
 
 			/*
 			 * Note: for the RTG case it might make sense to use
-			 * get_bmap_ext here and generate multiple bitmap
+			 * get_rgbmap_ext here and generate multiple bitmap
 			 * entries per lookup.
 			 */
 			if (xfs_has_rtgroups(mp))
-				state = get_bmap(idx,
+				state = get_rgbmap(rtg_rgno(rtg),
 					extno * mp->m_sb.sb_rextsize);
 			else
 				state = get_rtbmap(extno);
