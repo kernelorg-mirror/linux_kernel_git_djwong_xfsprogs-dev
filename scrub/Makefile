@@ -29,8 +29,16 @@ SYSTEMD_SERVICES=\
 	xfs_scrub_all.service \
 	xfs_scrub_all_fail.service \
 	xfs_scrub_all.timer \
-	system-xfs_scrub.slice
+	system-xfs_scrub.slice \
+	xfs_scrubbed@.service
 OPTIONAL_TARGETS += $(SYSTEMD_SERVICES)
+
+ifeq ($(HAVE_UDEV),yes)
+	XFS_SCRUBBED_UDEV_RULES = xfs_scrubbed.rules
+	XFS_SCRUBBED_HELPER = xfs_scrubbed_start
+	INSTALL_SCRUB += install-udev-scrubbed
+	OPTIONAL_TARGETS += $(XFS_SCRUBBED_HELPER)
+endif
 endif
 ifeq ($(HAVE_CROND),yes)
 INSTALL_SCRUB += install-crond
@@ -182,6 +190,14 @@ install-scrub: default
 install-udev: $(UDEV_RULES)
 	$(INSTALL) -m 755 -d $(UDEV_RULE_DIR)
 	for i in $(UDEV_RULES); do \
+		$(INSTALL) -m 644 $$i $(UDEV_RULE_DIR)/64-$$i; \
+	done
+
+install-udev-scrubbed: $(XFS_SCRUBBED_HELPER)
+	$(INSTALL) -m 755 -d $(UDEV_DIR)
+	$(INSTALL) -m 755 $(XFS_SCRUBBED_HELPER) $(UDEV_DIR)
+	$(INSTALL) -m 755 -d $(UDEV_RULE_DIR)
+	for i in $(XFS_SCRUBBED_UDEV_RULES); do \
 		$(INSTALL) -m 644 $$i $(UDEV_RULE_DIR)/64-$$i; \
 	done
 
