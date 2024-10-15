@@ -341,6 +341,9 @@ set_metadir(
 	struct xfs_mount	*mp,
 	struct xfs_sb		*new_sb)
 {
+	struct xfs_rtgroup	*rtg;
+	unsigned int		rgsize;
+
 	if (xfs_has_metadir(mp)) {
 		printf(_("Filesystem already supports metadata directory trees.\n"));
 		exit(0);
@@ -351,6 +354,15 @@ set_metadir(
 	_("Metadata directory trees only supported on V5 filesystems.\n"));
 		exit(0);
 	}
+
+	if (xfs_has_realtime(mp)) {
+		printf(
+	_("Realtime groups cannot be added to an existing realtime section.\n"));
+		exit(0);
+	}
+
+	if (!xfs_has_exchange_range(mp))
+		set_exchrange(mp, new_sb);
 
 	printf(_("Adding metadata directory trees to filesystem.\n"));
 	new_sb->sb_features_incompat |= (XFS_SB_FEAT_INCOMPAT_METADIR |
@@ -364,20 +376,34 @@ set_metadir(
 	doomed_gquotino = mp->m_sb.sb_gquotino;
 	doomed_pquotino = mp->m_sb.sb_pquotino;
 
-	new_sb->sb_rbmino = new_sb->sb_metadirino + 1;
-	new_sb->sb_rsumino = new_sb->sb_rbmino + 1;
+	new_sb->sb_rbmino = NULLFSINO;
+	new_sb->sb_rsumino = NULLFSINO;
 	new_sb->sb_uquotino = NULLFSINO;
 	new_sb->sb_gquotino = NULLFSINO;
 	new_sb->sb_pquotino = NULLFSINO;
+	rgsize = XFS_B_TO_FSBT(mp, 1ULL << 40); /* 1TB */
+	rgsize -= rgsize % new_sb->sb_rextsize;
+	new_sb->sb_rgextents = rgsize;
+	new_sb->sb_rgcount = 0;
+	new_sb->sb_rgblklog = libxfs_compute_rgblklog(new_sb->sb_rgextents,
+						      new_sb->sb_rextsize);
 
 	/* Indicate that we need a rebuild. */
 	need_metadir_inode = 1;
 	need_rbmino = 1;
 	need_rsumino = 1;
-	have_uquotino = 0;
-	have_gquotino = 0;
-	have_pquotino = 0;
+	clear_quota_inode(XFS_DQTYPE_USER);
+	clear_quota_inode(XFS_DQTYPE_GROUP);
+	clear_quota_inode(XFS_DQTYPE_PROJ);
 	quotacheck_skip();
+
+	/* Dump incore rt freespace inodes. */
+	rtg = libxfs_rtgroup_grab(mp, 0);
+	if (rtg) {
+		libxfs_rtginode_irele(&rtg->rtg_inodes[XFS_RTGI_BITMAP]);
+		libxfs_rtginode_irele(&rtg->rtg_inodes[XFS_RTGI_SUMMARY]);
+		libxfs_rtgroup_rele(rtg);
+	}
 
 	return true;
 }
