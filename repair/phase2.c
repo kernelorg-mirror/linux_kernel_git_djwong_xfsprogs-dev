@@ -200,7 +200,7 @@ set_exchrange(
 		exit(0);
 	}
 
-	if (!xfs_has_reflink(mp)) {
+	if (!xfs_has_reflink(mp) && !add_reflink) {
 		printf(
 	_("File exchange-range feature cannot be added without reflink.\n"));
 		exit(0);
@@ -230,6 +230,33 @@ set_finobt(
 
 	printf(_("Adding free inode btrees to filesystem.\n"));
 	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_FINOBT;
+	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+	return true;
+}
+
+static bool
+set_reflink(
+	struct xfs_mount	*mp,
+	struct xfs_sb		*new_sb)
+{
+	if (xfs_has_reflink(mp)) {
+		printf(_("Filesystem already supports reflink.\n"));
+		exit(0);
+	}
+
+	if (!xfs_has_crc(mp)) {
+		printf(
+	_("Reflink feature only supported on V5 filesystems.\n"));
+		exit(0);
+	}
+
+	if (xfs_has_realtime(mp)) {
+		printf(_("Reflink feature not supported with realtime.\n"));
+		exit(0);
+	}
+
+	printf(_("Adding reflink support to filesystem.\n"));
+	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_REFLINK;
 	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
 	return true;
 }
@@ -402,6 +429,8 @@ need_check_fs_free_space(
 {
 	if (xfs_has_finobt(mp) && !(old->features & XFS_FEAT_FINOBT))
 		return true;
+	if (xfs_has_reflink(mp) && !(old->features & XFS_FEAT_REFLINK))
+		return true;
 	return false;
 }
 
@@ -481,6 +510,8 @@ upgrade_filesystem(
 		dirty |= set_exchrange(mp, &new_sb);
 	if (add_finobt)
 		dirty |= set_finobt(mp, &new_sb);
+	if (add_reflink)
+		dirty |= set_reflink(mp, &new_sb);
 	if (!dirty)
 		return;
 
