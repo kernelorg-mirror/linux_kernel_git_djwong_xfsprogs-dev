@@ -322,8 +322,12 @@ _("free space (%u,%u-%u) only seen by one free space btree\n"),
 		case XR_E_FS_MAP:
 			break;
 		case XR_E_MULT:
-			add_dup_extent(agno + isrt ? mp->m_sb.sb_agcount : 0,
-					agbno, blen);
+			/*
+			 * Nothing is searching for duplicate RT extents, so
+			 * don't bother tracking them.
+			 */
+			if (!isrt)
+				add_dup_extent(agno, agbno, blen);
 			break;
 		case XR_E_BAD_STATE:
 		default:
