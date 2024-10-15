@@ -289,6 +289,7 @@
 #define xfs_rtsummary_create		libxfs_rtsummary_create
 
 #define xfs_rtgroup_alloc		libxfs_rtgroup_alloc
+#define xfs_rtgroup_extents		libxfs_rtgroup_extents
 #define xfs_rtgroup_grab		libxfs_rtgroup_grab
 #define xfs_rtgroup_rele		libxfs_rtgroup_rele
 
