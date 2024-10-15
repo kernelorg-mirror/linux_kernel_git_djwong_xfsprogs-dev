@@ -157,3 +157,4 @@ void			exchangerange_init(void);
 void			fsprops_init(void);
 void			aginfo_init(void);
 void			fsrefcounts_init(void);
+void			healthmon_init(void);
