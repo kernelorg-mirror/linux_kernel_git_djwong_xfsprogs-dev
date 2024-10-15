@@ -68,7 +68,7 @@ bool
 rmap_needs_work(
 	struct xfs_mount	*mp)
 {
-	return xfs_has_reflink(mp) ||
+	return xfs_has_reflink(mp) || add_reflink ||
 	       xfs_has_rmapbt(mp);
 }
 
@@ -1800,7 +1800,7 @@ check_refcounts(
 	struct xfs_perag		*pag = NULL;
 	int				error;
 
-	if (!xfs_has_reflink(mp))
+	if (!xfs_has_reflink(mp) || add_reflink)
 		return;
 	if (refcbt_suspect) {
 		if (no_modify && agno == 0)
@@ -1859,7 +1859,7 @@ check_rtrefcounts(
 	struct xfs_inode		*ip = NULL;
 	int				error;
 
-	if (!xfs_has_reflink(mp))
+	if (!xfs_has_reflink(mp) || add_reflink)
 		return;
 	if (refcbt_suspect) {
 		if (no_modify && rgno == 0)
