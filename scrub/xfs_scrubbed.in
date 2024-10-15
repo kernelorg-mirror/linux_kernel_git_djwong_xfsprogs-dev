@@ -571,6 +571,21 @@ def fgetpath(fd, fh = None, mountpoint = None):
 			break
 	return ret
 
+# Filesystem properties
+
+FSPROP_NAMESPACE = "trusted."
+FSPROP_NAME_PREFIX = "xfs:"
+FSPROP_AUTOFSCK_NAME = "autofsck"
+
+def fsprop_attrname(n):
+	'''Construct the xattr name for a filesystem property.'''
+	return f"{FSPROP_NAMESPACE}{FSPROP_NAME_PREFIX}{n}"
+
+def fsprop_getstr(fd, n):
+	'''Return the value of a filesystem property as a string.'''
+	attrname = fsprop_attrname(n)
+	return os.getxattr(fd, attrname).decode('utf-8')
+
 # main program
 
 def health_reports(mon_fp, fh):
@@ -717,6 +732,31 @@ def handle_event(e):
 	elif want_repair and event['type'] == 'sick':
 		repair_queue.submit(repair_metadata, event, fh)
 
+def want_repair_from_autofsck(fd):
+	'''Determine want_repair from the autofsck filesystem property.'''
+	global has_parent
+	global has_rmapbt
+
+	try:
+		advice = fsprop_getstr(fd, FSPROP_AUTOFSCK_NAME)
+		if advice == "repair":
+			return True
+		if advice == "check" or advice == "optimize":
+			return False
+		if advice == "none":
+			return None
+	except:
+		# Any OS error (including ENODATA) or string parsing error is
+		# treated the same as an unrecognized value.
+		pass
+
+	# For an unrecognized value, log but do not fix runtime corruption if
+	# backref metadata are enabled.  If no backref metadata are available,
+	# the fs is too old so don't run at all.
+	if has_rmapbt or has_parent:
+		return False
+	return None
+
 def monitor(mountpoint, event_queue, **kwargs):
 	'''Monitor the given mountpoint for health events.'''
 	global everything
@@ -734,6 +774,20 @@ def monitor(mountpoint, event_queue, **kwargs):
 	except Exception as e:
 		# Don't care if we can't detect parent pointers or rmap
 		print(e, file = sys.stderr)
+
+	# Does the sysadmin have any advice for us about whether or not to
+	# background scrub?
+	if want_repair is None:
+		want_repair = want_repair_from_autofsck(fd)
+		if want_repair is None:
+			print(f"{mountpoint}: Disabling daemon per autofsck directive.")
+			os.close(fd)
+			return 0
+		elif want_repair:
+			print(f"{mountpoint}: Automatically repairing per autofsck directive.")
+		else:
+			print(f"{mountpoint}: Only logging errors per autofsck directive.")
+
 
 	# Check for the backref metadata that makes repair effective.
 	if want_repair:
@@ -938,7 +992,11 @@ def main():
 			action = "store_true")
 	parser.add_argument("--everything", help = "Capture all events.", \
 			action = "store_true")
-	parser.add_argument("--repair", help = "Automatically repair corrupt metadata.", \
+	action_group = parser.add_mutually_exclusive_group()
+	action_group.add_argument("--repair", \
+			help = "Automatically repair corrupt metadata.", \
+			action = "store_true")
+	action_group.add_argument("--autofsck", help = argparse.SUPPRESS, \
 			action = "store_true")
 	parser.add_argument("-V", help = "Report version and exit.", \
 			action = "store_true")
@@ -975,6 +1033,8 @@ def main():
 		log = True
 	if args.everything:
 		everything = True
+	if args.autofsck:
+		want_repair = None
 	if args.repair:
 		want_repair = True
 
