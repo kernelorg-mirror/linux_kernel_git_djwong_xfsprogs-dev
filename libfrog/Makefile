@@ -65,6 +65,11 @@ workqueue.h
 
 LSRCFILES += gen_crc32table.c
 
+ifeq ($(HAVE_GETFSMAP),yes)
+CFILES+=clearspace.c
+HFILES+=clearspace.h
+endif
+
 LDIRT = gen_crc32table crc32table.h
 
 default: ltdepend $(LTLIBRARY)
