@@ -112,7 +112,8 @@ SYSTEMD_SYSTEM_UNIT_DIR = @systemd_system_unit_dir@
 HAVE_CROND = @have_crond@
 CROND_DIR = @crond_dir@
 HAVE_UDEV = @have_udev@
-UDEV_RULE_DIR = @udev_rule_dir@
+UDEV_DIR = @udev_dir@
+UDEV_RULE_DIR = @udev_dir@/rules.d
 HAVE_LIBURCU_ATOMIC64 = @have_liburcu_atomic64@
 USE_RADIX_TREE_FOR_INUMS = @use_radix_tree_for_inums@
 
