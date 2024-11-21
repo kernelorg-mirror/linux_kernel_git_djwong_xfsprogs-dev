@@ -568,7 +568,7 @@ phase2(
 		 * also mark blocks
 		 */
 		set_bmap_ext(0, XFS_INO_TO_AGBNO(mp, sb->sb_rootino),
-			     M_IGEO(mp)->ialloc_blks, XR_E_INO);
+			     M_IGEO(mp)->ialloc_blks, XR_E_INO, false);
 	} else  {
 		do_log(_("        - found root inode chunk\n"));
 		j = 0;
