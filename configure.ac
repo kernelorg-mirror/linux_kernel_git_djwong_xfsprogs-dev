@@ -174,7 +174,7 @@ if test "$enable_scrub" = "yes"; then
 fi
 AC_CONFIG_SYSTEMD_SYSTEM_UNIT_DIR
 AC_CONFIG_CROND_DIR
-AC_CONFIG_UDEV_RULE_DIR
+AC_CONFIG_UDEV_DIR
 AC_HAVE_BLKID_TOPO
 
 if test "$enable_ubsan" = "yes" || test "$enable_ubsan" = "probe"; then
