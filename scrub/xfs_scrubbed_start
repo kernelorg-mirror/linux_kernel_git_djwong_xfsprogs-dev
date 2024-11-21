@@ -1,0 +1,17 @@
+#!/bin/sh
+
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Copyright (c) 2024-2025 Oracle.  All Rights Reserved.
+# Author: Darrick J. Wong <djwong@kernel.org>
+
+# Start the xfs_scrubbed service when the filesystem is mounted
+
+command -v systemctl || exit 0
+
+grep "^$SOURCE[[:space:]]" /proc/mounts | while read source mntpt therest; do
+	inst="$(systemd-escape --path "$mntpt")"
+	systemctl restart --no-block "xfs_scrubbed@$inst" && break
+done
+
+exit 0
