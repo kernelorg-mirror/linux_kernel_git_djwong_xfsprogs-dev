@@ -56,6 +56,7 @@ bool	add_exchrange;		/* add file content exchange support */
 bool	add_finobt;		/* add free inode btrees */
 bool	add_reflink;		/* add reference count btrees */
 bool	add_rmapbt;		/* add reverse mapping btrees */
+bool	add_parent;		/* add parent pointers */
 
 /* misc status variables */
 
