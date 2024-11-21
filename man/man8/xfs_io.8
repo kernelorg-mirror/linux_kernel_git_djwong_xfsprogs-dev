@@ -1265,6 +1265,18 @@ If 1, set the NOALLOC flag.
 .RE
 
 .TP
+.BI "addfeature [ " features " ]"
+Upgrade the mounted filesystem feature set.
+The only supported features are:
+.BR bigtime ,
+.BR inobtcount ,
+.BR nrext64 ,
+and
+.BR exchange .
+.PD
+.RE
+
+.TP
 .BI "bulkstat [ \-a " agno " ] [ \-d ] [ \-e " endino " ] [ \-m ] [ \-n " batchsize " ] [ \-q ] [ \-s " startino " ] [ \-v " version" ]
 Display raw stat information about a bunch of inodes in an XFS filesystem.
 Options are as follows:
