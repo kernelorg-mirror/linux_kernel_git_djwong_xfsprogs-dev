@@ -295,15 +295,17 @@ process_dup_rt_extents(
  */
 static void
 process_dup_extents(
+	struct xfs_mount	*mp,
 	xfs_agnumber_t		agno,
 	xfs_agblock_t		agbno,
-	xfs_agblock_t		ag_end)
+	xfs_agblock_t		ag_end,
+	bool			isrt)
 {
 	do {
 		int		bstate;
 		xfs_extlen_t	blen;
 
-		bstate = get_bmap_ext(agno, agbno, ag_end, &blen);
+		bstate = get_bmap_ext(agno, agbno, ag_end, &blen, isrt);
 		switch (bstate) {
 		case XR_E_FREE1:
 			if (no_modify)
@@ -320,7 +322,8 @@ _("free space (%u,%u-%u) only seen by one free space btree\n"),
 		case XR_E_FS_MAP:
 			break;
 		case XR_E_MULT:
-			add_dup_extent(agno, agbno, blen);
+			add_dup_extent(agno + isrt ? mp->m_sb.sb_agcount : 0,
+					agbno, blen);
 			break;
 		case XR_E_BAD_STATE:
 		default:
@@ -389,7 +392,7 @@ phase4(xfs_mount_t *mp)
 			mp->m_sb.sb_dblocks -
 				(xfs_rfsblock_t) mp->m_sb.sb_agblocks * i;
 
-		process_dup_extents(i, ag_hdr_block, ag_end);
+		process_dup_extents(mp, i, ag_hdr_block, ag_end, false);
 
 		PROG_RPT_INC(prog_rpt_done[i], 1);
 	}
@@ -400,9 +403,8 @@ phase4(xfs_mount_t *mp)
 			uint64_t	rblocks;
 
 			rblocks = xfs_rtbxlen_to_blen(mp,
-					xfs_rtgroup_extents(mp, i));
-			process_dup_extents(mp->m_sb.sb_agcount + i, 0,
-					rblocks);
+					libxfs_rtgroup_extents(mp, i));
+			process_dup_extents(mp, i, 0, rblocks, true);
 		}
 	} else {
 		process_dup_rt_extents(mp);
