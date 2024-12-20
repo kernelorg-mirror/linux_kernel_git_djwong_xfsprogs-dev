@@ -1147,7 +1147,8 @@ rtinit_groups(
 				fail(_("rtrmap rtsb init failed"), error);
 		}
 
-		rtfreesp_init(rtg);
+		if (!xfs_has_zoned(mp))
+			rtfreesp_init(rtg);
 	}
 }
 
