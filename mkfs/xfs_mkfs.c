@@ -4276,6 +4276,9 @@ calculate_rtgroup_geometry(
 	struct libxfs_init	*xi,
 	struct zone_topology	*zt)
 {
+	struct libxfs_init	*xi = cli->xi;
+	unsigned int		max_zones;
+
 	if (zt->rt.nr_zones) {
 		cfg->rgsize = zt->rt.zone_capacity * 512;
 	} else {
@@ -4352,6 +4355,33 @@ _("empty zoned realtime device not supported.\n"));
 		cfg->rgsize = calc_rgsize_extsize_nonpower(cfg);
 		cfg->rgcount = cfg->rtblocks / cfg->rgsize +
 				(cfg->rtblocks % cfg->rgsize != 0);
+	}
+
+	if (cfg->sb_feat.zoned && cli->rtsize) {
+		/*
+		 * If we're creating a zoned filesystem and the user specified
+		 * a size, make sure to add enough over provisioning to be able
+		 * to back that amount of writable space.
+		 */
+		 cfg->rgcount += XFS_RESERVED_ZONES;
+
+		 if (zt->rt.nr_zones)
+			 max_zones = zt->rt.nr_zones;
+		 else
+			 max_zones = DTOBT(xi->rt.size, cfg->blocklog) /
+				 cfg->rgsize;
+
+		 if (cfg->rgcount > max_zones) {
+			 cfg->rgcount = max_zones;
+			 fprintf(stderr,
+_("Warning: not enough zones for backing requested rt size due to\n"
+  "over-provisioning needs, writeable size will be less than %s\n"),
+			 cli->rtsize);
+		 }
+
+		 cfg->rtextents = (cfg->rgcount * cfg->rgsize) /
+					 cfg->rtextblocks;
+		 cfg->rtblocks = cfg->rtextents * cfg->rtextblocks;
 	}
 
 	if (cfg->rgsize > XFS_MAX_RGBLOCKS) {
