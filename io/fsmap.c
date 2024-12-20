@@ -166,9 +166,9 @@ static void
 dump_map_verbose(
 	unsigned long long	*nr,
 	struct fsmap_head	*head,
-	bool			*dumped_flags,
-	struct xfs_fsop_geom	*fsgeo)
+	bool			*dumped_flags)
 {
+	struct xfs_fsop_geom	*fsgeo = &file->geom;
 	unsigned long long	i;
 	struct fsmap		*p;
 	int			agno;
@@ -395,7 +395,6 @@ fsmap_f(
 	struct fsmap		*p;
 	struct fsmap_head	*head;
 	struct fsmap		*l, *h;
-	struct xfs_fsop_geom	fsgeo;
 	long long		start = 0;
 	long long		end = -1;
 	int			map_size;
@@ -470,17 +469,6 @@ fsmap_f(
 		end <<= BBSHIFT;
 	}
 
-	if (vflag) {
-		c = -xfrog_geometry(file->fd, &fsgeo);
-		if (c) {
-			fprintf(stderr,
-				_("%s: can't get geometry [\"%s\"]: %s\n"),
-				progname, file->name, strerror(c));
-			exitcode = 1;
-			return 0;
-		}
-	}
-
 	map_size = nflag ? nflag : 131072 / sizeof(struct fsmap);
 	head = malloc(fsmap_sizeof(map_size));
 	if (head == NULL) {
@@ -531,7 +519,7 @@ fsmap_f(
 			break;
 
 		if (vflag)
-			dump_map_verbose(&nr, head, &dumped_flags, &fsgeo);
+			dump_map_verbose(&nr, head, &dumped_flags);
 		else if (mflag)
 			dump_map_machine(&nr, head);
 		else
