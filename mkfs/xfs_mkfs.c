@@ -4296,6 +4296,7 @@ adjust_nr_zones(
 	struct libxfs_init	*xi,
 	struct zone_topology	*zt)
 {
+	uint64_t		new_rtblocks, slack;
 	unsigned int		max_zones;
 
 	if (zt->rt.nr_zones)
@@ -4311,8 +4312,18 @@ _("Warning: not enough zones for backing requested rt size due to\n"
   "over-provisioning needs, writeable size will be less than %s\n"),
 			cli->rtsize);
 	}
-	cfg->rtblocks = (cfg->rgcount * cfg->rgsize);
+	new_rtblocks = (cfg->rgcount * cfg->rgsize);
+	slack = (new_rtblocks - cfg->rtblocks) % cfg->rgsize;
+
+	cfg->rtblocks = new_rtblocks;
 	cfg->rtextents = cfg->rtblocks / cfg->rtextblocks;
+
+	/*
+	 * Add the slack to the end of the last zone to the reserved blocks.
+	 * This ensures the visible user capacity is exactly the one that the
+	 * user asked for.
+	 */
+	cfg->rtreserved += (slack * cfg->blocksize);
 }
 
 static void
