@@ -2947,6 +2947,14 @@ _("rt extent size not supported on realtime devices with zoned mode specified\n"
 			}
 			cli->rtextsize = 0;
 		}
+		if (cli->sb_feat.zoned && cli->sb_feat.reflink) {
+			if (cli_opt_set(&mopts, M_REFLINK)) {
+				fprintf(stderr,
+_("reflink not supported on realtime devices with zoned mode specified\n"));
+				usage();
+			}
+			cli->sb_feat.reflink = false;
+		}
 		if (cli->rtextsize && cli->sb_feat.reflink) {
 			if (cli_opt_set(&mopts, M_REFLINK)) {
 				fprintf(stderr,
