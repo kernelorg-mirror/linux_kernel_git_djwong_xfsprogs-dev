@@ -3265,8 +3265,9 @@ _("bad (negative) size %" PRId64 " on inode %" PRIu64 "\n"),
 			flags &= XFS_DIFLAG_ANY;
 		}
 
-		/* need an rt-dev for the realtime flag! */
-		if ((flags & XFS_DIFLAG_REALTIME) && !rt_name) {
+		/* need an rt-dev for the realtime flag */
+		if ((flags & XFS_DIFLAG_REALTIME) &&
+		    !mp->m_rtdev_targp) {
 			if (!uncertain) {
 				do_warn(
 	_("inode %" PRIu64 " has RT flag set but there is no RT device\n"),
