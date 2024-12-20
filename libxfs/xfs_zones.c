@@ -3,6 +3,8 @@
  * Copyright (c) 2023-2024 Christoph Hellwig.
  * Copyright (c) 2024, Western Digital Corporation or its affiliates.
  */
+#include <linux/blkzoned.h>
+#include "libxfs_priv.h"
 #include "xfs.h"
 #include "xfs_fs.h"
 #include "xfs_shared.h"
