@@ -70,7 +70,8 @@ xfs_report_geom(
 "log      =%-22s bsize=%-6d blocks=%u, version=%d\n"
 "         =%-22s sectsz=%-5u sunit=%d blks, lazy-count=%d\n"
 "realtime =%-22s extsz=%-6d blocks=%lld, rtextents=%lld\n"
-"         =%-22s rgcount=%-4d rgsize=%u extents, zoned=%d\n"),
+"         =%-22s rgcount=%-4d rgsize=%u extents\n"
+"         =%-22s zoned=%-6d start=%llu reserved=%llu\n"),
 		mntpoint, geo->inodesize, geo->agcount, geo->agblocks,
 		"", geo->sectsize, attrversion, projid32bit,
 		"", crcs_enabled, finobt_enabled, spinodes, rmapbt_enabled,
@@ -86,7 +87,8 @@ xfs_report_geom(
 		!geo->rtblocks ? _("none") : rtname ? rtname : _("internal"),
 		geo->rtextsize * geo->blocksize, (unsigned long long)geo->rtblocks,
 			(unsigned long long)geo->rtextents,
-		"", geo->rgcount, geo->rgextents, zoned);
+		"", geo->rgcount, geo->rgextents,
+		"", zoned, geo->rtstart, geo->rtreserved);
 }
 
 /* Try to obtain the xfs geometry.  On error returns a negative error code. */
