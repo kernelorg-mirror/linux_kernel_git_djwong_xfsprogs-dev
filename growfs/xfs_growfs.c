@@ -202,7 +202,7 @@ main(int argc, char **argv)
 			progname, fname);
 		exit(1);
 	}
-	if (rflag && !xi.rt.dev) {
+	if (rflag && (!xi.rt.dev && !geo.rtstart)) {
 		fprintf(stderr,
 			_("%s: failed to access realtime device for %s\n"),
 			progname, fname);
@@ -210,6 +210,11 @@ main(int argc, char **argv)
 	}
 
 	xfs_report_geom(&geo, datadev, logdev, rtdev);
+
+	if (geo.rtstart) {
+		xi.rt.size = xi.data.size - geo.rtstart;
+		xi.data.size = geo.rtstart;
+	}
 
 	ddsize = xi.data.size;
 	dlsize = (xi.log.size ? xi.log.size :
