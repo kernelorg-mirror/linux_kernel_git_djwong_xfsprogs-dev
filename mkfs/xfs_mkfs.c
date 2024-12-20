@@ -814,6 +814,7 @@ static struct opt_params ropts = {
 		},
 		{ .index = R_ZONED,
 		  .conflicts = { { &ropts, R_EXTSIZE },
+				 { &ropts, R_CONCURRENCY },
 				 { NULL, LAST_CONFLICT } },
 		  .minval = 0,
 		  .maxval = 1,
@@ -1585,7 +1586,7 @@ reset_zones(struct mkfs_params *cfg, int fd, uint64_t start_sector,
 	};
 
 	if (!quiet) {
-		printf("Discarding blocks...");
+		printf("Resetting zones...");
 		fflush(stdout);
 	}
 
@@ -2505,10 +2506,15 @@ _("log stripe unit specified, using v2 logs\n"));
 }
 
 struct zone_info {
+	/* number of zones, conventional or sequential */
 	unsigned int		nr_zones;
+	/* number of conventional zones */
 	unsigned int		nr_conv_zones;
-	unsigned int		zone_size;
-	unsigned int		zone_capacity;
+
+	/* size of the address space for a zone, in 512b blocks */
+	xfs_daddr_t		zone_size;
+	/* write capacity of a zone, in 512b blocks */
+	xfs_daddr_t		zone_capacity;
 };
 
 struct zone_topology {
@@ -3832,7 +3838,7 @@ _("size specified for non-existent rt subvolume\n"));
 	if (cli->rtsize) {
 		if (cfg->rtblocks > DTOBT(xi->rt.size, cfg->blocklog)) {
 			fprintf(stderr,
-_("size %s specified for rt subvolume is too large, maxi->um is %lld blocks\n"),
+_("size %s specified for rt subvolume is too large, maximum is %lld blocks\n"),
 				cli->rtsize,
 				(long long)DTOBT(xi->rt.size, cfg->blocklog));
 			usage();
