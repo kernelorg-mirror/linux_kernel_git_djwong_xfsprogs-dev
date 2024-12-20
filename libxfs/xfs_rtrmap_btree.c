@@ -1034,8 +1034,11 @@ xfs_rtrmapbt_init_rtsb(
 	return error;
 }
 
+/*
+ * Return the highest rgbno currently tracked by the rmap for this rtg.
+ */
 xfs_rgblock_t
-xfs_rtrmap_first_unwritten_rgbno(
+xfs_rtrmap_highest_rgbno(
 	struct xfs_rtgroup	*rtg)
 {
 	struct xfs_btree_block	*block = rtg_rmap(rtg)->i_df.if_broot;
@@ -1043,9 +1046,9 @@ xfs_rtrmap_first_unwritten_rgbno(
 	struct xfs_btree_cur	*cur;
 
 	if (block->bb_numrecs == 0)
-		return 0;
+		return NULLRGBLOCK;
 	cur = xfs_rtrmapbt_init_cursor(NULL, rtg);
 	xfs_btree_get_keys(cur, block, &key);
 	xfs_btree_del_cursor(cur, XFS_BTREE_NOERROR);
-	return be32_to_cpu(key.__rmap_bigkey[1].rm_startblock) + 1;
+	return be32_to_cpu(key.__rmap_bigkey[1].rm_startblock);
 }
