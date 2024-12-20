@@ -6,6 +6,8 @@
 #include "libfrog/util.h"
 #include "libxfs.h"
 #include <ctype.h>
+#include <linux/blkzoned.h>
+#include "libxfs/xfs_zones.h"
 #include "xfs_multidisk.h"
 #include "libxcmd.h"
 #include "libfrog/fsgeom.h"
@@ -135,6 +137,9 @@ enum {
 	R_RGCOUNT,
 	R_RGSIZE,
 	R_CONCURRENCY,
+	R_ZONED,
+	R_START,
+	R_RESERVED,
 	R_MAX_OPTS,
 };
 
@@ -739,6 +744,9 @@ static struct opt_params ropts = {
 		[R_RGCOUNT] = "rgcount",
 		[R_RGSIZE] = "rgsize",
 		[R_CONCURRENCY] = "concurrency",
+		[R_ZONED] = "zoned",
+		[R_START] = "start",
+		[R_RESERVED] = "reserved",
 		[R_MAX_OPTS] = NULL,
 	},
 	.subopt_params = {
@@ -803,6 +811,28 @@ static struct opt_params ropts = {
 		  .minval = 0,
 		  .maxval = INT_MAX,
 		  .defaultval = 1,
+		},
+		{ .index = R_ZONED,
+		  .conflicts = { { &ropts, R_EXTSIZE },
+				 { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
+		},
+		{ .index = R_START,
+		  .conflicts = { { &ropts, R_DEV },
+				 { NULL, LAST_CONFLICT } },
+		  .convert = true,
+		  .minval = 0,
+		  .maxval = LLONG_MAX,
+		  .defaultval = SUBOPT_NEEDS_VAL,
+		},
+		{ .index = R_RESERVED,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .convert = true,
+		  .minval = 0,
+		  .maxval = LLONG_MAX,
+		  .defaultval = SUBOPT_NEEDS_VAL,
 		},
 	},
 };
@@ -1012,6 +1042,8 @@ struct sb_feat_args {
 	bool	nortalign;
 	bool	nrext64;
 	bool	exchrange;		/* XFS_SB_FEAT_INCOMPAT_EXCHRANGE */
+	bool	zoned;
+	bool	zone_gaps;
 
 	uint16_t qflags;
 };
@@ -1035,6 +1067,8 @@ struct cli_params {
 	char	*lsu;
 	char	*rtextsize;
 	char	*rtsize;
+	char	*rtstart;
+	uint64_t rtreserved;
 
 	/* parameters where 0 is a valid CLI value */
 	int	dsunit;
@@ -1121,6 +1155,8 @@ struct mkfs_params {
 	char		*label;
 
 	struct sb_feat_args	sb_feat;
+	uint64_t	rtstart;
+	uint64_t	rtreserved;
 };
 
 /*
@@ -1172,7 +1208,7 @@ usage( void )
 /* prototype file */	[-p fname]\n\
 /* quiet */		[-q]\n\
 /* realtime subvol */	[-r extsize=num,size=num,rtdev=xxx,rgcount=n,rgsize=n,\n\
-			    concurrency=num]\n\
+			    concurrency=num,zoned=0|1,start=n,reserved=n]\n\
 /* sectorsize */	[-s size=num]\n\
 /* version */		[-V]\n\
 			devicename\n\
@@ -1536,6 +1572,30 @@ discard_blocks(int fd, uint64_t nsectors, int quiet)
 		offset += tmp_step;
 	}
 	if (offset > 0 && !quiet)
+		printf("Done.\n");
+}
+
+static void
+reset_zones(struct mkfs_params *cfg, int fd, uint64_t start_sector,
+		uint64_t nsectors, int quiet)
+{
+	struct blk_zone_range range = {
+		.sector		= start_sector,
+		.nr_sectors	= nsectors,
+	};
+
+	if (!quiet) {
+		printf("Discarding blocks...");
+		fflush(stdout);
+	}
+
+	if (ioctl(fd, BLKRESETZONE, &range) < 0) {
+		if (!quiet)
+			printf(" FAILED\n");
+		exit(1);
+	}
+
+	if (!quiet)
 		printf("Done.\n");
 }
 
@@ -2144,6 +2204,15 @@ rtdev_opts_parser(
 	case R_CONCURRENCY:
 		set_rtvol_concurrency(opts, subopt, cli, value);
 		break;
+	case R_ZONED:
+		cli->sb_feat.zoned = getnum(value, opts, subopt);
+		break;
+	case R_START:
+		cli->rtstart = getstr(value, opts, subopt);
+		break;
+	case R_RESERVED:
+		cli->rtreserved = getnum(value, opts, subopt);
+		break;
 	default:
 		return -EINVAL;
 	}
@@ -2433,7 +2502,203 @@ _("Version 1 logs do not support sector size %d\n"),
 _("log stripe unit specified, using v2 logs\n"));
 		cli->sb_feat.log_version = 2;
 	}
+}
 
+struct zone_info {
+	unsigned int		nr_zones;
+	unsigned int		nr_conv_zones;
+	unsigned int		zone_size;
+	unsigned int		zone_capacity;
+};
+
+struct zone_topology {
+	struct zone_info	data;
+	struct zone_info	rt;
+	struct zone_info	log;
+};
+
+/* random size that allows efficient processing */
+#define ZONES_PER_IOCTL			16384
+
+static int report_zones(const char *name, struct zone_info *zi)
+{
+	struct blk_zone_report *rep;
+	size_t rep_size;
+	struct stat st;
+	unsigned int i, n = 0;
+	uint64_t device_size;
+	uint64_t sector = 0;
+	bool found_seq = false;
+	int ret = 0;
+	int fd;
+
+	fd = open(name, O_RDONLY);
+	if (fd < 0)
+		return -EIO;
+
+	if (fstat(fd, &st) < 0) {
+		ret = -EIO;
+		goto out_close;
+	}
+        if (!S_ISBLK(st.st_mode))
+		goto out_close;
+
+	if (ioctl(fd, BLKGETSIZE64, &device_size)) {
+		ret = -EIO;
+		goto out_close;
+	}
+	if (ioctl(fd, BLKGETZONESZ, &zi->zone_size) || !zi->zone_size)
+		goto out_close; /* not zoned */
+
+	device_size /= 512; /* BLKGETSIZE64 reports a byte value */
+	zi->nr_zones = device_size / zi->zone_size;
+	zi->nr_conv_zones = 0;
+
+	rep_size = sizeof(struct blk_zone_report) +
+		   sizeof(struct blk_zone) * ZONES_PER_IOCTL;
+	rep = malloc(rep_size);
+	if (!rep) {
+		ret = -ENOMEM;
+		goto out_close;
+	}
+
+	while (n < zi->nr_zones) {
+		struct blk_zone *zones = (struct blk_zone *)(rep + 1);
+
+		memset(rep, 0, rep_size);
+		rep->sector = sector;
+		rep->nr_zones = ZONES_PER_IOCTL;
+
+		ret = ioctl(fd, BLKREPORTZONE, rep);
+		if (ret) {
+			fprintf(stderr,
+_("ioctl(BLKREPORTZONE) failed: %d!\n"), ret);
+			goto out_free;
+		}
+		if (!rep->nr_zones)
+			break;
+
+		for (i = 0; i < rep->nr_zones; i++) {
+			if (n >= zi->nr_zones)
+				break;
+
+			if (zones[i].len != zi->zone_size) {
+				fprintf(stderr,
+_("Inconsistent zone size!\n"));
+				ret = -EIO;
+				goto out_free;
+			}
+
+			switch (zones[i].type) {
+			case BLK_ZONE_TYPE_CONVENTIONAL:
+				/*
+				 * We can only use the conventional space at the
+				 * start of the device for metadata, so don't
+				 * count later conventional zones.  This is
+				 * not an error because we can use them for data
+				 * just fine.
+				 */
+				if (!found_seq)
+					zi->nr_conv_zones++;
+				break;
+			case BLK_ZONE_TYPE_SEQWRITE_REQ:
+				found_seq = true;
+				break;
+			case BLK_ZONE_TYPE_SEQWRITE_PREF:
+				fprintf(stderr,
+_("Sequential write preferred zones not supported.\n"));
+				ret = -EIO;
+				goto out_free;
+			default:
+				fprintf(stderr,
+_("Unknown zone type (0x%x) found.\n"), zones[i].type);
+				ret = -EIO;
+				goto out_free;
+			}
+
+			if (!n) {
+				zi->zone_capacity = zones[i].capacity;
+				if (zi->zone_capacity > zi->zone_size) {
+					fprintf(stderr,
+_("Zone capacity larger than zone size!\n"));
+					ret = -EIO;
+					goto out_free;
+				}
+			} else if (zones[i].capacity != zi->zone_capacity) {
+				fprintf(stderr,
+_("Inconsistent zone capacity!\n"));
+				ret = -EIO;
+				goto out_free;
+			}
+
+			n++;
+		}
+		sector = zones[rep->nr_zones - 1].start +
+			 zones[rep->nr_zones - 1].len;
+	}
+
+out_free:
+	free(rep);
+out_close:
+	close(fd);
+	return ret;
+}
+
+static void
+validate_zoned(
+	struct mkfs_params	*cfg,
+	struct cli_params	*cli,
+	struct mkfs_default_params *dft,
+	struct zone_topology	*zt)
+{
+	if (!cli->xi->data.isfile) {
+		report_zones(cli->xi->data.name, &zt->data);
+		if (zt->data.nr_zones) {
+			if (!zt->data.nr_conv_zones) {
+				fprintf(stderr,
+_("Data devices requires conventional zones.\n"));
+				usage();
+			}
+			if (zt->data.zone_capacity != zt->data.zone_size) {
+				fprintf(stderr,
+_("Zone capacity equal to Zone size required for conventional zones.\n"));
+				usage();
+			}
+
+			cli->sb_feat.zoned = true;
+			cfg->rtstart =
+				zt->data.nr_conv_zones * zt->data.zone_capacity;
+		}
+	}
+
+	if (cli->xi->rt.name && !cli->xi->rt.isfile) {
+		report_zones(cli->xi->rt.name, &zt->rt);
+		if (zt->rt.nr_zones && !cli->sb_feat.zoned)
+			cli->sb_feat.zoned = true;
+		if (zt->rt.zone_size != zt->rt.zone_capacity)
+			cli->sb_feat.zone_gaps = true;
+	}
+
+	if (cli->xi->log.name && !cli->xi->log.isfile) {
+		report_zones(cli->xi->log.name, &zt->log);
+		if (zt->log.nr_zones) {
+			fprintf(stderr,
+_("Zoned devices not supported as log device!\n"));
+			usage();
+		}
+	}
+
+	if (cli->rtstart) {
+		if (cfg->rtstart) {
+			fprintf(stderr,
+_("rtstart override not allowed on zoned devices.\n"));
+			usage();
+		}
+		cfg->rtstart = getnum(cli->rtstart, &ropts, R_START) / 512;
+	}
+
+	if (cli->rtreserved)
+		cfg->rtreserved = cli->rtreserved;
 }
 
 /*
@@ -2658,7 +2923,23 @@ _("inode btree counters not supported without finobt support\n"));
 		cli->sb_feat.inobtcnt = false;
 	}
 
-	if (cli->xi->rt.name) {
+	if (cli->xi->rt.name || cfg->rtstart) {
+		if (cli->sb_feat.zoned && !cli->sb_feat.metadir) {
+			if (cli_opt_set(&mopts, M_METADIR)) {
+				fprintf(stderr,
+_("zoned realtime device not supported without metadir support\n"));
+				usage();
+			}
+			cli->sb_feat.metadir = true;
+		}
+		if (cli->sb_feat.zoned && cli->rtextsize) {
+			if (cli_opt_set(&ropts, R_EXTSIZE)) {
+				fprintf(stderr,
+_("rt extent size not supported on realtime devices with zoned mode specified\n"));
+				usage();
+			}
+			cli->rtextsize = 0;
+		}
 		if (cli->rtextsize && cli->sb_feat.reflink) {
 			if (cli_opt_set(&mopts, M_REFLINK)) {
 				fprintf(stderr,
@@ -2701,6 +2982,21 @@ _("rmapbt not supported on realtime devices without metadir feature\n"));
 			} else {
 				cli->sb_feat.rmapbt = false;
 			}
+		}
+	} else {
+		cli->sb_feat.zoned = false;
+	}
+
+	if (!cli->sb_feat.zoned) {
+		if (cli->rtstart) {
+			fprintf(stderr,
+_("internal RT section only support in zoned mode\n"));
+			usage();
+		}
+		if (cli->rtreserved) {
+			fprintf(stderr,
+_("reserved RT blocks only support in zoned mode\n"));
+			usage();
 		}
 	}
 
@@ -2898,6 +3194,11 @@ validate_rtextsize(
 				cfg->blocksize);
 			usage();
 		}
+		cfg->rtextblocks = 1;
+	} else if (cli->sb_feat.zoned) {
+		/*
+		 * Zoned mode only supports a rtextsize of 1.
+		 */
 		cfg->rtextblocks = 1;
 	} else {
 		/*
@@ -3303,7 +3604,8 @@ _("log stripe unit (%d bytes) is too large (maximum is 256KiB)\n"
 static void
 open_devices(
 	struct mkfs_params	*cfg,
-	struct libxfs_init	*xi)
+	struct libxfs_init	*xi,
+	struct zone_topology	*zt)
 {
 	uint64_t		sector_mask;
 
@@ -3316,6 +3618,17 @@ open_devices(
 	if (!xi->data.dev) {
 		fprintf(stderr, _("no device name given in argument list\n"));
 		usage();
+	}
+
+	if (cfg->rtstart) {
+		xi->rt.size = xi->data.size - cfg->rtstart;
+		xi->data.size = cfg->rtstart;
+	}
+
+	if (zt->data.nr_zones) {
+		zt->rt.zone_size = zt->data.zone_size;
+		zt->rt.zone_capacity = zt->data.zone_capacity;
+		zt->rt.nr_zones = zt->data.nr_zones - zt->data.nr_conv_zones;
 	}
 
 	/*
@@ -3336,17 +3649,31 @@ open_devices(
 
 static void
 discard_devices(
+	struct mkfs_params	*cfg,
 	struct libxfs_init	*xi,
+	struct zone_topology	*zt,
 	int			quiet)
 {
 	/*
 	 * This function has to be called after libxfs has been initialized.
 	 */
 
-	if (!xi->data.isfile)
-		discard_blocks(xi->data.fd, xi->data.size, quiet);
-	if (xi->rt.dev && !xi->rt.isfile)
-		discard_blocks(xi->rt.fd, xi->rt.size, quiet);
+	if (!xi->data.isfile) {
+		uint64_t	nsectors = xi->data.size;
+
+		if (cfg->rtstart && zt->data.nr_zones) {
+			reset_zones(cfg, xi->data.fd, cfg->rtstart, xi->rt.size,
+					quiet);
+			nsectors -= cfg->rtstart;
+		}
+		discard_blocks(xi->data.fd, nsectors, quiet);
+	}
+	if (xi->rt.dev && !xi->rt.isfile) {
+		if (zt->rt.nr_zones)
+			reset_zones(cfg, xi->rt.fd, 0, xi->rt.size, quiet);
+		else
+			discard_blocks(xi->rt.fd, xi->rt.size, quiet);
+	}
 	if (xi->log.dev && xi->log.dev != xi->data.dev && !xi->log.isfile)
 		discard_blocks(xi->log.fd, xi->log.size, quiet);
 }
@@ -3465,11 +3792,12 @@ reported by the device (%u).\n"),
 static void
 validate_rtdev(
 	struct mkfs_params	*cfg,
-	struct cli_params	*cli)
+	struct cli_params	*cli,
+	struct zone_topology	*zt)
 {
 	struct libxfs_init	*xi = cli->xi;
 
-	if (!xi->rt.dev) {
+	if (!xi->rt.dev && !cfg->rtstart) {
 		if (cli->rtsize) {
 			fprintf(stderr,
 _("size specified for non-existent rt subvolume\n"));
@@ -3500,6 +3828,9 @@ _("size %s specified for rt subvolume is too large, maxi->um is %lld blocks\n"),
 reported by the device (%u).\n"),
 				cfg->sectorsize, xi->rt.bsize);
 		}
+	} else if (zt->rt.nr_zones) {
+		cfg->rtblocks = DTOBT(zt->rt.nr_zones * zt->rt.zone_capacity,
+				      cfg->blocklog);
 	} else {
 		/* grab volume size */
 		cfg->rtblocks = DTOBT(xi->rt.size, cfg->blocklog);
@@ -3942,17 +4273,23 @@ static void
 calculate_rtgroup_geometry(
 	struct mkfs_params	*cfg,
 	struct cli_params	*cli,
-	struct libxfs_init	*xi)
+	struct libxfs_init	*xi,
+	struct zone_topology	*zt)
 {
-	if (!cli->sb_feat.metadir) {
-		cfg->rgcount = 0;
-		cfg->rgsize = 0;
-		return;
+	if (zt->rt.nr_zones) {
+		cfg->rgsize = zt->rt.zone_capacity * 512;
+	} else {
+		if (!cli->sb_feat.metadir) {
+			cfg->rgcount = 0;
+			cfg->rgsize = 0;
+			return;
+		}
+
+		if (cli->rgsize)	/* User-specified rtgroup size */
+			cfg->rgsize = getnum(cli->rgsize, &ropts, R_RGSIZE);
 	}
 
-	if (cli->rgsize) {	/* User-specified rtgroup size */
-		cfg->rgsize = getnum(cli->rgsize, &ropts, R_RGSIZE);
-
+	if (cfg->rgsize) {
 		/*
 		 * Check specified agsize is a multiple of blocksize.
 		 */
@@ -3967,10 +4304,21 @@ _("rgsize (%s) not a multiple of fs blk size (%d)\n"),
 				(cfg->rtblocks % cfg->rgsize != 0);
 
 	} else if (cli->rgcount) {	/* User-specified rtgroup count */
+		if (zt->rt.nr_zones) {
+			fprintf(stderr,
+_("rgsize argument not support on zoned devices.\n"));
+			usage();
+		}
 		cfg->rgcount = cli->rgcount;
 		cfg->rgsize = cfg->rtblocks / cfg->rgcount +
 				(cfg->rtblocks % cfg->rgcount != 0);
 	} else if (cfg->rtblocks == 0) {
+		if (cfg->sb_feat.zoned) {
+			fprintf(stderr,
+_("empty zoned realtime device not supported.\n"));
+			usage();
+		}
+
 		/*
 		 * If nobody specified a realtime device or the rtgroup size,
 		 * try 1TB, rounded down to the nearest rt extent.
@@ -3982,6 +4330,17 @@ _("rgsize (%s) not a multiple of fs blk size (%d)\n"),
 		/* too small even for a single group */
 		cfg->rgsize = cfg->rtblocks;
 		cfg->rgcount = 0;
+	} else if (cfg->sb_feat.zoned) {
+		/* pick a default that gives us a few zones to work with */
+#define GIGABYTES(count, blog)	((uint64_t)(count) << (30 - (blog)))
+		cfg->rgsize = GIGABYTES(2, cfg->blocklog);
+		for (;;) {
+			cfg->rgcount = cfg->rtblocks / cfg->rgsize +
+					(cfg->rtblocks % cfg->rgsize != 0);
+			if (cfg->rgcount >= XFS_MIN_ZONES)
+				break;
+			cfg->rgsize /= 2;
+		}
 	} else if (cli->rtvol_concurrency > 0 ||
 		   (cli->data_concurrency == -1 && rtdev_is_solidstate(xi))) {
 		calc_concurrency_rtgroup_geometry(cfg, cli, xi);
@@ -4026,7 +4385,17 @@ _("realtime group count (%llu) must be less than the maximum (%u)\n"),
 		usage();
 	}
 
-	if (cfg->rtextents)
+	if (cfg->sb_feat.zoned && cfg->rgcount < XFS_MIN_ZONES)  {
+		fprintf(stderr,
+_("realtime group count (%llu) must be greater than the minimum (%u)\n"),
+				(unsigned long long)cfg->rgcount,
+				XFS_MIN_ZONES);
+		usage();
+	}
+
+	if (cfg->sb_feat.zoned)
+		cfg->rtbmblocks = 0;
+	else if (cfg->rtextents)
 		cfg->rtbmblocks = howmany(cfg->rgsize / cfg->rtextblocks,
 			NBBY * (cfg->blocksize - sizeof(struct xfs_rtbuf_blkinfo)));
 }
@@ -4194,6 +4563,14 @@ sb_set_features(
 		sbp->sb_rgblklog = libxfs_compute_rgblklog(sbp->sb_rgextents,
 							   cfg->rtextblocks);
 	}
+
+	if (fp->zoned) {
+		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_ZONED;
+		sbp->sb_rtstart = (cfg->rtstart * 512) / cfg->blocksize;
+		sbp->sb_rtreserved = cfg->rtreserved / cfg->blocksize;
+	}
+	if (fp->zone_gaps)
+		sbp->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_ZONE_GAPS;
 }
 
 /*
@@ -4756,9 +5133,11 @@ prepare_devices(
 			 (xfs_extlen_t)XFS_FSB_TO_BB(mp, cfg->logblocks),
 			 &sbp->sb_uuid, cfg->sb_feat.log_version,
 			 lsunit, XLOG_FMT, XLOG_INIT_CYCLE, false);
-
 	/* finally, check we can write the last block in the realtime area */
-	if (mp->m_rtdev_targp->bt_bdev && cfg->rtblocks > 0) {
+	if (mp->m_rtdev_targp->bt_bdev &&
+	    mp->m_rtdev_targp != mp->m_ddev_targp &&
+	    cfg->rtblocks > 0 &&
+	    !xfs_has_zoned(mp)) {
 		buf = alloc_write_buf(mp->m_rtdev_targp,
 				XFS_FSB_TO_BB(mp, cfg->rtblocks - 1LL),
 				BTOBB(cfg->blocksize));
@@ -5215,7 +5594,7 @@ main(
 			 */
 		},
 	};
-
+	struct zone_topology zt = {};
 	struct list_head	buffer_list;
 	int			error;
 
@@ -5317,6 +5696,7 @@ main(
 	sectorsize = cfg.sectorsize;
 
 	validate_log_sectorsize(&cfg, &cli, &dft, &ft);
+	validate_zoned(&cfg, &cli, &dft, &zt);
 	validate_sb_features(&cfg, &cli);
 
 	/*
@@ -5341,11 +5721,11 @@ main(
 	/*
 	 * Open and validate the device configurations
 	 */
-	open_devices(&cfg, &xi);
+	open_devices(&cfg, &xi, &zt);
 	validate_overwrite(xi.data.name, force_overwrite);
 	validate_datadev(&cfg, &cli);
 	validate_logdev(&cfg, &cli);
-	validate_rtdev(&cfg, &cli);
+	validate_rtdev(&cfg, &cli, &zt);
 	calc_stripe_factors(&cfg, &cli, &ft);
 
 	/*
@@ -5356,7 +5736,7 @@ main(
 	 */
 	calculate_initial_ag_geometry(&cfg, &cli, &xi);
 	align_ag_geometry(&cfg);
-	calculate_rtgroup_geometry(&cfg, &cli, &xi);
+	calculate_rtgroup_geometry(&cfg, &cli, &xi, &zt);
 
 	calculate_imaxpct(&cfg, &cli);
 
@@ -5409,8 +5789,13 @@ main(
 	/*
 	 * All values have been validated, discard the old device layout.
 	 */
+	if (cli.sb_feat.zoned && !discard) {
+		fprintf(stderr,
+ _("-K not support for zoned file systems.\n"));
+		return 1;
+	}
 	if (discard && !dry_run)
-		discard_devices(&xi, quiet);
+		discard_devices(&cfg, &xi, &zt, quiet);
 
 	/*
 	 * we need the libxfs buffer cache from here on in.
