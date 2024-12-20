@@ -2924,6 +2924,13 @@ _("inode btree counters not supported without finobt support\n"));
 	}
 
 	if (cli->xi->rt.name || cfg->rtstart) {
+		/*
+		 * Force the rtinherit flag on the root inode for zoned file
+		 * systems as they use the data device only as a metadata
+		 * container.
+		 */
+		if (cli->sb_feat.zoned)
+			cli->fsx.fsx_xflags |= FS_XFLAG_RTINHERIT;
 		if (cli->sb_feat.zoned && !cli->sb_feat.metadir) {
 			if (cli_opt_set(&mopts, M_METADIR)) {
 				fprintf(stderr,
