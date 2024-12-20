@@ -81,7 +81,7 @@ xfs_report_geom(
 		isint ? _("internal log") : logname ? logname : _("external"),
 			geo->blocksize, geo->logblocks, logversion,
 		"", geo->logsectsize, geo->logsunit / geo->blocksize, lazycount,
-		!geo->rtblocks ? _("none") : rtname ? rtname : _("external"),
+		!geo->rtblocks ? _("none") : rtname ? rtname : _("internal"),
 		geo->rtextsize * geo->blocksize, (unsigned long long)geo->rtblocks,
 			(unsigned long long)geo->rtextents,
 		"", geo->rgcount, geo->rgextents);
