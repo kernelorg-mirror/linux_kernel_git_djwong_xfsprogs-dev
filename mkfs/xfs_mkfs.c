@@ -4310,7 +4310,8 @@ adjust_nr_zones(
 	else
 		max_zones = DTOBT(xi->rt.size, cfg->blocklog) / cfg->rgsize;
 
-	cfg->rgcount += XFS_RESERVED_ZONES;
+	if (!cli->rgcount)
+		cfg->rgcount += XFS_RESERVED_ZONES;
 	if (cfg->rgcount > max_zones) {
 		cfg->rgcount = max_zones;
 		fprintf(stderr,
@@ -4339,20 +4340,43 @@ calculate_rtgroup_geometry(
 	struct libxfs_init	*xi,
 	struct zone_topology	*zt)
 {
-	if (zt->rt.nr_zones) {
-		cfg->rgsize = zt->rt.zone_capacity * 512;
-	} else {
-		if (!cli->sb_feat.metadir) {
-			cfg->rgcount = 0;
-			cfg->rgsize = 0;
-			return;
-		}
-
-		if (cli->rgsize)	/* User-specified rtgroup size */
-			cfg->rgsize = getnum(cli->rgsize, &ropts, R_RGSIZE);
+	if (!cli->sb_feat.metadir) {
+		cfg->rgcount = 0;
+		cfg->rgsize = 0;
+		return;
 	}
 
-	if (cfg->rgsize) {
+	if (zt->rt.nr_zones) {	/* Hardware has zone requirements */
+		cfg->rgsize = zt->rt.zone_capacity * 512;
+
+		if (cfg->rgsize % cfg->blocksize) {
+			fprintf(stderr,
+_("rgsize (%s) not a multiple of fs blk size (%d)\n"),
+				cli->rgsize, cfg->blocksize);
+			usage();
+		}
+		if (cli->rgsize) {
+			fprintf(stderr,
+_("rgsize (%s) may not be specified when the rt device is zoned\n"),
+				cli->rgsize);
+			usage();
+		}
+
+		cfg->rgsize /= cfg->blocksize;
+		cfg->rgcount = howmany(cfg->rtblocks, cfg->rgsize);
+
+		if (cli->rgcount > cfg->rgcount) {
+			fprintf(stderr,
+_("rgcount (%llu) is larger than hardware zone count (%llu)\n"),
+					(unsigned long long)cli->rgcount,
+					(unsigned long long)cfg->rgcount);
+			usage();
+		} else if (cli->rgcount && cli->rgcount < cfg->rgcount) {
+			/* constrain the rt device to the given rgcount */
+			cfg->rgcount = cli->rgcount;
+		}
+	} else if (cli->rgsize) {	/* User-specified rtgroup size */
+		cfg->rgsize = getnum(cli->rgsize, &ropts, R_RGSIZE);
 		/*
 		 * Check specified agsize is a multiple of blocksize.
 		 */
@@ -4367,11 +4391,6 @@ _("rgsize (%s) not a multiple of fs blk size (%d)\n"),
 				(cfg->rtblocks % cfg->rgsize != 0);
 
 	} else if (cli->rgcount) {	/* User-specified rtgroup count */
-		if (zt->rt.nr_zones) {
-			fprintf(stderr,
-_("rgsize argument not support on zoned devices.\n"));
-			usage();
-		}
 		cfg->rgcount = cli->rgcount;
 		cfg->rgsize = cfg->rtblocks / cfg->rgcount +
 				(cfg->rtblocks % cfg->rgcount != 0);
@@ -4394,7 +4413,10 @@ _("empty zoned realtime device not supported.\n"));
 		cfg->rgsize = cfg->rtblocks;
 		cfg->rgcount = 0;
 	} else if (cfg->sb_feat.zoned) {
-		/* pick a default that gives us a few zones to work with */
+		/*
+		 * Hardware does not require host-managed zoned behavior, so
+		 * pick a default that gives us a few zones to work with.
+		 */
 #define GIGABYTES(count, blog)	((uint64_t)(count) << (30 - (blog)))
 		cfg->rgsize = GIGABYTES(2, cfg->blocklog);
 		for (;;) {
@@ -4417,7 +4439,7 @@ _("empty zoned realtime device not supported.\n"));
 				(cfg->rtblocks % cfg->rgsize != 0);
 	}
 
-	if (cfg->sb_feat.zoned && cli->rtsize)
+	if (cfg->sb_feat.zoned && (cli->rtsize || cli->rgcount))
 		adjust_nr_zones(cfg, cli, xi, zt);
 
 	if (cfg->rgsize > XFS_MAX_RGBLOCKS) {
