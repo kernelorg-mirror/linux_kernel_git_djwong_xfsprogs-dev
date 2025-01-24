@@ -105,7 +105,6 @@ struct scan_inodes {
 	scrub_inode_iter_fn	fn;
 	void			*arg;
 	unsigned int		nr_threads;
-	unsigned int		flags;
 	bool			aborted;
 };
 
@@ -139,6 +138,7 @@ ichunk_to_bulkstat(
 
 static inline int
 alloc_ichunk(
+	struct scrub_ctx	*ctx,
 	struct scan_inodes	*si,
 	uint32_t		agno,
 	uint64_t		startino,
@@ -164,7 +164,9 @@ alloc_ichunk(
 
 	breq = ichunk_to_bulkstat(ichunk);
 	breq->hdr.icount = LIBFROG_BULKSTAT_CHUNKSIZE;
-	if (si->flags & SCRUB_SCAN_METADIR)
+
+	/* Scan the metadata directory tree too. */
+	if (ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_METADIR)
 		breq->hdr.flags |= XFS_BULK_IREQ_METADIR;
 
 	*ichunkp = ichunk;
@@ -302,7 +304,7 @@ scan_ag_inumbers(
 
 	descr_set(&dsc, &agno);
 
-	error = alloc_ichunk(si, agno, 0, &ichunk);
+	error = alloc_ichunk(ctx, si, agno, 0, &ichunk);
 	if (error)
 		goto err;
 	ireq = ichunk_to_inumbers(ichunk);
@@ -355,7 +357,7 @@ scan_ag_inumbers(
 		}
 
 		if (!ichunk) {
-			error = alloc_ichunk(si, agno, nextino, &ichunk);
+			error = alloc_ichunk(ctx, si, agno, nextino, &ichunk);
 			if (error)
 				goto err;
 		}
@@ -375,19 +377,18 @@ out:
 }
 
 /*
- * Scan all the inodes in a filesystem.  On error, this function will log
- * an error message and return -1.
+ * Scan all the inodes in a filesystem, including metadata directory files and
+ * broken files.  On error, this function will log an error message and return
+ * -1.
  */
 int
 scrub_scan_all_inodes(
 	struct scrub_ctx	*ctx,
 	scrub_inode_iter_fn	fn,
-	unsigned int		flags,
 	void			*arg)
 {
 	struct scan_inodes	si = {
 		.fn		= fn,
-		.flags		= flags,
 		.arg		= arg,
 		.nr_threads	= scrub_nproc_workqueue(ctx),
 	};
