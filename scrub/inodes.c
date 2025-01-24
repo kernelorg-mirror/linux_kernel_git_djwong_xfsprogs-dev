@@ -43,6 +43,21 @@
  * the staleness as an error.
  */
 
+static int
+compare_bstat(
+	const void		*a,
+	const void		*b)
+{
+	const struct xfs_bulkstat *ba = a;
+	const struct xfs_bulkstat *bb = b;
+
+	if (ba->bs_ino < bb->bs_ino)
+		return -1;
+	if (ba->bs_ino > bb->bs_ino)
+		return 1;
+	return 0;
+}
+
 /*
  * Run bulkstat on an entire inode allocation group, then check that we got
  * exactly the inodes we expected.  If not, load them one at a time (or fake
@@ -56,14 +71,21 @@ bulkstat_for_inumbers(
 	struct xfs_bulkstat_req	*breq)
 {
 	struct xfs_bulkstat	*bstat = breq->bulkstat;
-	struct xfs_bulkstat	*bs;
+	struct xfs_bulkstat	*bs, *next_bs;
+	const uint64_t		end_ino =
+		inumbers->xi_startino + LIBFROG_BULKSTAT_CHUNKSIZE;
+	uint64_t		fill_mask = 0;
+	uint64_t		last_filled_ino = 0;
 	unsigned int		flags = 0;
 	int			i;
 	int			error;
 
-	/* First we try regular bulkstat, for speed. */
+	/*
+	 * First we try regular bulkstat, for speed.  Try to stat all the
+	 * inodes that might be in the same inumbers cluster.
+	 */
 	breq->hdr.ino = inumbers->xi_startino;
-	breq->hdr.icount = inumbers->xi_alloccount;
+	breq->hdr.icount = LIBFROG_BULKSTAT_CHUNKSIZE;
 	error = -xfrog_bulkstat(&ctx->mnt, breq);
 	if (error) {
 		char	errbuf[DESCR_BUFSZ];
@@ -76,27 +98,95 @@ bulkstat_for_inumbers(
 		flags |= XFS_BULK_IREQ_METADIR;
 
 	/*
-	 * Check each of the stats we got back to make sure we got the inodes
-	 * we asked for.
+	 * We asked bulkstat for information on the first CHUNKSIZE allocated
+	 * inodes starting at xi_startino.  Bulkstat always returns records in
+	 * ascending bs_ino order, and it doesn't return a sparse array.
+	 * It might return inodes that have been allocated since the inumbers
+	 * call.
+	 *
+	 * However, it might also return inodes beyond xi_startino + CHUNKSIZE.
+	 * Reduce ocount to ignore inodes not described by the inumbers record.
 	 */
-	for (i = 0, bs = bstat; i < LIBFROG_BULKSTAT_CHUNKSIZE; i++) {
+	for (i = breq->hdr.ocount - 1, bs = bstat + i;
+	     i >= 0 && bs->bs_ino >= end_ino;
+	     i--, bs--) {
+		breq->hdr.ocount--;
+	}
+
+	/*
+	 * bstat[] is a set of records sorted in ascending bs_ino order.
+	 * However, bulkstat stops filling the buffer if an inode is corrupt
+	 * enough that iget fails to load.  Bulkstat also doesn't report inodes
+	 * that have been freed since inumbers.  Walk the xi_allocmask looking
+	 * for set bits that aren't present in bstat and fill the entries at
+	 * the end of the array.
+	 */
+	for (i = 0, bs = bstat; i < breq->hdr.ocount; i++, bs++)
+		fill_mask |= 1ULL << (bs->bs_ino - inumbers->xi_startino);
+	if (breq->hdr.ocount)
+		last_filled_ino = bstat[breq->hdr.ocount - 1].bs_ino;
+	for (i = 0, next_bs = bs; i < LIBFROG_BULKSTAT_CHUNKSIZE; i++) {
+		/*
+		 * Don't single-step if inumbers said it wasn't allocated or
+		 * bulkstat actually filled it.
+		 */
 		if (!(inumbers->xi_allocmask & (1ULL << i)))
 			continue;
-		if (bs->bs_ino == inumbers->xi_startino + i) {
-			bs++;
+		if (fill_mask & (1ULL << i))
 			continue;
+
+		/*
+		 * We expected stat data for an inode but didn't get it.  If we
+		 * haven't reached the end of the results returned by bulkstat,
+		 * the inode was freed after inumbers but before bulkstat.
+		 * Don't single-step here.
+		 */
+		if (inumbers->xi_startino + i < last_filled_ino)
+			continue;
+
+		assert(breq->hdr.ocount != LIBFROG_BULKSTAT_CHUNKSIZE);
+
+		/*
+		 * Didn't get desired stat data and we've hit the end of the
+		 * returned data.  We can't distinguish between the inode being
+		 * freed vs. the inode being to corrupt to load, so try a
+		 * bulkstat single to see if we can load the inode.
+		 */
+		error = -xfrog_bulkstat_single(&ctx->mnt,
+				inumbers->xi_startino + i, flags, next_bs);
+		switch (error) {
+		case ENOENT:
+		case EINVAL:
+			/* Inode was freed since inumbers, move on. */
+			continue;
+		case 0:
+			/*
+			 * If we fell back to bulkstat v1, it could have given
+			 * us some other inode.  That means the inode was
+			 * freed since inumbers; move on.
+			 */
+			if (next_bs->bs_ino != inumbers->xi_startino + i)
+				continue;
+			break;
+		default:
+			/*
+			 * Any other error means we synthesize an entry and
+			 * hope that repair fixes the file.
+			 */
+			memset(next_bs, 0, sizeof(struct xfs_bulkstat));
+			next_bs->bs_ino = inumbers->xi_startino + i;
+			next_bs->bs_blksize = ctx->mnt_sv.f_frsize;
+			break;
 		}
 
-		/* Load the one inode. */
-		error = -xfrog_bulkstat_single(&ctx->mnt,
-				inumbers->xi_startino + i, flags, bs);
-		if (error || bs->bs_ino != inumbers->xi_startino + i) {
-			memset(bs, 0, sizeof(struct xfs_bulkstat));
-			bs->bs_ino = inumbers->xi_startino + i;
-			bs->bs_blksize = ctx->mnt_sv.f_frsize;
-		}
-		bs++;
+		fill_mask |= (1ULL << i);
+		breq->hdr.ocount++;
+		next_bs++;
 	}
+
+	/* If we added any entries, re-sort the array. */
+	if (next_bs != bs + 1)
+		qsort(bstat, breq->hdr.ocount, sizeof(*bstat), compare_bstat);
 }
 
 /* BULKSTAT wrapper routines. */
@@ -234,7 +324,7 @@ retry:
 
 	/* Iterate all the inodes. */
 	bs = &breq->bulkstat[0];
-	for (i = 0; !si->aborted && i < inumbers->xi_alloccount; i++, bs++) {
+	for (i = 0; !si->aborted && i < breq->hdr.ocount; i++, bs++) {
 		uint64_t	scan_ino = bs->bs_ino;
 
 		/* ensure forward progress if we retried */
