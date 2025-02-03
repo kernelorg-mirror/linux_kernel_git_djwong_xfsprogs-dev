@@ -26,6 +26,7 @@ struct healer_ctx {
 	int			everything;
 	int			background;
 	int			want_repair;
+	int			check;
 
 	/* fd and fs geometry for mount */
 	struct xfs_fd		mnt;
