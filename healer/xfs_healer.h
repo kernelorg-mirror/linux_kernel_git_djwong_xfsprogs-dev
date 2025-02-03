@@ -11,12 +11,15 @@ extern char *progname;
 #define _PATH_PROC_MOUNTS	"/proc/mounts"
 
 struct fs_path;
+struct weakhandle;
+struct hme_prefix;
 
 struct healer_ctx {
 	/* CLI options */
 	int			debug;
 	int			log;
 	int			everything;
+	int			want_repair;
 
 	/* fd and fs geometry for mount */
 	struct xfs_fd		mnt;
@@ -28,6 +31,9 @@ struct healer_ctx {
 	const char		*mntpoint;
 	struct fs_path		*fs_path;
 
+	/* weak file handle so we can reattach to filesystem */
+	struct weakhandle	*wh;
+
 	/* file stream of monitor and buffer */
 	FILE			*mon_fp;
 	char			*mon_buf;
@@ -38,5 +44,15 @@ struct healer_ctx {
 	/* event queue */
 	struct workqueue	event_queue;
 };
+
+/* repair.c */
+int repair_metadata(struct healer_ctx *ctx, const struct hme_prefix *pfx,
+		const struct xfs_health_monitor_event *hme);
+
+/* weakhandle.c */
+int weakhandle_alloc(int fd, const char *mountpoint, const struct fs_path *fsp,
+		struct weakhandle **whp);
+int weakhandle_reopen(struct weakhandle *wh, int *fd);
+void weakhandle_free(struct weakhandle **whp);
 
 #endif /* XFS_HEALER_XFS_HEALER_H_ */
