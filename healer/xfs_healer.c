@@ -58,6 +58,18 @@ event_loggable(
 	return ctx->log || event_not_actionable(hme);
 }
 
+/* Are we going to try a repair? */
+static inline bool
+event_repairable(
+	const struct healer_ctx			*ctx,
+	const struct xfs_health_monitor_event	*hme)
+{
+	if (event_not_actionable(hme))
+		return false;
+
+	return ctx->want_repair && hme->type == XFS_HEALTH_MONITOR_TYPE_SICK;
+}
+
 /* Handle an event asynchronously. */
 static void
 handle_event(
@@ -69,6 +81,7 @@ handle_event(
 	struct xfs_health_monitor_event	*hme = arg;
 	struct healer_ctx		*ctx = wq->wq_ctx;
 	const bool loggable = event_loggable(ctx, hme);
+	const bool will_repair = event_repairable(ctx, hme);
 
 	hme_prefix_init(&pfx, ctx->mntpoint);
 
@@ -81,6 +94,10 @@ handle_event(
 		hme_report_event(&pfx, hme);
 		pthread_mutex_unlock(&ctx->conlock);
 	}
+
+	/* Initiate a repair if appropriate. */
+	if (will_repair)
+		repair_metadata(ctx, &pfx, hme);
 
 	free(hme);
 }
@@ -98,6 +115,21 @@ setup_monitor(
 	if (ret) {
 		perror(ctx->mntpoint);
 		return -1;
+	}
+
+	/*
+	 * Open weak-referenced file handle to mountpoint so that we can
+	 * reconnect to the mountpoint to start repairs.
+	 */
+	if (ctx->want_repair) {
+		ret = weakhandle_alloc(ctx->mnt.fd, ctx->mntpoint,
+				ctx->fs_path, &ctx->wh);
+		if (ret) {
+			fprintf(stderr, "%s: %s: %s\n", ctx->mntpoint,
+					_("creating weak fshandle"),
+					strerror(errno));
+			return -1;
+		}
 	}
 
 	/*
@@ -210,6 +242,7 @@ teardown_monitor(
 		ctx->mon_fp = NULL;
 	}
 	free(ctx->mon_buf);
+	weakhandle_free(&ctx->wh);
 	ctx->mon_buf = NULL;
 }
 
@@ -222,6 +255,7 @@ usage(void)
 	fprintf(stderr, _("  --debug      Enable debugging messages.\n"));
 	fprintf(stderr, _("  --everything Capture all events.\n"));
 	fprintf(stderr, _("  --log        Log health events to stdout.\n"));
+	fprintf(stderr, _("  --repair     Always repair corrupt metadata.\n"));
 	fprintf(stderr, _("  -V           Print version.\n"));
 
 	exit(EXIT_FAILURE);
@@ -249,6 +283,7 @@ main(
 		{"debug",	no_argument,	&ctx.debug, 1 },
 		{"log",		no_argument,	&ctx.log, 1 },
 		{"everything",	no_argument,	&ctx.everything, 1 },
+		{"repair",	no_argument,	&ctx.want_repair, 1 },
 		{NULL,		0,		NULL, 0 },
 	};
 
