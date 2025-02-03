@@ -16,9 +16,9 @@ else
   Q = @
 endif
 
-CHECK=sparse
+CHECK=kcheck
 CHECK_OPTS=-Wsparse-all -Wbitwise -Wno-transparent-union -Wno-return-void -Wno-undef \
-	-Wno-non-pointer-null -D__CHECK_ENDIAN__ -D__linux__
+	-Wno-non-pointer-null -D__CHECK_ENDIAN__ -D__linux__ -D__GNUC__=1 -D__USE_LARGEFILE64
 
 ifeq ("$(origin C)", "command line")
   CHECK_CMD=$(CHECK) $(CHECK_OPTS)

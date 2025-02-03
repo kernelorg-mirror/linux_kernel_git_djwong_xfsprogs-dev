@@ -21,6 +21,82 @@ BUILD_CFLAGS = @BUILD_CFLAGS@ -D_FILE_OFFSET_BITS=64 -D_TIME_BITS=64
 # only use what we calculate from the configured options above.
 LDFLAGS =
 
+# Generate more debugging info
+WARNINGS += -femit-struct-debug-detailed=any
+WARNINGS += -fstack-usage
+
+# Base warnings(?)
+WARNINGS += -Wall
+WARNINGS += -Wpointer-sign
+WARNINGS += -Wuninitialized
+WARNINGS += -Wno-error=format=		# dont trip on printf debugging
+
+# Fedora wants to modernize C...
+WARNINGS += -Wimplicit-int
+WARNINGS += -Wimplicit-function-declaration
+WARNINGS += -Wint-conversion
+WARNINGS += -Wstrict-prototypes
+WARNINGS += -Wold-style-definition
+
+# Derived from scripts/Makefile.extrawarn on 2023-09-12 (v6.6-rc1)
+
+# W=e
+WARNINGS += -Werror
+
+# W=1
+WARNINGS += -Wextra -Wunused -Wno-unused-parameter
+WARNINGS += -Wmissing-declarations
+WARNINGS += -Wrestrict
+WARNINGS += -Wmissing-format-attribute
+WARNINGS += -Wmissing-prototypes
+WARNINGS += -Wold-style-definition
+WARNINGS += -Wmissing-include-dirs
+WARNINGS += -Wunused-but-set-variable
+WARNINGS += -Wunused-const-variable
+WARNINGS += -Wpacked-not-aligned
+WARNINGS += -Wformat-overflow
+WARNINGS += -Wformat-truncation
+WARNINGS += -Wstringop-overflow
+WARNINGS += -Wstringop-truncation
+
+WARNINGS += -Wundef
+
+# W=2
+WARNINGS += -Wdisabled-optimization
+WARNINGS += -Wshadow
+WARNINGS += -Wlogical-op
+WARNINGS += -Wmissing-field-initializers
+WARNINGS += -Wtype-limits
+WARNINGS += -Wmaybe-uninitialized
+#WARNINGS += -Wunused-macros			# dont care about extra macros
+
+# W=3
+#WARNINGS += -Wbad-function-cast		# pagecache
+#WARNINGS += -Wcast-align			# hits char* to struct* casts on riscv64
+#WARNINGS += -Wcast-qual			# rhashtable
+#WARNINGS += -Wconversion			# everywhere
+#WARNINGS += -Wpacked				# this whines about unnecesary __packed??
+#WARNINGS += -Wpadded				# maple tree
+#WARNINGS += -Wpointer-arith			# container_of
+#WARNINGS += -Wredundant-decls			# ftrace
+#WARNINGS += -Wsign-compare			# percpu
+#WARNINGS += -Wswitch-default			# everywhere
+#WARNINGS += $(call cc-option, -Wpacked-bitfield-compat) # not a gcc thing
+
+# Stuff we need to fix in xfsprogs
+WARNINGS += -Wno-suggest-attribute=format	# dont care about printf crap
+WARNINGS += -Wno-shadow				# many programs have global variables
+WARNINGS += -Wno-missing-field-initializers	# why is this even a problem?
+WARNINGS += -Wno-sign-compare			# zomg so much macro
+WARNINGS += -Wno-dangling-pointer		# gcc 12.2 bug
+
+WARNINGS += -Wno-error=type-limits		# rtgroups patchset
+WARNINGS += -Wno-error=array-bounds		# rtgroups patchset
+
+# Comment out for release builds
+CFLAGS += $(WARNINGS)
+BUILD_CFLAGS += $(WARNINGS)
+
 LIBRT = @librt@
 LIBUUID = @libuuid@
 LIBURCU = @liburcu@
@@ -115,7 +191,7 @@ HAVE_UDEV = @have_udev@
 UDEV_RULE_DIR = @udev_rule_dir@
 HAVE_LIBURCU_ATOMIC64 = @have_liburcu_atomic64@
 
-GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall
+GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall -Werror -Wextra -Wno-unused-parameter
 #	   -Wbitwise -Wno-transparent-union -Wno-old-initializer -Wno-decl
 
 # _LGPL_SOURCE is for liburcu to work correctly with GPL/LGPL programs
