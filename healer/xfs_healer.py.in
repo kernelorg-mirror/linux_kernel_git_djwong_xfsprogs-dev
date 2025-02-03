@@ -851,7 +851,27 @@ def handle_event(lines, fh):
 
 		repair_metadata(event, fh)
 
-def monitor(mountpoint, event_queue, **kwargs):
+def check_monitor(mountpoint, fd):
+	'''Check if the kernel can send us health events for the given mountpoint.'''
+
+	try:
+		mon_fd = open_health_monitor(fd, verbose = everything)
+	except OSError as e:
+		# Error opening monitor (or it's simply not there); monitor
+		# not available.
+		if e.errno == errno.ENOTTY or e.errno == errno.EOPNOTSUPP:
+			msg = _("XFS health monitoring not supported.")
+			eprintln(f"{mountpoint}: {msg}")
+		os.close(fd)
+		return 1
+
+	os.close(mon_fd)
+	os.close(fd)
+
+	# Monitor available; success!
+	return 0
+
+def monitor(mountpoint, event_queue, check, **kwargs):
 	'''Monitor the given mountpoint for health events.'''
 	global everything
 	global log
@@ -905,6 +925,12 @@ def monitor(mountpoint, event_queue, **kwargs):
 		if not has_parent:
 			msg = _("XFS online repair is less effective without parent pointers.")
 			printlogln(f"{mountpoint}: {msg}")
+
+	# Now that we know that we can repair if the user wanted to, make sure
+	# that the kernel supports reporting events if that was as far as the
+	# user wanted us to go.
+	if check:
+		return check_monitor(mountpoint, fd)
 
 	try:
 		fh = fshandle(fd, mountpoint) if want_repair or has_parent else None
@@ -1092,6 +1118,8 @@ def main():
 			help = argparse.SUPPRESS)
 	parser.add_argument("--repair", action = "store_true", \
 			help = _("Always repair corrupt metadata"))
+	parser.add_argument("--check", action = "store_true", \
+			help = _("Check that health monitoring is supported"))
 	args = parser.parse_args()
 
 	if args.V:

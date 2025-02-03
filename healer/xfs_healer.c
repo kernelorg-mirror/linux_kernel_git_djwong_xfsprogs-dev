@@ -122,6 +122,16 @@ monitor(
 	}
 
 	/*
+	 * Now that we know that we can repair if the user wanted to, make sure
+	 * that the kernel supports reporting events if that was as far as the
+	 * user wanted us to go.
+	 */
+	if (ctx->check) {
+		close(mon_fd);
+		return 0;
+	}
+
+	/*
 	 * mon_fp consumes mon_fd.  We intentionally leave mon_fp attached to
 	 * the context so that we keep the monitoring fd open until we've torn
 	 * down all the background threads.
@@ -171,6 +181,7 @@ usage(void)
 	fprintf(stderr, _("Usage: %s [OPTIONS] mountpoint\n"), progname);
 	fprintf(stderr, "\n");
 	fprintf(stderr, _("Options:\n"));
+	fprintf(stderr, _("  --check      Check that health monitoring is supported.\n"));
 	fprintf(stderr, _("  --debug      Enable debugging messages.\n"));
 	fprintf(stderr, _("  --everything Capture all events.\n"));
 	fprintf(stderr, _("  --log        Log health events to stdout.\n"));
@@ -203,6 +214,7 @@ main(
 		{"log",		no_argument,	&ctx.log, 1 },
 		{"everything",	no_argument,	&ctx.everything, 1 },
 		{"repair",	no_argument,	&ctx.want_repair, 1 },
+		{"check",	no_argument,	&ctx.check, 1 },
 		{NULL,		0,		NULL, 0 },
 	};
 
