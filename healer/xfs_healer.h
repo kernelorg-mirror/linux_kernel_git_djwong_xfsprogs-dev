@@ -50,9 +50,20 @@ struct healer_ctx {
 	bool			queue_active;
 };
 
+static inline bool healer_has_rmapbt(const struct healer_ctx *ctx)
+{
+	return ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_RMAPBT;
+}
+
+static inline bool healer_has_parent(const struct healer_ctx *ctx)
+{
+	return ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_PARENT;
+}
+
 /* repair.c */
 int repair_metadata(struct healer_ctx *ctx, const struct hme_prefix *pfx,
 		const struct xfs_health_monitor_event *hme);
+bool healer_can_repair(struct healer_ctx *ctx);
 
 /* weakhandle.c */
 int weakhandle_alloc(int fd, const char *mountpoint, const char *fsname,
