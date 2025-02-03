@@ -13,6 +13,7 @@
 
 static cmdinfo_t	fsrefcounts_cmd;
 static dev_t		xfs_data_dev;
+static dev_t		xfs_rt_dev;
 
 static void
 fsrefcounts_help(void)
@@ -119,7 +120,7 @@ dump_refcounts_verbose(
 	unsigned long long		i;
 	struct xfs_getfsrefs		*p;
 	int				agno;
-	off_t				agoff, bperag;
+	off_t				agoff, bperag, bperrtg;
 	int				boff_w, aoff_w, tot_w, agno_w, own_w;
 	int				nr_w, dev_w;
 	char				bbuf[40], abuf[40], obuf[40];
@@ -132,6 +133,7 @@ dump_refcounts_verbose(
 	nr_w = 4;
 	tot_w = MINTOT_WIDTH;
 	bperag = (off_t)fsgeo->agblocks * (off_t)fsgeo->blocksize;
+	bperrtg = bytes_per_rtgroup(fsgeo);
 	sunit = (fsgeo->sunit * fsgeo->blocksize);
 	swidth = (fsgeo->swidth * fsgeo->blocksize);
 
@@ -169,6 +171,13 @@ dump_refcounts_verbose(
 		if (p->fcr_device == xfs_data_dev) {
 			agno = p->fcr_physical / bperag;
 			agoff = p->fcr_physical - (agno * bperag);
+			snprintf(abuf, sizeof(abuf),
+				"(%lld..%lld)",
+				(long long)BTOBBT(agoff),
+				(long long)BTOBBT(agoff + p->fcr_length - 1));
+		} else if (p->fcr_device == xfs_rt_dev && fsgeo->rgcount > 0) {
+			agno = p->fcr_physical / bperrtg;
+			agoff = p->fcr_physical - (agno * bperrtg);
 			snprintf(abuf, sizeof(abuf),
 				"(%lld..%lld)",
 				(long long)BTOBBT(agoff),
@@ -224,6 +233,16 @@ dump_refcounts_verbose(
 		if (p->fcr_device == xfs_data_dev) {
 			agno = p->fcr_physical / bperag;
 			agoff = p->fcr_physical - (agno * bperag);
+			snprintf(abuf, sizeof(abuf),
+				"(%lld..%lld)",
+				(long long)BTOBBT(agoff),
+				(long long)BTOBBT(agoff + p->fcr_length - 1));
+			snprintf(gbuf, sizeof(gbuf),
+				"%lld",
+				(long long)agno);
+		} else if (p->fcr_device == xfs_rt_dev && fsgeo->rgcount > 0) {
+			agno = p->fcr_physical / bperrtg;
+			agoff = p->fcr_physical - (agno * bperrtg);
 			snprintf(abuf, sizeof(abuf),
 				"(%lld..%lld)",
 				(long long)BTOBBT(agoff),
@@ -420,6 +439,7 @@ fsrefcounts_f(
 	}
 	fs = fs_table_lookup(file->name, FS_MOUNT_POINT);
 	xfs_data_dev = fs ? fs->fs_datadev : 0;
+	xfs_rt_dev = fs ? fs->fs_rtdev : 0;
 
 	head->fch_count = map_size;
 	do {
