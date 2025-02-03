@@ -658,6 +658,29 @@ out_destroy:
 	return ret;
 }
 
+static void
+report_ioerr_to_kernel(
+	struct scrub_ctx		*ctx,
+	struct disk			*disk,
+	uint64_t			start,
+	uint64_t			length)
+{
+	struct xfs_media_error		me = {
+		.daddr			= start,
+		.bbcount		= length,
+	};
+	dev_t				dev = disk_to_dev(ctx, disk);
+
+	if (dev == ctx->fsinfo.fs_datadev)
+		me.flags |= XFS_MEDIA_ERROR_DATADEV;
+	else if (dev == ctx->fsinfo.fs_rtdev)
+		me.flags |= XFS_MEDIA_ERROR_RTDEV;
+	else if (dev == ctx->fsinfo.fs_logdev)
+		me.flags |= XFS_MEDIA_ERROR_LOGDEV;
+
+	ioctl(ctx->mnt.fd, XFS_IOC_MEDIA_ERROR, &me);
+}
+
 /* Remember a media error for later. */
 static void
 remember_ioerr(
@@ -683,6 +706,8 @@ remember_ioerr(
 			vs->l_trunc = true;
 		return;
 	}
+
+	report_ioerr_to_kernel(ctx, disk, start, length);
 
 	tree = bitmap_for_disk(ctx, disk, vs);
 	if (!tree) {
