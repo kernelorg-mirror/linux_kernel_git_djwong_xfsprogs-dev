@@ -52,6 +52,11 @@ bool fsprop_validate(const char *name, const char *value);
 
 #define FSPROP_AUTOFSCK_NAME		"autofsck"
 
+/* filesystem property name for fgetxattr */
+#define VFS_FSPROP_AUTOFSCK_NAME	(FSPROP_NAMESPACE \
+					 FSPROP_NAME_PREFIX \
+					 FSPROP_AUTOFSCK_NAME)
+
 enum fsprop_autofsck {
 	FSPROP_AUTOFSCK_UNSET = 0,	/* do not set property */
 	FSPROP_AUTOFSCK_NONE,		/* no background scrubs */
