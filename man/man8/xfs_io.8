@@ -1357,6 +1357,31 @@ Only available in expert mode and requires privileges.
 Undo the effects of a filesystem freeze operation.
 Only available in expert mode and requires privileges.
 .TP
+.BI "healthmon [ \-c " bufsize " ] [ \-c ] [ \-d " delay_ms " ] [ \-p ] [ \-v ]"
+Watch for filesystem health events and write them to the console.
+.RE
+.RS 1.0i
+.PD 0
+.TP
+.BI "\-b " bufsize
+Use a buffer of this size to read events from the kernel.
+.TP
+.BI \-c
+Close the open file and replace it with the monitor file.
+.TP
+.BI "\-d " delay_ms
+Sleep for this long between read attempts.
+.TP
+.B \-p
+Probe for the existence of the functionality by opening the monitoring fd and
+closing it immediately.
+.TP
+.BI \-v
+Request all health events, even if nothing changed.
+.PD
+.RE
+
+.TP
 .BI "inject [ " tag " ]"
 Inject errors into a filesystem to observe filesystem behavior at
 specific points under adverse conditions. Without the
