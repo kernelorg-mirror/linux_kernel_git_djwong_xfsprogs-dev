@@ -1453,6 +1453,27 @@ argument, displays the list of error tags available.
 Only available in expert mode and requires privileges.
 
 .TP
+.BI "mediaerror [ \-lr ] [ " offset " [ " length " ]]"
+Report a media error against the data device of an XFS filesystem.
+The
+.I offset
+and
+.I length
+parameters are specified in units of bytes.
+If neither are specified, the entire device will be reported.
+.RE
+.RS 1.0i
+.PD 0
+.TP
+.BI \-l
+Report against the log device instead of the data device.
+.TP
+.BI \-r
+Report against the realtime device instead of the data device.
+.PD
+.RE
+
+.TP
 .BI "rginfo [ \-r " rgno " ]"
 Show information about or update the state of realtime allocation groups.
 .RE
