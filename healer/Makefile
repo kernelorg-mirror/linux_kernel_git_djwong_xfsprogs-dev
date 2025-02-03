@@ -15,7 +15,8 @@ default: $(XFS_HEALER_PROG)
 
 xfs_healer: xfs_healer.in $(builddefs)
 	@echo "    [SED]    $@"
-	$(Q)$(SED) -e "s|@pkg_version@|$(PKG_VERSION)|g" \
+	$(Q)$(SED) -e "s|@pkg_data_dir@|$(PKG_DATA_DIR)|g" \
+		   -e "s|@pkg_version@|$(PKG_VERSION)|g" \
 		   < $< > $@
 	$(Q)chmod a+x $@
 
