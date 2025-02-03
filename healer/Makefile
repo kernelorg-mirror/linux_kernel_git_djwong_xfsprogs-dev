@@ -31,6 +31,7 @@ $(XFS_HEALER_PROG): $(XFS_HEALER_PROG).in $(builddefs) $(TOPDIR)/libfrog/gettext
 	$(Q)$(SED) -e "s|@pkg_version@|$(PKG_VERSION)|g" \
 		   -e '/@INIT_GETTEXT@/r $(TOPDIR)/libfrog/gettext.py' \
 		   -e '/@INIT_GETTEXT@/d' \
+		   -e "s|@pkg_data_dir@|$(PKG_DATA_DIR)|g" \
 		   < $< > $@
 	$(Q)chmod a+x $@
 
