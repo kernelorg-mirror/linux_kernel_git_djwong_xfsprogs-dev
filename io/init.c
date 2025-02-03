@@ -93,6 +93,7 @@ init_commands(void)
 	exchangerange_init();
 	fsprops_init();
 	healthmon_init();
+	verifymedia_init();
 }
 
 /*
