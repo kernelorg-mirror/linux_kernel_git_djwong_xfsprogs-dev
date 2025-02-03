@@ -40,4 +40,16 @@ hme_prefix_init(
 void hme_report_event(const struct hme_prefix *pfx,
 		const struct xfs_health_monitor_event *hme);
 
+enum repair_outcome {
+	REPAIR_SUCCESS,
+	REPAIR_FAILED,
+	REPAIR_PROBABLY_OK,
+	REPAIR_UNNECESSARY,
+};
+
+void report_health_repair(const struct hme_prefix *pfx,
+		const struct xfs_health_monitor_event *hme,
+		uint32_t event_mask,
+		enum repair_outcome outcome);
+
 #endif /* LIBFROG_HEALTHEVENT_H_ */

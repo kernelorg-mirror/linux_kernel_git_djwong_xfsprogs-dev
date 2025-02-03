@@ -358,3 +358,120 @@ hme_report_event(
 		break;
 	}
 }
+
+static const char *
+repair_outcome_string(
+	enum repair_outcome	o)
+{
+	switch (o) {
+	case REPAIR_FAILED:
+		return _("Repair unsuccessful; offline repair required.");
+	case REPAIR_PROBABLY_OK:
+		return _("Seems correct but cross-referencing failed; offline repair recommended.");
+	case REPAIR_UNNECESSARY:
+		return _("No modification needed.");
+	case REPAIR_SUCCESS:
+		return _("Repairs successful.");
+	}
+
+	return NULL;
+}
+
+/* Report inode metadata repair */
+static void
+report_inode_repair(
+	const struct hme_prefix			*pfx,
+	const struct xfs_health_monitor_event	*hme,
+	uint32_t				domain_mask,
+	enum repair_outcome			outcome)
+{
+	if (hme_prefix_has_path(pfx))
+		printf("%s %s: %s\n",
+				pfx->path,
+				lowest_set_mask_string(inode_structs,
+						       domain_mask),
+				repair_outcome_string(outcome));
+	else
+		printf("%s %s %llu %s 0x%x %s: %s\n",
+				pfx->mountpoint,
+				_("ino"),
+				(unsigned long long)hme->e.inode.ino,
+				_("gen"),
+				hme->e.inode.gen,
+				lowest_set_mask_string(inode_structs,
+						       domain_mask),
+				repair_outcome_string(outcome));
+	fflush(stdout);
+}
+
+/* Report AG metadata repair */
+static void
+report_ag_repair(
+	const struct hme_prefix			*pfx,
+	const struct xfs_health_monitor_event	*hme,
+	uint32_t				domain_mask,
+	enum repair_outcome			outcome)
+{
+	printf("%s %s 0x%x %s: %s\n", pfx->mountpoint,
+			_("agno"),
+			hme->e.group.gno,
+			lowest_set_mask_string(ag_structs, domain_mask),
+			repair_outcome_string(outcome));
+	fflush(stdout);
+}
+
+/* Report rtgroup metadata repair */
+static void
+report_rtgroup_repair(
+	const struct hme_prefix			*pfx,
+	const struct xfs_health_monitor_event	*hme,
+	uint32_t				domain_mask,
+	enum repair_outcome			outcome)
+{
+	printf("%s %s 0x%x %s: %s\n", pfx->mountpoint,
+			_("rgno"),
+			hme->e.group.gno,
+			lowest_set_mask_string(rtgroup_structs, domain_mask),
+			repair_outcome_string(outcome));
+	fflush(stdout);
+}
+
+/* Report fs-wide metadata repair */
+static void
+report_fs_repair(
+	const struct hme_prefix			*pfx,
+	const struct xfs_health_monitor_event	*hme,
+	uint32_t				domain_mask,
+	enum repair_outcome			outcome)
+{
+	printf("%s %s: %s\n", pfx->mountpoint,
+			lowest_set_mask_string(fs_structs, domain_mask),
+			repair_outcome_string(outcome));
+	fflush(stdout);
+}
+
+/* Log a repair event to stdout. */
+void
+report_health_repair(
+	const struct hme_prefix			*pfx,
+	const struct xfs_health_monitor_event	*hme,
+	uint32_t				domain_mask,
+	enum repair_outcome			outcome)
+{
+	switch (hme->domain) {
+	case XFS_HEALTH_MONITOR_DOMAIN_INODE:
+		report_inode_repair(pfx, hme, domain_mask, outcome);
+		break;
+	case XFS_HEALTH_MONITOR_DOMAIN_AG:
+		report_ag_repair(pfx, hme, domain_mask, outcome);
+		break;
+	case XFS_HEALTH_MONITOR_DOMAIN_RTGROUP:
+		report_rtgroup_repair(pfx, hme, domain_mask, outcome);
+		break;
+	case XFS_HEALTH_MONITOR_DOMAIN_FS:
+		report_fs_repair(pfx, hme, domain_mask, outcome);
+		break;
+	default:
+		break;
+	}
+}
