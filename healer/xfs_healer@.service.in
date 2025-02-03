@@ -18,7 +18,7 @@ RequiresMountsFor=%f
 Type=exec
 Environment=SERVICE_MODE=1
 ExecCondition=@pkg_libexec_dir@/xfs_healer --check %f
-ExecStart=@pkg_libexec_dir@/xfs_healer --log %f
+ExecStart=@pkg_libexec_dir@/xfs_healer --autofsck --background --log %f
 SyslogIdentifier=%N
 
 # Create the service underneath the healer background service slice so that we
