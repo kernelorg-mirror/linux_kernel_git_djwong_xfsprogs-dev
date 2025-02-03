@@ -142,8 +142,14 @@ handle_event(
 	free(hme);
 }
 
+enum mon_state {
+	MON_START,
+	MON_EXIT,
+	MON_ERROR,
+};
+
 /* Set ourselves up to monitor the given mountpoint for health events. */
-static int
+static enum mon_state
 setup_monitor(
 	struct healer_ctx	*ctx)
 {
@@ -154,7 +160,7 @@ setup_monitor(
 	ret = xfd_open(&ctx->mnt, ctx->mntpoint, O_RDONLY);
 	if (ret) {
 		perror(ctx->mntpoint);
-		return -1;
+		return MON_ERROR;
 	}
 
 	if (ctx->want_repair) {
@@ -163,7 +169,7 @@ setup_monitor(
 			fprintf(stderr, "%s: %s\n", ctx->mntpoint,
  _("XFS online repair is not supported, exiting"));
 			close(ctx->mnt.fd);
-			return -1;
+			return MON_ERROR;
 		}
 
 		/* Check for backref metadata that makes repair effective. */
@@ -189,7 +195,7 @@ setup_monitor(
 			fprintf(stderr, "%s: %s: %s\n", ctx->mntpoint,
 					_("creating weak fshandle"),
 					strerror(errno));
-			return -1;
+			return MON_ERROR;
 		}
 	}
 
@@ -215,7 +221,17 @@ setup_monitor(
 			perror(ctx->mntpoint);
 			break;
 		}
-		return -1;
+		return MON_ERROR;
+	}
+
+	/*
+	 * At this point, we know that the kernel is capable of repairing the
+	 * filesystem and telling us that it needs repairs.  If the user only
+	 * wanted us to check for the capability, we're done.
+	 */
+	if (ctx->check) {
+		close(mon_fd);
+		return MON_EXIT;
 	}
 
 	/*
@@ -227,7 +243,7 @@ setup_monitor(
 	if (!ctx->mon_fp) {
 		close(mon_fd);
 		perror(ctx->mntpoint);
-		return -1;
+		return MON_ERROR;
 	}
 
 	/* Increase the buffer size so that we can reduce kernel calls */
@@ -246,11 +262,11 @@ setup_monitor(
 		errno = ret;
 		fprintf(stderr, "%s: %s: %s\n", ctx->mntpoint,
 				_("worker threadpool setup"), strerror(errno));
-		return -1;
+		return MON_ERROR;
 	}
 	ctx->queue_active = true;
 
-	return 0;
+	return MON_START;
 }
 
 /* Monitor the given mountpoint for health events. */
@@ -359,6 +375,7 @@ usage(void)
 			_("[OPTIONS] mountpoint"));
 	fprintf(stderr, "\n");
 	fprintf(stderr, _("Options:\n"));
+	fprintf(stderr, _("  --check      Check that health monitoring is supported.\n"));
 	fprintf(stderr, _("  --debug      Enable debugging messages.\n"));
 	fprintf(stderr, _("  --everything Capture all events.\n"));
 	fprintf(stderr, _("  --log        Log health events to stdout.\n"));
@@ -369,6 +386,7 @@ usage(void)
 }
 
 enum long_opt_nr {
+	LOPT_CHECK,
 	LOPT_DEBUG,
 	LOPT_EVERYTHING,
 	LOPT_LOG,
@@ -396,6 +414,7 @@ main(
 	textdomain(PACKAGE);
 
 	struct option long_options[] = {
+		[LOPT_CHECK]	= {"check", no_argument, &ctx.check, 1 },
 		[LOPT_DEBUG]	= {"debug", no_argument, &ctx.debug, 1 },
 		[LOPT_EVERYTHING] = {"everything", no_argument, &ctx.everything, 1 },
 		[LOPT_LOG]	= {"log", no_argument, &ctx.log, 1 },
@@ -443,9 +462,17 @@ main(
 		goto out;
 	}
 
-	ret = setup_monitor(&ctx);
-	if (ret)
+	switch (setup_monitor(&ctx)) {
+	case MON_ERROR:
+		ret = -1;
 		goto out_events;
+	case MON_EXIT:
+		ret = 0;
+		goto out_events;
+	case MON_START:
+		ret = 0;
+		break;
+	}
 
 	monitor(&ctx);
 
@@ -466,7 +493,7 @@ out:
 	 * fail service uses the service name to gather log messages for the
 	 * error report.
 	 */
-	if (getenv("SERVICE_MODE") != NULL)
+	if (!ctx.check && getenv("SERVICE_MODE") != NULL)
 		sleep(2);
 
 	return ret != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
