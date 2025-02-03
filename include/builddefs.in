@@ -91,6 +91,7 @@ ENABLE_SHARED	= @enable_shared@
 ENABLE_GETTEXT	= @enable_gettext@
 ENABLE_EDITLINE	= @enable_editline@
 ENABLE_SCRUB	= @enable_scrub@
+ENABLE_HEALER	= @enable_healer@
 
 HAVE_ZIPPED_MANPAGES = @have_zipped_manpages@
 
