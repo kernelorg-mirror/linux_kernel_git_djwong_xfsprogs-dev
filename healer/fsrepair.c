@@ -245,3 +245,19 @@ repair_metadata(
 	close(repair_fd);
 	return 0;
 }
+
+/* Ask the kernel if it supports repairs. */
+bool
+healer_can_repair(
+	struct healer_ctx	*ctx)
+{
+	struct xfs_scrub_metadata sm = {
+		.sm_type = XFS_SCRUB_TYPE_PROBE,
+		.sm_flags = XFS_SCRUB_IFLAG_REPAIR,
+	};
+	int			ret;
+
+	/* assume any errno means not supported */
+	ret = ioctl(ctx->mnt.fd, XFS_IOC_SCRUB_METADATA, &sm);
+	return ret ? false : true;
+}

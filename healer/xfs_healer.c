@@ -66,6 +66,26 @@ monitor(
 		return 1;
 	}
 
+	if (ctx->want_repair) {
+		/* Check that the kernel supports repairs at all. */
+		if (!healer_can_repair(ctx)) {
+			fprintf(stderr, "%s: %s\n", ctx->mntpoint,
+ _("XFS online repair is not supported, exiting"));
+			close(ctx->mnt.fd);
+			return -1;
+		}
+
+		/* Check for backref metadata that makes repair effective. */
+		if (!healer_has_rmapbt(ctx))
+			fprintf(stderr, "%s: %s\n", ctx->mntpoint,
+ _("XFS online repair is less effective without rmap btrees."));
+
+		if (!healer_has_parent(ctx))
+			fprintf(stderr, "%s: %s\n", ctx->mntpoint,
+ _("XFS online repair is less effective without parent pointers."));
+
+	}
+
 	/*
 	 * Open weak-referenced file handle to mountpoint before we go any
 	 * further.

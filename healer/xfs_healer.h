@@ -44,6 +44,16 @@ struct healer_ctx {
 	struct workqueue	event_queue;
 };
 
+static inline bool healer_has_rmapbt(const struct healer_ctx *ctx)
+{
+	return ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_RMAPBT;
+}
+
+static inline bool healer_has_parent(const struct healer_ctx *ctx)
+{
+	return ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_PARENT;
+}
+
 /* eventlog.c */
 void report_event(struct healer_ctx *ctx,
 		const struct xfs_health_monitor_event *hme);
@@ -55,6 +65,7 @@ const char *inode_structname(uint32_t what);
 /* repair.c */
 int repair_metadata(struct healer_ctx *ctx,
 		const struct xfs_health_monitor_event *hme);
+bool healer_can_repair(struct healer_ctx *ctx);
 
 /* weakhandle.c */
 int weakhandle_alloc(int fd, const char *mountpoint, const struct fs_path *fsp,
