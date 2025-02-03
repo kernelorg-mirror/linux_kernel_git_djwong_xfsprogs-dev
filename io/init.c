@@ -92,6 +92,7 @@ init_commands(void)
 	crc32cselftest_init();
 	exchangerange_init();
 	fsprops_init();
+	healthmon_init();
 }
 
 /*
