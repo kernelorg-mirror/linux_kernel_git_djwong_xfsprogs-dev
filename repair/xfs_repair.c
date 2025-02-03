@@ -74,6 +74,7 @@ enum c_opt_nums {
 	CONVERT_FINOBT,
 	CONVERT_REFLINK,
 	CONVERT_RMAPBT,
+	CONVERT_PARENT,
 	C_MAX_OPTS,
 };
 
@@ -86,6 +87,7 @@ static char *c_opts[] = {
 	[CONVERT_FINOBT]	= "finobt",
 	[CONVERT_REFLINK]	= "reflink",
 	[CONVERT_RMAPBT]	= "rmapbt",
+	[CONVERT_PARENT]	= "parent",
 	[C_MAX_OPTS]		= NULL,
 };
 
@@ -404,6 +406,15 @@ process_args(int argc, char **argv)
 						do_abort(
 		_("-c rmapbt only supports upgrades\n"));
 					add_rmapbt = true;
+					break;
+				case CONVERT_PARENT:
+					if (!val)
+						do_abort(
+		_("-c parent requires a parameter\n"));
+					if (strtol(val, NULL, 0) != 1)
+						do_abort(
+		_("-c parent only supports upgrades\n"));
+					add_parent = true;
 					break;
 				default:
 					unknown('c', val);
