@@ -1390,6 +1390,48 @@ argument, displays the list of error tags available.
 Only available in expert mode and requires privileges.
 
 .TP
+.BI "verifymedia [ \-bdlrsR ] [ " start " [ " end " ]]"
+Check for media errors on the storage devices backing XFS.
+The
+.I start
+and
+.I end
+parameters are the range of physical storage to verify, in bytes.
+The
+.I start
+parameter is inclusive.
+The
+.I end
+parameter is exclusive.
+If neither
+.IR start " nor " end
+are specified, the entire device will be verified.
+.RE
+.RS 1.0i
+.PD 0
+.TP
+.B \-b
+Don't issue any IOs larger than this size.
+.TP
+.B \-d
+Verify the data device.
+This is the default.
+.TP
+.B \-l
+Verify the log device instead of the data device.
+.TP
+.B \-r
+Verify the realtime device instead of the data device.
+.TP
+.B \-R
+Report media errors to fsnotify.
+.TP
+.B \-s
+Sleep this many microseconds between IO requests.
+.PD
+.RE
+
+.TP
 .BI "rginfo [ \-r " rgno " ]"
 Show information about or update the state of realtime allocation groups.
 .RE
