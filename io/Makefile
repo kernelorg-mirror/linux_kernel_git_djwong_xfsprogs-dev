@@ -22,6 +22,7 @@ CFILES = \
 	file.c \
 	freeze.c \
 	fsproperties.c \
+	fsrefcounts.c \
 	fsuuid.c \
 	fsync.c \
 	getrusage.c \
