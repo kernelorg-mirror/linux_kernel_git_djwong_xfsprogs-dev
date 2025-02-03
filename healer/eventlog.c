@@ -243,6 +243,51 @@ struct u32_str		(name)[] = { \
 	{0,		NULL}, \
 }
 
+static const char *
+first_u32_str(
+	uint32_t		flags,
+	const struct u32_str	*map)
+{
+	const struct u32_str	*f = map;
+
+	foreach_u32_str_in(f, flags, map)
+		return f->string;
+
+	return "???";
+}
+
+/* XFS_FSOP_GEOM_SICK -> name */
+const char *fs_structname(uint32_t what)
+{
+	DEFINE_FS_STRINGS(FS_STRUCTURES);
+
+	return first_u32_str(what, FS_STRUCTURES);
+}
+
+/* XFS_AG_GEOM_SICK -> name */
+const char *ag_structname(uint32_t what)
+{
+	DEFINE_AG_STRINGS(AG_STRUCTURES);
+
+	return first_u32_str(what, AG_STRUCTURES);
+}
+
+/* XFS_RTGROUP_GEOM_SICK -> name */
+const char *rtg_structname(uint32_t what)
+{
+	DEFINE_RTG_STRINGS(RTG_STRUCTURES);
+
+	return first_u32_str(what, RTG_STRUCTURES);
+}
+
+/* XFS_BS_GEOM_SICK -> name */
+const char *inode_structname(uint32_t what)
+{
+	DEFINE_INODE_STRINGS(INODE_STRUCTURES);
+
+	return first_u32_str(what, INODE_STRUCTURES);
+}
+
 /* Log a monitoring event to stdout. */
 static void
 report_loggable(

@@ -13,6 +13,8 @@ LTCOMMAND=xfs_healer
 
 CFILES = \
 eventlog.c \
+fsrepair.c \
+weakhandle.c \
 xfs_healer.c
 
 HFILES = \
