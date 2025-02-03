@@ -395,5 +395,21 @@ out_events:
 	teardown_monitor(&ctx);
 	fs_table_destroy();
 out:
+	/*
+	 * If we're being run as a service, the return code must fit the LSB
+	 * init script action error guidelines, which is to say that we
+	 * compress all errors to 1 ("generic or unspecified error", LSB 5.0
+	 * section 22.2) and hope the admin will scan the log for what
+	 * actually happened.
+	 *
+	 * We have to sleep 2 seconds here because journald uses the pid to
+	 * connect our log messages to the systemd service.  This is critical
+	 * for capturing all the log messages if the scrub fails, because the
+	 * fail service uses the service name to gather log messages for the
+	 * error report.
+	 */
+	if (getenv("SERVICE_MODE") != NULL)
+		sleep(2);
+
 	return ret != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
 }
