@@ -9,6 +9,22 @@ include $(builddefs)
 XFS_HEALER_PROG = xfs_healer
 INSTALL_HEALER = install-healer
 
+RUSTFILES = \
+	src/main.rs
+
+ifeq ($(ENABLE_RELEASE),yes)
+	CARGO_BUILD_FLAGS=--release
+else
+	CARGO_BUILD_FLAGS=
+endif
+
+ifeq ($(HAVE_RUST),yes)
+.PHONY: healer-rust
+CARGO_CONFIG=Cargo.toml
+XFS_HEALER_PROG += healer-rust
+INSTALL_HEALER += install-rust-healer
+endif
+
 ifeq ($(HAVE_SYSTEMD),yes)
 INSTALL_HEALER += install-systemd
 SYSTEMD_SERVICES=\
@@ -24,7 +40,7 @@ ifeq ($(HAVE_UDEV),yes)
 endif
 endif
 
-LDIRT = $(XFS_HEALER_PROG)
+LDIRT = $(XFS_HEALER_PROG) $(CARGO_CONFIG)
 
 default: $(XFS_HEALER_PROG) $(SYSTEMD_SERVICES) $(UDEV_RULES) $(XFS_HEALER_HELPER)
 
@@ -39,6 +55,18 @@ xfs_healer: xfs_healer.in $(builddefs)
 	@echo "    [SED]    $@"
 	$(Q)$(SED) -e "s|@pkg_libexec_dir@|$(PKG_LIBEXEC_DIR)|g" \
 		   < $< > $@
+
+$(CARGO_CONFIG): $(CARGO_CONFIG).in
+	@echo "    [TOML]   $@"
+	$(Q)$(SED) -e "s|@pkg_version@|$(PKG_VERSION)|g" < $< | sed -e 's|\~WIP.*|"|g' > $@
+
+docs:
+	@echo "    [CARGO]  $@"
+	$(Q)cargo doc
+
+healer-rust: $(RUSTFILES) $(CARGO_CONFIG)
+	@echo "    [CARGO]  $@ $(CARGO_BUILD_FLAGS)"
+	$(Q)cargo build $(CARGOFLAGS) $(CARGO_BUILD_FLAGS)
 
 include $(BUILDRULES)
 
@@ -59,6 +87,9 @@ install-udev: default
 	for i in $(UDEV_RULES); do \
 		$(INSTALL) -m 644 $$i $(UDEV_RULE_DIR)/64-$$i; \
 	done
+
+install-rust-healer: default
+	cargo install --path . --root $(exec_prefix)
 
 install-dev:
 

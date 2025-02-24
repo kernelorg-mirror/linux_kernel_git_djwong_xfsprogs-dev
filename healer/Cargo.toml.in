@@ -1,0 +1,10 @@
+[package]
+name = "xfs_healer"
+version = "@pkg_version@"
+edition = "2021"
+
+[profile.release]
+lto = true
+
+[dependencies]
+clap = { version = "4.0.32", features = ["derive"] }

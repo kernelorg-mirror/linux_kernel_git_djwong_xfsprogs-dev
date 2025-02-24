@@ -12,6 +12,10 @@ fi
 if test "${CXXFLAGS+set}" != "set"; then
 	CXXFLAGS="-g -O2 -std=gnu++11"
 fi
+if test "${CARGOFLAGS+set}" != "set"; then
+	CARGOFLAGS=""
+fi
+AC_SUBST(CARGOFLAGS)
 
 AC_PROG_INSTALL
 LT_INIT
@@ -114,6 +118,12 @@ AC_ARG_ENABLE(healer,
 [  --enable-healer=[yes/no]  Enable build of xfs_healer utility [default=yes]],,
 	enable_healer=yes)
 AC_SUBST(enable_healer)
+
+# Is this a release build?
+AC_ARG_ENABLE(release,
+[  --enable-release=[yes/no] This is a release build [default=no]],,
+	enable_release=no)
+AC_SUBST(enable_release)
 
 #
 # If the user specified a libdir ending in lib64 do not append another
@@ -220,6 +230,7 @@ fi
 AC_MANUAL_FORMAT
 AC_HAVE_LIBURCU_ATOMIC64
 AC_USE_RADIX_TREE_FOR_INUMS
+AC_HAVE_RUST
 
 AC_CONFIG_FILES([include/builddefs])
 AC_OUTPUT
