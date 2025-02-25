@@ -11,6 +11,7 @@ use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 use std::mem::MaybeUninit;
 use nix::ioctl_write_ptr;
+use serde_json;
 use crate::xfs_fs;
 
 ioctl_write_ptr!(xfs_ioc_health_monitor, 'X', 68, xfs_fs::xfs_health_monitor);
@@ -91,10 +92,22 @@ impl XfsHealthMonitor {
 }
 
 impl Iterator for XfsHealthMonitor {
-    type Item = String;
+    type Item = serde_json::Value;
 
     /// Return health monitoring events
     fn next(&mut self) -> Option<Self::Item> {
-        self.get_event_json()
+        loop {
+            let jsonstr = self.get_event_json()?;
+
+            match serde_json::from_str(&jsonstr) {
+                Ok(json) => return Some(json),
+
+                // json parsing errors aren't fatal
+                Err(e) => {
+                    eprintln!("{}: {}", self.mountpoint.display(), e);
+                    continue;
+                },
+            }
+        }
     }
 }
