@@ -252,10 +252,22 @@ if test "$have_rustc" = "yes"; then
 	AC_HAVE_CARGO
 fi
 
-# If we have cargo, check that our crate dependencies are present
+# If we have cargo, check that we have the first two dependencies for bindgen
 if test "$have_cargo" = "yes"; then
 	AC_USE_DEBIAN_CRATES
 	AC_HAVE_CLIPPY
+	AC_HAVE_CLANG
+	AC_HAVE_RUSTFMT
+fi
+
+# If we have the first two deps for bindgen, check that we have bindgen
+if test "$have_clang:$have_rustfmt" = "yes:yes"; then
+	AC_HAVE_BINDGEN
+fi
+
+# If we have rustc, cargo, clang, rustfmt, and bindgen, check that our crate
+# dependencies are present
+if test "$have_bindgen" = "yes"; then
 	AC_HAVE_HEALER_CRATES
 fi
 

@@ -112,3 +112,25 @@ clap = { version = "4.0.32", features = [["derive"]] }
 ],
     [yes], [no])
 ])
+
+# Check if clang is installed so that bindgen can find system headers.
+AC_DEFUN([AC_HAVE_CLANG],
+[
+  AC_CHECK_PROG([have_clang], [clang], [yes], [no])
+  AC_SUBST(have_clang)
+])
+
+# Check if rustfmt is installed; bindgen needs this to produce readable source
+# code.
+AC_DEFUN([AC_HAVE_RUSTFMT],
+[
+  AC_CHECK_PROG([have_rustfmt], [rustfmt], [yes], [no])
+  AC_SUBST(have_rustfmt)
+])
+
+# Check if bindgen (aka the C FFI generator) is installed
+AC_DEFUN([AC_HAVE_BINDGEN],
+[
+  AC_CHECK_PROG([have_bindgen], [bindgen], [yes], [no])
+  AC_SUBST(have_bindgen)
+])

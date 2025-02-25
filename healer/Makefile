@@ -13,12 +13,17 @@ INSTALL_HEALER = install-healer
 # Rust implementation
 ifeq ($(HAVE_HEALER_CRATES),yes)
 
+HFILES = \
+	bindgen_xfs_fs.h
+
 RUSTFILES = \
 	src/lib.rs \
 	src/main.rs \
+	src/xfs_fs.rs \
 	src/xfsprogs.rs
 
 BUILT_RUSTFILES = \
+	src/xfs_fs.rs \
 	src/xfsprogs.rs
 
 CARGO_MANIFEST=Cargo.toml
@@ -109,9 +114,18 @@ $(CARGO_CONFIG):
 	touch $@
 endif
 
+ifeq ($(HAVE_RUSTFMT),yes)
+rustfmt: $(RUSTFILES)
+	rustfmt $^
+endif
+
 docs:
 	@echo "    [CARGO]  doc $@"
 	$(Q)cargo doc --no-deps
+
+src/xfs_fs.rs: bindgen_xfs_fs.h ../libxfs/xfs_fs.h rbindgen
+	@echo "    [RBIND]  $@"
+	$(Q)./rbindgen $< $@ '*xfs_fs.h*'
 
 # cargo install only knows how to build a binary and install it to $root/bin,
 # so we install it to ./rust/bin/ and let the install-rust target move it to
