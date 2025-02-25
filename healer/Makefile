@@ -20,7 +20,9 @@ RUSTFILES = \
 	src/lib.rs \
 	src/main.rs \
 	src/xfs_fs.rs \
-	src/xfsprogs.rs
+	src/xfsprogs.rs \
+	src/healthmon/json.rs \
+	src/healthmon/mod.rs
 
 BUILT_RUSTFILES = \
 	src/xfs_fs.rs \

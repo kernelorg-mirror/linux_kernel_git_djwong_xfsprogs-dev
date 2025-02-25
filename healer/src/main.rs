@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::Result;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use xfs_healer::healthmon::json::XfsHealthMonitor as JsonMonitor;
 use xfs_healer::xfsprogs;
 
 // The struct below is a magic struct that implements argument parsing.
@@ -58,7 +59,14 @@ impl App {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let _fp = File::open(&self.path)?;
+        let fp = File::open(&self.path)?;
+        let hmon = JsonMonitor::try_new(fp, &self.path, self.everything, self.debug)?;
+
+        for raw_event in hmon {
+            if self.log {
+                println!("{}", raw_event);
+            }
+        }
 
         Ok(ExitCode::SUCCESS)
     }

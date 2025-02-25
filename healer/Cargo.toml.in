@@ -12,3 +12,4 @@ lto = @cargo_lto@
 # Be sure to update package_rust.m4 if you update the dependency list.
 [dependencies]
 clap = { version = "4.0.32", features = ["derive"] }
+nix = { version = "0.26.1" }
