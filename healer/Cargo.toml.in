@@ -10,3 +10,5 @@ lto = true
 clap = { version = "4.0.32", features = ["derive"] }
 nix = { version = "0.26.1" }
 serde_json = { version = "1.0.87" }
+enumset = { version = "1.0.12" }
+chrono = { version = "0.4.23" }

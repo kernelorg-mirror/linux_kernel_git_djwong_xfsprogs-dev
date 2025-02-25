@@ -38,7 +38,7 @@ fn __main(args: &Cli) -> io::Result<i32> {
 
     for f in hmon {
         if args.log {
-            println!("{:?}", f);
+            f.log();
         }
     }
 

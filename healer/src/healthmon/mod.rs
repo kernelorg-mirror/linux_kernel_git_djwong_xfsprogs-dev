@@ -14,6 +14,11 @@ use nix::ioctl_write_ptr;
 use serde_json;
 use crate::xfs_fs;
 
+pub mod event;
+pub mod group;
+pub mod inodes;
+pub mod fs;
+
 ioctl_write_ptr!(xfs_ioc_health_monitor, 'X', 68, xfs_fs::xfs_health_monitor);
 
 /// Iterator object that returns health events in json
@@ -89,10 +94,45 @@ impl XfsHealthMonitor {
         }
         Some(jsonstr)
     }
+
+    fn mount_event_from_json(&mut self, json: serde_json::Value) ->
+            Option<Box<dyn event::XfsHealthEvent>> {
+        let m = match json["type"].as_str() {
+            Some("lost")        => event::create_lost_event(json),
+            Some("shutdown")    => fs::create_shutdown_event(json),
+            _                   => event::create_lost_event(json),
+        };
+        match m {
+            Err(e) => {
+                eprintln!("{}", e);
+                return None
+            },
+            Ok(o) => Some(o),
+        }
+    }
+
+    fn event_from_json(&mut self, json: serde_json::Value) ->
+            Option<Box<dyn event::XfsHealthEvent>> {
+        let m = match json["domain"].as_str() {
+            Some("rtgroup") => group::create_rtgroup_event(json),
+            Some("perag")   => group::create_perag_event(json),
+            Some("inode")   => inodes::create_inode_event(json),
+            Some("fs")      => fs::create_wholefs_event(json),
+            Some("mount")   => return self.mount_event_from_json(json),
+            _               => event::create_lost_event(json),
+        };
+        match m {
+            Err(e) => {
+                eprintln!("{}", e);
+                return None
+            },
+            Ok(o) => Some(o),
+        }
+    }
 }
 
 impl Iterator for XfsHealthMonitor {
-    type Item = serde_json::Value;
+    type Item = Box<dyn event::XfsHealthEvent>;
 
     /// Return health monitoring events
     fn next(&mut self) -> Option<Self::Item> {
@@ -100,7 +140,16 @@ impl Iterator for XfsHealthMonitor {
             let jsonstr = self.get_event_json()?;
 
             match serde_json::from_str(&jsonstr) {
-                Ok(json) => return Some(json),
+                Ok(json) => {
+                    // no event object means there was some error that was
+                    // already reported; just keep going with the loop
+                    match self.event_from_json(json) {
+                        None => {
+                            continue;
+                        },
+                        Some(x) => return Some(x),
+                    }
+                },
 
                 // json parsing errors aren't fatal
                 Err(e) => {

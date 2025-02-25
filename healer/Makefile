@@ -13,7 +13,11 @@ RUSTFILES = \
 	src/main.rs \
 	src/lib.rs \
 	src/xfs_fs.rs \
-	src/healthmon/mod.rs
+	src/healthmon/mod.rs \
+	src/healthmon/fs.rs \
+	src/healthmon/group.rs \
+	src/healthmon/inodes.rs \
+	src/healthmon/event.rs
 
 ifeq ($(ENABLE_RELEASE),yes)
 	CARGO_BUILD_FLAGS=--release
