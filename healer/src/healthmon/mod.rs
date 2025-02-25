@@ -6,6 +6,10 @@
 use crate::xfs_fs::xfs_health_monitor;
 use nix::ioctl_write_ptr;
 
+pub mod event;
+pub mod fs;
+pub mod groups;
+pub mod inodes;
 pub mod json;
 
 ioctl_write_ptr!(xfs_ioc_health_monitor, 'X', 68, xfs_health_monitor);

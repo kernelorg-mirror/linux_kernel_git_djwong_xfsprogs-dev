@@ -6,4 +6,6 @@
 
 pub mod xfsprogs;
 pub mod xfs_fs;
+pub mod xfs_types;
+pub mod util;
 pub mod healthmon;
