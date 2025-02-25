@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# Wrap bindgen so that it gives us what we want
+
+input="$1"
+shift
+output="$1"
+shift
+
+if [ -z "$1" ] || [ -z "${input}" ] || [ -z "${output}" ] || [ "$1" = "--help" ]; then
+	echo "Usage: $0 src dest ok_file..."
+	exit 1
+fi
+
+bindgen_args=("${input}" -o "${output}")
+
+# try to generate inline functions
+bindgen_args+=(--generate-inline-functions)
+# implement Debug on all generated structures
+bindgen_args+=(--impl-debug)
+# implement PartialEq when possible
+bindgen_args+=(--with-derive-partialeq)
+# implement Default when possible so that we can zero-init things
+bindgen_args+=(--with-derive-default)
+# shut up about the typenames being wrong, this is C
+bindgen_args+=(--raw-line '#![allow(non_camel_case_types)]')
+
+for f in "$@"; do
+	bindgen_args+=(--allowlist-file "$f")
+done
+
+# XXX needed for djwong system
+clang_args=(-I ../ -I /usr/lib/gcc/x86_64-linux-gnu/12/include)
+
+exec bindgen "${bindgen_args[@]}" -- "${clang_args[@]}"

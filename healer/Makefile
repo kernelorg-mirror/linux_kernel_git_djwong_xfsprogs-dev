@@ -10,7 +10,9 @@ XFS_HEALER_PROG = xfs_healer
 INSTALL_HEALER = install-healer
 
 RUSTFILES = \
-	src/main.rs
+	src/main.rs \
+	src/lib.rs \
+	src/xfs_fs.rs
 
 ifeq ($(ENABLE_RELEASE),yes)
 	CARGO_BUILD_FLAGS=--release
@@ -40,7 +42,7 @@ ifeq ($(HAVE_UDEV),yes)
 endif
 endif
 
-LDIRT = $(XFS_HEALER_PROG) $(CARGO_CONFIG)
+LDIRT = $(XFS_HEALER_PROG) $(CARGO_CONFIG) src/xfs_fs.rs
 
 default: $(XFS_HEALER_PROG) $(SYSTEMD_SERVICES) $(UDEV_RULES) $(XFS_HEALER_HELPER)
 
@@ -63,6 +65,10 @@ $(CARGO_CONFIG): $(CARGO_CONFIG).in
 docs:
 	@echo "    [CARGO]  $@"
 	$(Q)cargo doc
+
+src/xfs_fs.rs: bindgen_xfs_fs.h ../libxfs/xfs_fs.h rbindgen
+	@echo "    [RBG]    $@"
+	$(Q)./rbindgen $< $@ '*xfs_fs.h*'
 
 healer-rust: $(RUSTFILES) $(CARGO_CONFIG)
 	@echo "    [CARGO]  $@ $(CARGO_BUILD_FLAGS)"
