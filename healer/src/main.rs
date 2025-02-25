@@ -64,7 +64,14 @@ impl App {
 
         for raw_event in hmon {
             if self.log {
-                println!("{}", raw_event);
+                match serde_json::Value::try_from(raw_event) {
+                    Ok(e) => {
+                        println!("{}", e);
+                    }
+                    Err(e) => {
+                        println!("{}: Bad event!", e);
+                    }
+                }
             }
         }
 

@@ -6,6 +6,8 @@
 use crate::healthmon::xfs_ioc_health_monitor;
 use crate::xfs_fs;
 use crate::xfs_fs::xfs_health_monitor;
+use serde_json::from_str;
+use serde_json::Value;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fs::File;
@@ -69,6 +71,15 @@ impl XfsHealthRawEvent {
     /// Push a string into the event string collection
     fn push(&mut self, s: String) {
         self.0.push(s)
+    }
+}
+
+impl TryFrom<XfsHealthRawEvent> for Value {
+    type Error = serde_json::Error;
+
+    /// Return a json value from this raw event
+    fn try_from(val: XfsHealthRawEvent) -> serde_json::Result<Self> {
+        from_str(&val.0.join(""))
     }
 }
 

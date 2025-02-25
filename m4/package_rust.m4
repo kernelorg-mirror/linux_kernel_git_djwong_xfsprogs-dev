@@ -110,6 +110,7 @@ AC_DEFUN([AC_HAVE_HEALER_CRATES],
     [
 clap = { version = "4.0.32", features = [["derive"]] }
 nix = { version = "0.26.1" }
+serde_json = { version = "1.0.87" }
 ],
     [yes], [no])
 ])
