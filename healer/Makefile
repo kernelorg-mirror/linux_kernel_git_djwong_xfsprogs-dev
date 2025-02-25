@@ -12,7 +12,8 @@ INSTALL_HEALER = install-healer
 RUSTFILES = \
 	src/main.rs \
 	src/lib.rs \
-	src/xfs_fs.rs
+	src/xfs_fs.rs \
+	src/healthmon/mod.rs
 
 ifeq ($(ENABLE_RELEASE),yes)
 	CARGO_BUILD_FLAGS=--release

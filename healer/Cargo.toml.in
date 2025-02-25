@@ -8,3 +8,4 @@ lto = true
 
 [dependencies]
 clap = { version = "4.0.32", features = ["derive"] }
+nix = { version = "0.26.1" }

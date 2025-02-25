@@ -6,6 +6,7 @@
 use std::io;
 use std::fs::File;
 use clap::Parser;
+use xfs_healer::healthmon::XfsHealthMonitor;
 
 /// Interpret command line arguments
 #[derive(Parser, Debug)]
@@ -31,7 +32,15 @@ fn __main(args: &Cli) -> io::Result<i32> {
         println!("{:?}", args);
     }
 
-    let _fp = File::open(&args.path)?;
+    let fp = File::open(&args.path)?;
+    let hmon = XfsHealthMonitor::try_from(fp, &args.path, args.everything,
+                                          args.debug)?;
+
+    for f in hmon {
+        if args.log {
+            println!("{:?}", f);
+        }
+    }
 
     Ok(0)
 }

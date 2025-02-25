@@ -5,3 +5,4 @@
  */
 
 pub mod xfs_fs;
+pub mod healthmon;
