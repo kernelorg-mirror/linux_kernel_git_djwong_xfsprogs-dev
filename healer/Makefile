@@ -13,6 +13,7 @@ RUSTFILES = \
 	src/main.rs \
 	src/lib.rs \
 	src/xfs_fs.rs \
+	src/libhandle.rs \
 	src/healthmon/mod.rs \
 	src/healthmon/fs.rs \
 	src/healthmon/group.rs \
@@ -74,6 +75,10 @@ docs:
 src/xfs_fs.rs: bindgen_xfs_fs.h ../libxfs/xfs_fs.h rbindgen
 	@echo "    [RBG]    $@"
 	$(Q)./rbindgen $< $@ '*xfs_fs.h*'
+
+src/libhandle.rs: bindgen_libhandle.h ../include/handle.h rbindgen
+	@echo "    [RBG]    $@"
+	$(Q)./rbindgen $< $@ '*handle.h'
 
 healer-rust: $(RUSTFILES) $(CARGO_CONFIG)
 	@echo "    [CARGO]  $@ $(CARGO_BUILD_FLAGS)"
