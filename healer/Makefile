@@ -19,7 +19,8 @@ RUSTFILES = \
 	src/healthmon/group.rs \
 	src/healthmon/inodes.rs \
 	src/healthmon/event.rs \
-	src/softhandle.rs
+	src/softhandle.rs \
+	src/repair.rs
 
 ifeq ($(ENABLE_RELEASE),yes)
 	CARGO_BUILD_FLAGS=--release

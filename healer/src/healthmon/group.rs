@@ -11,6 +11,8 @@ use crate::healthmon::event::XfsHealthStatus;
 use crate::healthmon::event::XfsHealthEvent;
 use crate::healthmon::event::XfsHealthEventTime;
 use crate::baddata;
+use crate::xfs_fs;
+use crate::repair;
 
 /// Metadata types for an allocation group on the data device
 #[derive(EnumSetType, Debug)]
@@ -59,6 +61,23 @@ impl XfsPeragMetadata {
         }
         Ok(set)
     }
+
+    /// Convert to scrub type
+    fn to_scrub(&self) -> Option<u32> {
+        match self {
+            XfsPeragMetadata::agf           => Some(xfs_fs::XFS_SCRUB_TYPE_AGF),
+            XfsPeragMetadata::agfl          => Some(xfs_fs::XFS_SCRUB_TYPE_AGFL),
+            XfsPeragMetadata::agi           => Some(xfs_fs::XFS_SCRUB_TYPE_AGI),
+            XfsPeragMetadata::bnobt         => Some(xfs_fs::XFS_SCRUB_TYPE_BNOBT),
+            XfsPeragMetadata::cntbt         => Some(xfs_fs::XFS_SCRUB_TYPE_CNTBT),
+            XfsPeragMetadata::finobt        => Some(xfs_fs::XFS_SCRUB_TYPE_FINOBT),
+            XfsPeragMetadata::inobt         => Some(xfs_fs::XFS_SCRUB_TYPE_INOBT),
+            XfsPeragMetadata::refcountbt    => Some(xfs_fs::XFS_SCRUB_TYPE_REFCNTBT),
+            XfsPeragMetadata::rmapbt        => Some(xfs_fs::XFS_SCRUB_TYPE_RMAPBT),
+            XfsPeragMetadata::superblock    => Some(xfs_fs::XFS_SCRUB_TYPE_SB),
+            _ => None,
+        }
+    }
 }
 
 /// Extract group number from a json value
@@ -103,6 +122,19 @@ impl XfsHealthEvent for XfsPeragEvent {
         println!("{}: agno {} metadata {:?} status {:?}",
                  self.timestamp, self.group, self.metadata, self.status);
     }
+
+    fn schedule_repair(&self) -> Option<Vec<repair::Repair>> {
+        if self.status != XfsHealthStatus::Sick {
+            return None
+        }
+        let mut ret = Vec::new();
+        for f in self.metadata {
+            if let Some(sm_type) = f.to_scrub() {
+                ret.push(repair::Repair::from_perag(sm_type, self.group));
+            }
+        }
+        Some(ret)
+    }
 }
 
 /// Metadata types for an allocation group on the realtime device
@@ -140,6 +172,17 @@ impl XfsRtgroupMetadata {
         }
         Ok(set)
     }
+
+    /// Convert to scrub type
+    fn to_scrub(&self) -> Option<u32> {
+        match self {
+            XfsRtgroupMetadata::bitmap      => Some(xfs_fs::XFS_SCRUB_TYPE_RTBITMAP),
+            XfsRtgroupMetadata::summary     => Some(xfs_fs::XFS_SCRUB_TYPE_RTSUM),
+            XfsRtgroupMetadata::refcountbt  => Some(xfs_fs::XFS_SCRUB_TYPE_RTREFCBT),
+            XfsRtgroupMetadata::rmapbt      => Some(xfs_fs::XFS_SCRUB_TYPE_RTRMAPBT),
+            XfsRtgroupMetadata::superblock  => Some(xfs_fs::XFS_SCRUB_TYPE_RGSUPER),
+        }
+    }
 }
 
 /// XFS rtgroup health event
@@ -172,5 +215,18 @@ impl XfsHealthEvent for XfsRtgroupEvent {
     fn log(&self) {
         println!("{}: rgno {} metadata {:?} status {:?}",
                  self.timestamp, self.group, self.metadata, self.status);
+    }
+
+    fn schedule_repair(&self) -> Option<Vec<repair::Repair>> {
+        if self.status != XfsHealthStatus::Sick {
+            return None
+        }
+        let mut ret = Vec::new();
+        for f in self.metadata {
+            if let Some(sm_type) = f.to_scrub() {
+                ret.push(repair::Repair::from_rtgroup(sm_type, self.group));
+            }
+        }
+        Some(ret)
     }
 }

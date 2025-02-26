@@ -86,6 +86,11 @@ impl SoftHandle {
         Ok(fp)
     }
 
+    /// Report mountpoint in a displayable manner
+    pub fn mountpoint(&self) -> String {
+        self.mountpoint.display().to_string()
+    }
+
     /// Create a soft handle from an open file descriptor and its mount point
     pub fn try_from(fp: &File, mountpoint: &std::path::PathBuf) ->
             io::Result<SoftHandle> {
@@ -93,5 +98,11 @@ impl SoftHandle {
             mountpoint: mountpoint.clone(),
             handle: xfs_fs::xfs_handle::from_file(&fp)?,
         })
+    }
+}
+
+impl std::fmt::Display for SoftHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.mountpoint.display())
     }
 }

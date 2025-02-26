@@ -11,6 +11,8 @@ use crate::healthmon::event::XfsHealthStatus;
 use crate::healthmon::event::XfsHealthEvent;
 use crate::healthmon::event::XfsHealthEventTime;
 use crate::baddata;
+use crate::repair;
+use crate::xfs_fs;
 
 /// Metadata types for an XFS whole-fs metadata
 #[derive(EnumSetType, Debug)]
@@ -53,6 +55,19 @@ impl XfsWholeFsMetadata {
         }
         Ok(set)
     }
+
+    /// Convert to scrub type
+    fn to_scrub(&self) -> Option<u32> {
+        match self {
+            XfsWholeFsMetadata::fscounters  => Some(xfs_fs::XFS_SCRUB_TYPE_FSCOUNTERS),
+            XfsWholeFsMetadata::grpquota    => Some(xfs_fs::XFS_SCRUB_TYPE_GQUOTA),
+            XfsWholeFsMetadata::nlinks      => Some(xfs_fs::XFS_SCRUB_TYPE_NLINKS),
+            XfsWholeFsMetadata::prjquota    => Some(xfs_fs::XFS_SCRUB_TYPE_PQUOTA),
+            XfsWholeFsMetadata::quotacheck  => Some(xfs_fs::XFS_SCRUB_TYPE_QUOTACHECK),
+            XfsWholeFsMetadata::usrquota    => Some(xfs_fs::XFS_SCRUB_TYPE_UQUOTA),
+            _ => None
+        }
+    }
 }
 
 /// XFS whole-fs health event
@@ -82,6 +97,19 @@ impl XfsHealthEvent for XfsWholeFsEvent {
     fn log(&self) {
         println!("{}: metadata {:?} status {:?}",
                  self.timestamp, self.metadata, self.status);
+    }
+
+    fn schedule_repair(&self) -> Option<Vec<repair::Repair>> {
+        if self.status != XfsHealthStatus::Sick {
+            return None
+        }
+        let mut ret = Vec::new();
+        for f in self.metadata {
+            if let Some(sm_type) = f.to_scrub() {
+                ret.push(repair::Repair::from_whole_fs(sm_type));
+            }
+        }
+        Some(ret)
     }
 }
 
@@ -152,6 +180,10 @@ impl XfsHealthEvent for XfsShutdownEvent {
         println!("{}: reasons {:?} status {:?}",
                  self.timestamp, self.reasons, self.status);
     }
+
+    fn schedule_repair(&self) -> Option<Vec<repair::Repair>> {
+        None
+    }
 }
 
 /// Devices
@@ -219,5 +251,9 @@ impl XfsHealthEvent for XfsMediaErrorEvent {
     fn log(&self) {
         println!("{}: device {:?} daddr {} bbcount {}",
                  self.timestamp, self.device, self.daddr, self.bbcount);
+    }
+
+    fn schedule_repair(&self) -> Option<Vec<repair::Repair>> {
+        None
     }
 }

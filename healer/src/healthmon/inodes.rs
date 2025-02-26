@@ -11,6 +11,8 @@ use crate::healthmon::event::XfsHealthStatus;
 use crate::healthmon::event::XfsHealthEvent;
 use crate::healthmon::event::XfsHealthEventTime;
 use crate::baddata;
+use crate::xfs_fs;
+use crate::repair;
 
 /// Metadata types for an XFS inode
 #[derive(EnumSetType, Debug)]
@@ -62,6 +64,22 @@ impl XfsInodeMetadata {
             set |= XfsInodeMetadata::from_json(value)?;
         }
         Ok(set)
+    }
+
+    /// Convert to scrub type
+    fn to_scrub(&self) -> Option<u32> {
+        match self {
+            XfsInodeMetadata::bmapbta   => Some(xfs_fs::XFS_SCRUB_TYPE_BMBTA),
+            XfsInodeMetadata::bmapbtc   => Some(xfs_fs::XFS_SCRUB_TYPE_BMBTC),
+            XfsInodeMetadata::bmapbtd   => Some(xfs_fs::XFS_SCRUB_TYPE_BMBTD),
+            XfsInodeMetadata::core      => Some(xfs_fs::XFS_SCRUB_TYPE_INODE),
+            XfsInodeMetadata::directory => Some(xfs_fs::XFS_SCRUB_TYPE_DIR),
+            XfsInodeMetadata::dirtree   => Some(xfs_fs::XFS_SCRUB_TYPE_DIRTREE),
+            XfsInodeMetadata::parent    => Some(xfs_fs::XFS_SCRUB_TYPE_PARENT),
+            XfsInodeMetadata::symlink   => Some(xfs_fs::XFS_SCRUB_TYPE_SYMLINK),
+            XfsInodeMetadata::xattr     => Some(xfs_fs::XFS_SCRUB_TYPE_XATTR),
+            _ => None
+        }
     }
 }
 
@@ -116,6 +134,20 @@ impl XfsHealthEvent for XfsInodeEvent {
     fn log(&self) {
         println!("{}: ino {} gen {} metadata {:?} status {:?}",
                  self.timestamp, self.ino, self.gen, self.metadata, self.status);
+    }
+
+    fn schedule_repair(&self) -> Option<Vec<repair::Repair>> {
+        if self.status != XfsHealthStatus::Sick {
+            return None
+        }
+        let mut ret = Vec::new();
+        for f in self.metadata {
+            if let Some(sm_type) = f.to_scrub() {
+                    ret.push(repair::Repair::from_file(sm_type, self.ino,
+                                                       self.gen));
+            }
+        }
+        Some(ret)
     }
 }
 
@@ -195,5 +227,9 @@ impl XfsHealthEvent for XfsFileIoErrorEvent {
         println!("{}: ino {} gen {} op {:?} pos {} len {}",
                  self.timestamp, self.ino, self.gen, self.iotype, self.pos,
                  self.len);
+    }
+
+    fn schedule_repair(&self) -> Option<Vec<repair::Repair>> {
+        None
     }
 }

@@ -5,6 +5,7 @@
  */
 use std::io;
 use std::time;
+use crate::repair;
 
 #[macro_export]
 macro_rules! baddata {
@@ -22,6 +23,9 @@ macro_rules! baddata {
 pub trait XfsHealthEvent {
     /// Print the health event to stdout
     fn log(&self);
+
+    /// Generate the inputs to a kernel scrub ioctl
+    fn schedule_repair(&self) -> Option<Vec<repair::Repair>>;
 }
 
 /// Event for the kernel losing events due to us being slow
@@ -34,6 +38,10 @@ impl XfsHealthEvent for LostEvent {
     fn log(&self) {
         println!("{}: events lost", self.timestamp);
     }
+
+    fn schedule_repair(&self) -> Option<Vec<repair::Repair>> {
+        None
+    }
 }
 
 /// Create event for the kernel telling us that it lost an event
@@ -45,7 +53,7 @@ pub fn create_lost_event(v: serde_json::Value) ->
 }
 
 /// Health status for metadata events
-#[derive(Debug)]
+#[derive(PartialEq, Debug)]
 pub enum XfsHealthStatus {
     /// Problems have been observed at runtime
     Sick,

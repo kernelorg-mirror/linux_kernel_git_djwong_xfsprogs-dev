@@ -24,6 +24,10 @@ struct Cli {
     #[arg(short, long)]
     everything: bool,
 
+    /// Repair broken metadata?
+    #[arg(short, long)]
+    repair: bool,
+
     /// XFS filesystem mountpoint to monitor.
     path: std::path::PathBuf,
 }
@@ -34,13 +38,23 @@ fn __main(args: &Cli) -> io::Result<i32> {
     }
 
     let fp = File::open(&args.path)?;
-    let _fh = SoftHandle::try_from(&fp, &args.path)?;
+    let fh = SoftHandle::try_from(&fp, &args.path)?;
     let hmon = XfsHealthMonitor::try_from(fp, &args.path, args.everything,
                                           args.debug)?;
 
     for f in hmon {
         if args.log {
             f.log();
+        }
+        if args.repair {
+            match f.schedule_repair() {
+                Some(vec) => {
+                    for mut repair in vec {
+                        repair.perform(&fh)
+                    }
+                },
+                _ => continue,
+            }
         }
     }
 
