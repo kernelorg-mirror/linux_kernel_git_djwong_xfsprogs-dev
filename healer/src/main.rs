@@ -7,6 +7,7 @@ use std::io;
 use std::fs::File;
 use clap::Parser;
 use xfs_healer::healthmon::XfsHealthMonitor;
+use xfs_healer::softhandle::SoftHandle;
 
 /// Interpret command line arguments
 #[derive(Parser, Debug)]
@@ -33,6 +34,7 @@ fn __main(args: &Cli) -> io::Result<i32> {
     }
 
     let fp = File::open(&args.path)?;
+    let _fh = SoftHandle::try_from(&fp, &args.path)?;
     let hmon = XfsHealthMonitor::try_from(fp, &args.path, args.everything,
                                           args.debug)?;
 

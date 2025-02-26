@@ -18,7 +18,8 @@ RUSTFILES = \
 	src/healthmon/fs.rs \
 	src/healthmon/group.rs \
 	src/healthmon/inodes.rs \
-	src/healthmon/event.rs
+	src/healthmon/event.rs \
+	src/softhandle.rs
 
 ifeq ($(ENABLE_RELEASE),yes)
 	CARGO_BUILD_FLAGS=--release
@@ -74,11 +75,11 @@ docs:
 
 src/xfs_fs.rs: bindgen_xfs_fs.h ../libxfs/xfs_fs.h rbindgen
 	@echo "    [RBG]    $@"
-	$(Q)./rbindgen $< $@ '*xfs_fs.h*'
+	$(Q)./rbindgen $< $@ '' '*xfs_fs.h*'
 
 src/libhandle.rs: bindgen_libhandle.h ../include/handle.h rbindgen
 	@echo "    [RBG]    $@"
-	$(Q)./rbindgen $< $@ '*handle.h'
+	$(Q)./rbindgen $< $@ 'handle' '*handle.h'
 
 healer-rust: $(RUSTFILES) $(CARGO_CONFIG)
 	@echo "    [CARGO]  $@ $(CARGO_BUILD_FLAGS)"

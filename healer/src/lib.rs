@@ -6,3 +6,5 @@
 
 pub mod xfs_fs;
 pub mod healthmon;
+pub mod libhandle;
+pub mod softhandle;

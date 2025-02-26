@@ -6,9 +6,11 @@ input="$1"
 shift
 output="$1"
 shift
+library="$1"
+shift
 
 if [ -z "$1" ] || [ -z "${input}" ] || [ -z "${output}" ] || [ "$1" = "--help" ]; then
-	echo "Usage: $0 src dest ok_file..."
+	echo "Usage: $0 src dest library ok_file..."
 	exit 1
 fi
 
@@ -24,6 +26,13 @@ bindgen_args+=(--with-derive-partialeq)
 bindgen_args+=(--with-derive-default)
 # shut up about the typenames being wrong, this is C
 bindgen_args+=(--raw-line '#![allow(non_camel_case_types)]')
+
+# link against a library, if that's what we're doing
+if [ -n "${library}" ]; then
+	bindgen_args+=(--raw-line '#[link(name = "'"${library}"'")]')
+	bindgen_args+=(--raw-line 'extern "C" {')
+	bindgen_args+=(--raw-line '}')
+fi
 
 for f in "$@"; do
 	bindgen_args+=(--allowlist-file "$f")
