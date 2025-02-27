@@ -40,6 +40,10 @@ struct Cli {
     #[arg(long)]
     repair: bool,
 
+    /// Check to see if monitoring is supported
+    #[arg(long)]
+    check: bool,
+
     /// XFS filesystem mountpoint to monitor
     path: PathBuf,
 }
@@ -52,6 +56,7 @@ struct App {
     log: bool,
     everything: bool,
     repair: bool,
+    check: bool,
     path: PathBuf,
 }
 
@@ -119,6 +124,14 @@ impl App {
 
         let fp = File::open(&self.path)?;
 
+        if self.check {
+            return Ok(if xfs_healer::healthmon::is_supported(&fp) {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            });
+        }
+
         let fsgeom = xfs_fsop_geom::try_from(&fp)?;
         if self.repair {
             if let Some(ret) = self.check_repair(&fp, &fsgeom) {
@@ -145,6 +158,7 @@ impl From<Cli> for App {
             log: cli.log,
             everything: cli.everything,
             repair: cli.repair,
+            check: cli.check,
             path: cli.path,
         }
     }
