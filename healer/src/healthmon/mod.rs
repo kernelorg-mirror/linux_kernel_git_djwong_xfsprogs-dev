@@ -58,6 +58,17 @@ impl XfsHealthMonitor {
         })
     }
 
+    /// Check if the open file supports a health monitor.
+    pub fn is_supported(fp: &File) -> io::Result<bool> {
+        unsafe {
+            let mut hminfo: xfs_fs::xfs_health_monitor = MaybeUninit::zeroed().assume_init();
+            hminfo.format = xfs_fs::XFS_HEALTH_MONITOR_FMT_JSON as u8;
+
+            xfs_ioc_health_monitor(fp.as_raw_fd(), &hminfo)?;
+        };
+        Ok(true)
+    }
+
     /// Read strings from the health monitor until we have a json blob
     /// describing a health event.
     fn get_event_json(&mut self) -> Option<String> {

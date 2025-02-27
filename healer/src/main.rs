@@ -13,6 +13,10 @@ use xfs_healer::xfs_fs::xfs_fsop_geom;
 /// Interpret command line arguments
 #[derive(Parser, Debug)]
 struct Cli {
+    /// Check to see if monitoring is supported.
+    #[arg(short, long)]
+    check: bool,
+
     /// Enable debugging messages.
     #[arg(short, long)]
     debug: bool,
@@ -39,6 +43,14 @@ fn __main(args: &Cli) -> io::Result<i32> {
     }
 
     let fp = File::open(&args.path)?;
+
+    /* Just a presence check? */
+    if args.check {
+        match XfsHealthMonitor::is_supported(&fp) {
+            Ok(_)  => std::process::exit(0),
+            Err(_) => std::process::exit(1),
+        }
+    }
 
     /* Complain a bit if repairs won't be entirely effective. */
     let fsgeom = xfs_fsop_geom::try_from(&fp)?;
