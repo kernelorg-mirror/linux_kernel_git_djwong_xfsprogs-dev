@@ -8,6 +8,7 @@ use std::fs::File;
 use clap::Parser;
 use xfs_healer::healthmon::XfsHealthMonitor;
 use xfs_healer::softhandle::SoftHandle;
+use xfs_healer::xfs_fs::xfs_fsop_geom;
 
 /// Interpret command line arguments
 #[derive(Parser, Debug)]
@@ -38,6 +39,20 @@ fn __main(args: &Cli) -> io::Result<i32> {
     }
 
     let fp = File::open(&args.path)?;
+
+    /* Complain a bit if repairs won't be entirely effective. */
+    let fsgeom = xfs_fsop_geom::try_from(&fp)?;
+    if args.repair {
+        if ! fsgeom.has_rmapbt() {
+            println!("{}: XFS online repair is less effective without rmap btrees",
+                     args.path.display());
+        }
+        if ! fsgeom.has_parent() {
+            println!("{}: XFS online repair is less effective without parent pointers",
+                     args.path.display());
+        }
+    }
+
     let fh = SoftHandle::try_from(&fp, &args.path)?;
     let hmon = XfsHealthMonitor::try_from(fp, &args.path, args.everything,
                                           args.debug)?;
