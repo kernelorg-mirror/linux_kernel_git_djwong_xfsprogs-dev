@@ -4,8 +4,11 @@
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
 use crate::baddata;
+use crate::xfs_fs::xfs_fid;
+use crate::xfs_fs::xfs_fsop_geom;
 use crate::xfs_fs::xfs_fsop_handlereq;
 use crate::xfs_fs::xfs_handle;
+use crate::xfs_types::XfsFid;
 use nix::ioctl_readwrite;
 use nix::libc::O_LARGEFILE;
 use std::fmt::Display;
@@ -73,6 +76,9 @@ pub struct WeakHandle<'a> {
 
     /// Filesystem handle
     handle: xfs_handle,
+
+    /// Does this filesystem support parent pointers?
+    has_parent: bool,
 }
 
 impl WeakHandle<'_> {
@@ -94,11 +100,33 @@ impl WeakHandle<'_> {
     }
 
     /// Create a soft handle from an open file descriptor and its mount point
-    pub fn try_new<'a>(fp: &File, mountpoint: &'a Path) -> Result<WeakHandle<'a>> {
+    pub fn try_new<'a>(
+        fp: &File,
+        mountpoint: &'a Path,
+        fsgeom: xfs_fsop_geom,
+    ) -> Result<WeakHandle<'a>> {
         Ok(WeakHandle {
             mountpoint,
             handle: xfs_handle::try_from(fp)?,
+            has_parent: fsgeom.has_parent(),
         })
+    }
+
+    /// Create a new file handle from this one
+    pub fn subst(&self, fid: XfsFid) -> xfs_handle {
+        xfs_handle {
+            ha_fid: xfs_fid {
+                fid_ino: fid.ino.into(),
+                fid_gen: fid.gen.into(),
+                ..self.handle.ha_fid
+            },
+            ..self.handle
+        }
+    }
+
+    /// Can this filesystem do parent pointer lookups?
+    pub fn can_get_parents(&self) -> bool {
+        self.has_parent
     }
 }
 
