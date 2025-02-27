@@ -11,3 +11,4 @@ pub mod softhandle;
 pub mod repair;
 pub mod fsgeom;
 pub mod getparents;
+pub mod fsprops;

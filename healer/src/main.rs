@@ -9,6 +9,7 @@ use clap::Parser;
 use xfs_healer::healthmon::XfsHealthMonitor;
 use xfs_healer::softhandle::SoftHandle;
 use xfs_healer::xfs_fs::xfs_fsop_geom;
+use xfs_healer::fsprops;
 
 /// Interpret command line arguments
 #[derive(Parser, Debug)]
@@ -33,11 +34,15 @@ struct Cli {
     #[arg(short, long)]
     repair: bool,
 
+    /// Decide if we'll repair broken metadata using fs property?
+    #[arg(short, long)]
+    autofsck: bool,
+
     /// XFS filesystem mountpoint to monitor.
     path: std::path::PathBuf,
 }
 
-fn __main(args: &Cli) -> io::Result<i32> {
+fn __main(args: &mut Cli) -> io::Result<i32> {
     if args.debug {
         println!("{:?}", args);
     }
@@ -66,6 +71,19 @@ fn __main(args: &Cli) -> io::Result<i32> {
     }
 
     let fh = SoftHandle::try_from(&fp, &args.path, &fsgeom)?;
+
+    /*
+     * Caller wants us to figure out if we're doing repairs from the admin
+     * configurable fs property
+     */
+    if args.autofsck {
+        if let Some(value) = fsprops::get(&fp, fsprops::AUTOFSCK_NAME) {
+            if value == "repair" {
+                args.repair = true;
+            }
+        }
+    }
+
     let hmon = XfsHealthMonitor::try_from(fp, &args.path, args.everything,
                                           args.debug)?;
 
@@ -89,9 +107,9 @@ fn __main(args: &Cli) -> io::Result<i32> {
 }
 
 fn main() {
-    let args = Cli::parse();
+    let mut args = Cli::parse();
 
-    match __main(&args) {
+    match __main(&mut args) {
         Ok(f)   => std::process::exit(f),
         Err(e)  => {
             eprintln!("{}: {}", args.path.display(), e);
