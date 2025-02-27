@@ -17,6 +17,7 @@ HFILES = \
 	bindgen_xfs_fs.h
 
 RUSTFILES = \
+	src/fsgeom.rs \
 	src/lib.rs \
 	src/main.rs \
 	src/repair.rs \
