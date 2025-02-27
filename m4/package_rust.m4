@@ -114,6 +114,7 @@ serde_json = { version = "1.0.87" }
 enumset = { version = "1.0.12" }
 strum = { version = "0.19.2" }
 strum_macros = { version = "0.19.2" }
+libc = { version = "0.2.139" }
 ],
     [yes], [no])
 ])
