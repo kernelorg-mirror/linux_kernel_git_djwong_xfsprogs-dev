@@ -71,6 +71,9 @@ pub struct SoftHandle {
 
     /// Filesystem handle
     handle: xfs_fs::xfs_handle,
+
+    /// Does this filesystem support parent pointers?
+    has_parent: bool,
 }
 
 impl SoftHandle {
@@ -92,12 +95,27 @@ impl SoftHandle {
     }
 
     /// Create a soft handle from an open file descriptor and its mount point
-    pub fn try_from(fp: &File, mountpoint: &std::path::PathBuf) ->
-            io::Result<SoftHandle> {
+    pub fn try_from(fp: &File, mountpoint: &std::path::PathBuf,
+                    fsgeom: &xfs_fs::xfs_fsop_geom) -> io::Result<SoftHandle> {
         Ok(SoftHandle {
             mountpoint: mountpoint.clone(),
             handle: xfs_fs::xfs_handle::from_file(&fp)?,
+            has_parent: fsgeom.has_parent(),
         })
+    }
+
+    /// Create a new file handle from this one
+    pub fn subst(&self, ino: u64, gen: u32) -> xfs_fs::xfs_handle {
+        let mut ret = self.handle.clone();
+
+        ret.ha_fid.fid_ino = ino;
+        ret.ha_fid.fid_gen = gen;
+        ret
+    }
+
+    /// Can this filesystem do parent pointer lookups?
+    pub fn can_get_parents(&self) -> bool {
+        self.has_parent
     }
 }
 

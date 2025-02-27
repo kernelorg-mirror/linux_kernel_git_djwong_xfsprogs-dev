@@ -6,6 +6,7 @@
 use std::io;
 use std::time;
 use crate::repair;
+use crate::softhandle;
 
 #[macro_export]
 macro_rules! baddata {
@@ -21,8 +22,8 @@ macro_rules! baddata {
 
 /// Common behaviors of all health events
 pub trait XfsHealthEvent {
-    /// Print the health event to stdout
-    fn log(&self);
+    /// Print the health event to stdout.  The soft handle is for logging.
+    fn log(&self, fh: &softhandle::SoftHandle);
 
     /// Generate the inputs to a kernel scrub ioctl
     fn schedule_repair(&self) -> Option<Vec<repair::Repair>>;
@@ -35,7 +36,7 @@ struct LostEvent {
 }
 
 impl XfsHealthEvent for LostEvent {
-    fn log(&self) {
+    fn log(&self, _fh: &softhandle::SoftHandle) {
         println!("{}: events lost", self.timestamp);
     }
 

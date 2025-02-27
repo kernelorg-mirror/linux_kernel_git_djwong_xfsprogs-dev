@@ -13,6 +13,7 @@ use crate::healthmon::event::XfsHealthEventTime;
 use crate::baddata;
 use crate::repair;
 use crate::xfs_fs;
+use crate::softhandle;
 
 /// Metadata types for an XFS whole-fs metadata
 #[derive(EnumSetType, Debug)]
@@ -94,7 +95,7 @@ pub fn create_wholefs_event(v: serde_json::Value) ->
 }
 
 impl XfsHealthEvent for XfsWholeFsEvent {
-    fn log(&self) {
+    fn log(&self, _fh: &softhandle::SoftHandle) {
         println!("{}: metadata {:?} status {:?}",
                  self.timestamp, self.metadata, self.status);
     }
@@ -176,7 +177,7 @@ pub fn create_shutdown_event(v: serde_json::Value) ->
 }
 
 impl XfsHealthEvent for XfsShutdownEvent {
-    fn log(&self) {
+    fn log(&self, _fh: &softhandle::SoftHandle) {
         println!("{}: reasons {:?} status {:?}",
                  self.timestamp, self.reasons, self.status);
     }
@@ -248,7 +249,7 @@ pub fn create_media_error_event(v: serde_json::Value) ->
 }
 
 impl XfsHealthEvent for XfsMediaErrorEvent {
-    fn log(&self) {
+    fn log(&self, _fh: &softhandle::SoftHandle) {
         println!("{}: device {:?} daddr {} bbcount {}",
                  self.timestamp, self.device, self.daddr, self.bbcount);
     }

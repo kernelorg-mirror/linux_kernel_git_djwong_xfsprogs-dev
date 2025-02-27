@@ -21,7 +21,8 @@ RUSTFILES = \
 	src/healthmon/event.rs \
 	src/softhandle.rs \
 	src/repair.rs \
-	src/fsgeom.rs
+	src/fsgeom.rs \
+	src/getparents.rs
 
 ifeq ($(ENABLE_RELEASE),yes)
 	CARGO_BUILD_FLAGS=--release

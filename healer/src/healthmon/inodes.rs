@@ -13,6 +13,7 @@ use crate::healthmon::event::XfsHealthEventTime;
 use crate::baddata;
 use crate::xfs_fs;
 use crate::repair;
+use crate::softhandle;
 
 /// Metadata types for an XFS inode
 #[derive(EnumSetType, Debug)]
@@ -131,7 +132,13 @@ pub fn create_inode_event(v: serde_json::Value) ->
 }
 
 impl XfsHealthEvent for XfsInodeEvent {
-    fn log(&self) {
+    fn log(&self, fh: &softhandle::SoftHandle) {
+        if let Ok(Some(path)) = fh.path_from(self.ino, self.gen) {
+            println!("{}: {}: metadata {:#?} status {:?}",
+                     self.timestamp, path, self.metadata, self.status);
+            return
+        }
+
         println!("{}: ino {} gen {} metadata {:?} status {:?}",
                  self.timestamp, self.ino, self.gen, self.metadata, self.status);
     }
@@ -223,7 +230,14 @@ pub fn create_file_io_error_event(v: serde_json::Value) ->
 }
 
 impl XfsHealthEvent for XfsFileIoErrorEvent {
-    fn log(&self) {
+    fn log(&self, fh: &softhandle::SoftHandle) {
+        if let Ok(Some(path)) = fh.path_from(self.ino, self.gen) {
+            println!("timestamp {} path {} op {:?} pos {} len {}",
+                     self.timestamp, path, self.iotype, self.pos,
+                     self.len);
+            return
+        }
+
         println!("{}: ino {} gen {} op {:?} pos {} len {}",
                  self.timestamp, self.ino, self.gen, self.iotype, self.pos,
                  self.len);

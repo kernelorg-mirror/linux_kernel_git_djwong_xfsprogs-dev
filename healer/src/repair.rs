@@ -174,6 +174,10 @@ impl Repair {
                          what, self.blob.sm_agno, outcome)
             },
             RepairGroup::File => {
+                if let Ok(Some(path)) = fh.path_from(self.blob.sm_ino, self.blob.sm_gen) {
+                    println!("{}: repair of ino {} gen {} {}: {}", path,
+                             what, self.blob.sm_ino, self.blob.sm_gen, outcome)
+                }
                 println!("{}: repair of ino {} gen {} {}: {}", fh.mountpoint(),
                          what, self.blob.sm_ino, self.blob.sm_gen, outcome)
             },

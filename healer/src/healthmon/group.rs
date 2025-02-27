@@ -13,6 +13,7 @@ use crate::healthmon::event::XfsHealthEventTime;
 use crate::baddata;
 use crate::xfs_fs;
 use crate::repair;
+use crate::softhandle;
 
 /// Metadata types for an allocation group on the data device
 #[derive(EnumSetType, Debug)]
@@ -118,7 +119,7 @@ pub fn create_perag_event(v: serde_json::Value) ->
 }
 
 impl XfsHealthEvent for XfsPeragEvent {
-    fn log(&self) {
+    fn log(&self, _fh: &softhandle::SoftHandle) {
         println!("{}: agno {} metadata {:?} status {:?}",
                  self.timestamp, self.group, self.metadata, self.status);
     }
@@ -212,7 +213,7 @@ pub fn create_rtgroup_event(v: serde_json::Value) ->
 }
 
 impl XfsHealthEvent for XfsRtgroupEvent {
-    fn log(&self) {
+    fn log(&self, _fh: &softhandle::SoftHandle) {
         println!("{}: rgno {} metadata {:?} status {:?}",
                  self.timestamp, self.group, self.metadata, self.status);
     }

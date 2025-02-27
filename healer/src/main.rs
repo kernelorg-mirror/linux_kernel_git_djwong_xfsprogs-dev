@@ -53,13 +53,13 @@ fn __main(args: &Cli) -> io::Result<i32> {
         }
     }
 
-    let fh = SoftHandle::try_from(&fp, &args.path)?;
+    let fh = SoftHandle::try_from(&fp, &args.path, &fsgeom)?;
     let hmon = XfsHealthMonitor::try_from(fp, &args.path, args.everything,
                                           args.debug)?;
 
     for f in hmon {
         if args.log {
-            f.log();
+            f.log(&fh);
         }
         if args.repair {
             match f.schedule_repair() {
