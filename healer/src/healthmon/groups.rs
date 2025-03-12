@@ -3,8 +3,10 @@
  * Copyright (C) 2025 Oracle.  All Rights Reserved.
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
+use crate::healthmon::event::schedule_repairs;
 use crate::healthmon::event::XfsHealthEvent;
 use crate::healthmon::event::XfsHealthStatus;
+use crate::repair::Repair;
 use crate::util::format_set;
 use crate::xfs_types::{XfsPeragNumber, XfsRtgroupNumber};
 use enumset::EnumSet;
@@ -65,6 +67,10 @@ impl XfsHealthEvent for XfsPeragEvent {
             self.status
         )
     }
+
+    schedule_repairs!(XfsPeragEvent, |s: &XfsPeragEvent, sm_type| {
+        Repair::from_perag(sm_type, s.group)
+    });
 }
 
 /// Metadata types for an allocation group on the realtime device
@@ -115,4 +121,8 @@ impl XfsHealthEvent for XfsRtgroupEvent {
             self.status
         )
     }
+
+    schedule_repairs!(XfsRtgroupEvent, |s: &XfsRtgroupEvent, sm_type| {
+        Repair::from_rtgroup(sm_type, s.group)
+    });
 }

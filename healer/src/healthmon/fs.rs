@@ -3,8 +3,10 @@
  * Copyright (C) 2025 Oracle.  All Rights Reserved.
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
+use crate::healthmon::event::schedule_repairs;
 use crate::healthmon::event::XfsHealthEvent;
 use crate::healthmon::event::XfsHealthStatus;
+use crate::repair::Repair;
 use crate::util::format_set;
 use crate::xfs_types::XfsPhysRange;
 use enumset::EnumSet;
@@ -46,6 +48,10 @@ impl XfsHealthEvent for XfsWholeFsEvent {
     fn format(&self) -> String {
         format!("{} status {}", format_set(self.metadata), self.status)
     }
+
+    schedule_repairs!(XfsWholeFsEvent, |_: &XfsWholeFsEvent, sm_type| {
+        Repair::from_whole_fs(sm_type)
+    });
 }
 
 /// Reasons for a filesystem shutdown event

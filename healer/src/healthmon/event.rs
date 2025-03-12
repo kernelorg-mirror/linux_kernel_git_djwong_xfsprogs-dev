@@ -3,6 +3,7 @@
  * Copyright (C) 2025 Oracle.  All Rights Reserved.
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
+use crate::repair::Repair;
 use strum_macros::EnumString;
 
 /// Common behaviors of all health events
@@ -14,10 +15,36 @@ pub trait XfsHealthEvent {
 
     /// Format this event as something we can display
     fn format(&self) -> String;
+
+    /// Generate the inputs to a kernel scrub ioctl
+    fn schedule_repairs(&self) -> Vec<Repair> {
+        vec![]
+    }
 }
 
+/// Boilerplate implementation of a schedule_repairs function.  Pass a lambda
+/// that generates a Repair object from &self and sm_type.
+#[macro_export]
+macro_rules! schedule_repairs {
+    ($event_type:ty , $lambda: expr ) => {
+        fn schedule_repairs(&self) -> Vec<$crate::repair::Repair> {
+            if self.status != $crate::healthmon::event::XfsHealthStatus::Sick {
+                return vec![];
+            }
+            let mut ret = Vec::new();
+            for f in self.metadata {
+                if let Some(sm_type) = f.to_scrub() {
+                    ret.push($lambda(self, sm_type));
+                }
+            }
+            ret
+        }
+    };
+}
+pub(crate) use schedule_repairs;
+
 /// Health status for metadata events
-#[derive(Debug, strum_macros::Display, EnumString)]
+#[derive(PartialEq, Debug, strum_macros::Display, EnumString)]
 #[strum(serialize_all = "lowercase")]
 pub enum XfsHealthStatus {
     /// Problems have been observed at runtime
