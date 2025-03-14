@@ -10,6 +10,7 @@ use std::fs::File;
 use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 
+pub mod cstruct;
 pub mod event;
 pub mod fs;
 pub mod groups;
@@ -19,9 +20,13 @@ pub mod json;
 ioctl_write_ptr!(xfs_ioc_health_monitor, 'X', 68, xfs_health_monitor);
 
 /// Check if the open file supports a health monitor.
-pub fn is_supported(fp: &File) -> bool {
+pub fn is_supported(fp: &File, use_json: bool) -> bool {
     let hminfo = xfs_health_monitor {
-        format: xfs_fs::XFS_HEALTH_MONITOR_FMT_JSON as u8,
+        format: if use_json {
+            xfs_fs::XFS_HEALTH_MONITOR_FMT_JSON as u8
+        } else {
+            xfs_fs::XFS_HEALTH_MONITOR_FMT_CSTRUCT as u8
+        },
         ..Default::default()
     };
 

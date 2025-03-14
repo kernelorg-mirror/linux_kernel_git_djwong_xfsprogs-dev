@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use xfs_healer::fsprops;
 use xfs_healer::fsprops::XfsAutofsck;
+use xfs_healer::healthmon::cstruct::XfsHealthMonitor as CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
 use xfs_healer::healthmon::json::XfsHealthMonitor as JsonMonitor;
 use xfs_healer::repair;
@@ -50,6 +51,10 @@ struct Cli {
     #[arg(long)]
     autofsck: bool,
 
+    /// Use the JSON interface?
+    #[arg(long)]
+    json: bool,
+
     /// XFS filesystem mountpoint to monitor
     path: PathBuf,
 }
@@ -64,6 +69,7 @@ struct App {
     repair: bool,
     check: bool,
     autofsck: bool,
+    json: bool,
     path: PathBuf,
 }
 
@@ -160,7 +166,7 @@ impl App {
         let fp = File::open(&self.path)?;
 
         if self.check {
-            return Ok(if xfs_healer::healthmon::is_supported(&fp) {
+            return Ok(if xfs_healer::healthmon::is_supported(&fp, self.json) {
                 ExitCode::SUCCESS
             } else {
                 ExitCode::FAILURE
@@ -182,10 +188,18 @@ impl App {
         }
 
         let fh = WeakHandle::try_new(&fp, &self.path, fsgeom)?;
-        let hmon = JsonMonitor::try_new(fp, &self.path, self.everything, self.debug)?;
+        if self.json {
+            let hmon = JsonMonitor::try_new(fp, &self.path, self.everything, self.debug)?;
 
-        for raw_event in hmon {
-            self.process_event(&fh, raw_event.cook());
+            for raw_event in hmon {
+                self.process_event(&fh, raw_event.cook());
+            }
+        } else {
+            let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)?;
+
+            for raw_event in hmon {
+                self.process_event(&fh, raw_event.cook());
+            }
         }
 
         Ok(ExitCode::SUCCESS)
@@ -202,6 +216,7 @@ impl From<Cli> for App {
             repair: cli.repair,
             check: cli.check,
             autofsck: cli.autofsck,
+            json: cli.json,
             path: cli.path,
         }
     }
