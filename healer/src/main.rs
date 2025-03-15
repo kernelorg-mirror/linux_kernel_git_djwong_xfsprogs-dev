@@ -8,15 +8,18 @@ use std::fs::File;
 use std::io::Result;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::rc::Rc;
+use std::sync::Arc;
+use threadpool::ThreadPool;
 use xfs_healer::fsprops;
 use xfs_healer::fsprops::XfsAutofsck;
 use xfs_healer::healthmon::cstruct::XfsHealthMonitor as CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
 use xfs_healer::healthmon::json::XfsHealthMonitor as JsonMonitor;
+use xfs_healer::healthmon::json::XfsHealthRawEvent as JsonEvent;
 use xfs_healer::repair;
 use xfs_healer::weakhandle::WeakHandle;
 use xfs_healer::xfs_fs::xfs_fsop_geom;
+use xfs_healer::xfs_fs::xfs_health_monitor_event;
 use xfs_healer::xfsprogs;
 
 // The struct below is a magic struct that implements argument parsing.
@@ -71,7 +74,7 @@ struct App {
     check: bool,
     autofsck: bool,
     json: bool,
-    path: Rc<PathBuf>,
+    path: Arc<PathBuf>,
 }
 
 impl App {
@@ -81,26 +84,56 @@ impl App {
     }
 
     /// Handle a health event that has been decoded into real objects
-    fn process_event(&self, fh: &WeakHandle, cooked: Result<Box<dyn XfsHealthEvent>>) {
+    fn process_event(
+        fh: Arc<WeakHandle>,
+        should_log: bool,
+        should_repair: bool,
+        cooked: Result<Box<dyn XfsHealthEvent>>,
+    ) {
         match cooked {
             Err(e) => {
-                eprintln!("{}: {}", self.path.display(), e)
+                eprintln!("{}: {}", fh.mountpoint(), e)
             }
             Ok(event) => {
-                if self.log || event.must_log() {
-                    let (maybe_path, message) = event.format(fh);
+                if should_log || event.must_log() {
+                    let (maybe_path, message) = event.format(&fh);
                     match maybe_path {
                         Some(x) => println!("{}: {}", x.display(), message),
-                        None => println!("{}: {}", self.path.display(), message),
+                        None => println!("{}: {}", fh.mountpoint(), message),
                     };
                 }
-                if self.repair {
+                if should_repair {
                     for mut repair in event.schedule_repairs() {
-                        repair.perform(fh)
+                        repair.perform(&fh)
                     }
                 }
             }
         }
+    }
+
+    // fugly helpers to reduce the scope of the variables moved into the closure
+    fn dispatch_json_event(
+        threads: &ThreadPool,
+        fh: Arc<WeakHandle>,
+        should_log: bool,
+        should_repair: bool,
+        raw_event: JsonEvent,
+    ) {
+        threads.execute(move || {
+            App::process_event(fh, should_log, should_repair, raw_event.cook());
+        })
+    }
+
+    fn dispatch_cstruct_event(
+        threads: &ThreadPool,
+        fh: Arc<WeakHandle>,
+        should_log: bool,
+        should_repair: bool,
+        raw_event: xfs_health_monitor_event,
+    ) {
+        threads.execute(move || {
+            App::process_event(fh, should_log, should_repair, raw_event.cook());
+        })
     }
 
     /// Complain a bit if repairs won't be entirely effective.
@@ -188,20 +221,25 @@ impl App {
             }
         }
 
-        let fh = WeakHandle::try_new(&fp, self.path.clone(), fsgeom)?;
+        let fh = Arc::new(WeakHandle::try_new(&fp, self.path.clone(), fsgeom)?);
+
+        // Creates a threadpool with nr_cpus workers.
+        let threads = threadpool::Builder::new().build();
+
         if self.json {
             let hmon = JsonMonitor::try_new(fp, &self.path, self.everything, self.debug)?;
 
             for raw_event in hmon {
-                self.process_event(&fh, raw_event.cook());
+                App::dispatch_json_event(&threads, fh.clone(), self.log, self.repair, raw_event);
             }
         } else {
             let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)?;
 
             for raw_event in hmon {
-                self.process_event(&fh, raw_event.cook());
+                App::dispatch_cstruct_event(&threads, fh.clone(), self.log, self.repair, raw_event);
             }
         }
+        threads.join();
 
         Ok(ExitCode::SUCCESS)
     }
@@ -218,7 +256,7 @@ impl From<Cli> for App {
             check: cli.check,
             autofsck: cli.autofsck,
             json: cli.json,
-            path: Rc::new(cli.path),
+            path: Arc::new(cli.path),
         }
     }
 }

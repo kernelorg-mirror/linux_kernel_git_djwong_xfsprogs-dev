@@ -18,3 +18,4 @@ enumset = { version = "1.0.12" }
 strum = { version = "0.19.2" }
 strum_macros = { version = "0.19.2" }
 libc = { version = "0.2.139" }
+threadpool = { version = "1.8.1" }
