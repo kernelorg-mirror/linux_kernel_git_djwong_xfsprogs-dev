@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::Result;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::rc::Rc;
 use xfs_healer::fsprops;
 use xfs_healer::fsprops::XfsAutofsck;
 use xfs_healer::healthmon::cstruct::XfsHealthMonitor as CStructMonitor;
@@ -70,7 +71,7 @@ struct App {
     check: bool,
     autofsck: bool,
     json: bool,
-    path: PathBuf,
+    path: Rc<PathBuf>,
 }
 
 impl App {
@@ -163,7 +164,7 @@ impl App {
             return Ok(ExitCode::SUCCESS);
         }
 
-        let fp = File::open(&self.path)?;
+        let fp = File::open(&*self.path)?;
 
         if self.check {
             return Ok(if xfs_healer::healthmon::is_supported(&fp, self.json) {
@@ -187,7 +188,7 @@ impl App {
             }
         }
 
-        let fh = WeakHandle::try_new(&fp, &self.path, fsgeom)?;
+        let fh = WeakHandle::try_new(&fp, self.path.clone(), fsgeom)?;
         if self.json {
             let hmon = JsonMonitor::try_new(fp, &self.path, self.everything, self.debug)?;
 
@@ -217,7 +218,7 @@ impl From<Cli> for App {
             check: cli.check,
             autofsck: cli.autofsck,
             json: cli.json,
-            path: cli.path,
+            path: Rc::new(cli.path),
         }
     }
 }
