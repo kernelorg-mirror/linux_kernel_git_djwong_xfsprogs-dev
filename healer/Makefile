@@ -19,6 +19,7 @@ HFILES = \
 RUSTFILES = \
 	src/lib.rs \
 	src/main.rs \
+	src/repair.rs \
 	src/util.rs \
 	src/weakhandle.rs \
 	src/xfs_fs.rs \

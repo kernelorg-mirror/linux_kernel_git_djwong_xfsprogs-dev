@@ -4,6 +4,7 @@
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
 use crate::baddata;
+use crate::xfs_fs::xfs_scrub_metadata;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::io::Error;
@@ -11,7 +12,7 @@ use std::io::Result;
 use strum_macros::EnumString;
 
 /// Allocation group number on the data device
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct XfsAgNumber(u32);
 
 impl TryFrom<u64> for XfsAgNumber {
@@ -32,8 +33,20 @@ impl Display for XfsAgNumber {
     }
 }
 
+impl From<XfsAgNumber> for u32 {
+    fn from(val: XfsAgNumber) -> Self {
+        val.0
+    }
+}
+
+impl From<xfs_scrub_metadata> for XfsAgNumber {
+    fn from(val: xfs_scrub_metadata) -> Self {
+        XfsAgNumber(val.sm_agno)
+    }
+}
+
 /// Realtime group number on the realtime device
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct XfsRgNumber(u32);
 
 impl Display for XfsRgNumber {
@@ -51,6 +64,18 @@ impl TryFrom<u64> for XfsRgNumber {
         } else {
             Ok(XfsRgNumber(v as u32))
         }
+    }
+}
+
+impl From<XfsRgNumber> for u32 {
+    fn from(val: XfsRgNumber) -> Self {
+        val.0
+    }
+}
+
+impl From<xfs_scrub_metadata> for XfsRgNumber {
+    fn from(val: xfs_scrub_metadata) -> Self {
+        XfsRgNumber(val.sm_agno)
     }
 }
 
@@ -119,7 +144,7 @@ impl Display for XfsPhysRange {
 }
 
 /// Inode number
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct XfsIno(u64);
 
 impl Display for XfsIno {
@@ -140,8 +165,14 @@ impl TryFrom<u64> for XfsIno {
     }
 }
 
+impl From<XfsIno> for u64 {
+    fn from(val: XfsIno) -> Self {
+        val.0
+    }
+}
+
 /// Inode generation number
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct XfsIgeneration(u32);
 
 impl Display for XfsIgeneration {
@@ -162,8 +193,14 @@ impl TryFrom<u64> for XfsIgeneration {
     }
 }
 
+impl From<XfsIgeneration> for u32 {
+    fn from(val: XfsIgeneration) -> Self {
+        val.0
+    }
+}
+
 /// Miniature FID for a handle
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct XfsFid {
     /// Inode number
     pub ino: XfsIno,
@@ -175,6 +212,15 @@ pub struct XfsFid {
 impl Display for XfsFid {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{} {}", self.ino, self.gen)
+    }
+}
+
+impl From<xfs_scrub_metadata> for XfsFid {
+    fn from(val: xfs_scrub_metadata) -> Self {
+        XfsFid {
+            ino: XfsIno(val.sm_ino),
+            gen: XfsIgeneration(val.sm_gen),
+        }
     }
 }
 
