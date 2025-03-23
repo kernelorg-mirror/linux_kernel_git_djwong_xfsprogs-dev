@@ -28,6 +28,7 @@ serde_json = { version = "1.0.87" }
 nix = { version = "0", features = ["ioctl"] }	# 0.26.1
 strum = { version = "0" }			# 0.19.2
 strum_macros = { version = "0" }		# 0.19.2
+libc = { version = "0" }			# 0.2.139
 
 # Dynamically comment out all the gettextrs related dependency information in
 # Cargo.toml becuse cargo requires the crate to be present so that it can
