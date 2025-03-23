@@ -120,6 +120,7 @@ strum = { version = "0.19.2" }
 strum_macros = { version = "0.19.2" }
 serde_json = { version = "1.0.87" }
 libc = { version = "0.2.139" }
+threadpool = { version = "1.8.1" }
 ],
     [yes], [no])
 ])
