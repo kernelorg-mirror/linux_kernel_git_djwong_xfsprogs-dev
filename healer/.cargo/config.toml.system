@@ -1,0 +1,6 @@
+# XXX gross hack so that we don't download crates from the internet
+[source]
+[source.system-packages]
+directory = "/usr/share/cargo/registry"
+[source.crates-io]
+replace-with = "system-packages"
