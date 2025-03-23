@@ -69,6 +69,12 @@ impl Cli {
                     .help(M_("Always repair corrupt metadata"))
                     .action(ArgAction::SetTrue),
             )
+            .arg(
+                Arg::new("check")
+                    .long("check")
+                    .help(M_("Check that health monitoring is supported"))
+                    .action(ArgAction::SetTrue),
+            )
             .get_matches())
     }
 }
@@ -81,6 +87,7 @@ struct App {
     everything: bool,
     json: bool,
     repair: bool,
+    check: bool,
     path: PathBuf,
 }
 
@@ -155,6 +162,16 @@ impl App {
             }
         }
 
+        // Now that we know that we can repair if the user wanted to, make sure that the kernel
+        // supports reporting events if that was as far as the user wanted us to go.
+        if self.check {
+            return Ok(if xfs_healer::healthmon::is_supported(&fp, self.json) {
+                ExitCode::SUCCESS
+            } else {
+                ExitCode::FAILURE
+            });
+        }
+
         let fh = WeakHandle::try_new(&fp, &self.path, fsgeom)
             .with_context(|| M_("Configuring filesystem handle"))?;
 
@@ -187,6 +204,7 @@ impl From<Cli> for App {
             path: cli.0.get_one::<PathBuf>("path").unwrap().to_path_buf(),
             json: cli.0.get_flag("json"),
             repair: cli.0.get_flag("repair"),
+            check: cli.0.get_flag("check"),
         }
     }
 }
