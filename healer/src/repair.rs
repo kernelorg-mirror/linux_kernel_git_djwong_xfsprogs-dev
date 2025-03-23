@@ -313,14 +313,24 @@ impl Repair {
             RepairGroup::File => {
                 let fid: XfsFid = self.detail.into();
 
-                printlogln!(
-                    "{}: {} {} {}: {}",
-                    fh.mountpoint(),
-                    M_("repair of"),
-                    fid,
-                    self.scrub_type,
-                    self.outcome
-                )
+                if let Some(path) = fh.path_for(fid) {
+                    printlogln!(
+                        "{}: {} {}: {}",
+                        path.display(),
+                        M_("repair of"),
+                        self.scrub_type,
+                        self.outcome
+                    )
+                } else {
+                    printlogln!(
+                        "{}: {} {} {}: {}",
+                        fh.mountpoint(),
+                        M_("repair of"),
+                        fid,
+                        self.scrub_type,
+                        self.outcome
+                    )
+                }
             }
         };
     }
