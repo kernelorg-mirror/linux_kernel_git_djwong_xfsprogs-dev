@@ -8,16 +8,19 @@ use clap::{value_parser, Arg, ArgAction, ArgGroup, ArgMatches, Command};
 use std::fs::File;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::rc::Rc;
+use std::sync::Arc;
+use threadpool::ThreadPool;
 use xfs_healer::fsprops;
 use xfs_healer::fsprops::XfsAutofsck;
 use xfs_healer::healthmon::cstruct::CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
+use xfs_healer::healthmon::json::JsonEventWrapper;
 use xfs_healer::healthmon::json::JsonMonitor;
 use xfs_healer::printlogln;
 use xfs_healer::repair::Repair;
 use xfs_healer::weakhandle::WeakHandle;
 use xfs_healer::xfs_fs::xfs_fsop_geom;
+use xfs_healer::xfs_fs::xfs_health_monitor_event;
 use xfs_healer::xfsprogs;
 use xfs_healer::xfsprogs::M_;
 
@@ -99,7 +102,25 @@ struct App {
     repair: bool,
     check: bool,
     autofsck: bool,
-    path: Rc<PathBuf>,
+    path: Arc<PathBuf>,
+}
+
+/// Contains all the per-thread state
+#[derive(Debug)]
+struct EventThread {
+    log: bool,
+    repair: bool,
+}
+
+impl EventThread {
+    /// Create a new thread context from an App reference
+    // XXX: I don't know how to do From<&App>
+    fn new(app: &App) -> Self {
+        EventThread {
+            log: app.log,
+            repair: app.repair,
+        }
+    }
 }
 
 /// Outcome of checking if the kernel supports metadata repair
@@ -123,26 +144,53 @@ impl App {
     }
 
     /// Handle a health event that has been decoded into real objects
-    fn process_event(&self, fh: &WeakHandle, cooked: Result<Box<dyn XfsHealthEvent>>) {
+    fn process_event(
+        et: EventThread,
+        fh: Arc<WeakHandle>,
+        cooked: Result<Box<dyn XfsHealthEvent>>,
+    ) {
         match cooked {
             Err(e) => {
-                eprintln!("{}: {:#}", self.path.display(), e)
+                eprintln!("{}: {:#}", fh.mountpoint(), e)
             }
             Ok(event) => {
-                if self.log || event.must_log() {
-                    let (maybe_path, message) = event.format(fh);
+                if et.log || event.must_log() {
+                    let (maybe_path, message) = event.format(&fh);
                     match maybe_path {
                         Some(x) => printlogln!("{}{}", x.display(), message),
-                        None => printlogln!("{}{}", self.path.display(), message),
+                        None => printlogln!("{}{}", fh.mountpoint(), message),
                     };
                 }
-                if self.repair {
+                if et.repair {
                     for mut repair in event.schedule_repairs() {
-                        repair.perform(fh)
+                        repair.perform(&fh)
                     }
                 }
             }
         }
+    }
+
+    // fugly helpers to reduce the scope of the variables moved into the closure
+    fn dispatch_json_event(
+        threads: &ThreadPool,
+        et: EventThread,
+        fh: Arc<WeakHandle>,
+        raw_event: JsonEventWrapper,
+    ) {
+        threads.execute(move || {
+            App::process_event(et, fh, raw_event.cook());
+        })
+    }
+
+    fn dispatch_cstruct_event(
+        threads: &ThreadPool,
+        et: EventThread,
+        fh: Arc<WeakHandle>,
+        raw_event: xfs_health_monitor_event,
+    ) {
+        threads.execute(move || {
+            App::process_event(et, fh, raw_event.cook());
+        })
     }
 
     /// Complain if repairs won't be entirely effective.
@@ -247,24 +295,35 @@ impl App {
             });
         }
 
-        let fh = WeakHandle::try_new(&fp, self.path.clone(), fsgeom)
-            .with_context(|| M_("Configuring filesystem handle"))?;
+        let fh = Arc::new(
+            WeakHandle::try_new(&fp, self.path.clone(), fsgeom)
+                .with_context(|| M_("Configuring filesystem handle"))?,
+        );
+
+        // Creates a threadpool with nr_cpus workers.
+        let threads = threadpool::Builder::new().build();
 
         if self.json {
             let hmon = JsonMonitor::try_new(fp, &self.path, self.everything, self.debug)
                 .with_context(|| M_("Opening js health monitor file"))?;
 
             for raw_event in hmon {
-                self.process_event(&fh, raw_event.cook());
+                App::dispatch_json_event(&threads, EventThread::new(self), fh.clone(), raw_event);
             }
         } else {
             let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)
                 .with_context(|| M_("Opening health monitor file"))?;
 
             for raw_event in hmon {
-                self.process_event(&fh, raw_event.cook());
+                App::dispatch_cstruct_event(
+                    &threads,
+                    EventThread::new(self),
+                    fh.clone(),
+                    raw_event,
+                );
             }
         }
+        threads.join();
 
         Ok(ExitCode::SUCCESS)
     }
@@ -276,7 +335,7 @@ impl From<Cli> for App {
             debug: cli.0.get_flag("debug"),
             log: cli.0.get_flag("log"),
             everything: cli.0.get_flag("everything"),
-            path: Rc::new(cli.0.get_one::<PathBuf>("path").unwrap().to_path_buf()),
+            path: Arc::new(cli.0.get_one::<PathBuf>("path").unwrap().to_path_buf()),
             json: cli.0.get_flag("json"),
             repair: cli.0.get_flag("repair"),
             check: cli.0.get_flag("check"),
