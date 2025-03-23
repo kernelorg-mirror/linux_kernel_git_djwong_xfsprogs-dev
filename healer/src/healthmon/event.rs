@@ -5,7 +5,9 @@
  */
 use crate::display_for_enum;
 use crate::repair::Repair;
+use crate::weakhandle::WeakHandle;
 use crate::xfsprogs::M_;
+use std::path::PathBuf;
 use strum_macros::EnumString;
 
 /// Common behaviors of all health events
@@ -15,8 +17,9 @@ pub trait XfsHealthEvent {
         false
     }
 
-    /// Format this event as something we can display
-    fn format(&self) -> String;
+    /// Format this event as something we can display.  Returns an optional
+    /// pathname string, and the message.
+    fn format(&self, fh: &WeakHandle) -> (Option<PathBuf>, String);
 
     /// Generate the inputs to a kernel scrub ioctl
     fn schedule_repairs(&self) -> Vec<Repair> {
@@ -83,8 +86,8 @@ impl XfsHealthEvent for LostEvent {
         true
     }
 
-    fn format(&self) -> String {
-        format!("{} {}", self.count, M_("events lost"))
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (None, format!("{} {}", self.count, M_("events lost")))
     }
 }
 
@@ -92,8 +95,8 @@ impl XfsHealthEvent for LostEvent {
 pub struct RunningEvent {}
 
 impl XfsHealthEvent for RunningEvent {
-    fn format(&self) -> String {
-        M_("monitoring started")
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (None, M_("monitoring started"))
     }
 }
 
@@ -105,7 +108,7 @@ impl XfsHealthEvent for UnknownEvent {
         true
     }
 
-    fn format(&self) -> String {
-        M_("unrecognized event")
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (None, M_("unrecognized event"))
     }
 }
