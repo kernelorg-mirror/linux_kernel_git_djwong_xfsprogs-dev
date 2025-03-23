@@ -12,6 +12,10 @@ fi
 if test "${CXXFLAGS+set}" != "set"; then
 	CXXFLAGS="-g -O2 -std=gnu++11"
 fi
+if test "${CARGOFLAGS+set}" != "set"; then
+	CARGOFLAGS=""
+fi
+AC_SUBST(CARGOFLAGS)
 
 AC_PROG_INSTALL
 LT_INIT
@@ -114,6 +118,19 @@ AC_ARG_ENABLE(healer,
 [  --enable-healer=[yes/no]  Enable build of xfs_healer utility [default=yes]],,
 	enable_healer=yes)
 AC_SUBST(enable_healer)
+
+# Is this a release build?  Mostly important for cargo/rustc.
+AC_ARG_ENABLE(release,
+[  --enable-release=[yes/no] This is a release build [default=no]],,
+	enable_release=no)
+AC_SUBST(enable_release)
+
+# Should we check for Rust crates?  Distros that package crates themselves
+# and establish build dependencies on those packages can skip the checks.
+AC_ARG_ENABLE(crate-checks,
+[  --enable-crate-checks=[yes/no] Check for Rust crates [default=yes]],,
+	enable_crate_checks=yes)
+AC_SUBST(enable_crate_checks)
 
 #
 # If the user specified a libdir ending in lib64 do not append another
@@ -220,6 +237,34 @@ fi
 AC_MANUAL_FORMAT
 AC_HAVE_LIBURCU_ATOMIC64
 AC_USE_RADIX_TREE_FOR_INUMS
+
+# Check for a Rust compiler
+# XXX: I don't know how to cross compile Rust yet
+if test "$host" = "$build"; then
+	AC_HAVE_RUSTC
+fi
+
+# If we have rustc, check if LTO is supported (it should be)
+if test "$have_rustc" = "yes"; then
+	if test "$enable_lto" = "yes" || test "$enable_lto" = "probe"; then
+		AC_RUSTC_CHECK_LTO
+	fi
+fi
+if test "$enable_lto" = "yes" && test "$have_rustc_lto" != "yes"; then
+	AC_MSG_ERROR([LTO not supported by Rust compiler.])
+fi
+
+# If we still have rustc, check that we have cargo for crate management
+if test "$have_rustc" = "yes"; then
+	AC_HAVE_CARGO
+fi
+
+# If we have cargo, check that our crate dependencies are present
+if test "$have_cargo" = "yes"; then
+	AC_USE_DEBIAN_CRATES
+	AC_HAVE_CLIPPY
+	AC_HAVE_HEALER_CRATES
+fi
 
 AC_CONFIG_FILES([include/builddefs])
 AC_OUTPUT
