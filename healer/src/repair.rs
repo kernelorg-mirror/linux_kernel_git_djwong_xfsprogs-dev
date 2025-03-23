@@ -13,10 +13,23 @@ use crate::xfs_types::{XfsAgNumber, XfsFid, XfsRgNumber};
 use nix::ioctl_readwrite;
 use std::fmt::Display;
 use std::fmt::Formatter;
+use std::fs::File;
 use std::io::Result;
 use std::os::fd::AsRawFd;
 
 ioctl_readwrite!(xfs_ioc_scrub_metadata, 'X', 60, xfs_scrub_metadata);
+
+/// Determine if repairs are supported by this kernel
+pub fn is_supported(fp: &File) -> bool {
+    let mut detail = xfs_scrub_metadata {
+        sm_type: xfs_fs::XFS_SCRUB_TYPE_PROBE,
+        sm_flags: xfs_fs::XFS_SCRUB_IFLAG_REPAIR,
+        ..Default::default()
+    };
+
+    // SAFETY: Trusting the kernel not to corrupt memory.
+    unsafe { xfs_ioc_scrub_metadata(fp.as_raw_fd(), &mut detail).is_ok() }
+}
 
 /// Classification information for later reporting
 #[derive(Debug)]
