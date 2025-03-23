@@ -12,6 +12,7 @@ use xfs_healer::healthmon::cstruct::CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
 use xfs_healer::healthmon::json::JsonMonitor;
 use xfs_healer::printlogln;
+use xfs_healer::weakhandle::WeakHandle;
 use xfs_healer::xfsprogs;
 use xfs_healer::xfsprogs::M_;
 
@@ -97,6 +98,8 @@ impl App {
     /// Main app method
     fn main(&self) -> Result<ExitCode> {
         let fp = File::open(&self.path).with_context(|| M_("Opening filesystem failed"))?;
+        let _fh = WeakHandle::try_new(&fp, &self.path)
+            .with_context(|| M_("Configuring filesystem handle"))?;
 
         if self.json {
             let hmon = JsonMonitor::try_new(fp, &self.path, self.everything, self.debug)
