@@ -11,3 +11,4 @@ pub mod util;
 pub mod healthmon;
 pub mod weakhandle;
 pub mod repair;
+pub mod fsgeom;
