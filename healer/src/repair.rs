@@ -285,6 +285,19 @@ impl Repair {
         }
     }
 
+    /// Translate the target of this repair into a filesystem path
+    fn repair_path(&self, fh: &WeakHandle) -> String {
+        if let RepairGroup::File = self.group {
+            let fid: XfsFid = self.detail.into();
+
+            if let Some(path) = fh.path_for(fid) {
+                return path.display().to_string();
+            }
+        }
+
+        fh.mountpoint()
+    }
+
     /// Call the kernel to repair things
     fn repair(&mut self, fh: &WeakHandle) -> Result<bool> {
         let fp = fh
@@ -305,10 +318,15 @@ impl Repair {
     pub fn perform(&mut self, fh: &WeakHandle) {
         match self.repair(fh) {
             Err(e) => {
-                eprintln!("{}: {:#}", fh.mountpoint(), e);
+                eprintln!("{}: {:#}", self.repair_path(fh), e);
             }
             _ => {
-                printlogln!("{}: {}: {}", fh.mountpoint(), self.summary(), self.outcome);
+                printlogln!(
+                    "{}: {}: {}",
+                    self.repair_path(fh),
+                    self.summary(),
+                    self.outcome
+                );
             }
         };
     }
