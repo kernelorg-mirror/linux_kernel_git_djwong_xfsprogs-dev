@@ -5,3 +5,4 @@
  */
 
 pub mod xfsprogs;
+pub mod xfs_fs;
