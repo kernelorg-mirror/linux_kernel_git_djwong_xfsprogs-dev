@@ -131,6 +131,7 @@ src/xfsprogs.rs: src/xfsprogs.rs.in $(builddefs)
 	$(Q)$(SED) -e "s|@pkg_version@|$(PKG_VERSION)|g" \
 		   -e "s|@PACKAGE@|$(PKG_NAME)|g" \
 		   -e "s|@LOCALEDIR@|$(PKG_LOCALE_DIR)|g" \
+		   -e "s|@scrub_svcname@|$(XFS_SCRUB_SVCNAME)|g" \
 		   < $< > $@
 
 $(CARGO_MANIFEST): $(CARGO_MANIFEST).in $(builddefs)
