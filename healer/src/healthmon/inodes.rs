@@ -4,8 +4,10 @@
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
 use crate::display_for_enum;
+use crate::healthmon::event::schedule_repairs;
 use crate::healthmon::event::XfsHealthEvent;
 use crate::healthmon::event::XfsHealthStatus;
+use crate::repair::Repair;
 use crate::util::format_set;
 use crate::xfs_types::{XfsFid, XfsFileRange};
 use crate::xfsprogs::M_;
@@ -75,6 +77,10 @@ impl XfsHealthEvent for XfsInodeEvent {
             self.status
         )
     }
+
+    schedule_repairs!(XfsInodeEvent, |s: &XfsInodeEvent, sm_type| {
+        Repair::from_file(sm_type, s.fid)
+    });
 }
 
 /// File I/O types
