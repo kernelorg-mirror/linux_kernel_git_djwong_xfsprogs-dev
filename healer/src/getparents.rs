@@ -180,7 +180,7 @@ fn find_path_components(
     Some(false)
 }
 
-impl WeakHandle<'_> {
+impl WeakHandle {
     /// Return a path to the root for the given soft handle and ino/gen info,
     /// or None if errors occurred or we couldn't find the root.
     pub fn path_for(&self, fid: XfsFid) -> Option<PathBuf> {
