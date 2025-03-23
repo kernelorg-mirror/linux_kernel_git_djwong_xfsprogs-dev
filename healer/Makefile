@@ -31,6 +31,7 @@ XFS_HEALER_SVCNAME=xfs_healer@.service
 SYSTEMD_SERVICES = \
 	system-xfs_healer.slice \
 	$(XFS_HEALER_SVCNAME)
+SYSTEMD_PRESETS = 50-xfs_healer.preset
 endif # HAVE_SYSTEMD
 
 ifeq ($(HAVE_HEALER_START_DEPS),yes)
@@ -43,7 +44,7 @@ BUILD_TARGETS += xfs_healer_start
 SYSTEMD_SERVICES += xfs_healer_start.service
 endif # xfs_healer_start deps
 
-default: depend $(BUILD_TARGETS) $(SYSTEMD_SERVICES)
+default: depend $(BUILD_TARGETS) $(SYSTEMD_SERVICES) $(SYSTEMD_PRESETS)
 
 xfs_healer_start: $(SUBDIRS) xfs_healer_start.o $(LTDEPENDENCIES)
 	@echo "    [LD]     $@"
@@ -65,6 +66,8 @@ install-healer: default
 install-systemd: default
 	$(INSTALL) -m 755 -d $(SYSTEMD_SYSTEM_UNIT_DIR)
 	$(INSTALL) -m 644 $(SYSTEMD_SERVICES) $(SYSTEMD_SYSTEM_UNIT_DIR)
+	$(INSTALL) -m 755 -d $(SYSTEMD_SYSTEM_PRESET_DIR)
+	$(INSTALL) -m 644 $(SYSTEMD_PRESETS) $(SYSTEMD_SYSTEM_PRESET_DIR)
 
 install-dev:
 
