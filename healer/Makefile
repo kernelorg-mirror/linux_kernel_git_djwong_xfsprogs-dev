@@ -34,6 +34,7 @@ RUSTFILES = \
 	src/lib.rs \
 	src/main.rs \
 	src/util.rs \
+	src/weakhandle.rs \
 	src/xfs_fs.rs \
 	src/xfsprogs.rs \
 	src/xfs_types.rs \
