@@ -4,6 +4,7 @@
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
 pub const VERSION: &str = "@pkg_version@";
+pub const XFS_SCRUB_SVCNAME: &str = "@scrub_svcname@";
 
 /// Try to initialize a localization library.  Like the other xfsprogs utilities, we don't care
 /// if this fails.
