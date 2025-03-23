@@ -41,6 +41,7 @@ configure_options = \
 	--enable-lto \
 	--enable-release \
 	--with-system-crates \
+	--disable-crate-checks \
 	--localstatedir=/var
 
 options = export DEBUG=-DNDEBUG DISTRIBUTION=debian \
