@@ -17,6 +17,15 @@ CFLAGS = @CFLAGS@ -D_FILE_OFFSET_BITS=64 -D_TIME_BITS=64 -Wno-address-of-packed-
 CXXFLAGS = @CXXFLAGS@ -D_FILE_OFFSET_BITS=64 -D_TIME_BITS=64 -Wno-address-of-packed-member
 BUILD_CFLAGS = @BUILD_CFLAGS@ -D_FILE_OFFSET_BITS=64 -D_TIME_BITS=64
 
+ENABLE_RELEASE = @enable_release@
+HAVE_RUSTC = @have_rustc@
+HAVE_RUSTC_LTO = @have_rustc_lto@
+HAVE_CARGO = @have_cargo@
+HAVE_HEALER_CRATES = @have_healer_crates@
+CARGOFLAGS = @CARGOFLAGS@
+USE_SYSTEM_CRATES = @use_system_crates@
+HAVE_CLIPPY = @have_clippy@
+
 # make sure we don't pick up whacky LDFLAGS from the make environment and
 # only use what we calculate from the configured options above.
 LDFLAGS =
