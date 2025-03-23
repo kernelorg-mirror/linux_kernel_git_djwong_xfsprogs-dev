@@ -54,6 +54,12 @@ impl Cli {
                     .value_parser(value_parser!(PathBuf))
                     .required_unless_present("version"),
             )
+            .arg(
+                Arg::new("repair")
+                    .long("repair")
+                    .help(M_("Always repair corrupt metadata"))
+                    .action(ArgAction::SetTrue),
+            )
             .get_matches())
     }
 }
@@ -63,6 +69,7 @@ impl Cli {
 struct App {
     log: bool,
     everything: bool,
+    repair: bool,
     path: PathBuf,
 }
 
@@ -73,7 +80,7 @@ impl App {
     }
 
     /// Handle a health event that has been decoded into real objects
-    fn process_event(&self, cooked: Result<Box<dyn XfsHealthEvent>>) {
+    fn process_event(&self, fh: &WeakHandle, cooked: Result<Box<dyn XfsHealthEvent>>) {
         match cooked {
             Err(e) => {
                 eprintln!("{}: {:#}", self.path.display(), e)
@@ -82,6 +89,11 @@ impl App {
                 if self.log || event.must_log() {
                     printlogln!("{}{}", self.path.display(), event.format());
                 }
+                if self.repair {
+                    for mut repair in event.schedule_repairs() {
+                        repair.perform(fh)
+                    }
+                }
             }
         }
     }
@@ -89,14 +101,14 @@ impl App {
     /// Main app method
     fn main(&self) -> Result<ExitCode> {
         let fp = File::open(&self.path).with_context(|| M_("Opening filesystem failed"))?;
-        let _fh = WeakHandle::try_new(&fp, &self.path)
+        let fh = WeakHandle::try_new(&fp, &self.path)
             .with_context(|| M_("Configuring filesystem handle"))?;
 
         let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)
             .with_context(|| M_("Opening health monitor file"))?;
 
         for raw_event in hmon {
-            self.process_event(raw_event.cook());
+            self.process_event(&fh, raw_event.cook());
         }
 
         Ok(ExitCode::SUCCESS)
@@ -109,6 +121,7 @@ impl From<Cli> for App {
             log: cli.0.get_flag("log"),
             everything: cli.0.get_flag("everything"),
             path: cli.0.get_one::<PathBuf>("path").unwrap().to_path_buf(),
+            repair: cli.0.get_flag("repair"),
         }
     }
 }
