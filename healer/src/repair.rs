@@ -14,6 +14,7 @@ use crate::xfs_fs::xfs_scrub_metadata;
 use crate::xfs_types::{XfsAgNumber, XfsFid, XfsRgNumber};
 use crate::xfsprogs::M_;
 use nix::ioctl_readwrite;
+use std::fs::File;
 use std::io::Result;
 use std::os::fd::AsRawFd;
 
@@ -172,6 +173,18 @@ pub struct Repair {
 }
 
 impl Repair {
+    /// Determine if repairs are supported by this kernel
+    pub fn is_supported(fp: &File) -> bool {
+        let mut detail = xfs_scrub_metadata {
+            sm_type: xfs_fs::XFS_SCRUB_TYPE_PROBE,
+            sm_flags: xfs_fs::XFS_SCRUB_IFLAG_REPAIR,
+            ..Default::default()
+        };
+
+        // SAFETY: Trusting the kernel not to corrupt memory.
+        unsafe { xfs_ioc_scrub_metadata(fp.as_raw_fd(), &mut detail).is_ok() }
+    }
+
     /// Schedule a full-filesystem metadata repair
     pub fn from_whole_fs(t: XfsScrubType) -> Repair {
         Repair {
