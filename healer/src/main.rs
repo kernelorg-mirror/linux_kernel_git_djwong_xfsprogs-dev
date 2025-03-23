@@ -3,11 +3,13 @@
  * Copyright (C) 2025 Oracle.  All Rights Reserved.
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
-use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
+use clap::{value_parser, Arg, ArgAction, ArgGroup, ArgMatches, Command};
 use std::fs::File;
 use std::io::Result;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use xfs_healer::fsprops;
+use xfs_healer::fsprops::XfsAutofsck;
 use xfs_healer::healthmon::cstruct::CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
 use xfs_healer::healthmon::json::JsonMonitor;
@@ -75,6 +77,13 @@ impl Cli {
                     .help(M_("Check that health monitoring is supported"))
                     .action(ArgAction::SetTrue),
             )
+            .arg(
+                Arg::new("autofsck")
+                    .long("autofsck")
+                    .help(M_("Use the \"autofsck\" fs property to decide to repair"))
+                    .action(ArgAction::SetTrue),
+            )
+            .group(ArgGroup::new("decide_repair").args(["repair", "autofsck"]))
             .get_matches())
     }
 }
@@ -88,7 +97,22 @@ struct App {
     json: bool,
     repair: bool,
     check: bool,
+    autofsck: bool,
     path: PathBuf,
+}
+
+/// Outcome of checking if the kernel supports metadata repair
+enum CheckRepair {
+    ExitWith(ExitCode),
+    Downgrade,
+    Proceed,
+}
+
+/// Outcome of looking at the autofsck fsproperty to decide if we will repair metadata
+enum CheckAutofsck {
+    ExitWith(ExitCode),
+    Upgrade,
+    Proceed,
 }
 
 impl App {
@@ -121,14 +145,23 @@ impl App {
     }
 
     /// Complain if repairs won't be entirely effective.
-    fn check_repair(&self, fp: &File, fsgeom: &xfs_fsop_geom) -> Option<ExitCode> {
+    fn check_repair(&self, fp: &File, fsgeom: &xfs_fsop_geom) -> CheckRepair {
         if !Repair::is_supported(fp) {
+            if !self.autofsck {
+                printlogln!(
+                    "{}: {}",
+                    self.path.display(),
+                    M_("XFS online repair is not supported, exiting")
+                );
+                return CheckRepair::ExitWith(ExitCode::FAILURE);
+            }
+
             printlogln!(
                 "{}: {}",
                 self.path.display(),
-                M_("XFS online repair is not supported, exiting")
+                M_("XFS online repair is not supported, will report only")
             );
-            return Some(ExitCode::FAILURE);
+            return CheckRepair::Downgrade;
         }
 
         if !fsgeom.has_rmapbt() {
@@ -146,18 +179,59 @@ impl App {
             );
         }
 
-        None
+        CheckRepair::Proceed
+    }
+
+    /// Set the behavior of the program from the autofsck fs property.
+    fn check_autofsck(&self, fp: &File) -> CheckAutofsck {
+        match fsprops::get_autofsck(fp) {
+            XfsAutofsck::None => {
+                printlogln!(
+                    "{}: {}",
+                    self.path.display(),
+                    M_("Disabling healer per autofsck directive.")
+                );
+                return CheckAutofsck::ExitWith(ExitCode::SUCCESS);
+            }
+            XfsAutofsck::Check | XfsAutofsck::Optimize | XfsAutofsck::Unset => {
+                printlogln!(
+                    "{}: {}",
+                    self.path.display(),
+                    M_("Will not automatically heal per autofsck directive.")
+                );
+            }
+            XfsAutofsck::Repair => {
+                printlogln!(
+                    "{}: {}",
+                    self.path.display(),
+                    M_("Automatically healing per autofsck directive.")
+                );
+                return CheckAutofsck::Upgrade;
+            }
+        }
+        CheckAutofsck::Proceed
     }
 
     /// Main app method
-    fn main(&self) -> Result<ExitCode> {
+    fn main(&mut self) -> Result<ExitCode> {
         let fp = File::open(&self.path)?;
+
+        // Decide if we're going to enable repairs, which must come before check_repair.
+        if self.autofsck {
+            match self.check_autofsck(&fp) {
+                CheckAutofsck::ExitWith(ret) => return Ok(ret),
+                CheckAutofsck::Upgrade => self.repair = true,
+                CheckAutofsck::Proceed => {}
+            }
+        }
 
         // Make sure that we can initiate repairs
         let fsgeom = xfs_fsop_geom::try_from(&fp)?;
         if self.repair {
-            if let Some(ret) = self.check_repair(&fp, &fsgeom) {
-                return Ok(ret);
+            match self.check_repair(&fp, &fsgeom) {
+                CheckRepair::ExitWith(ret) => return Ok(ret),
+                CheckRepair::Downgrade => self.repair = false,
+                CheckRepair::Proceed => {}
             }
         }
 
@@ -200,6 +274,7 @@ impl From<Cli> for App {
             json: cli.0.get_flag("json"),
             repair: cli.0.get_flag("repair"),
             check: cli.0.get_flag("check"),
+            autofsck: cli.0.get_flag("autofsck"),
         }
     }
 }
@@ -217,7 +292,7 @@ fn main() -> ExitCode {
         printlogln!("args: {:?}", args);
     }
 
-    let app: App = args.into();
+    let mut app: App = args.into();
     match app.main() {
         Ok(f) => f,
         Err(e) => {
