@@ -21,7 +21,7 @@ use std::io::Result;
 use std::os::fd::AsRawFd;
 use std::os::raw::c_void;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
 
 ioctl_readwrite!(xfs_ioc_fd_to_handle, 'X', 106, xfs_fsop_handlereq);
 
@@ -74,7 +74,7 @@ impl TryFrom<&File> for xfs_handle {
 /// Filesystem handle that can be disconnected from any open files
 pub struct WeakHandle {
     /// path to the filesystem mountpoint
-    mountpoint: Rc<PathBuf>,
+    mountpoint: Arc<PathBuf>,
 
     /// Filesystem handle
     handle: xfs_handle,
@@ -109,7 +109,7 @@ impl WeakHandle {
     /// Create a soft handle from an open file descriptor and its mount point
     pub fn try_new(
         fp: &File,
-        mountpoint: Rc<PathBuf>,
+        mountpoint: Arc<PathBuf>,
         fsgeom: xfs_fsop_geom,
     ) -> Result<WeakHandle> {
         Ok(WeakHandle {
