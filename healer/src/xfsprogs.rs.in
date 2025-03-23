@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+/*
+ * Copyright (C) 2025 Oracle.  All Rights Reserved.
+ * Author: Darrick J. Wong <djwong@kernel.org>
+ */
+pub const VERSION: &str = "@pkg_version@";
+
+/// Dummy function to simulate looking up a string in a message catalog
+#[allow(non_snake_case)]
+pub fn M_<T: Into<String>>(msgid: T) -> String {
+    msgid.into()
+}
