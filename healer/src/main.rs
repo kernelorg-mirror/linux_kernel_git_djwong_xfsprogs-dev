@@ -11,7 +11,9 @@ use std::process::ExitCode;
 use xfs_healer::healthmon::cstruct::CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
 use xfs_healer::printlogln;
+use xfs_healer::repair::Repair;
 use xfs_healer::weakhandle::WeakHandle;
+use xfs_healer::xfs_fs::xfs_fsop_geom;
 use xfs_healer::xfsprogs;
 use xfs_healer::xfsprogs::M_;
 
@@ -98,9 +100,48 @@ impl App {
         }
     }
 
+    /// Complain if repairs won't be entirely effective.
+    fn check_repair(&self, fp: &File, fsgeom: &xfs_fsop_geom) -> Option<ExitCode> {
+        if !Repair::is_supported(fp) {
+            printlogln!(
+                "{}: {}",
+                self.path.display(),
+                M_("XFS online repair is not supported, exiting")
+            );
+            return Some(ExitCode::FAILURE);
+        }
+
+        if !fsgeom.has_rmapbt() {
+            printlogln!(
+                "{}: {}",
+                self.path.display(),
+                M_("XFS online repair is less effective without rmap btrees")
+            );
+        }
+        if !fsgeom.has_parent() {
+            printlogln!(
+                "{}: {}",
+                self.path.display(),
+                M_("XFS online repair is less effective without parent pointers")
+            );
+        }
+
+        None
+    }
+
     /// Main app method
     fn main(&self) -> Result<ExitCode> {
         let fp = File::open(&self.path).with_context(|| M_("Opening filesystem failed"))?;
+
+        // Make sure that we can initiate repairs
+        let fsgeom =
+            xfs_fsop_geom::try_from(&fp).with_context(|| M_("Querying filesystem geometry"))?;
+        if self.repair {
+            if let Some(ret) = self.check_repair(&fp, &fsgeom) {
+                return Ok(ret);
+            }
+        }
+
         let fh = WeakHandle::try_new(&fp, &self.path)
             .with_context(|| M_("Configuring filesystem handle"))?;
 
