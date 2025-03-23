@@ -25,6 +25,9 @@ enumset = { version = "1.0.12" }
 # break.  Ref:
 # https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html
 nix = { version = "0", features = ["ioctl"] }	# 0.26.1
+libc = { version = "0" }			# 0.2.139
+strum = { version = "0" }			# 0.19.2
+strum_macros = { version = "0" }		# 0.19.2
 
 # Dynamically comment out all the gettextrs related dependency information in
 # Cargo.toml becuse cargo requires the crate to be present so that it can
