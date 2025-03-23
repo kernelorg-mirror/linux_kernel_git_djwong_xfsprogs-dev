@@ -11,6 +11,7 @@ use std::process::ExitCode;
 use xfs_healer::healthmon::cstruct::CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
 use xfs_healer::healthmon::json::JsonMonitor;
+use xfs_healer::weakhandle::WeakHandle;
 use xfs_healer::xfsprogs;
 
 // The struct below is a magic struct that implements argument parsing.
@@ -75,6 +76,7 @@ impl App {
     /// Main app method
     fn main(&self) -> Result<ExitCode> {
         let fp = File::open(&self.path)?;
+        let _fh = WeakHandle::try_new(&fp, &self.path)?;
 
         if self.json {
             let hmon = JsonMonitor::try_new(fp, &self.path, self.everything, self.debug)?;
