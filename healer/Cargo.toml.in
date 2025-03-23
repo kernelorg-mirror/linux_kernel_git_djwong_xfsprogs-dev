@@ -18,6 +18,7 @@ clap = { version = "4.0.32", features = ["derive"] }
 anyhow = { version = "1.0.69" }
 enumset = { version = "1.0.12" }
 serde_json = { version = "1.0.87" }
+threadpool = { version = "1.8.1" }
 
 # XXX: Crates with major version 0 are not considered ABI-stable, so the minor
 # version is treated as if it were the major version.  This creates problems
