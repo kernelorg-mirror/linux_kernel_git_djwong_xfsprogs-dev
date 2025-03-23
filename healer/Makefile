@@ -35,6 +35,7 @@ HFILES = \
 
 RUSTFILES = \
 	src/fsgeom.rs \
+	src/fsprops.rs \
 	src/getparents.rs \
 	src/lib.rs \
 	src/main.rs \
