@@ -25,6 +25,9 @@ HAVE_HEALER_CRATES = @have_healer_crates@
 CARGOFLAGS = @CARGOFLAGS@
 USE_SYSTEM_CRATES = @use_system_crates@
 HAVE_CLIPPY = @have_clippy@
+HAVE_CLANG = @have_clang@
+HAVE_RUSTFMT = @have_rustfmt@
+HAVE_BINDGEN = @have_bindgen@
 
 # make sure we don't pick up whacky LDFLAGS from the make environment and
 # only use what we calculate from the configured options above.
