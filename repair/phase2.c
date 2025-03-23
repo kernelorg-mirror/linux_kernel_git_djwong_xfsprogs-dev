@@ -251,8 +251,8 @@ set_reflink(
 		exit(0);
 	}
 
-	if (xfs_has_realtime(mp)) {
-		printf(_("Reflink feature not supported with realtime.\n"));
+	if (xfs_has_realtime(mp) && !xfs_has_rtgroups(mp)) {
+		printf(_("Reference count btree requires realtime groups.\n"));
 		exit(0);
 	}
 
@@ -264,6 +264,7 @@ set_reflink(
 	printf(_("Adding reflink support to filesystem.\n"));
 	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_REFLINK;
 	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+
 	return true;
 }
 
@@ -508,6 +509,28 @@ compute_rtrmap_reservation(
 	return ret;
 }
 
+/*
+ * Compute the amount of extra space needed for further rtrefcount btree
+ * expansion.  If we're adding rtrefcount to a filesystem then there won't be
+ * an rtrefcount inode and we'll return the full reservation charge.  If
+ * there's already an rtrefcount inode, then subtract the ondisk space usage
+ * because that's not reserved.
+ */
+static xfs_rfsblock_t
+compute_rtrefcount_reservation(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg_mount(rtg);
+	xfs_rfsblock_t		ret = libxfs_rtrefcountbt_calc_reserves(mp);
+
+	if (!xfs_has_rtreflink(mp))
+		return 0;
+
+	if (rtg_refcount(rtg))
+		ret -= min(ret, rtg_refcount(rtg)->i_nblocks);
+	return ret;
+}
+
 static void
 check_fs_free_space(
 	struct xfs_mount		*mp,
@@ -595,6 +618,7 @@ check_fs_free_space(
 	/* Realtime metadata btree inodes */
 	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
 		new_resv += compute_rtrmap_reservation(rtg);
+		new_resv += compute_rtrefcount_reservation(rtg);
 	}
 
 	if (new_resv > mp->m_sb.sb_fdblocks) {
