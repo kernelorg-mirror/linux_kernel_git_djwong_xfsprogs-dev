@@ -84,6 +84,7 @@ pub enum XfsFileIoErrorType {
     Writeback,
     DirectioRead,
     DirectioWrite,
+    DataLost,
 }
 
 display_for_enum!(XfsFileIoErrorType, {
@@ -91,6 +92,7 @@ display_for_enum!(XfsFileIoErrorType, {
     Writeback     => M_("writeback"),
     DirectioRead  => M_("directio_read"),
     DirectioWrite => M_("directio_write"),
+    DataLost      => M_("storage"),
 });
 
 /// XFS file I/O error event
