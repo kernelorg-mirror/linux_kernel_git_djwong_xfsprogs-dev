@@ -251,8 +251,8 @@ set_reflink(
 		exit(0);
 	}
 
-	if (xfs_has_realtime(mp)) {
-		printf(_("Reflink feature not supported with realtime.\n"));
+	if (xfs_has_realtime(mp) && !xfs_has_rtgroups(mp)) {
+		printf(_("Reference count btree requires realtime groups.\n"));
 		exit(0);
 	}
 
@@ -264,6 +264,7 @@ set_reflink(
 	printf(_("Adding reflink support to filesystem.\n"));
 	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_REFLINK;
 	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+
 	return true;
 }
 
@@ -505,6 +506,25 @@ reserve_new_rtrmap_inode(
 	return libxfs_rtrmapbt_calc_reserves(mp);
 }
 
+/*
+ * Reserve space to handle rt refcount btree expansion for a new refcountbt
+ * inode.
+ *
+ * If rtreflink is enabled but the rtrefcount inode doesn't exist, return the
+ * amount of space needed to handle a new maximally sized rtrefcount btree.
+ */
+static xfs_rfsblock_t
+reserve_new_rtrefcount_inode(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg_mount(rtg);
+
+	if (!xfs_has_rtreflink(mp) || rtg_refcount(rtg) != NULL)
+		return 0;
+
+	return libxfs_rtrefcountbt_calc_reserves(mp);
+}
+
 static void
 check_fs_free_space(
 	struct xfs_mount		*mp,
@@ -592,6 +612,7 @@ check_fs_free_space(
 	/* Realtime metadata btree inodes */
 	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
 		new_resv += reserve_new_rtrmap_inode(rtg);
+		new_resv += reserve_new_rtrefcount_inode(rtg);
 	}
 
 	error = -libxfs_metafile_resv_init(mp);
