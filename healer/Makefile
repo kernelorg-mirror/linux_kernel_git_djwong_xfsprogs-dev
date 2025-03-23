@@ -6,8 +6,54 @@ TOPDIR = ..
 builddefs=$(TOPDIR)/include/builddefs
 include $(builddefs)
 
+# Python implementation
 XFS_HEALER_PROG = xfs_healer.py
 INSTALL_HEALER = install-healer
+
+# Rust implementation
+ifeq ($(HAVE_HEALER_CRATES),yes)
+
+RUSTFILES = \
+	src/lib.rs \
+	src/main.rs \
+	src/xfsprogs.rs
+
+BUILT_RUSTFILES = \
+	src/xfsprogs.rs
+
+CARGO_MANIFEST=Cargo.toml
+CARGO_CONFIG=.cargo/config.toml
+
+XFS_HEALER_RUST += bin/xfs_healer
+INSTALL_HEALER += install-rust-healer
+CLEAN_HEALER += clean-rust-healer
+
+ifeq ($(HAVE_CLIPPY),yes)
+	CLIPPY=$(Q)cargo clippy
+else
+	CLIPPY=@true
+endif
+
+ifeq ($(ENABLE_RELEASE),yes)
+	CARGO_CLIPPY_FLAGS=--no-deps
+	CARGO_BUILD_FLAGS=--release
+	CARGO_INSTALL_FLAGS=
+else
+	CARGO_CLIPPY_FLAGS=--no-deps
+	CARGO_BUILD_FLAGS=
+	CARGO_INSTALL_FLAGS=--debug
+endif
+
+# Assume that if rustc supports LTO then cargo knows how to configure it.
+# rustc and cargo support LTO as of Rust-2021.
+ifeq ($(HAVE_RUSTC_LTO),yes)
+	CARGO_LTO=true
+else
+	CARGO_LTO=false
+endif
+
+RUST_DIRT=$(CARGO_MANIFEST) $(CARGO_CONFIG) $(XFS_HEALER_RUST) $(BUILT_RUSTFILES)
+endif # HAVE_HEALER_CRATES
 
 ifeq ($(HAVE_SYSTEMD),yes)
 INSTALL_HEALER += install-systemd
@@ -24,9 +70,14 @@ ifeq ($(HAVE_UDEV),yes)
 endif
 endif
 
-LDIRT = $(XFS_HEALER_PROG)
+LDIRT = $(XFS_HEALER_PROG) $(RUST_DIRT)
 
-default: $(XFS_HEALER_PROG) $(SYSTEMD_SERVICES) $(UDEV_RULES) $(XFS_HEALER_HELPER)
+default: $(XFS_HEALER_PROG) $(XFS_HEALER_RUST) $(SYSTEMD_SERVICES) $(UDEV_RULES) $(XFS_HEALER_HELPER)
+
+clean: $(CLEAN_HEALER)
+
+clean-rust-healer:
+	-cargo clean
 
 $(XFS_HEALER_PROG): $(XFS_HEALER_PROG).in $(builddefs) $(TOPDIR)/libfrog/gettext.py
 	@echo "    [SED]    $@"
@@ -42,6 +93,41 @@ $(XFS_HEALER_PROG): $(XFS_HEALER_PROG).in $(builddefs) $(TOPDIR)/libfrog/gettext
 	@echo "    [SED]    $@"
 	$(Q)$(SED) -e "s|@pkg_libexec_dir@|$(PKG_LIBEXEC_DIR)|g" \
 		   < $< > $@
+
+src/xfsprogs.rs: src/xfsprogs.rs.in $(builddefs)
+	@echo "    [SED]    $@"
+	$(Q)$(SED) -e "s|@pkg_version@|$(PKG_VERSION)|g" \
+		   < $< > $@
+
+$(CARGO_MANIFEST): $(CARGO_MANIFEST).in $(builddefs)
+	@echo "    [TOML]   $@"
+	$(Q)$(SED) -e "s|@pkg_version@|$(PKG_VERSION)|g" \
+		   -e "s|@cargo_lto@|$(CARGO_LTO)|g" \
+		   < $< | sed -e 's|\~WIP.*|"|g' > $@
+
+ifeq ($(USE_SYSTEM_CRATES),yes)
+$(CARGO_CONFIG): $(CARGO_CONFIG).system
+	@echo "    [TOML]   $@"
+	$(Q)cp $< $@
+else
+$(CARGO_CONFIG):
+	touch $@
+endif
+
+docs:
+	@echo "    [CARGO]  doc $@"
+	$(Q)cargo doc --no-deps
+
+# cargo install only knows how to build a binary and install it to $root/bin,
+# so we install it to ./rust/bin/ and let the install-rust target move it to
+# $prefix/usr/libexec/xfsprogs like we want.
+$(XFS_HEALER_RUST): $(RUSTFILES) $(CARGO_MANIFEST) $(CARGO_CONFIG)
+	@echo "    [CARGO]  clippy $@ $(CARGO_CLIPPY_FLAGS)"
+	$(CLIPPY) $(CARGO_CLIPPY_FLAGS)
+	@echo "    [CARGO]  build $@ $(CARGO_BUILD_FLAGS)"
+	$(Q)cargo build $(CARGOFLAGS) $(CARGO_BUILD_FLAGS)
+	@echo "    [CARGO]  install $@ $(CARGO_INSTALL_FLAGS)"
+	$(Q)cargo install --path . --root . $(CARGOFLAGS) $(CARGO_INSTALL_FLAGS) &>/dev/null
 
 include $(BUILDRULES)
 
@@ -62,6 +148,12 @@ install-udev: default
 	for i in $(UDEV_RULES); do \
 		$(INSTALL) -m 644 $$i $(UDEV_RULE_DIR)/64-$$i; \
 	done
+
+# Leave the python version in the installed system for now
+install-rust-healer: default install-healer
+	$(INSTALL) -m 755 -d $(PKG_LIBEXEC_DIR)
+	$(INSTALL) -m 755 $(XFS_HEALER_PROG) $(PKG_LIBEXEC_DIR)
+	$(INSTALL) -m 755 $(XFS_HEALER_RUST) $(PKG_LIBEXEC_DIR)
 
 install-dev:
 
