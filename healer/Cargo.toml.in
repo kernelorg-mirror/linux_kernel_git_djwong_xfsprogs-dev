@@ -1,0 +1,15 @@
+[package]
+name = "xfs_healer"
+version = "@pkg_version@"
+edition = "2021"
+
+[profile.dev]
+lto = @cargo_lto@
+
+[profile.release]
+lto = @cargo_lto@
+
+# Be sure to update AC_HAVE_HEALER_CRATES if you update the dependency list.
+[dependencies]
+clap = { version = "4.0.32", features = ["derive"] }
+anyhow = { version = "1.0.69" }
