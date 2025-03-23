@@ -47,6 +47,7 @@ enum o_opt_nums {
 	BLOAD_NODE_SLACK,
 	NOQUOTA,
 	SKIP_FREESP_CHECK,
+	ALLOW_RMAPBT_UPGRADE_WITH_REFLINK,
 	O_MAX_OPTS,
 };
 
@@ -61,6 +62,7 @@ static char *o_opts[] = {
 	[BLOAD_NODE_SLACK]	= "debug_bload_node_slack",
 	[NOQUOTA]		= "noquota",
 	[SKIP_FREESP_CHECK]	= "debug_skip_freesp_check_on_upgrade",
+	[ALLOW_RMAPBT_UPGRADE_WITH_REFLINK] = "debug_allow_rmapbt_upgrade_with_reflink",
 	[O_MAX_OPTS]		= NULL,
 };
 
@@ -333,6 +335,15 @@ process_args(int argc, char **argv)
 					if (skip_freesp_check_on_upgrade)
 						do_log(
 		_("WARNING: Allowing filesystem upgrades to proceed without free space check.  THIS MAY DESTROY YOUR FILESYSTEM!!!\n"));
+					break;
+				case ALLOW_RMAPBT_UPGRADE_WITH_REFLINK:
+					if (!val)
+						do_abort(
+		_("-o debug_allow_rmapbt_upgrade_with_reflink requires a parameter\n"));
+					allow_rmapbt_upgrade_with_reflink = (int)strtol(val, NULL, 0);
+					if (allow_rmapbt_upgrade_with_reflink)
+						do_log(
+		_("WARNING: Allowing filesystem upgrade to rmapbt when reflink enabled.  THIS MAY DESTROY YOUR FILESYSTEM!!!\n"));
 					break;
 				default:
 					unknown('o', val);
