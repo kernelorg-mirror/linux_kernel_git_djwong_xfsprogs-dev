@@ -6,6 +6,7 @@
 use crate::xfs_fs::xfs_health_monitor;
 use nix::ioctl_write_ptr;
 
+pub mod cstruct;
 pub mod event;
 pub mod fs;
 pub mod groups;
