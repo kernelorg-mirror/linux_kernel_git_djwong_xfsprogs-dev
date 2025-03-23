@@ -8,6 +8,8 @@ use std::fs::File;
 use std::io::Result;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use xfs_healer::fsprops;
+use xfs_healer::fsprops::XfsAutofsck;
 use xfs_healer::healthmon::cstruct::CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
 use xfs_healer::healthmon::json::JsonMonitor;
@@ -49,6 +51,10 @@ struct Cli {
     #[arg(long)]
     check: bool,
 
+    /// Decide what to do using the autofsck fs property
+    #[arg(long)]
+    autofsck: bool,
+
     /// XFS filesystem mountpoint to monitor
     path: PathBuf,
 }
@@ -62,6 +68,7 @@ struct App {
     json: bool,
     repair: bool,
     check: bool,
+    autofsck: bool,
     path: PathBuf,
 }
 
@@ -120,8 +127,36 @@ impl App {
         None
     }
 
+    /// Set the behavior of the program from the autofsck fs property.
+    /// Returns a u32 if we should exit the program.
+    fn set_autofsck(&mut self, fp: &File) -> Option<ExitCode> {
+        match fsprops::get_autofsck(fp) {
+            XfsAutofsck::None => {
+                println!(
+                    "{}: Disabling healer per autofsck directive.",
+                    self.path.display()
+                );
+                return Some(ExitCode::SUCCESS);
+            }
+            XfsAutofsck::Check | XfsAutofsck::Optimize | XfsAutofsck::Unset => {
+                println!(
+                    "{}: Will not automatically heal per autofsck directive.",
+                    self.path.display()
+                );
+            }
+            XfsAutofsck::Repair => {
+                println!(
+                    "{}: Automatically healing per autofsck directive.",
+                    self.path.display()
+                );
+                self.repair = true;
+            }
+        }
+        None
+    }
+
     /// Main app method
-    fn main(&self) -> Result<ExitCode> {
+    fn main(&mut self) -> Result<ExitCode> {
         let fp = File::open(&self.path)?;
 
         if self.check {
@@ -130,6 +165,13 @@ impl App {
             } else {
                 ExitCode::FAILURE
             });
+        }
+
+        // Decide if we're going to enable repairs, which must come before check_repair.
+        if self.autofsck {
+            if let Some(ret) = self.set_autofsck(&fp) {
+                return Ok(ret);
+            }
         }
 
         let fsgeom = xfs_fsop_geom::try_from(&fp)?;
@@ -167,6 +209,7 @@ impl From<Cli> for App {
             json: cli.json,
             repair: cli.repair,
             check: cli.check,
+            autofsck: cli.autofsck,
             path: cli.path,
         }
     }
@@ -185,7 +228,7 @@ fn main() -> ExitCode {
         println!("args: {:?}", args);
     }
 
-    let app: App = args.into();
+    let mut app: App = args.into();
 
     match app.main() {
         Ok(f) => f,
