@@ -8,6 +8,8 @@ use std::fs::File;
 use std::io::Result;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use xfs_healer::healthmon::cstruct::CStructMonitor;
+use xfs_healer::healthmon::event::XfsHealthEvent;
 use xfs_healer::xfsprogs;
 
 // The struct below is a magic struct that implements argument parsing.
@@ -50,9 +52,29 @@ impl App {
         self.path.display().to_string()
     }
 
+    /// Handle a health event that has been decoded into real objects
+    fn process_event(&self, cooked: Result<Box<dyn XfsHealthEvent>>) {
+        match cooked {
+            Err(e) => {
+                eprintln!("{}: {}", self.path.display(), e)
+            }
+            Ok(event) => {
+                if self.log || event.must_log() {
+                    println!("{}: {}", self.path.display(), event.format());
+                }
+            }
+        }
+    }
+
     /// Main app method
     fn main(&self) -> Result<ExitCode> {
-        let _fp = File::open(&self.path)?;
+        let fp = File::open(&self.path)?;
+
+        let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)?;
+
+        for raw_event in hmon {
+            self.process_event(raw_event.cook());
+        }
 
         Ok(ExitCode::SUCCESS)
     }
