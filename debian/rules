@@ -40,6 +40,7 @@ configure_options = \
 	--disable-threadsan \
 	--enable-lto \
 	--enable-release \
+	--disable-crate-checks \
 	--localstatedir=/var
 
 options = export DEBUG=-DNDEBUG DISTRIBUTION=debian \
