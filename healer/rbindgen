@@ -1,0 +1,57 @@
+#!/bin/bash
+
+# SPDX-License-Identifier: GPL-2.0
+# Copyright (c) 2025 Oracle.  All Rights Reserved.
+
+# Wrap bindgen so that it gives us what we want
+
+input="$1"
+shift
+output="$1"
+shift
+
+if [ -z "$1" ] || [ -z "${input}" ] || [ -z "${output}" ] || [ "$1" = "--help" ]; then
+	echo "Usage: $0 src dest"
+	exit 1
+fi
+
+bindgen_args=("${input}" -o "${output}")
+
+# Try to generate inline functions
+bindgen_args+=(--generate-inline-functions)
+
+# Implement Debug on all generated structures so we can debug C FFI issues
+bindgen_args+=(--impl-debug)
+
+# Implement PartialEq when possible so that we can compare file handles
+bindgen_args+=(--with-derive-partialeq)
+
+# Implement Default when possible so that we can zero-init things
+bindgen_args+=(--with-derive-default)
+
+# Don't complain about unsafe code and improperly cased typenames being wrong
+# in this file, we want the C versions as-is
+bindgen_args+=(--raw-line '#![allow(non_camel_case_types)]')
+bindgen_args+=(--raw-line '#![allow(non_snake_case)]')
+bindgen_args+=(--raw-line '#![allow(non_upper_case_globals)]')
+
+# aarch64 libc defines va_args as an opaque u64 array which causes rustc to
+# complain about passing arrays by reference.  We don't call out to va_args
+# functions from Rust, so this is irrelevant.
+bindgen_args+=(--raw-line '#![allow(improper_ctypes)]')
+
+# Don't complain about unsafe code missing safety docs because we implicitly
+# trust the C programmers
+bindgen_args+=(--raw-line '#![allow(clippy::missing_safety_doc)]')
+
+# Older versions of bindgen (e.g. 0.60) required us to request promotion of
+# size_t to usize.  This seems to be the default as of 0.69, so force it here.
+if bindgen --help | grep -q -w -- '--size_t-is-usize'; then
+	bindgen_args+=(--size_t-is-usize)
+fi
+
+# Include xfsprogs C headers; if bindgen can't find stddef.h then you need to
+# install clang
+clang_args=(-I ../include/ -I ../libxfs/ -I ../)
+
+exec bindgen "${bindgen_args[@]}" -- "${clang_args[@]}"
