@@ -8,6 +8,8 @@ use clap::{value_parser, Arg, ArgAction, ArgMatches, Command};
 use std::fs::File;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use xfs_healer::healthmon::cstruct::CStructMonitor;
+use xfs_healer::healthmon::event::XfsHealthEvent;
 use xfs_healer::printlogln;
 use xfs_healer::xfsprogs;
 use xfs_healer::xfsprogs::M_;
@@ -70,9 +72,30 @@ impl App {
         self.path.display().to_string()
     }
 
+    /// Handle a health event that has been decoded into real objects
+    fn process_event(&self, cooked: Result<Box<dyn XfsHealthEvent>>) {
+        match cooked {
+            Err(e) => {
+                eprintln!("{}: {:#}", self.path.display(), e)
+            }
+            Ok(event) => {
+                if self.log || event.must_log() {
+                    printlogln!("{}{}", self.path.display(), event.format());
+                }
+            }
+        }
+    }
+
     /// Main app method
     fn main(&self) -> Result<ExitCode> {
-        let _fp = File::open(&self.path).with_context(|| M_("Opening filesystem failed"))?;
+        let fp = File::open(&self.path).with_context(|| M_("Opening filesystem failed"))?;
+
+        let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)
+            .with_context(|| M_("Opening health monitor file"))?;
+
+        for raw_event in hmon {
+            self.process_event(raw_event.cook());
+        }
 
         Ok(ExitCode::SUCCESS)
     }

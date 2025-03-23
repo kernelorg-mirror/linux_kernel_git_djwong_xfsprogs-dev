@@ -40,6 +40,7 @@ RUSTFILES = \
 	src/xfs_fs.rs \
 	src/xfsprogs.rs \
 	src/xfs_types.rs \
+	src/healthmon/cstruct.rs \
 	src/healthmon/event.rs \
 	src/healthmon/fs.rs \
 	src/healthmon/groups.rs \
