@@ -8,9 +8,11 @@ use crate::healthmon::event::XfsHealthEvent;
 use crate::healthmon::event::XfsHealthStatus;
 use crate::repair::Repair;
 use crate::util::format_set;
+use crate::weakhandle::WeakHandle;
 use crate::xfs_types::XfsPhysRange;
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use std::path::PathBuf;
 use strum_macros::EnumString;
 
 /// Metadata types for an XFS whole-fs metadata
@@ -45,8 +47,11 @@ impl XfsWholeFsEvent {
 }
 
 impl XfsHealthEvent for XfsWholeFsEvent {
-    fn format(&self) -> String {
-        format!("{} status {}", format_set(self.metadata), self.status)
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (
+            None,
+            format!("{} status {}", format_set(self.metadata), self.status),
+        )
     }
 
     schedule_repairs!(XfsWholeFsEvent, |_: &XfsWholeFsEvent, sm_type| {
@@ -95,8 +100,11 @@ impl XfsHealthEvent for XfsShutdownEvent {
         true
     }
 
-    fn format(&self) -> String {
-        format!("filesystem shut down due to {}", format_set(self.reasons))
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (
+            None,
+            format!("filesystem shut down due to {}", format_set(self.reasons))
+        )
     }
 }
 
@@ -108,8 +116,8 @@ impl XfsHealthEvent for XfsUnmountEvent {
         true
     }
 
-    fn format(&self) -> String {
-        "filesystem unmounted".to_string()
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (None, "filesystem unmounted".to_string())
     }
 }
 
@@ -128,7 +136,7 @@ impl XfsMediaErrorEvent {
 }
 
 impl XfsHealthEvent for XfsMediaErrorEvent {
-    fn format(&self) -> String {
-        format!("media error on {}", self.range)
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (None, format!("media error on {}", self.range))
     }
 }

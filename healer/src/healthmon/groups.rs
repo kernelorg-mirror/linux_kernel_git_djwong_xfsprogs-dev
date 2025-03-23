@@ -8,9 +8,11 @@ use crate::healthmon::event::XfsHealthEvent;
 use crate::healthmon::event::XfsHealthStatus;
 use crate::repair::Repair;
 use crate::util::format_set;
+use crate::weakhandle::WeakHandle;
 use crate::xfs_types::{XfsAgNumber, XfsRgNumber};
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use std::path::PathBuf;
 use strum_macros::EnumString;
 
 /// Metadata types for an allocation group on the data device
@@ -59,12 +61,15 @@ impl XfsPeragEvent {
 }
 
 impl XfsHealthEvent for XfsPeragEvent {
-    fn format(&self) -> String {
-        format!(
-            "{} {} {}",
-            self.group,
-            format_set(self.metadata),
-            self.status
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (
+            None,
+            format!(
+                "{} {} {}",
+                self.group,
+                format_set(self.metadata),
+                self.status
+            ),
         )
     }
 
@@ -113,12 +118,15 @@ impl XfsRtgroupEvent {
 }
 
 impl XfsHealthEvent for XfsRtgroupEvent {
-    fn format(&self) -> String {
-        format!(
-            "{} {} {}",
-            self.group,
-            format_set(self.metadata),
-            self.status
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (
+            None,
+            format!(
+                "{} {} {}",
+                self.group,
+                format_set(self.metadata),
+                self.status
+            ),
         )
     }
 
