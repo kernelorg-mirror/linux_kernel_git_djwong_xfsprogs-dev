@@ -107,6 +107,8 @@ INSTALL_HEALER += install-systemd
 SYSTEMD_SERVICES=\
 	system-xfs_healer.slice \
 	xfs_healer@.service
+SYSTEMD_PRESETS=\
+	50-xfs_healer.preset
 OPTIONAL_TARGETS += $(SYSTEMD_SERVICES)
 
 ifeq ($(HAVE_UDEV),yes)
@@ -119,7 +121,7 @@ endif
 
 LDIRT = $(RUST_DIRT)
 
-default: depend $(LTCOMMAND) $(SYSTEMD_SERVICES) $(UDEV_RULES) $(XFS_HEALER_HELPER) $(XFS_HEALER_RUST)
+default: depend $(LTCOMMAND) $(SYSTEMD_SERVICES) $(UDEV_RULES) $(XFS_HEALER_HELPER) $(XFS_HEALER_RUST) $(SYSTEMD_PRESETS)
 
 clean: $(CLEAN_HEALER)
 
@@ -190,6 +192,8 @@ install-healer: default
 install-systemd: default
 	$(INSTALL) -m 755 -d $(SYSTEMD_SYSTEM_UNIT_DIR)
 	$(INSTALL) -m 644 $(SYSTEMD_SERVICES) $(SYSTEMD_SYSTEM_UNIT_DIR)
+	$(INSTALL) -m 755 -d $(SYSTEMD_SYSTEM_PRESET_DIR)
+	$(INSTALL) -m 644 $(SYSTEMD_PRESETS) $(SYSTEMD_SYSTEM_PRESET_DIR)
 
 install-udev: default
 	$(INSTALL) -m 755 -d $(UDEV_DIR)
