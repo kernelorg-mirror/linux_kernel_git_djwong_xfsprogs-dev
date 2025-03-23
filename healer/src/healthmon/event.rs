@@ -22,7 +22,7 @@ pub trait XfsHealthEvent {
     fn format(&self, fh: &WeakHandle) -> (Option<PathBuf>, String);
 
     /// Generate the inputs to a kernel scrub ioctl
-    fn schedule_repairs(&self) -> Vec<Repair> {
+    fn schedule_repairs(&self, _everything: bool) -> Vec<Repair> {
         vec![]
     }
 }
@@ -32,7 +32,7 @@ pub trait XfsHealthEvent {
 #[macro_export]
 macro_rules! schedule_repairs {
     ($event_type:ty , $lambda: expr ) => {
-        fn schedule_repairs(&self) -> Vec<$crate::repair::Repair> {
+        fn schedule_repairs(&self, _: bool) -> Vec<$crate::repair::Repair> {
             if self.status != $crate::healthmon::event::XfsHealthStatus::Sick {
                 return vec![];
             }
@@ -88,6 +88,14 @@ impl XfsHealthEvent for LostEvent {
 
     fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
         (None, format!("{} {}", self.count, M_("events lost")))
+    }
+
+    fn schedule_repairs(&self, everything: bool) -> Vec<Repair> {
+        if everything {
+            vec![]
+        } else {
+            vec![Repair::full_repair()]
+        }
     }
 }
 
