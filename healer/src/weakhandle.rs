@@ -20,7 +20,8 @@ use std::io::ErrorKind;
 use std::io::Result;
 use std::os::fd::AsRawFd;
 use std::os::raw::c_void;
-use std::path::Path;
+use std::path::PathBuf;
+use std::rc::Rc;
 
 ioctl_readwrite!(xfs_ioc_fd_to_handle, 'X', 106, xfs_fsop_handlereq);
 
@@ -71,9 +72,9 @@ impl TryFrom<&File> for xfs_handle {
 }
 
 /// Filesystem handle that can be disconnected from any open files
-pub struct WeakHandle<'a> {
+pub struct WeakHandle {
     /// path to the filesystem mountpoint
-    mountpoint: &'a Path,
+    mountpoint: Rc<PathBuf>,
 
     /// Filesystem handle
     handle: xfs_handle,
@@ -82,10 +83,10 @@ pub struct WeakHandle<'a> {
     has_parent: bool,
 }
 
-impl WeakHandle<'_> {
+impl WeakHandle {
     /// Try to reopen the filesystem from which we got the handle.
     pub fn reopen(&self) -> Result<File> {
-        let fp = File::open(self.mountpoint)?;
+        let fp = File::open(self.mountpoint.as_path())?;
 
         if xfs_handle::try_from(&fp)? != self.handle {
             let s = format!(
@@ -106,11 +107,11 @@ impl WeakHandle<'_> {
     }
 
     /// Create a soft handle from an open file descriptor and its mount point
-    pub fn try_new<'a>(
+    pub fn try_new(
         fp: &File,
-        mountpoint: &'a Path,
+        mountpoint: Rc<PathBuf>,
         fsgeom: xfs_fsop_geom,
-    ) -> Result<WeakHandle<'a>> {
+    ) -> Result<WeakHandle> {
         Ok(WeakHandle {
             mountpoint,
             handle: xfs_handle::try_from(fp)?,
@@ -136,7 +137,7 @@ impl WeakHandle<'_> {
     }
 }
 
-impl Display for WeakHandle<'_> {
+impl Display for WeakHandle {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
         write!(f, "{}", self.mountpoint.display())
     }
