@@ -98,7 +98,11 @@ impl App {
             }
             Ok(event) => {
                 if self.log || event.must_log() {
-                    printlogln!("{}: {}", self.path.display(), event.format());
+                    let (maybe_path, message) = event.format(fh);
+                    match maybe_path {
+                        Some(x) => printlogln!("{}: {}", x.display(), message),
+                        None => printlogln!("{}: {}", self.path.display(), message),
+                    };
                 }
                 if self.repair {
                     for mut repair in event.schedule_repairs() {
@@ -151,7 +155,7 @@ impl App {
             }
         }
 
-        let fh = WeakHandle::try_new(&fp, &self.path)
+        let fh = WeakHandle::try_new(&fp, &self.path, fsgeom)
             .with_context(|| M_("Configuring filesystem handle"))?;
 
         if self.json {
