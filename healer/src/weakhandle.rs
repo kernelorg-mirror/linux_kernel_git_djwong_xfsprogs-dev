@@ -4,6 +4,7 @@
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
 use crate::baddata;
+use crate::badness;
 use crate::xfs_fs::xfs_fid;
 use crate::xfs_fs::xfs_fsop_geom;
 use crate::xfs_fs::xfs_fsop_handlereq;
@@ -12,6 +13,7 @@ use crate::xfs_types::XfsFid;
 use crate::xfsprogs::M_;
 use nix::ioctl_readwrite;
 use nix::libc::O_LARGEFILE;
+use std::ffi::OsString;
 use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fs::File;
@@ -20,7 +22,9 @@ use std::io::ErrorKind;
 use std::io::Result;
 use std::os::fd::AsRawFd;
 use std::os::raw::c_void;
+use std::os::unix::ffi::OsStringExt;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::Arc;
 
 ioctl_readwrite!(xfs_ioc_fd_to_handle, 'X', 106, xfs_fsop_handlereq);
@@ -129,6 +133,24 @@ impl WeakHandle {
     /// Can this filesystem do parent pointer lookups?
     pub fn can_get_parents(&self) -> bool {
         self.has_parent
+    }
+
+    /// Compute the systemd instance unit name for this mountpoint.
+    pub fn instance_unit_name(&self, service_template: &str) -> Result<OsString> {
+        let output = Command::new("systemd-escape")
+            .arg("--template")
+            .arg(service_template)
+            .arg("--path")
+            .arg(self.mountpoint.as_ref())
+            .output()?;
+
+        if !output.status.success() {
+            return Err(badness!("Could not format systemd instance unit name."));
+        }
+
+        // systemd always adds a newline to the end of the output; remove it
+        let trunc_out = &output.stdout[0..output.stdout.len() - 1];
+        Ok(OsString::from_vec(trunc_out.to_vec()))
     }
 }
 
