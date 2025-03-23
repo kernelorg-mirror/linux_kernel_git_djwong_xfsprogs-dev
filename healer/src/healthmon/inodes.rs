@@ -9,10 +9,12 @@ use crate::healthmon::event::XfsHealthEvent;
 use crate::healthmon::event::XfsHealthStatus;
 use crate::repair::Repair;
 use crate::util::format_set;
+use crate::weakhandle::WeakHandle;
 use crate::xfs_types::{XfsFid, XfsFileRange};
 use crate::xfsprogs::M_;
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use std::path::PathBuf;
 use strum_macros::EnumString;
 
 /// Metadata types for an XFS inode
@@ -71,8 +73,17 @@ impl XfsInodeEvent {
 }
 
 impl XfsHealthEvent for XfsInodeEvent {
-    fn format(&self) -> String {
-        format!(" {} {}: {}", self.fid, format_set(self.metadata), self.status)
+    fn format(&self, fh: &WeakHandle) -> (Option<PathBuf>, String) {
+        match fh.path_for(self.fid) {
+            Some(path) => (
+                Some(path),
+                format!(" {}: {}", format_set(self.metadata), self.status),
+            ),
+            None => (
+                None,
+                format!(" {} {}: {}", self.fid, format_set(self.metadata), self.status),
+            ),
+        }
     }
 
     schedule_repairs!(XfsInodeEvent, |s: &XfsInodeEvent, sm_type| {
@@ -122,7 +133,10 @@ impl XfsFileIoErrorEvent {
 }
 
 impl XfsHealthEvent for XfsFileIoErrorEvent {
-    fn format(&self) -> String {
-        format!(" {} {}: {} {}", self.fid, self.range, self.iotype, M_("failed"))
+    fn format(&self, fh: &WeakHandle) -> (Option<PathBuf>, String) {
+        match fh.path_for(self.fid) {
+            Some(path) => (Some(path), format!(" {}: {} {}", self.range, self.iotype, M_("failed"))),
+            None => (None, format!(" {} {}: {} {}", self.fid, self.range, self.iotype, M_("failed"))),
+        }
     }
 }

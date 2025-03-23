@@ -9,10 +9,12 @@ use crate::healthmon::event::XfsHealthEvent;
 use crate::healthmon::event::XfsHealthStatus;
 use crate::repair::Repair;
 use crate::util::format_set;
+use crate::weakhandle::WeakHandle;
 use crate::xfs_types::XfsPhysRange;
 use crate::xfsprogs::M_;
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use std::path::PathBuf;
 use strum_macros::EnumString;
 
 /// Metadata types for an XFS whole-fs metadata
@@ -58,11 +60,14 @@ impl XfsWholeFsEvent {
 }
 
 impl XfsHealthEvent for XfsWholeFsEvent {
-    fn format(&self) -> String {
-        format!(
-            " {}: {}",
-            format_set(self.metadata),
-            self.status
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (
+            None,
+            format!(
+                " {}: {}",
+                format_set(self.metadata),
+                self.status
+            ),
         )
     }
 
@@ -111,11 +116,14 @@ impl XfsHealthEvent for XfsShutdownEvent {
         true
     }
 
-    fn format(&self) -> String {
-        format!(
-            ": {} {}",
-            M_("filesystem shut down due to"),
-            format_set(self.reasons)
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (
+            None,
+            format!(
+                ": {} {}",
+                M_("filesystem shut down due to"),
+                format_set(self.reasons)
+            ),
         )
     }
 }
@@ -128,8 +136,8 @@ impl XfsHealthEvent for XfsUnmountEvent {
         true
     }
 
-    fn format(&self) -> String {
-        format!( ": {}", M_("filesystem unmounted"))
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (None, format!(": {}", M_("filesystem unmounted")))
     }
 }
 
@@ -148,7 +156,7 @@ impl XfsMediaErrorEvent {
 }
 
 impl XfsHealthEvent for XfsMediaErrorEvent {
-    fn format(&self) -> String {
-        format!(" {}: {}", self.range, M_("media error"))
+    fn format(&self, _: &WeakHandle) -> (Option<PathBuf>, String) {
+        (None, format!(" {}: {}", self.range, M_("media error")))
     }
 }
