@@ -8,6 +8,7 @@ use clap::{value_parser, Arg, ArgAction, ArgGroup, ArgMatches, Command};
 use std::fs::File;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::rc::Rc;
 use xfs_healer::fsprops;
 use xfs_healer::fsprops::XfsAutofsck;
 use xfs_healer::healthmon::cstruct::CStructMonitor;
@@ -89,7 +90,7 @@ struct App {
     repair: bool,
     check: bool,
     autofsck: bool,
-    path: PathBuf,
+    path: Rc<PathBuf>,
 }
 
 /// Outcome of checking if the kernel supports metadata repair
@@ -205,7 +206,7 @@ impl App {
 
     /// Main app method
     fn main(&mut self) -> Result<ExitCode> {
-        let fp = File::open(&self.path).with_context(|| M_("Opening filesystem failed"))?;
+        let fp = File::open(&*self.path).with_context(|| M_("Opening filesystem failed"))?;
 
         // Decide if we're going to enable repairs, which must come before check_repair.
         if self.autofsck {
@@ -237,7 +238,7 @@ impl App {
             });
         }
 
-        let fh = WeakHandle::try_new(&fp, &self.path, fsgeom)
+        let fh = WeakHandle::try_new(&fp, self.path.clone(), fsgeom)
             .with_context(|| M_("Configuring filesystem handle"))?;
 
         let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)
@@ -256,7 +257,7 @@ impl From<Cli> for App {
         App {
             log: cli.0.get_flag("log"),
             everything: cli.0.get_flag("everything"),
-            path: cli.0.get_one::<PathBuf>("path").unwrap().to_path_buf(),
+            path: Rc::new(cli.0.get_one::<PathBuf>("path").unwrap().to_path_buf()),
             repair: cli.0.get_flag("repair"),
             check: cli.0.get_flag("check"),
             autofsck: cli.0.get_flag("autofsck"),
