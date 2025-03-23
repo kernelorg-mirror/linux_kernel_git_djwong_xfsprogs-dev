@@ -109,6 +109,7 @@ struct App {
 #[derive(Debug)]
 struct EventThread {
     log: bool,
+    everything: bool,
     repair: bool,
 }
 
@@ -118,6 +119,7 @@ impl EventThread {
     fn new(app: &App) -> Self {
         EventThread {
             log: app.log,
+            everything: app.everything,
             repair: app.repair,
         }
     }
@@ -162,7 +164,7 @@ impl App {
                     };
                 }
                 if et.repair {
-                    for mut repair in event.schedule_repairs() {
+                    for mut repair in event.schedule_repairs(et.everything) {
                         repair.perform(&fh)
                     }
                 }
