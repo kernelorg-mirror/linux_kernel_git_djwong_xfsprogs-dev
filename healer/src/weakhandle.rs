@@ -9,6 +9,8 @@ use crate::xfs_fs::xfs_handle;
 use crate::xfsprogs::M_;
 use nix::ioctl_readwrite;
 use nix::libc::O_LARGEFILE;
+use std::fmt::Display;
+use std::fmt::Formatter;
 use std::fs::File;
 use std::io::Error;
 use std::io::ErrorKind;
@@ -87,11 +89,22 @@ impl WeakHandle<'_> {
         Ok(fp)
     }
 
+    /// Report mountpoint in a displayable manner
+    pub fn mountpoint(&self) -> String {
+        self.mountpoint.display().to_string()
+    }
+
     /// Create a soft handle from an open file descriptor and its mount point
     pub fn try_new<'a>(fp: &File, mountpoint: &'a Path) -> Result<WeakHandle<'a>> {
         Ok(WeakHandle {
             mountpoint,
             handle: xfs_handle::try_from(fp)?,
         })
+    }
+}
+
+impl Display for WeakHandle<'_> {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.mountpoint.display())
     }
 }
