@@ -80,6 +80,7 @@ struct App {
 #[derive(Debug)]
 struct EventThread {
     log: bool,
+    everything: bool,
     repair: bool,
 }
 
@@ -89,6 +90,7 @@ impl EventThread {
     fn new(app: &App) -> Self {
         EventThread {
             log: app.log,
+            everything: app.everything,
             repair: app.repair,
         }
     }
@@ -119,7 +121,7 @@ impl App {
                     };
                 }
                 if et.repair {
-                    for mut repair in event.schedule_repairs() {
+                    for mut repair in event.schedule_repairs(et.everything) {
                         repair.perform(&fh)
                     }
                 }
@@ -232,6 +234,10 @@ impl App {
 
         let fh = Arc::new(WeakHandle::try_new(&fp, self.path.clone(), fsgeom)?);
 
+        // XXX debug code
+        let mud = fh.instance_unit_name("xfs_scrub@.service")?;
+        println!("GAWK |{:?}|", mud);
+
         // Creates a threadpool with nr_cpus workers.
         let threads = threadpool::Builder::new().build();
 
@@ -245,7 +251,12 @@ impl App {
             let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)?;
 
             for raw_event in hmon {
-                App::dispatch_cstruct_event(&threads, EventThread::new(self), fh.clone(), raw_event);
+                App::dispatch_cstruct_event(
+                    &threads,
+                    EventThread::new(self),
+                    fh.clone(),
+                    raw_event,
+                );
             }
         }
         threads.join();

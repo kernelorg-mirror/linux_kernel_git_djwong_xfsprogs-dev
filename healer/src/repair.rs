@@ -3,6 +3,7 @@
  * Copyright (C) 2025 Oracle.  All Rights Reserved.
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
+use crate::badness;
 use crate::healthmon::fs::XfsWholeFsMetadata;
 use crate::healthmon::groups::{XfsPeragMetadata, XfsRtgroupMetadata};
 use crate::healthmon::inodes::XfsInodeMetadata;
@@ -16,6 +17,7 @@ use std::fmt::Formatter;
 use std::fs::File;
 use std::io::Result;
 use std::os::fd::AsRawFd;
+use std::process::Command;
 
 ioctl_readwrite!(xfs_ioc_scrub_metadata, 'X', 60, xfs_scrub_metadata);
 
@@ -32,22 +34,24 @@ pub fn is_supported(fp: &File) -> bool {
 }
 
 /// Classification information for later reporting
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum RepairGroup {
     WholeFs,
     PerAg,
     RtGroup,
     File,
+    FullRepair,
 }
 
 /// What happened when we tried to repair something?
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum RepairOutcome {
     Queued,
     Success,
     Unnecessary,
     MightBeOk,
     Failed,
+    Running,
 }
 
 impl Display for RepairOutcome {
@@ -60,6 +64,7 @@ impl Display for RepairOutcome {
             }
             RepairOutcome::Unnecessary => "No modification needed.",
             RepairOutcome::Success => "Repairs successful.",
+            RepairOutcome::Running => "In progress.",
         };
         write!(f, "{}", s)
     }
@@ -197,6 +202,17 @@ impl Repair {
         }
     }
 
+    /// Schedule the full online fsck
+    pub fn full_repair() -> Repair {
+        Repair {
+            group: RepairGroup::FullRepair,
+            detail: xfs_scrub_metadata {
+                ..Default::default()
+            },
+            outcome: RepairOutcome::Queued,
+        }
+    }
+
     /// Return a description of what we tried to repair
     fn name(&self) -> &str {
         match self.detail.sm_type {
@@ -253,8 +269,35 @@ impl Repair {
         }
     }
 
+    /// Start the background xfs_scrub@ service on a filesystem in the hopes that its autofsck
+    /// setting allows repairs.  Does not wait for the service to complete.  Multiple activations
+    /// while the service runs will be coalesced into a single service instance.
+    fn run_full_repair(&self, fh: &WeakHandle) -> Result<bool> {
+        let unit_name = fh.instance_unit_name("xfs_scrub@.service")?;
+
+        let output = Command::new("systemctl")
+            .arg("start")
+            .arg("--no-block")
+            .arg(unit_name)
+            .output()?;
+
+        if !output.status.success() {
+            return Err(badness!("Could not start xfs_scrub service."));
+        }
+
+        Ok(true)
+    }
+
     /// Call the kernel to repair things
     fn repair(&mut self, fh: &WeakHandle) -> Result<bool> {
+        if self.group == RepairGroup::FullRepair {
+            let started = self.run_full_repair(fh)?;
+            if started {
+                self.outcome = RepairOutcome::Running;
+            }
+            return Ok(started);
+        }
+
         let fp = fh.reopen()?;
 
         // SAFETY: Trusting the kernel not to corrupt memory.
@@ -311,6 +354,9 @@ impl Repair {
                     )
                 }
             }
+            RepairGroup::FullRepair => {
+                println!("{}: full repair: {}", fh.mountpoint(), self.outcome)
+            }
         };
     }
 
@@ -322,6 +368,12 @@ impl Repair {
             }
             _ => {
                 self.report(fh);
+
+                // Transform into a full repair if we failed to fix things.
+                if self.outcome == RepairOutcome::Failed && self.group != RepairGroup::FullRepair {
+                    self.group = RepairGroup::FullRepair;
+                    self.perform(fh);
+                }
             }
         };
     }

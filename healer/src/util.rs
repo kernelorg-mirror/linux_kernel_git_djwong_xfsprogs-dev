@@ -21,6 +21,15 @@ macro_rules! baddata {
     }};
 }
 
+/// Simple macro for creating errors for random badness.  The only parameter describes why the
+/// badness happened.
+#[macro_export]
+macro_rules! badness {
+    ($message:expr) => {{
+        std::io::Error::new(std::io::ErrorKind::Other, $message)
+    }};
+}
+
 /// Format an enum set into a string
 pub fn format_set<T: EnumSetType + Display>(f: EnumSet<T>) -> String {
     let mut ret = "".to_string();
