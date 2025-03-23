@@ -134,6 +134,7 @@ enumset = { version = "1.0.12" }
 libc = { version = "0" }				# 0.2.139
 strum = { version = "0" }				# 0.19.2
 strum_macros = { version = "0" }			# 0.19.2
+threadpool = { version = "1.8.1" }
 ],
     [yes], [no])
 ])
