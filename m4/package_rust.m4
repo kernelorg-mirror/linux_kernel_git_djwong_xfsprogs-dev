@@ -114,6 +114,10 @@ AC_DEFUN([AC_HAVE_HEALER_CRATES],
   AC_CHECK_CRATES([have_healer_crates], [xfs_healer],
     [
 clap = { version = "4.0.32", features = [["derive"]] }
+nix = { version = "0.26.1" }
+enumset = { version = "1.0.12" }
+strum = { version = "0.19.2" }
+strum_macros = { version = "0.19.2" }
 ],
     [yes], [no])
 ])
