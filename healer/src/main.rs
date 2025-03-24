@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use xfs_healer::healthmon::cstruct::CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
+use xfs_healer::healthmon::json::JsonMonitor;
 use xfs_healer::printlogln;
 use xfs_healer::xfsprogs;
 use xfs_healer::xfsprogs::M_;
@@ -53,6 +54,12 @@ impl Cli {
                     .value_parser(value_parser!(PathBuf))
                     .required_unless_present("version"),
             )
+            .arg(
+                Arg::new("json")
+                    .long("json")
+                    .help(M_("Use the JSON kernel interface instead of C"))
+                    .action(ArgAction::SetTrue),
+            )
             .get_matches())
     }
 }
@@ -63,6 +70,7 @@ struct App {
     debug: bool,
     log: bool,
     everything: bool,
+    json: bool,
     path: PathBuf,
 }
 
@@ -90,10 +98,18 @@ impl App {
     fn main(&self) -> Result<ExitCode> {
         let fp = File::open(&self.path)?;
 
-        let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)?;
+        if self.json {
+            let hmon = JsonMonitor::try_new(fp, &self.path, self.everything, self.debug)?;
 
-        for raw_event in hmon {
-            self.process_event(raw_event.cook());
+            for raw_event in hmon {
+                self.process_event(raw_event.cook());
+            }
+        } else {
+            let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)?;
+
+            for raw_event in hmon {
+                self.process_event(raw_event.cook());
+            }
         }
 
         Ok(ExitCode::SUCCESS)
@@ -107,6 +123,7 @@ impl From<Cli> for App {
             log: cli.0.get_flag("log"),
             everything: cli.0.get_flag("everything"),
             path: cli.0.get_one::<PathBuf>("path").unwrap().to_path_buf(),
+            json: cli.0.get_flag("json"),
         }
     }
 }
