@@ -13,6 +13,7 @@
 #include "libfrog/workqueue.h"
 #include "libfrog/getparents.h"
 #include "libfrog/paths.h"
+#include "libfrog/systemd.h"
 #include "xfs_healer.h"
 
 struct weakhandle {
@@ -198,4 +199,16 @@ weakhandle_getpath_for(
 
 	close(mnt_fd);
 	return ret;
+}
+
+/* Compute the systemd instance unit name for this mountpoint. */
+int
+weakhandle_instance_unit_name(
+	struct weakhandle	*wh,
+	const char		*template,
+	char			*unitname,
+	size_t			unitnamelen)
+{
+	return systemd_path_instance_unit_name(template, wh->mntpoint,
+			unitname, unitnamelen);
 }
