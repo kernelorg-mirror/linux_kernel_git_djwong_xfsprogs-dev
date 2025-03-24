@@ -19,3 +19,7 @@ clap = { version = "4.0.32", features = ["derive"] }
 # Cargo.toml becuse cargo requires the crate to be present so that it can
 # generate a Cargo.lock file even if the build never uses it.
 @cargo_want_gettext@ gettext-rs = { version = "0.7.0", optional = true }
+nix = { version = "0.26.1" }
+enumset = { version = "1.0.12" }
+strum = { version = "0.19.2" }
+strum_macros = { version = "0.19.2" }
