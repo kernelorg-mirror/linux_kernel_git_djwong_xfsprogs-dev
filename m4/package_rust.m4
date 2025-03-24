@@ -132,6 +132,7 @@ nix = { version = "0.26.1" }
 enumset = { version = "1.0.12" }
 strum = { version = "0.19.2" }
 strum_macros = { version = "0.19.2" }
+serde_json = { version = "1.0.87" }
 ],
     [yes], [no])
 ])
