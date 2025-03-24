@@ -137,6 +137,13 @@ handle_event(
 		pthread_mutex_unlock(&ctx->conlock);
 	}
 
+	/*
+	 * If we didn't ask for all the metadata reports (including the healthy
+	 * ones) and the kernel tells us it lost something, run the full scan.
+	 */
+	if (hme->type == XFS_HEALTH_MONITOR_TYPE_LOST && !ctx->everything)
+		run_full_repair(ctx);
+
 	/* Initiate a repair if appropriate. */
 	if (will_repair)
 		repair_metadata(ctx, &pfx, hme);
