@@ -4,6 +4,7 @@
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
 #include "xfs.h"
+#include <sys/wait.h>
 
 #include "platform_defs.h"
 #include "libfrog/fsgeom.h"
@@ -15,6 +16,11 @@ enum repair_outcome {
 	REPAIR_FAILED,
 	REPAIR_PROBABLY_OK,
 	REPAIR_UNNECESSARY,
+};
+
+enum what_next {
+	NEED_FULL_REPAIR,
+	REPAIR_DONE,
 };
 
 /* Translate scrub output flags to outcome. */
@@ -83,7 +89,7 @@ __xfs_repair_metadata(
 }
 
 /* React to a fs-domain corruption event by repairing it. */
-static void
+static enum what_next
 try_repair_wholefs(
 	struct healer_ctx			*ctx,
 	int					mnt_fd,
@@ -115,11 +121,16 @@ try_repair_wholefs(
 		printf("%s: %s: %s\n", ctx->mntpoint, what, report);
 		fflush(stdout);
 		pthread_mutex_unlock(&ctx->conlock);
+
+		if (outcome == REPAIR_FAILED)
+			return NEED_FULL_REPAIR;
 	}
+
+	return REPAIR_DONE;
 }
 
 /* React to a group-domain corruption event by repairing it. */
-static void
+static enum what_next
 try_repair_group(
 	struct healer_ctx			*ctx,
 	int					mnt_fd,
@@ -168,11 +179,16 @@ try_repair_group(
 				report);
 		fflush(stdout);
 		pthread_mutex_unlock(&ctx->conlock);
+
+		if (outcome == REPAIR_FAILED)
+			return NEED_FULL_REPAIR;
 	}
+
+	return REPAIR_DONE;
 }
 
 /* React to a inode-domain corruption event by repairing it. */
-static void
+static enum what_next
 try_repair_inode(
 	struct healer_ctx			*ctx,
 	int					mnt_fd,
@@ -208,7 +224,12 @@ try_repair_inode(
 		printf("%s: %s: %s\n", path, what, report);
 		fflush(stdout);
 		pthread_mutex_unlock(&ctx->conlock);
+
+		if (outcome == REPAIR_FAILED)
+			return NEED_FULL_REPAIR;
 	}
+
+	return REPAIR_DONE;
 }
 
 /* Repair a metadata corruption. */
@@ -217,6 +238,7 @@ repair_metadata(
 	struct healer_ctx			*ctx,
 	const struct xfs_health_monitor_event	*hme)
 {
+	enum what_next				what_next;
 	int					repair_fd;
 	int					ret;
 
@@ -230,16 +252,22 @@ repair_metadata(
 
 	switch (hme->domain) {
 	case XFS_HEALTH_MONITOR_DOMAIN_FS:
-		try_repair_wholefs(ctx, repair_fd, hme);
+		what_next = try_repair_wholefs(ctx, repair_fd, hme);
 		break;
 	case XFS_HEALTH_MONITOR_DOMAIN_AG:
 	case XFS_HEALTH_MONITOR_DOMAIN_RTGROUP:
-		try_repair_group(ctx, repair_fd, hme);
+		what_next = try_repair_group(ctx, repair_fd, hme);
 		break;
 	case XFS_HEALTH_MONITOR_DOMAIN_INODE:
-		try_repair_inode(ctx, repair_fd, hme);
+		what_next = try_repair_inode(ctx, repair_fd, hme);
 		break;
+	default:
+		what_next = REPAIR_DONE;
 	}
+
+	/* Transform into a full repair if we failed to fix this item. */
+	if (what_next == NEED_FULL_REPAIR)
+		run_full_repair(ctx);
 
 	close(repair_fd);
 	return 0;
@@ -259,4 +287,59 @@ healer_can_repair(
 	/* assume any errno means not supported */
 	ret = ioctl(ctx->mnt.fd, XFS_IOC_SCRUB_METADATA, &sm);
 	return ret ? false : true;
+}
+
+/* Run a full repair of the filesystem using the background fsck service. */
+void
+run_full_repair(
+	struct healer_ctx	*ctx)
+{
+	char			svcname[PATH_MAX];
+	pid_t			child_pid;
+	int			child_status;
+	int			ret;
+
+	ret = weakhandle_instance_unit_name(ctx->wh, XFS_SCRUB_SVCNAME,
+			svcname, PATH_MAX);
+	if (ret) {
+		fprintf(stderr, "%s: %s: %s\n", ctx->mntpoint,
+				_("computing name of xfs_scrub service"),
+				strerror(errno));
+		return;
+	}
+
+	child_pid = fork();
+	if (child_pid < 0) {
+		perror(ctx->mntpoint);
+		return;
+	}
+	if (!child_pid) {
+		/* child starts the process */
+		char		*argv[] = {
+			"systemctl",
+			"start",
+			"--no-block",
+			svcname,
+			NULL,
+		};
+
+		ret = execvp("systemctl", argv);
+		if (ret)
+			perror("systemctl");
+
+		exit(EXIT_FAILURE);
+	}
+
+	/* parent waits for process */
+	waitpid(child_pid, &child_status, 0);
+
+	if (WIFEXITED(child_status) && WEXITSTATUS(child_status) == 0) {
+		printf("%s: %s\n", ctx->mntpoint,
+ _("Full repair: Repairs in progress."));
+		fflush(stdout);
+		return;
+	}
+
+	fprintf(stderr, "%s: %s\n", ctx->mntpoint,
+ _("Could not start xfs_scrub service."));
 }

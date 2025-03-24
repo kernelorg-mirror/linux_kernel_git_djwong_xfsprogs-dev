@@ -23,6 +23,7 @@ import ctypes.util
 from enum import Enum
 import collections
 import time
+import subprocess
 
 try:
 	# Not all systems will have this json schema validation libarary,
@@ -261,6 +262,17 @@ class fshandle(object):
 		'''Substitute the inode and generation components of a handle.'''
 		self.handle.ha_fid.fid_ino = ino
 		self.handle.ha_fid.fid_gen = gen
+
+	def instance_unit_name(self, service_template):
+		'''Compute the systemd instance unit name for this mountpoint.'''
+
+		cmd = ['systemd-escape', '--template', service_template,
+		       '--path', self.mountpoint]
+
+		proc = subprocess.Popen(cmd, stdout = subprocess.PIPE)
+		proc.wait()
+		for line in proc.stdout:
+			return line.decode(sys.stdout.encoding).strip()
 
 def libhandle_load():
 	'''Load libhandle and set things up.'''
@@ -778,7 +790,7 @@ def report_shutdown(event):
 	msg = _("filesystem shut down due to")
 	printlogln(f"{printf_prefix}: {msg} {some_reasons}")
 
-def handle_event(lines, fh):
+def handle_event(lines, fh, everything):
 	'''Handle an event asynchronously.'''
 	global log
 	global has_parent
@@ -834,6 +846,8 @@ def handle_event(lines, fh):
 	# messages.
 	if event['type'] == 'lost':
 		report_lost(event)
+		if want_repair and not everything:
+			run_full_repair(fh)
 		return
 
 	if event['type'] == 'running':
@@ -921,13 +935,14 @@ def monitor(mountpoint, event_queue, check, **kwargs):
 	global has_rmapbt
 	use_autofsck = want_repair is None
 
-	def event_loop(mon_fd, event_queue, fh):
+	def event_loop(mon_fd, event_queue, fh, everything):
 		# Ownership of mon_fd (and hence responsibility for closing it)
 		# is transferred to the mon_fp object.
 		with os.fdopen(mon_fd) as mon_fp:
 			nr = 0
 			for lines in health_reports(mon_fp):
-				event_queue.submit(handle_event, lines, fh)
+				event_queue.submit(handle_event, lines, fh,
+						everything)
 
 				# Periodically run the garbage collector to
 				# constrain memory usage in the main thread.
@@ -1020,7 +1035,7 @@ def monitor(mountpoint, event_queue, check, **kwargs):
 
 	try:
 		# mon_fd is consumed by this function
-		event_loop(mon_fd, event_queue, fh)
+		event_loop(mon_fd, event_queue, fh, everything)
 	except Exception as e:
 		eprintln(f"{mountpoint}: {e}")
 		return 1
@@ -1083,6 +1098,8 @@ def repair_wholefs(event, fd):
 			outcome = RepairOutcome.from_oflags(oflags)
 			report = outcome.report()
 			printlogln(f"{printf_prefix}: {struct}: {report}")
+			if outcome == RepairOutcome.Failed:
+				return outcome
 		except Exception as e:
 			eprintln(f"{printf_prefix}: {struct}: {e}")
 
@@ -1099,6 +1116,8 @@ def repair_group(event, fd, group_type):
 			outcome = RepairOutcome.from_oflags(oflags)
 			report = outcome.report()
 			printlogln(f"{printf_prefix}: {struct}: {report}")
+			if outcome == RepairOutcome.Failed:
+				return outcome
 		except Exception as e:
 			eprintln(f"{printf_prefix}: {struct}: {e}")
 
@@ -1117,6 +1136,8 @@ def repair_inode(event, fd):
 			outcome = RepairOutcome.from_oflags(oflags)
 			report = outcome.report()
 			printlogln(f"{prefix} {structure}: {report}")
+			if outcome == RepairOutcome.Failed:
+				return outcome
 		except Exception as e:
 			eprintln(f"{prefix} {structure}: {e}")
 
@@ -1136,19 +1157,43 @@ def repair_metadata(event, fh):
 
 	try:
 		if event['domain'] in ['fs', 'realtime']:
-			repair_wholefs(event, fd)
+			outcome = repair_wholefs(event, fd)
 		elif event['domain'] in ['perag', 'rtgroup']:
-			repair_group(event, fd, event['domain'])
+			outcome = repair_group(event, fd, event['domain'])
 		elif event['domain'] == 'inode':
-			repair_inode(event, fd)
+			outcome = repair_inode(event, fd)
 		else:
 			domain = event['domain']
 			msg = _("Unknown metadata domain")
 			raise Exception(f"{msg} \"{domain}\".")
+
+		# Transform into a full repair if we failed to fix this item.
+		if outcome == RepairOutcome.Failed:
+			run_full_repair(fh)
 	except Exception as e:
 		eprintln(f"{printf_prefix}: {e}")
 	finally:
 		os.close(fd)
+
+def run_full_repair(fh):
+	'''Run a full repair of the filesystem using the background fsck.'''
+	global printf_prefix
+
+	try:
+		unit_name = fh.instance_unit_name("@scrub_svcname@")
+		cmd = ['systemctl', 'start', '--no-block', unit_name]
+
+		proc = subprocess.Popen(cmd)
+		proc.wait()
+		if proc.returncode == 0:
+			msg = _("Full repair: Repairs in progress.")
+			printlogln(f"{printf_prefix}: {msg}")
+		else:
+			msg = _("Could not start xfs_scrub service.")
+			eprintln(f"{printf_prefix}: {msg}");
+	except Exception as e:
+		eprintln(f"{printf_prefix}: {e}")
+
 
 def main():
 	global debug

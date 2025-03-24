@@ -6,6 +6,7 @@
 #include "xfs.h"
 #include <pthread.h>
 #include <stdlib.h>
+#include <sys/wait.h>
 
 #include "platform_defs.h"
 #include "handle.h"
@@ -193,4 +194,73 @@ weakhandle_getpath_for(
 
 	close(mnt_fd);
 	return ret;
+}
+
+/* Compute the systemd instance unit name for this mountpoint. */
+int
+weakhandle_instance_unit_name(
+	struct weakhandle	*wh,
+	const char		*template,
+	char			*unitname,
+	size_t			unitnamelen)
+{
+	FILE			*fp;
+	char			*s;
+	ssize_t			bytes;
+	pid_t			child_pid;
+	int			pipe_fds[2];
+	int			ret;
+
+	ret = pipe(pipe_fds);
+	if (ret)
+		return -1;
+
+	child_pid = fork();
+	if (child_pid < 0)
+		return -1;
+
+	if (!child_pid) {
+		/* child process */
+		char		*argv[] = {
+			"systemd-escape",
+			"--template",
+			(char *)template,
+			"--path",
+			(char *)wh->mntpoint,
+			NULL,
+		};
+
+		ret = dup2(pipe_fds[1], STDOUT_FILENO);
+		if (ret < 0) {
+			perror(wh->mntpoint);
+			goto fail;
+		}
+
+		ret = execvp("systemd-escape", argv);
+		if (ret)
+			perror(wh->mntpoint);
+
+fail:
+		exit(EXIT_FAILURE);
+	}
+
+	/* parent scrapes the output */
+	fp = fdopen(pipe_fds[0], "r");
+	s = fgets(unitname, unitnamelen, fp);
+	fclose(fp);
+	close(pipe_fds[1]);
+
+	waitpid(child_pid, NULL, 0);
+
+	if (!s) {
+		errno = ENOENT;
+		return -1;
+	}
+
+	/* trim off trailing newline */
+	bytes = strlen(s);
+	if (s[bytes - 1] == '\n')
+		s[bytes - 1] = 0;
+
+	return 0;
 }

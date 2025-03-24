@@ -46,6 +46,15 @@ handle_event(
 
 	report_event(ctx, hme);
 
+	/*
+	 * If we only asked for failure reports and the kernel tells us it lost
+	 * something, run the full scan.
+	 */
+	if (hme->type == XFS_HEALTH_MONITOR_TYPE_LOST && !ctx->everything) {
+		run_full_repair(ctx);
+		return;
+	}
+
 	if (ctx->want_repair && hme->type == XFS_HEALTH_MONITOR_TYPE_SICK)
 		repair_metadata(ctx, hme);
 
