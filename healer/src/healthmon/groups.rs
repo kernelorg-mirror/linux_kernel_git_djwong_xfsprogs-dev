@@ -11,9 +11,11 @@ use crate::xfs_types::{XfsAgNumber, XfsRgNumber};
 use crate::xfsprogs::M_;
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use strum_macros::EnumString;
 
 /// Metadata types for an allocation group on the data device
-#[derive(EnumSetType, Debug)]
+#[derive(EnumSetType, Debug, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum XfsPeragMetadata {
     Agf,
     Agfl,
@@ -82,7 +84,8 @@ impl XfsHealthEvent for XfsPeragEvent {
 }
 
 /// Metadata types for an allocation group on the realtime device
-#[derive(EnumSetType, Debug)]
+#[derive(EnumSetType, Debug, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum XfsRtgroupMetadata {
     Bitmap,
     Summary,
