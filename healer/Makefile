@@ -19,8 +19,15 @@ HFILES = \
 RUSTFILES = \
 	src/lib.rs \
 	src/main.rs \
+	src/util.rs \
 	src/xfs_fs.rs \
-	src/xfsprogs.rs
+	src/xfsprogs.rs \
+	src/xfs_types.rs \
+	src/healthmon/event.rs \
+	src/healthmon/fs.rs \
+	src/healthmon/groups.rs \
+	src/healthmon/inodes.rs \
+	src/healthmon/mod.rs
 
 BUILT_RUSTFILES = \
 	src/xfs_fs.rs \

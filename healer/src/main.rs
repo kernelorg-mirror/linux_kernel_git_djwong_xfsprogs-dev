@@ -8,6 +8,7 @@ use std::fs::File;
 use std::io::Result;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use xfs_healer::printlogln;
 use xfs_healer::xfsprogs;
 use xfs_healer::xfsprogs::M_;
 
@@ -93,12 +94,12 @@ fn main() -> ExitCode {
 
     let args = Cli::new();
     if args.0.get_flag("version") {
-        println!("{} {}", M_("xfs_healer version"), xfsprogs::VERSION);
+        printlogln!("{} {}", M_("xfs_healer version"), xfsprogs::VERSION);
         return ExitCode::SUCCESS;
     }
 
     if args.0.get_flag("debug") {
-        println!("args: {:?}", args);
+        printlogln!("args: {:?}", args);
     }
 
     let app: App = args.into();
