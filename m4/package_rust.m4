@@ -131,6 +131,9 @@ anyhow = { version = "1.0.69" }
 $gettext_dep
 nix = { version = "0", features = [["ioctl"]] }		# 0.26.1
 enumset = { version = "1.0.12" }
+strum = { version = "0" }				# 0.19.2
+strum_macros = { version = "0" }			# 0.19.2
+serde_json = { version = "1.0.87" }
 ],
     [yes], [no])
 ])
