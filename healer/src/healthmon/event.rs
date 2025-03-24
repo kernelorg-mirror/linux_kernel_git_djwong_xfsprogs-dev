@@ -5,6 +5,7 @@
  */
 use crate::display_for_enum;
 use crate::xfsprogs::M_;
+use strum_macros::EnumString;
 
 /// Common behaviors of all health events
 pub trait XfsHealthEvent {
@@ -18,7 +19,8 @@ pub trait XfsHealthEvent {
 }
 
 /// Health status for metadata events
-#[derive(Debug)]
+#[derive(Debug, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum XfsHealthStatus {
     /// Problems have been observed at runtime
     Sick,
