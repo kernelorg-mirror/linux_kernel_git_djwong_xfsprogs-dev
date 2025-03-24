@@ -11,9 +11,11 @@ use crate::xfs_types::XfsPhysRange;
 use crate::xfsprogs::M_;
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use strum_macros::EnumString;
 
 /// Metadata types for an XFS whole-fs metadata
-#[derive(EnumSetType, Debug)]
+#[derive(EnumSetType, Debug, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum XfsWholeFsMetadata {
     FsCounters,
     GrpQuota,
@@ -65,7 +67,8 @@ impl XfsHealthEvent for XfsWholeFsEvent {
 }
 
 /// Reasons for a filesystem shutdown event
-#[derive(EnumSetType, Debug)]
+#[derive(EnumSetType, Debug, EnumString)]
+#[strum(serialize_all = "snake_case")]
 pub enum XfsShutdownReason {
     CorruptIncore,
     CorruptOndisk,

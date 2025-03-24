@@ -28,6 +28,7 @@ RUSTFILES = \
 	src/healthmon/fs.rs \
 	src/healthmon/groups.rs \
 	src/healthmon/inodes.rs \
+	src/healthmon/json.rs \
 	src/healthmon/mod.rs
 
 BUILT_RUSTFILES = \
