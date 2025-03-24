@@ -11,9 +11,11 @@ use crate::xfs_types::{XfsFid, XfsFileRange};
 use crate::xfsprogs::M_;
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use strum_macros::EnumString;
 
 /// Metadata types for an XFS inode
-#[derive(EnumSetType, Debug)]
+#[derive(EnumSetType, Debug, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum XfsInodeMetadata {
     Bmapbta,
     Bmapbtc,
@@ -73,7 +75,8 @@ impl XfsHealthEvent for XfsInodeEvent {
 }
 
 /// File I/O types
-#[derive(Debug)]
+#[derive(Debug, EnumString)]
+#[strum(serialize_all = "snake_case")]
 pub enum XfsFileIoErrorType {
     Readahead,
     Writeback,
