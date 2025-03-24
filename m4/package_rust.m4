@@ -128,6 +128,10 @@ AC_DEFUN([AC_HAVE_HEALER_CRATES],
     [
 clap = { version = "4.0.32", features = [["derive"]] }
 $gettext_dep
+nix = { version = "0.26.1" }
+enumset = { version = "1.0.12" }
+strum = { version = "0.19.2" }
+strum_macros = { version = "0.19.2" }
 ],
     [yes], [no])
 ])
