@@ -16,6 +16,7 @@ lto = @cargo_lto@
 [dependencies]
 clap = { version = "4.0.32", features = ["derive"] }
 anyhow = { version = "1.0.69" }
+enumset = { version = "1.0.12" }
 
 # XXX: Crates with major version 0 are not considered ABI-stable, so the minor
 # version is treated as if it were the major version.  This creates problems
@@ -23,6 +24,7 @@ anyhow = { version = "1.0.69" }
 # version 0.  Until these crates reach 1.0.0, we'll have to patch when things
 # break.  Ref:
 # https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html
+nix = { version = "0", features = ["ioctl"] }	# 0.26.1
 
 # Dynamically comment out all the gettextrs related dependency information in
 # Cargo.toml becuse cargo requires the crate to be present so that it can
