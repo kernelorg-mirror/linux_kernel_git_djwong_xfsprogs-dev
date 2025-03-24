@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use xfs_healer::healthmon::cstruct::CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
+use xfs_healer::healthmon::json::JsonMonitor;
 use xfs_healer::xfsprogs;
 
 // The struct below is a magic struct that implements argument parsing.
@@ -33,6 +34,10 @@ struct Cli {
     #[arg(long)]
     everything: bool,
 
+    /// Use the JSON interface?
+    #[arg(long)]
+    json: bool,
+
     /// XFS filesystem mountpoint to monitor
     path: PathBuf,
 }
@@ -43,6 +48,7 @@ struct App {
     debug: bool,
     log: bool,
     everything: bool,
+    json: bool,
     path: PathBuf,
 }
 
@@ -70,10 +76,18 @@ impl App {
     fn main(&self) -> Result<ExitCode> {
         let fp = File::open(&self.path)?;
 
-        let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)?;
+        if self.json {
+            let hmon = JsonMonitor::try_new(fp, &self.path, self.everything, self.debug)?;
 
-        for raw_event in hmon {
-            self.process_event(raw_event.cook());
+            for raw_event in hmon {
+                self.process_event(raw_event.cook());
+            }
+        } else {
+            let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)?;
+
+            for raw_event in hmon {
+                self.process_event(raw_event.cook());
+            }
         }
 
         Ok(ExitCode::SUCCESS)
@@ -86,6 +100,7 @@ impl From<Cli> for App {
             debug: cli.debug,
             log: cli.log,
             everything: cli.everything,
+            json: cli.json,
             path: cli.path,
         }
     }

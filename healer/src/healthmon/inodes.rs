@@ -9,17 +9,19 @@ use crate::util::format_set;
 use crate::xfs_types::{XfsFid, XfsFileRange};
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use strum_macros::EnumString;
 
 /// Metadata types for an XFS inode
-#[derive(EnumSetType, Debug, strum_macros::Display)]
+#[derive(EnumSetType, Debug, strum_macros::Display, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum XfsInodeMetadata {
-    #[strum(to_string = "attrfork")]
+    #[strum(serialize = "bmapbta", to_string = "attrfork")]
     Bmapbta,
 
-    #[strum(to_string = "cowfork")]
+    #[strum(serialize = "bmapbtc", to_string = "cowfork")]
     Bmapbtc,
 
-    #[strum(to_string = "datafork")]
+    #[strum(serialize = "bmapbtd", to_string = "datafork")]
     Bmapbtd,
 
     Core,
@@ -67,18 +69,18 @@ impl XfsHealthEvent for XfsInodeEvent {
 }
 
 /// File I/O types
-#[derive(Debug, strum_macros::Display)]
+#[derive(Debug, strum_macros::Display, EnumString)]
 pub enum XfsFileIoErrorType {
-    #[strum(to_string = "readahead")]
+    #[strum(serialize = "readahead", to_string = "readahead")]
     ReadAhead,
 
-    #[strum(to_string = "writeback")]
+    #[strum(serialize = "writeback", to_string = "writeback")]
     WriteBack,
 
-    #[strum(to_string = "directio_read")]
+    #[strum(serialize = "directio_read", to_string = "directio_read")]
     DioRead,
 
-    #[strum(to_string = "directio_write")]
+    #[strum(serialize = "directio_write", to_string = "directio_write")]
     DioWrite,
 }
 

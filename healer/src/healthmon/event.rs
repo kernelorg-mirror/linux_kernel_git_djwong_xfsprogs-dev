@@ -3,6 +3,7 @@
  * Copyright (C) 2025 Oracle.  All Rights Reserved.
  * Author: Darrick J. Wong <djwong@kernel.org>
  */
+use strum_macros::EnumString;
 
 /// Common behaviors of all health events
 pub trait XfsHealthEvent {
@@ -16,7 +17,8 @@ pub trait XfsHealthEvent {
 }
 
 /// Health status for metadata events
-#[derive(Debug, strum_macros::Display)]
+#[derive(Debug, strum_macros::Display, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum XfsHealthStatus {
     /// Problems have been observed at runtime
     Sick,

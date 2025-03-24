@@ -9,9 +9,11 @@ use crate::util::format_set;
 use crate::xfs_types::XfsPhysRange;
 use enumset::EnumSet;
 use enumset::EnumSetType;
+use strum_macros::EnumString;
 
 /// Metadata types for an XFS whole-fs metadata
-#[derive(EnumSetType, Debug, strum_macros::Display)]
+#[derive(EnumSetType, Debug, strum_macros::Display, EnumString)]
+#[strum(serialize_all = "lowercase")]
 pub enum XfsWholeFsMetadata {
     FsCounters,
     GrpQuota,
@@ -47,24 +49,24 @@ impl XfsHealthEvent for XfsWholeFsEvent {
 }
 
 /// Reasons for a filesystem shutdown event
-#[derive(EnumSetType, Debug, strum_macros::Display)]
+#[derive(EnumSetType, Debug, strum_macros::Display, EnumString)]
 pub enum XfsShutdownReason {
-    #[strum(to_string = "in-memory state corruption")]
+    #[strum(serialize = "corrupt_incore", to_string = "in-memory state corruption")]
     CorruptInCore,
 
-    #[strum(to_string = "ondisk metadata corruption")]
+    #[strum(serialize = "corrupt_ondisk", to_string = "ondisk metadata corruption")]
     CorruptOnDisk,
 
-    #[strum(to_string = "device removed")]
+    #[strum(serialize = "device_removed", to_string = "device removed")]
     DeviceRemoved,
 
-    #[strum(to_string = "forced unmount")]
+    #[strum(serialize = "force_umount", to_string = "forced unmount")]
     ForceUmount,
 
-    #[strum(to_string = "log I/O error")]
+    #[strum(serialize = "log_ioerr", to_string = "log I/O error")]
     LogIoerr,
 
-    #[strum(to_string = "metadata I/O error")]
+    #[strum(serialize = "meta_ioerr", to_string = "metadata I/O error")]
     MetaIoerr,
 }
 

@@ -8,6 +8,7 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::io::Error;
 use std::io::Result;
+use strum_macros::EnumString;
 
 /// Allocation group number on the data device
 #[derive(Debug)]
@@ -54,15 +55,15 @@ impl TryFrom<u64> for XfsRgNumber {
 }
 
 /// Disk devices
-#[derive(Debug, strum_macros::Display)]
+#[derive(Debug, strum_macros::Display, EnumString)]
 pub enum XfsDevice {
-    #[strum(to_string = "datadev")]
+    #[strum(serialize = "datadev", to_string = "datadev")]
     Data,
 
-    #[strum(to_string = "logdev")]
+    #[strum(serialize = "logdev", to_string = "logdev")]
     Log,
 
-    #[strum(to_string = "rtdev")]
+    #[strum(serialize = "rtdev", to_string = "rtdev")]
     Realtime,
 }
 
