@@ -34,6 +34,7 @@ $(XFS_HEALER_PROG): $(XFS_HEALER_PROG).in $(builddefs) $(TOPDIR)/libfrog/gettext
 		   -e '/@INIT_GETTEXT@/r $(TOPDIR)/libfrog/gettext.py' \
 		   -e '/@INIT_GETTEXT@/d' \
 		   -e "s|@pkg_data_dir@|$(PKG_DATA_DIR)|g" \
+		   -e "s|@scrub_svcname@|$(XFS_SCRUB_SVCNAME)|g" \
 		   < $< > $@
 	$(Q)chmod a+x $@
 
