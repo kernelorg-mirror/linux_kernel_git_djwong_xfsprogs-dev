@@ -89,6 +89,8 @@ impl From<Cli> for App {
 }
 
 fn main() -> ExitCode {
+    xfsprogs::init_localization();
+
     let args = Cli::new();
     if args.0.get_flag("version") {
         println!("{} {}", M_("xfs_healer version"), xfsprogs::VERSION);
