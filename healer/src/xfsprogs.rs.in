@@ -5,8 +5,27 @@
  */
 pub const VERSION: &str = "@pkg_version@";
 
+/// Try to initialize a localization library.  Like the other xfsprogs utilities, we don't care
+/// if this fails.
+#[cfg(feature = "gettext")]
+pub fn init_localization() {
+    let _ = gettextrs::setlocale(gettextrs::LocaleCategory::LcAll, "");
+    let _ = gettextrs::bindtextdomain("@PACKAGE@", "@LOCALEDIR@");
+    let _ = gettextrs::textdomain("@PACKAGE@");
+}
+
+/// Look up a string in a message catalog
+#[cfg(feature = "gettext")]
+pub use gettextrs::gettext as M_;
+
+/// Pretend to initialize localization library
+#[cfg(not(feature = "gettext"))]
+pub fn init_localization() {
+}
+
 /// Dummy function to simulate looking up a string in a message catalog
 #[allow(non_snake_case)]
+#[cfg(not(feature = "gettext"))]
 pub fn M_<T: Into<String>>(msgid: T) -> String {
     msgid.into()
 }

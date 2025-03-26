@@ -44,6 +44,19 @@ else
 	CARGO_INSTALL_FLAGS=--debug
 endif
 
+# Enable gettext if it's available
+ifeq ($(ENABLE_GETTEXT),yes)
+CARGO_BUILD_FLAGS+=--features gettext
+CARGO_CLIPPY_FLAGS+=--features gettext
+CARGO_INSTALL_FLAGS+=--features gettext
+CARGO_WANT_GETTEXT=
+else
+	# This is what you have to do to define a variable to a octothorpe.
+	define CARGO_WANT_GETTEXT
+#
+endef
+endif
+
 # Assume that if rustc supports LTO then cargo knows how to configure it.
 # rustc and cargo support LTO as of Rust-2021.
 ifeq ($(HAVE_RUSTC_LTO),yes)
@@ -97,12 +110,15 @@ $(XFS_HEALER_PROG): $(XFS_HEALER_PROG).in $(builddefs) $(TOPDIR)/libfrog/gettext
 src/xfsprogs.rs: src/xfsprogs.rs.in $(builddefs)
 	@echo "    [SED]    $@"
 	$(Q)$(SED) -e "s|@pkg_version@|$(PKG_VERSION)|g" \
+		   -e "s|@PACKAGE@|$(PKG_NAME)|g" \
+		   -e "s|@LOCALEDIR@|$(PKG_LOCALE_DIR)|g" \
 		   < $< > $@
 
 $(CARGO_MANIFEST): $(CARGO_MANIFEST).in $(builddefs)
 	@echo "    [TOML]   $@"
 	$(Q)$(SED) -e "s|@pkg_version@|$(PKG_VERSION)|g" \
 		   -e "s|@cargo_lto@|$(CARGO_LTO)|g" \
+		   -e "s|@cargo_want_gettext@|$(CARGO_WANT_GETTEXT)|g" \
 		   < $< | sed -e 's|\~WIP.*|"|g' > $@
 
 ifeq ($(USE_SYSTEM_CRATES),yes)
