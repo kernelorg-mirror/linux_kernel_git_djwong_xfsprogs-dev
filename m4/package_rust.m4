@@ -119,9 +119,15 @@ ENDL
 # Do we have all the crates we need for xfs_healer?
 AC_DEFUN([AC_HAVE_HEALER_CRATES],
 [
+  if test "$enable_gettext" = "yes"; then
+    gettext_dep='gettext-rs = { version = "0.7.0", optional = true }'
+  else
+    gettext_dep=""
+  fi
   AC_CHECK_CRATES([have_healer_crates], [xfs_healer],
     [
 clap = { version = "4.0.32", features = [["derive"]] }
+$gettext_dep
 ],
     [yes], [no])
 ])
