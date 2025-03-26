@@ -143,6 +143,17 @@ AC_ARG_ENABLE(crate-checks,
 	enable_crate_checks=yes)
 AC_SUBST(enable_crate_checks)
 
+# Some distributions do not package gettext-rs; provide a way to disable it
+# for Rust without disabling it for the C programs.
+AC_ARG_ENABLE(gettext-rs,
+[  --enable-gettext-rs=[yes/no]   Enable gettext-rs support if gettext is enabled],,
+	enable_gettext_rs="$enable_gettext")
+# If the main gettext is not enabled, then we don't want the Rust version.
+if test "$enable_gettext" = "no"; then
+	enable_gettext_rs="no"
+fi
+AC_SUBST(enable_gettext_rs)
+
 #
 # If the user specified a libdir ending in lib64 do not append another
 # 64 to the library names.
@@ -163,7 +174,7 @@ test -n "$multiarch" && enable_lib64=no
 # to "find" is required, to avoid including such directories in the
 # list.
 LOCALIZED_FILES=""
-for lfile in `find ${srcdir} -path './.??*' -prune -o -name '*.c' -print -o -name '*.py.in' -print || exit 1`; do
+for lfile in `find ${srcdir} -path './.??*' -prune -o -name '*.c' -print -o -name '*.py.in' -print -o -name '*.rs' -print || exit 1`; do
     LOCALIZED_FILES="$LOCALIZED_FILES \$(TOPDIR)/$lfile"
 done
 AC_SUBST(LOCALIZED_FILES)
