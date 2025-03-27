@@ -1,0 +1,85 @@
+.TH xfs_healer 8
+.SH NAME
+xfs_healer \- automatically heal damage to XFS filesystem metadata
+.SH SYNOPSIS
+.B xfs_healer
+[
+.B OPTIONS
+]
+.I mount-point
+.br
+.B xfs_healer \-V
+.SH DESCRIPTION
+.B xfs_healer
+is a daemon that tries to automatically repair damaged XFS filesystem metadata.
+.PP
+.B WARNING!
+This program is
+.BR EXPERIMENTAL ","
+which means that its behavior and interface
+could change at any time!
+.PP
+.B xfs_healer
+asks the kernel to report all observations of corrupt metadata, media errors,
+filesystem shutdowns, and file I/O errors.
+The program can respond to runtime metadata corruption errors by initiating
+targeted repairs of the suspect metadata or a full online fsck of the
+filesystem.
+
+Normally this program runs as a systemd service.
+The service is activated through udev whenever a filesystem is mounted.
+Only systemd is supported.
+
+The kernel may not support repairing or optimizing the filesystem.
+If this is the case, the filesystem must be unmounted and
+.BR xfs_repair (8)
+run on the filesystem to fix the problems.
+.SH OPTIONS
+.TP
+.B \-\-autofsck
+Use the
+.I autofsck
+filesystem property to decide whether or not to repair corrupt metadata.
+See the
+.B \-\-repair
+option for more details.
+If this option is specified but the kernel does not support repairs, the
+program will report but not act upon corruptions.
+.TP
+.B \-\-check
+Check if the filesystem supports sending health events.
+Exits with 0 if it does, and non-zero if not.
+.TP
+.BI \-\-everything
+Ask the kernel to send us good metadata health events, not only events related
+to metadata corruption, media errors, shutdowns, and I/O errors.
+.TP
+.B \-\-log
+Print every event to standard output.
+.TP
+.B \-\-repair
+Always try to repair each piece of corrupt metadata when the kernel tells us
+about it.
+If an individual repair fails or the kernel tells us that health events were
+lost, the
+.I xfs_scrub
+service for this mount point will be launched.
+The default is not to try to repair anything.
+If this option is specified but the kernel does not support repairs, the
+program will exit.
+.TP
+.BI \-V
+Prints the version number and exit.
+.SH CAVEATS
+.B xfs_healer
+is an immature utility!
+Do not run this program unless you have backups of your data!
+This program takes advantage of in-kernel scrubbing to verify a given
+data structure with locks held and can keep the filesystem busy for a
+long time.
+The kernel must be new enough to support the SCRUB_METADATA ioctl.
+.PP
+If errors are found and cannot be repaired, the filesystem must be
+unmounted and repaired.
+.SH SEE ALSO
+.BR xfs_repair (8).
