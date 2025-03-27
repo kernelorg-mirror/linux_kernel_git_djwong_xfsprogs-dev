@@ -7,13 +7,41 @@ include $(TOPDIR)/include/builddefs
 
 MAN_SECTION	= 8
 
-ifneq ("$(ENABLE_SCRUB)","yes")
-  MAN_PAGES = $(filter-out xfs_scrub%,$(shell echo *.$(MAN_SECTION)))
-else
-  MAN_PAGES = $(shell echo *.$(MAN_SECTION))
-  MAN_PAGES += xfs_scrub_all.8
+MAN_PAGES = \
+	fsck.xfs.8 \
+	mkfs.xfs.8 \
+	xfs_admin.8 \
+	xfs_bmap.8 \
+	xfs_copy.8 \
+	xfs_db.8 \
+	xfs_estimate.8 \
+	xfs_freeze.8 \
+	xfs_fsr.8 \
+	xfs_growfs.8 \
+	xfs_info.8 \
+	xfs_io.8 \
+	xfs_logprint.8 \
+	xfs_mdrestore.8 \
+	xfs_metadump.8 \
+	xfs_mkfile.8 \
+	xfs_ncheck.8 \
+	xfs_property.8 \
+	xfs_protofile.8 \
+	xfs_quota.8 \
+	xfs_repair.8 \
+	xfs_rtcp.8 \
+	xfs_spaceman.8
+
+ifeq ($(ENABLE_HEALER),yes)
+  MAN_PAGES += xfs_healer.8
 endif
-MAN_PAGES	+= mkfs.xfs.8
+ifeq ($(HAVE_HEALER_START_DEPS),yes)
+  MAN_PAGES += xfs_healer_start.8
+endif
+ifeq ($(ENABLE_SCRUB),yes)
+  MAN_PAGES += xfs_scrub.8 xfs_scrub_all.8
+endif
+
 MAN_DEST	= $(PKG_MAN_DIR)/man$(MAN_SECTION)
 LSRCFILES	= $(MAN_PAGES)
 DIRT		= mkfs.xfs.8 xfs_scrub_all.8
