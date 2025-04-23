@@ -3379,6 +3379,32 @@ _("illegal CoW extent size hint %lld, must be less than %u and a multiple of %u.
 	}
 }
 
+static void
+validate_device_awu(
+	struct mkfs_params	*cfg,
+	struct device_topology	*dt)
+{
+	/* Ignore hw atomic write capability if it can't do even 1 fsblock */
+	if (BBTOB(dt->awu_min) > cfg->blocksize ||
+	    BBTOB(dt->awu_max) < cfg->blocksize) {
+		dt->awu_min = 0;
+		dt->awu_max = 0;
+	}
+}
+
+static void
+validate_hw_atomic_writes(
+	struct mkfs_params	*cfg,
+	struct cli_params	*cli,
+	struct fs_topology	*ft)
+{
+	validate_device_awu(cfg, &ft->data);
+	if (cli->xi->log.name)
+		validate_device_awu(cfg, &ft->log);
+	if (cli->xi->rt.name)
+		validate_device_awu(cfg, &ft->rt);
+}
+
 /* Complain if this filesystem is not a supported configuration. */
 static void
 validate_supported(
@@ -4051,10 +4077,20 @@ _("agsize (%s) not a multiple of fs blk size (%d)\n"),
  */
 static void
 align_ag_geometry(
-	struct mkfs_params	*cfg)
+	struct mkfs_params	*cfg,
+	struct fs_topology	*ft)
 {
-	uint64_t	tmp_agsize;
-	int		dsunit = cfg->dsunit;
+	uint64_t		tmp_agsize;
+	int			dsunit = cfg->dsunit;
+
+	/*
+	 * We've already validated (or discarded) the hardware atomic write
+	 * geometry.  Try to align the agsize to the maximum atomic write unit
+	 * to give users maximum flexibility in choosing atomic write sizes.
+	 */
+	if (ft->data.awu_max > 0)
+		dsunit = max(DTOBT(ft->data.awu_max, cfg->blocklog),
+				dsunit);
 
 	if (!dsunit)
 		goto validate;
@@ -4110,7 +4146,8 @@ _("agsize rounded to %lld, sunit = %d\n"),
 				(long long)cfg->agsize, dsunit);
 	}
 
-	if ((cfg->agsize % cfg->dswidth) == 0 &&
+	if (cfg->dswidth > 0 &&
+	    (cfg->agsize % cfg->dswidth) == 0 &&
 	    cfg->dswidth != cfg->dsunit &&
 	    cfg->agcount > 1) {
 
@@ -5872,6 +5909,7 @@ main(
 	cfg.rtblocks = calc_dev_size(cli.rtsize, &cfg, &ropts, R_SIZE, "rt");
 
 	validate_rtextsize(&cfg, &cli, &ft);
+	validate_hw_atomic_writes(&cfg, &cli, &ft);
 
 	/*
 	 * Open and validate the device configurations
@@ -5890,7 +5928,7 @@ main(
 	 * aligns to device geometry correctly.
 	 */
 	calculate_initial_ag_geometry(&cfg, &cli, &xi);
-	align_ag_geometry(&cfg);
+	align_ag_geometry(&cfg, &ft);
 	if (cfg.sb_feat.zoned)
 		calculate_zone_geometry(&cfg, &cli, &xi, &zt);
 	else
