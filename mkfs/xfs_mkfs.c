@@ -3624,6 +3624,10 @@ _("log stripe unit (%d) must be a multiple of the block size (%d)\n"),
 		   cfg->loginternal && cfg->dsunit) {
 		/* lsunit and dsunit now in fs blocks */
 		cfg->lsunit = cfg->dsunit;
+	} else if (cfg->sb_feat.log_version == 2 &&
+		   !cfg->loginternal) {
+		/* use the external log device properties */
+		cfg->lsunit = DTOBT(ft->log.sunit, cfg->blocklog);
 	}
 
 	if (cfg->sb_feat.log_version == 2 &&
