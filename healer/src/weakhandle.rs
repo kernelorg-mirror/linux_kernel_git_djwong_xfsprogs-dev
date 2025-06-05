@@ -5,6 +5,7 @@
  */
 use crate::baddata;
 use crate::badness;
+use crate::getmntent::MountEntries;
 use crate::xfs_fs::xfs_fid;
 use crate::xfs_fs::xfs_fsop_geom;
 use crate::xfs_fs::xfs_fsop_handlereq;
@@ -23,7 +24,7 @@ use std::io::Result;
 use std::os::fd::AsRawFd;
 use std::os::raw::c_void;
 use std::os::unix::ffi::OsStringExt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
 
@@ -77,6 +78,9 @@ impl TryFrom<&File> for xfs_handle {
 
 /// Filesystem handle that can be disconnected from any open files
 pub struct WeakHandle {
+    /// device for the xfs filesystem
+    fsname: String,
+
     /// path to the filesystem mountpoint
     mountpoint: Arc<PathBuf>,
 
@@ -88,15 +92,15 @@ pub struct WeakHandle {
 }
 
 impl WeakHandle {
-    /// Try to reopen the filesystem from which we got the handle.
-    pub fn reopen(&self) -> Result<File> {
-        let fp = File::open(self.mountpoint.as_path())?;
+    /// Try to reopen the filesystem with a given mountpoint
+    fn reopen_from(&self, mountpoint: &Path) -> Result<File> {
+        let fp = File::open(mountpoint)?;
 
         if xfs_handle::try_from(&fp)? != self.handle {
             let s = format!(
                 "{} {}: {}",
                 M_("reopening"),
-                self.mountpoint.display(),
+                mountpoint.display(),
                 M_("Stale file handle")
             );
             return Err(Error::new(ErrorKind::Other, s));
@@ -105,9 +109,34 @@ impl WeakHandle {
         Ok(fp)
     }
 
+    /// Try to reopen the filesystem from which we got the handle.
+    pub fn reopen(&self) -> Result<File> {
+        // First try the original mountpoint
+        let orig_result = self.reopen_from(&self.mountpoint);
+        if let Ok(x) = orig_result {
+            return Ok(x);
+        }
+
+        // Now scan /proc/self/mounts for any other bind mounts of this filesystem
+        let entries = MountEntries::try_new()?;
+        for mntent in entries.filter(|x| x.fstype == "xfs" && x.fsname == self.fsname) {
+            if let Ok(x) = self.reopen_from(&mntent.dir) {
+                return Ok(x);
+            }
+        }
+
+        // Return original error
+        orig_result
+    }
+
     /// Report mountpoint in a displayable manner
     pub fn mountpoint(&self) -> String {
         self.mountpoint.display().to_string()
+    }
+
+    /// Report xfs device in a displayable manner
+    pub fn fsname(&self) -> String {
+        self.fsname.clone()
     }
 
     /// Create a soft handle from an open file descriptor and its mount point
@@ -116,8 +145,18 @@ impl WeakHandle {
         mountpoint: Arc<PathBuf>,
         fsgeom: xfs_fsop_geom,
     ) -> Result<WeakHandle> {
+        let mut entries = MountEntries::try_new()?;
+        let fsname = match entries.find(|x| x.fstype == "xfs" && x.dir == *mountpoint) {
+            None => {
+                let s = format!("{}: {}", mountpoint.display(), M_("Cannot find xfs device"));
+                return Err(Error::new(ErrorKind::Other, s));
+            }
+            Some(mntent) => mntent.fsname,
+        };
+
         Ok(WeakHandle {
             mountpoint,
+            fsname,
             handle: xfs_handle::try_from(fp)?,
             has_parent: fsgeom.has_parent(),
         })
@@ -161,6 +200,6 @@ impl WeakHandle {
 
 impl Display for WeakHandle {
     fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.mountpoint.display())
+        write!(f, "{} {}", self.fsname, self.mountpoint.display())
     }
 }
