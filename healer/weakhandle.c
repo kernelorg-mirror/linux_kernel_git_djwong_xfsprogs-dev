@@ -66,10 +66,14 @@ out_wh:
 	return -1;
 }
 
-/* Reopen a file handle obtained via weak reference. */
-int
-weakhandle_reopen(
+/*
+ * Reopen a file handle obtained via weak reference, using the given path to a
+ * mount point.
+ */
+static int
+weakhandle_reopen_from(
 	struct weakhandle	*wh,
+	const char		*path,
 	int			*fd)
 {
 	void			*hanp;
@@ -79,7 +83,7 @@ weakhandle_reopen(
 
 	*fd = -1;
 
-	mnt_fd = open(wh->mntpoint, O_RDONLY);
+	mnt_fd = open(path, O_RDONLY);
 	if (mnt_fd < 0)
 		return -1;
 
@@ -101,6 +105,44 @@ out_handle:
 out_mntfd:
 	close(mnt_fd);
 	return -1;
+}
+
+/* Reopen a file handle obtained via weak reference. */
+int
+weakhandle_reopen(
+	struct weakhandle	*wh,
+	int			*fd)
+{
+	FILE			*mtab;
+	struct mntent		*mount;
+	int			ret;
+
+	ret = weakhandle_reopen_from(wh, wh->mntpoint, fd);
+	if (!ret)
+		return 0;
+
+	mtab = setmntent(_PATH_PROC_MOUNTS, "r");
+	if (!mtab)
+		return -1;
+
+	while ((mount = getmntent(mtab)) != NULL) {
+		if (strcmp(mount->mnt_type, "xfs"))
+			continue;
+		if (strcmp(mount->mnt_fsname, wh->fs_path->fs_name))
+			continue;
+
+		ret = weakhandle_reopen_from(wh, mount->mnt_dir, fd);
+		if (!ret)
+			break;
+	}
+
+	if (*fd < 0) {
+		errno = ESTALE;
+		ret = -1;
+	}
+
+	endmntent(mtab);
+	return ret;
 }
 
 /* Tear down a weak handle */
