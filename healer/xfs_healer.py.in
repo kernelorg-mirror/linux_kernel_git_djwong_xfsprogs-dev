@@ -80,6 +80,7 @@ want_repair = False
 has_parent = False
 has_rmapbt = False
 libhandle = None
+libc = None
 
 def printlogln(*args, **kwargs):
 	'''Print a log message to stdout and flush it.'''
@@ -184,6 +185,16 @@ class xfs_handle(ctypes.Structure):
 	]
 assert ctypes.sizeof(xfs_handle) == 24
 
+def find_xfs_dev(mountpoint):
+	'''Find the xfs device for a particular mount point or raise exception.'''
+
+	for mnt in some_mount_entries(
+			lambda mnt: mnt.type == 'xfs' and \
+				    mnt.dir == mountpoint):
+		return mnt.fsname
+
+	raise Exception(_('Cannot find xfs device'))
+
 class fshandle(object):
 	def __init__(self, fd, mountpoint = None):
 		global libhandle
@@ -193,6 +204,7 @@ class fshandle(object):
 
 		if isinstance(fd, fshandle):
 			# copy an existing fshandle
+			self.fsname = fd.fsname
 			self.mountpoint = fd.mountpoint
 			ctypes.pointer(self.handle)[0] = fd.handle
 			return
@@ -201,6 +213,7 @@ class fshandle(object):
 			raise Exception(_('fshandle needs a mountpoint'))
 
 		self.mountpoint = mountpoint
+		self.fsname = find_xfs_dev(mountpoint)
 
 		# Create the file and fs handles for the open mountpoint
 		# so that we can compare them later
@@ -222,15 +235,16 @@ class fshandle(object):
 		hanp = ctypes.cast(buf, ctypes.POINTER(xfs_handle))
 		self.handle = hanp.contents
 
-	def reopen(self):
-		'''Reopen a file handle obtained via weak reference.'''
+	def reopen_from(self, mountpoint):
+		'''Reopen a file handle obtained via weak reference, using
+		a specific mount point.'''
 		global libhandle
 		global printf_prefix
 
 		buf = ctypes.c_void_p()
 		buflen = ctypes.c_size_t()
 
-		fd = os.open(self.mountpoint, os.O_RDONLY)
+		fd = os.open(mountpoint, os.O_RDONLY)
 
 		# Create the file and fs handles for the open mountpoint
 		# so that we can compare them later
@@ -257,6 +271,26 @@ class fshandle(object):
 
 		libhandle.free_handle(buf, buflen)
 		return fd
+
+	def reopen(self):
+		'''Reopen a file handle obtained via weak reference.'''
+
+		# First try the original mountpoint
+		try:
+			return self.reopen_from(self.mountpoint)
+		except Exception as e:
+			# Now scan /proc/self/mounts for any other bind mounts
+			# of this filesystem
+			for mnt in some_mount_entries(
+					lambda mnt: mnt.type == 'xfs' and \
+						    mnt.fsname == self.fsname):
+				try:
+					return self.reopen_from(mnt.dir)
+				except:
+					pass
+
+			# Return original error
+			raise e
 
 	def subst(self, ino, gen):
 		'''Substitute the inode and generation components of a handle.'''
@@ -301,6 +335,77 @@ def libhandle_load():
 	libhandle.free_handle.argtypes = (
 			ctypes.c_void_p,
 			ctypes.c_size_t)
+
+class libc_mntent(ctypes.Structure):
+	_fields_ = [
+		("mnt_fsname",	ctypes.c_char_p),
+		("mnt_dir",	ctypes.c_char_p),
+		("mnt_type",	ctypes.c_char_p),
+		("mnt_opts",	ctypes.c_char_p),
+		("mnt_freq",	ctypes.c_int),
+		("mnt_passno",	ctypes.c_int),
+	]
+
+class MountEntry(object):
+	'''Description of a mounted filesystem.'''
+	def __init__(self, fsname, dir, type, opts):
+		self.fsname = fsname
+		self.dir = pathlib.Path(dir.decode('utf-8'))
+		self.type = type.decode('utf-8')
+		self.opts = opts
+
+def mount_entries():
+	'''Iterate all mounted filesystems in the system.'''
+	try:
+		fp = libc.setmntent(b"/proc/self/mounts", b"r")
+		mntbuf = libc_mntent()
+		namebuflen = 4096
+		namebuf = ctypes.create_string_buffer(namebuflen)
+		mnt = libc.getmntent_r(fp, mntbuf, namebuf, namebuflen);
+		while mnt:
+			yield MountEntry(mnt.contents.mnt_fsname,
+					 mnt.contents.mnt_dir,
+					 mnt.contents.mnt_type,
+					 mnt.contents.mnt_opts)
+			mnt = libc.getmntent_r(fp, mntbuf, namebuf, namebuflen);
+	finally:
+		libc.endmntent(fp);
+
+def some_mount_entries(filter_fn):
+	'''Iterate some of the mounted filesystems in the system.'''
+	return filter(filter_fn, mount_entries())
+
+def libc_load():
+	'''Load libc and set things up.'''
+	global libc
+
+	soname = ctypes.util.find_library('c')
+	if soname is None:
+		errstr = os.strerror(errno.ENOENT)
+		msg = _("while finding library")
+		raise OSError(errno.ENOENT, f'{msg}: {errstr}', 'libc')
+
+	libc = ctypes.CDLL(soname, use_errno = True)
+
+	libc.setmntent.argtypes = (
+			ctypes.c_char_p,
+			ctypes.c_char_p)
+	libc.setmntent.restype = ctypes.c_void_p
+
+	libc.getmntent_r.argtypes = (
+			ctypes.c_void_p,
+			ctypes.POINTER(libc_mntent),
+			ctypes.POINTER(ctypes.c_char),
+			ctypes.c_int)
+	libc.getmntent_r.restype = ctypes.POINTER(libc_mntent)
+
+	libc.getmntent.argtypes = (
+			ctypes.c_void_p,)
+	libc.getmntent.restype = ctypes.POINTER(libc_mntent)
+
+	libc.endmntent.argtypes = (
+			ctypes.c_void_p,)
+	libc.endmntent.restype = ctypes.c_int
 
 # metadata scrubbing stuff
 XFS_SCRUB_TYPE_PROBE		= 0
@@ -1242,6 +1347,12 @@ def main():
 
 	validator_fn = init_validation(args)
 	if not validator_fn:
+		return 1
+
+	try:
+		libc_load()
+	except OSError as e:
+		eprintln(f"libc: {e}")
 		return 1
 
 	try:
