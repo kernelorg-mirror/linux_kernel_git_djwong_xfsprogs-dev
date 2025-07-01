@@ -163,6 +163,28 @@ def open_health_monitor(fd, verbose = False):
 	ret = fcntl.ioctl(fd, XFS_IOC_HEALTH_MONITOR, arg)
 	return ret
 
+class xfs_health_samefs(ctypes.Structure):
+	_fields_ = [
+		('fd',		ctypes.c_int),
+		('flags',	ctypes.c_uint),
+	]
+assert ctypes.sizeof(xfs_health_samefs) == 8
+
+XFS_IOC_HEALTH_SAMEFS = _IOW(0x58, 69, xfs_health_samefs)
+
+def is_same_fs(mon_fd, fd):
+	'''Does fd point to the same filesystem as the monitor fd?'''
+	arg = xfs_health_samefs()
+	arg.fd = fd
+	arg.flags = 0
+
+	try:
+		fcntl.ioctl(mon_fd, XFS_IOC_HEALTH_SAMEFS, arg)
+	except OSError as e:
+		# any error means this isn't the right fs mount
+		return False
+	return True
+
 # libhandle stuff
 class xfs_fsid(ctypes.Structure):
 	_fields_ = [
@@ -235,7 +257,7 @@ class fshandle(object):
 		hanp = ctypes.cast(buf, ctypes.POINTER(xfs_handle))
 		self.handle = hanp.contents
 
-	def reopen_from(self, mountpoint):
+	def reopen_from(self, mountpoint, is_acceptable):
 		'''Reopen a file handle obtained via weak reference, using
 		a specific mount point.'''
 		global libhandle
@@ -261,7 +283,8 @@ class fshandle(object):
 
 		# Did we get the same handle?
 		if buflen.value != ctypes.sizeof(xfs_handle) or \
-		   bytes(hanp.contents) != bytes(self.handle):
+		   bytes(hanp.contents) != bytes(self.handle) or \
+		   not is_acceptable(fd):
 			os.close(fd)
 			libhandle.free_handle(buf, buflen)
 			msg = _("reopening")
@@ -270,14 +293,15 @@ class fshandle(object):
 					printf_prefix)
 
 		libhandle.free_handle(buf, buflen)
+
 		return fd
 
-	def reopen(self):
+	def reopen(self, is_acceptable = lambda x: True):
 		'''Reopen a file handle obtained via weak reference.'''
 
 		# First try the original mountpoint
 		try:
-			return self.reopen_from(self.mountpoint)
+			return self.reopen_from(self.mountpoint, is_acceptable)
 		except Exception as e:
 			# Now scan /proc/self/mounts for any other bind mounts
 			# of this filesystem
@@ -285,7 +309,8 @@ class fshandle(object):
 					lambda mnt: mnt.type == 'xfs' and \
 						    mnt.fsname == self.fsname):
 				try:
-					return self.reopen_from(mnt.dir)
+					return self.reopen_from(mnt.dir,
+							is_acceptable)
 				except:
 					pass
 
@@ -895,7 +920,7 @@ def report_shutdown(event):
 	msg = _("filesystem shut down due to")
 	printlogln(f"{printf_prefix}: {msg} {some_reasons}")
 
-def handle_event(lines, fh, everything):
+def handle_event(lines, fh, everything, mon_fd):
 	'''Handle an event asynchronously.'''
 	global log
 	global has_parent
@@ -983,7 +1008,7 @@ def handle_event(lines, fh, everything):
 		if maybe_pathify:
 			pathify_event(event, fh)
 
-		repair_metadata(event, fh)
+		repair_metadata(event, fh, mon_fd)
 
 def check_monitor(mountpoint, fd):
 	'''Check if the kernel can send us health events for the given mountpoint.'''
@@ -1047,7 +1072,7 @@ def monitor(mountpoint, event_queue, check, **kwargs):
 			nr = 0
 			for lines in health_reports(mon_fp):
 				event_queue.submit(handle_event, lines, fh,
-						everything)
+						everything, mon_fd)
 
 				# Periodically run the garbage collector to
 				# constrain memory usage in the main thread.
@@ -1056,6 +1081,12 @@ def monitor(mountpoint, event_queue, check, **kwargs):
 				if nr % 5355 == 0:
 					gc.collect()
 				nr += 1
+
+			# Once we run out of events to process, shut down all
+			# the workers and wait for them to complete before we
+			# close mon_fp so that repair reopen can't walk off
+			# freed mon_fd.
+			event_queue.shutdown(wait = True, cancel_futures = True)
 
 	try:
 		fd = os.open(mountpoint, os.O_RDONLY)
@@ -1246,7 +1277,7 @@ def repair_inode(event, fd):
 		except Exception as e:
 			eprintln(f"{prefix} {structure}: {e}")
 
-def repair_metadata(event, fh):
+def repair_metadata(event, fh, mon_fd):
 	'''Repair a metadata corruption.'''
 	global debug
 	global printf_prefix
@@ -1255,7 +1286,7 @@ def repair_metadata(event, fh):
 		printlogln(f'repair {event}')
 
 	try:
-		fd = fh.reopen()
+		fd = fh.reopen(lambda fdx: is_same_fs(mon_fd, fdx))
 	except Exception as e:
 		eprintln(f"{printf_prefix}: {e}")
 		return
@@ -1389,8 +1420,6 @@ def main():
 	except KeyboardInterrupt:
 		# Consider SIGINT to be a clean exit.
 		pass
-
-	args.event_queue.shutdown()
 
 	# See the service mode comments in xfs_scrub.c for why we sleep and
 	# compress all nonzero exit codes to 1.

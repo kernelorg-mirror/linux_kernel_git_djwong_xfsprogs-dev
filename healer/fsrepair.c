@@ -232,6 +232,22 @@ try_repair_inode(
 	return REPAIR_DONE;
 }
 
+/* Make sure the reopened file is on the same fs as the monitor. */
+static bool
+is_same_fs(
+	int				mnt_fd,
+	void				*data)
+{
+	struct xfs_health_samefs	sm = {
+		.fd = mnt_fd,
+	};
+	FILE				*mon_fp = data;
+	int				ret;
+
+	ret = ioctl(fileno(mon_fp), XFS_IOC_HEALTH_SAMEFS, &sm);
+	return ret == 0;
+}
+
 /* Repair a metadata corruption. */
 int
 repair_metadata(
@@ -242,7 +258,7 @@ repair_metadata(
 	int					repair_fd;
 	int					ret;
 
-	ret = weakhandle_reopen(ctx->wh, &repair_fd);
+	ret = weakhandle_reopen(ctx->wh, &repair_fd, is_same_fs, ctx->mon_fp);
 	if (ret) {
 		fprintf(stderr, "%s: %s: %s\n", ctx->mntpoint,
 				_("cannot open filesystem to repair"),
