@@ -73,7 +73,9 @@ static int
 weakhandle_reopen_from(
 	struct weakhandle	*wh,
 	const char		*path,
-	int			*fd)
+	int			*fd,
+	weakhandle_fd_t		is_acceptable,
+	void			*data)
 {
 	void			*hanp;
 	size_t			hlen;
@@ -95,6 +97,11 @@ weakhandle_reopen_from(
 		goto out_handle;
 	}
 
+	if (is_acceptable && !is_acceptable(mnt_fd, data)) {
+		errno = ESTALE;
+		goto out_handle;
+	}
+
 	free_handle(hanp, hlen);
 	*fd = mnt_fd;
 	return 0;
@@ -110,13 +117,15 @@ out_mntfd:
 int
 weakhandle_reopen(
 	struct weakhandle	*wh,
-	int			*fd)
+	int			*fd,
+	weakhandle_fd_t		is_acceptable,
+	void			*data)
 {
 	FILE			*mtab;
 	struct mntent		*mount;
 	int			ret;
 
-	ret = weakhandle_reopen_from(wh, wh->mntpoint, fd);
+	ret = weakhandle_reopen_from(wh, wh->mntpoint, fd, is_acceptable, data);
 	if (!ret)
 		return 0;
 
@@ -130,7 +139,8 @@ weakhandle_reopen(
 		if (strcmp(mount->mnt_fsname, wh->fsname))
 			continue;
 
-		ret = weakhandle_reopen_from(wh, mount->mnt_dir, fd);
+		ret = weakhandle_reopen_from(wh, mount->mnt_dir, fd,
+				is_acceptable, data);
 		if (!ret)
 			break;
 	}
@@ -215,7 +225,7 @@ weakhandle_getpath_for(
 	fakehandle.ha_fid.fid_ino = ino;
 	fakehandle.ha_fid.fid_gen = gen;
 
-	ret = weakhandle_reopen(wh, &mnt_fd);
+	ret = weakhandle_reopen(wh, &mnt_fd, NULL, NULL);
 	if (ret)
 		return ret;
 
