@@ -92,10 +92,14 @@ pub struct WeakHandle {
 
 impl WeakHandle {
     /// Try to reopen the filesystem with a given mountpoint
-    fn reopen_from(&self, mountpoint: &Path) -> Result<File> {
+    fn reopen_from(
+        &self,
+        mountpoint: &Path,
+        is_acceptable: impl Fn(&File) -> bool,
+    ) -> Result<File> {
         let fp = File::open(mountpoint)?;
 
-        if xfs_handle::try_from(&fp)? != self.handle {
+        if xfs_handle::try_from(&fp)? != self.handle || !is_acceptable(&fp) {
             let s = format!(
                 "{} {}: {}",
                 M_("reopening"),
@@ -109,9 +113,9 @@ impl WeakHandle {
     }
 
     /// Try to reopen the filesystem from which we got the handle.
-    pub fn reopen(&self) -> Result<File> {
+    pub fn reopen(&self, is_acceptable: impl Fn(&File) -> bool) -> Result<File> {
         // First try the original mountpoint
-        let orig_result = self.reopen_from(&self.mountpoint);
+        let orig_result = self.reopen_from(&self.mountpoint, &is_acceptable);
         if let Ok(x) = orig_result {
             return Ok(x);
         }
@@ -119,7 +123,7 @@ impl WeakHandle {
         // Now scan /proc/self/mounts for any other bind mounts of this filesystem
         let entries = MountEntries::try_new()?;
         for mntent in entries.filter(|x| x.fstype == "xfs" && x.fsname == self.fsname) {
-            if let Ok(x) = self.reopen_from(&mntent.dir) {
+            if let Ok(x) = self.reopen_from(&mntent.dir, &is_acceptable) {
                 return Ok(x);
             }
         }

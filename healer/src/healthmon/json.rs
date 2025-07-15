@@ -17,6 +17,7 @@ use crate::healthmon::groups::{XfsPeragEvent, XfsPeragMetadata};
 use crate::healthmon::groups::{XfsRtgroupEvent, XfsRtgroupMetadata};
 use crate::healthmon::inodes::{XfsFileIoErrorEvent, XfsFileIoErrorType};
 use crate::healthmon::inodes::{XfsInodeEvent, XfsInodeMetadata};
+use crate::healthmon::samefs::SameFs;
 use crate::healthmon::xfs_ioc_health_monitor;
 use crate::printlogln;
 use crate::xfs_fs;
@@ -38,6 +39,7 @@ use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 
 /// Boilerplate to stamp out functions to convert json array to an enumset
 /// of the given enum type; or return an error with the given message.
@@ -106,6 +108,9 @@ pub struct JsonMonitor<'a> {
 
     /// are we debugging?
     debug: bool,
+
+    /// object that repair threads use to check their reopened files against the monitored fs
+    samefs: Arc<SameFs>,
 }
 
 impl JsonMonitor<'_> {
@@ -127,9 +132,9 @@ impl JsonMonitor<'_> {
 
         // SAFETY: Trusting the kernel ioctl not to corrupt stack contents, and to return us a valid
         // file description number.
-        let health_fp = unsafe {
+        let (health_fp, samefs) = unsafe {
             let health_fd = xfs_ioc_health_monitor(fp.as_raw_fd(), &hminfo)?;
-            File::from_raw_fd(health_fd)
+            (File::from_raw_fd(health_fd), SameFs::new(health_fd))
         };
         drop(fp);
 
@@ -137,7 +142,13 @@ impl JsonMonitor<'_> {
             lineiter: BufReader::new(health_fp).lines(),
             mountpoint,
             debug,
+            samefs: samefs.into(),
         })
+    }
+
+    /// Return an object that can be used to check reopened files
+    pub fn new_samefs(&self) -> Arc<SameFs> {
+        self.samefs.clone()
     }
 }
 
