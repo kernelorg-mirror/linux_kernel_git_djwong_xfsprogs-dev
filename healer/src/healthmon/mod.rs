@@ -5,6 +5,7 @@
  */
 use crate::xfs_fs;
 use crate::xfs_fs::xfs_health_monitor;
+use crate::xfs_fs::xfs_health_samefs;
 use nix::ioctl_write_ptr;
 use std::fs::File;
 use std::os::fd::AsRawFd;
@@ -15,8 +16,10 @@ pub mod event;
 pub mod fs;
 pub mod groups;
 pub mod inodes;
+pub mod samefs;
 
 ioctl_write_ptr!(xfs_ioc_health_monitor, 'X', 68, xfs_health_monitor);
+ioctl_write_ptr!(xfs_ioc_health_samefs, 'X', 69, xfs_health_samefs);
 
 /// Check if the open file supports a health monitor.
 pub fn is_supported(fp: &File) -> bool {
