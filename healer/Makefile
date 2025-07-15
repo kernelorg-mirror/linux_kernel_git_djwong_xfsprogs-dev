@@ -48,7 +48,8 @@ RUSTFILES = \
 	src/healthmon/fs.rs \
 	src/healthmon/groups.rs \
 	src/healthmon/inodes.rs \
-	src/healthmon/mod.rs
+	src/healthmon/mod.rs \
+	src/healthmon/samefs.rs
 
 BUILT_RUSTFILES = \
 	src/xfs_fs.rs \

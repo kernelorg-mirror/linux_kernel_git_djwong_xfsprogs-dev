@@ -14,6 +14,7 @@ use xfs_healer::fsprops;
 use xfs_healer::fsprops::XfsAutofsck;
 use xfs_healer::healthmon::cstruct::CStructMonitor;
 use xfs_healer::healthmon::event::XfsHealthEvent;
+use xfs_healer::healthmon::samefs::SameFs;
 use xfs_healer::printlogln;
 use xfs_healer::repair::Repair;
 use xfs_healer::weakhandle::WeakHandle;
@@ -138,6 +139,7 @@ impl App {
     /// Handle a health event that has been decoded into real objects
     fn process_event(
         et: EventThread,
+        samefs: Arc<SameFs>,
         fh: Arc<WeakHandle>,
         cooked: Result<Box<dyn XfsHealthEvent>>,
     ) {
@@ -155,7 +157,7 @@ impl App {
                 }
                 if et.repair {
                     for mut repair in event.schedule_repairs(et.everything) {
-                        repair.perform(&fh)
+                        repair.perform(&samefs, &fh)
                     }
                 }
             }
@@ -166,11 +168,12 @@ impl App {
     fn dispatch_cstruct_event(
         threads: &ThreadPool,
         et: EventThread,
+        samefs: Arc<SameFs>,
         fh: Arc<WeakHandle>,
         raw_event: xfs_health_monitor_event,
     ) {
         threads.execute(move || {
-            App::process_event(et, fh, raw_event.cook());
+            App::process_event(et, samefs, fh, raw_event.cook());
         })
     }
 
@@ -286,15 +289,20 @@ impl App {
 
         let hmon = CStructMonitor::try_new(fp, &self.path, self.everything)
             .with_context(|| M_("Opening health monitor file"))?;
+        let samefs = hmon.new_samefs();
 
         for raw_event in hmon {
             App::dispatch_cstruct_event(
                 &threads,
                 EventThread::new(self),
+                samefs.clone(),
                 fh.clone(),
                 raw_event,
             );
         }
+
+        // Prohibit hmon from leaving scope (and closing the health mon fd) before the worker
+        // threads have finished whatever they're doing.
         threads.join();
 
         Ok(ExitCode::SUCCESS)
