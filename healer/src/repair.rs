@@ -8,6 +8,7 @@ use crate::display_for_enum;
 use crate::healthmon::fs::XfsWholeFsMetadata;
 use crate::healthmon::groups::{XfsPeragMetadata, XfsRtgroupMetadata};
 use crate::healthmon::inodes::XfsInodeMetadata;
+use crate::healthmon::samefs::SameFs;
 use crate::printlogln;
 use crate::weakhandle::WeakHandle;
 use crate::xfs_fs;
@@ -299,7 +300,7 @@ impl Repair {
     }
 
     /// Call the kernel to repair things
-    fn repair(&mut self, fh: &WeakHandle) -> Result<bool> {
+    fn repair(&mut self, samefs: &SameFs, fh: &WeakHandle) -> Result<bool> {
         if self.group == RepairGroup::FullRepair {
             let started = self.run_full_repair(fh)?;
             if started {
@@ -308,7 +309,7 @@ impl Repair {
             return Ok(started);
         }
 
-        let fp = fh.reopen()?;
+        let fp = fh.reopen(|fp| samefs.is_same_fs(fp))?;
 
         // SAFETY: Trusting the kernel not to corrupt memory.
         unsafe {
@@ -389,8 +390,8 @@ impl Repair {
     }
 
     /// Try to repair something, or log whatever went wrong
-    pub fn perform(&mut self, fh: &WeakHandle) {
-        match self.repair(fh) {
+    pub fn perform(&mut self, samefs: &SameFs, fh: &WeakHandle) {
+        match self.repair(samefs, fh) {
             Err(e) => {
                 eprintln!("{}: {}", fh.mountpoint(), e);
             }
@@ -400,7 +401,7 @@ impl Repair {
                 // Transform into a full repair if we failed to fix things.
                 if self.outcome == RepairOutcome::Failed && self.group != RepairGroup::FullRepair {
                     self.group = RepairGroup::FullRepair;
-                    self.perform(fh);
+                    self.perform(samefs, fh);
                 }
             }
         };

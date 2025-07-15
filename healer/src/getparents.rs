@@ -188,7 +188,7 @@ impl WeakHandle {
             return None;
         }
 
-        let fp = match self.reopen() {
+        let fp = match self.reopen(|_| true) {
             Err(_) => return None,
             Ok(x) => x,
         };

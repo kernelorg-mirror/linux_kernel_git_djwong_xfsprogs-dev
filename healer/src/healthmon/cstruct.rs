@@ -17,6 +17,7 @@ use crate::healthmon::groups::{XfsPeragEvent, XfsPeragMetadata};
 use crate::healthmon::groups::{XfsRtgroupEvent, XfsRtgroupMetadata};
 use crate::healthmon::inodes::{XfsFileIoErrorEvent, XfsFileIoErrorType};
 use crate::healthmon::inodes::{XfsInodeEvent, XfsInodeMetadata};
+use crate::healthmon::samefs::SameFs;
 use crate::healthmon::xfs_ioc_health_monitor;
 use crate::xfs_fs;
 use crate::xfs_fs::xfs_health_monitor;
@@ -33,6 +34,7 @@ use std::io::Result;
 use std::os::fd::AsRawFd;
 use std::os::fd::FromRawFd;
 use std::path::Path;
+use std::sync::Arc;
 
 /// Boilerplate to stamp out functions to convert a u32 mask to an enumset
 /// of the given enum type.
@@ -74,6 +76,9 @@ pub struct CStructMonitor<'a> {
 
     /// path to the filesystem mountpoint
     mountpoint: &'a Path,
+
+    /// object that repair threads use to check their reopened files against the monitored fs
+    samefs: Arc<SameFs>,
 }
 
 impl CStructMonitor<'_> {
@@ -90,16 +95,22 @@ impl CStructMonitor<'_> {
 
         // SAFETY: Trusting the kernel ioctl not to corrupt stack contents, and to return us a valid
         // file description number.
-        let health_fp = unsafe {
+        let (health_fp, samefs) = unsafe {
             let health_fd = xfs_ioc_health_monitor(fp.as_raw_fd(), &hminfo)?;
-            File::from_raw_fd(health_fd)
+            (File::from_raw_fd(health_fd), SameFs::new(health_fd))
         };
         drop(fp);
 
         Ok(CStructMonitor {
             objiter: BufReader::new(health_fp),
             mountpoint,
+            samefs: samefs.into(),
         })
+    }
+
+    /// Return an object that can be used to check reopened files
+    pub fn new_samefs(&self) -> Arc<SameFs> {
+        self.samefs.clone()
     }
 }
 
