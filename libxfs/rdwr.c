@@ -120,7 +120,7 @@ libxfs_device_zero(struct xfs_buftarg *btp, xfs_daddr_t start, uint len)
 
 static void unmount_record(void *p)
 {
-	xlog_op_header_t	*op = (xlog_op_header_t *)p;
+	struct xlog_op_header	*op = (struct xlog_op_header *)p;
 	/* the data section must be 32 bit size aligned */
 	struct {
 	    uint16_t magic;
@@ -137,7 +137,7 @@ static void unmount_record(void *p)
 	op->oh_res2 = 0;
 
 	/* and the data for this op */
-	memcpy((char *)p + sizeof(xlog_op_header_t), &magic, sizeof(magic));
+	memcpy((char *)p + sizeof(struct xlog_op_header), &magic, sizeof(magic));
 }
 
 static char *next(
