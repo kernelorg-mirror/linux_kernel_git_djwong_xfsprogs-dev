@@ -2689,7 +2689,7 @@ xfs_rmap_finish_one(
 
 	trace_xfs_rmap_deferred(mp, ri);
 
-	if (XFS_TEST_ERROR(false, mp, XFS_ERRTAG_RMAP_FINISH_ONE))
+	if (XFS_TEST_ERROR(mp, XFS_ERRTAG_RMAP_FINISH_ONE))
 		return -EIO;
 
 	/*
