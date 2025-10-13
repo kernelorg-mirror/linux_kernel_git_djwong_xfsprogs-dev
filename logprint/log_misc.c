@@ -220,13 +220,13 @@ xlog_print_trans_header(char **ptr, int len)
 static int
 xlog_print_trans_buffer(char **ptr, int len, int *i, int num_ops)
 {
-    xfs_buf_log_format_t *f;
+    struct xfs_buf_log_format *f;
     struct xlog_op_header	 *head = NULL;
     int			 num, skip;
     int			 super_block = 0;
     int			 bucket, col, buckets;
     int64_t			 blkno;
-    xfs_buf_log_format_t lbuf;
+    struct xfs_buf_log_format lbuf;
     int			 size, blen, map_size, struct_size;
     unsigned short	 flags;
 
@@ -234,7 +234,7 @@ xlog_print_trans_buffer(char **ptr, int len, int *i, int num_ops)
      * memmove to ensure 8-byte alignment for the long longs in
      * buf_log_format_t structure
      */
-    memmove(&lbuf, *ptr, min(sizeof(xfs_buf_log_format_t), len));
+    memmove(&lbuf, *ptr, min(sizeof(struct xfs_buf_log_format), len));
     f = &lbuf;
     *ptr += len;
 
