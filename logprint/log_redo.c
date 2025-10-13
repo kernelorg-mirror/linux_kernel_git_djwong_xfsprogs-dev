@@ -42,7 +42,7 @@ xfs_efi_copy_format(
 		}
 		return 0;
 	} else if (len == len64) {
-		xfs_efi_log_format_64_t *src_efi_fmt_64 = (xfs_efi_log_format_64_t *)buf;
+		struct xfs_efi_log_format_64 *src_efi_fmt_64 = (struct xfs_efi_log_format_64 *)buf;
 
 		dst_efi_fmt->efi_type	 = src_efi_fmt_64->efi_type;
 		dst_efi_fmt->efi_size	 = src_efi_fmt_64->efi_size;
