@@ -202,10 +202,10 @@ STATIC void
 xlog_recover_print_dquot(
 	struct xlog_recover_item *item)
 {
-	xfs_dq_logformat_t	*f;
+	struct xfs_dq_logformat	*f;
 	struct xfs_disk_dquot	*d;
 
-	f = (xfs_dq_logformat_t *)item->ri_buf[0].iov_base;
+	f = (struct xfs_dq_logformat *)item->ri_buf[0].iov_base;
 	ASSERT(f);
 	ASSERT(f->qlf_len == 1);
 	d = (struct xfs_disk_dquot *)item->ri_buf[1].iov_base;
