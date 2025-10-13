@@ -28,7 +28,7 @@ xfs_efi_copy_format(
 		memcpy((char *)dst_efi_fmt, buf, len);
 		return 0;
 	} else if (len == len32) {
-		xfs_efi_log_format_32_t *src_efi_fmt_32 = (xfs_efi_log_format_32_t *)buf;
+		struct xfs_efi_log_format_32 *src_efi_fmt_32 = (struct xfs_efi_log_format_32 *)buf;
 
 		dst_efi_fmt->efi_type	 = src_efi_fmt_32->efi_type;
 		dst_efi_fmt->efi_size	 = src_efi_fmt_32->efi_size;
