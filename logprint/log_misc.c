@@ -95,19 +95,19 @@ print_or_dump(char *ptr, int len) {
  * a log operation header.
  */
 void
-xlog_print_op_header(xlog_op_header_t	*op_head,
+xlog_print_op_header(struct xlog_op_header	*op_head,
 		     int		i,
 		     char		**ptr)
 {
-    xlog_op_header_t hbuf;
+    struct xlog_op_header hbuf;
 
     /*
      * memmove because on 64/n32, partial reads can cause the op_head
      * pointer to come in pointing to an odd-numbered byte
      */
-    memmove(&hbuf, op_head, sizeof(xlog_op_header_t));
+    memmove(&hbuf, op_head, sizeof(struct xlog_op_header));
     op_head = &hbuf;
-    *ptr += sizeof(xlog_op_header_t);
+    *ptr += sizeof(struct xlog_op_header);
     printf(_("Oper (%d): tid: %x  len: %d  clientid: %s  "), i,
 	    be32_to_cpu(op_head->oh_tid),
 	    be32_to_cpu(op_head->oh_len),
@@ -221,7 +221,7 @@ static int
 xlog_print_trans_buffer(char **ptr, int len, int *i, int num_ops)
 {
     xfs_buf_log_format_t *f;
-    xlog_op_header_t	 *head = NULL;
+    struct xlog_op_header	 *head = NULL;
     int			 num, skip;
     int			 super_block = 0;
     int			 bucket, col, buckets;
@@ -275,7 +275,7 @@ xlog_print_trans_buffer(char **ptr, int len, int *i, int num_ops)
     }
     while (num-- > 0) {
 	(*i)++;
-	head = (xlog_op_header_t *)*ptr;
+	head = (struct xlog_op_header *)*ptr;
 	xlog_print_op_header(head, *i, ptr);
 	if (super_block) {
 		printf(_("SUPER BLOCK Buffer: "));
@@ -594,7 +594,7 @@ xlog_print_trans_inode(
 	    return skip_count;
 
     /* core inode comes 2nd */
-    op_head = (xlog_op_header_t *)*ptr;
+    op_head = (struct xlog_op_header *)*ptr;
     xlog_print_op_header(op_head, *i, ptr);
 
     if (op_head->oh_flags & XLOG_CONTINUE_TRANS)  {
@@ -625,7 +625,7 @@ xlog_print_trans_inode(
     ASSERT((f->ilf_size == 3) || (f->ilf_fields & XFS_ILOG_AFORK));
 
     /* does anything come next */
-    op_head = (xlog_op_header_t *)*ptr;
+    op_head = (struct xlog_op_header *)*ptr;
 
     if (f->ilf_fields & XFS_ILOG_DFORK) {
 	    if (*i == num_ops-1)
@@ -653,7 +653,7 @@ xlog_print_trans_inode(
 	    *ptr += be32_to_cpu(op_head->oh_len);
 	    if (op_head->oh_flags & XLOG_CONTINUE_TRANS)
 	        return skip_count;
-	    op_head = (xlog_op_header_t *)*ptr;
+	    op_head = (struct xlog_op_header *)*ptr;
 	    skip_count--;
     }
 
@@ -697,7 +697,7 @@ xlog_print_trans_dquot(char **ptr, int len, int *i, int num_ops)
     xfs_dq_logformat_t		*f;
     xfs_dq_logformat_t		lbuf = {0};
     struct xfs_disk_dquot	ddq;
-    xlog_op_header_t		*head = NULL;
+    struct xlog_op_header		*head = NULL;
     int				num, skip;
 
     /*
@@ -732,7 +732,7 @@ xlog_print_trans_dquot(char **ptr, int len, int *i, int num_ops)
     }
 
     while (num-- > 0) {
-	head = (xlog_op_header_t *)*ptr;
+	head = (struct xlog_op_header *)*ptr;
 	xlog_print_op_header(head, *i, ptr);
 	ASSERT(be32_to_cpu(head->oh_len) == sizeof(struct xfs_disk_dquot));
 	memmove(&ddq, *ptr, sizeof(struct xfs_disk_dquot));
@@ -928,7 +928,7 @@ xlog_print_record(
     for (i=0; i<num_ops; i++) {
 	int continued;
 
-	xlog_op_header_t *op_head = (xlog_op_header_t *)ptr;
+	struct xlog_op_header *op_head = (struct xlog_op_header *)ptr;
 
 	print_xlog_op_line();
 	xlog_print_op_header(op_head, i, &ptr);
