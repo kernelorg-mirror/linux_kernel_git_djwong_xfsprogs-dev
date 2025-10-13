@@ -72,13 +72,13 @@ xlog_recover_print_buffer(
 {
 	xfs_agi_t		*agi;
 	xfs_agf_t		*agf;
-	xfs_buf_log_format_t	*f;
+	struct xfs_buf_log_format	*f;
 	char			*p;
 	int			len, num, i;
 	xfs_daddr_t		blkno;
 	struct xfs_disk_dquot	*ddq;
 
-	f = (xfs_buf_log_format_t *)item->ri_buf[0].iov_base;
+	f = (struct xfs_buf_log_format *)item->ri_buf[0].iov_base;
 	printf("	");
 	ASSERT(f->blf_type == XFS_LI_BUF);
 	printf(_("BUF:  #regs:%d   start blkno:0x%llx   len:%d   bmap size:%d   flags:0x%x\n"),
