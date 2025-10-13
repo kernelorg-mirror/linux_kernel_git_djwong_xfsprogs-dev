@@ -183,9 +183,9 @@ STATIC void
 xlog_recover_print_quotaoff(
 	struct xlog_recover_item *item)
 {
-	xfs_qoff_logformat_t	*qoff_f;
+	struct xfs_qoff_logformat	*qoff_f;
 
-	qoff_f = (xfs_qoff_logformat_t *)item->ri_buf[0].iov_base;
+	qoff_f = (struct xfs_qoff_logformat *)item->ri_buf[0].iov_base;
 
 	ASSERT(qoff_f);
 	printf(_("\tQUOTAOFF: #regs:%d   type:"), qoff_f->qf_size);
