@@ -65,7 +65,7 @@ int xlog_print_trans_attri_value(char **ptr, uint src_len, int value_len,
 extern void xlog_recover_print_attri(struct xlog_recover_item *item);
 extern int xlog_print_trans_attrd(char **ptr, uint len);
 extern void xlog_recover_print_attrd(struct xlog_recover_item *item);
-extern void xlog_print_op_header(xlog_op_header_t *op_head, int i, char **ptr);
+extern void xlog_print_op_header(struct xlog_op_header *op_head, int i, char **ptr);
 
 int xlog_print_trans_xmi(char **ptr, uint src_len, int continued);
 void xlog_recover_print_xmi(struct xlog_recover_item *item);
