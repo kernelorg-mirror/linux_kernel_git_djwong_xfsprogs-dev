@@ -449,13 +449,13 @@ xlog_print_trans_buffer(char **ptr, int len, int *i, int num_ops)
 static int
 xlog_print_trans_qoff(char **ptr, uint len)
 {
-    xfs_qoff_logformat_t *f;
-    xfs_qoff_logformat_t lbuf;
+    struct xfs_qoff_logformat *f;
+    struct xfs_qoff_logformat lbuf;
 
-    memmove(&lbuf, *ptr, min(sizeof(xfs_qoff_logformat_t), len));
+    memmove(&lbuf, *ptr, min(sizeof(struct xfs_qoff_logformat), len));
     f = &lbuf;
     *ptr += len;
-    if (len >= sizeof(xfs_qoff_logformat_t)) {
+    if (len >= sizeof(struct xfs_qoff_logformat)) {
 	printf(_("QOFF:  #regs: %d    flags: 0x%x\n"), f->qf_size, f->qf_flags);
 	return 0;
     } else {

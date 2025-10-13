@@ -62,7 +62,7 @@ typedef struct xfs_buf_log_item {
 typedef struct xfs_qoff_logitem {
 	xfs_log_item_t		qql_item;	/* common portion */
 	struct xfs_qoff_logitem	*qql_start_lip;	/* qoff-start logitem, if any */
-	xfs_qoff_logformat_t	qql_format;	/* logged structure */
+	struct xfs_qoff_logformat	qql_format;	/* logged structure */
 } xfs_qoff_logitem_t;
 
 typedef struct xfs_trans {
