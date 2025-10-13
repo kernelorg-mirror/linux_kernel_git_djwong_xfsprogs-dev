@@ -1112,7 +1112,7 @@ xlog_recover_add_to_trans(
 		}
 
 		item->ri_total = in_f->ilf_size;
-		item->ri_buf = kzalloc(item->ri_total * sizeof(xfs_log_iovec_t),
+		item->ri_buf = kzalloc(item->ri_total * sizeof(struct xfs_log_iovec),
 				    0);
 	}
 	ASSERT(item->ri_total > item->ri_cnt);
