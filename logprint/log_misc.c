@@ -694,8 +694,8 @@ xlog_print_trans_inode(
 static int
 xlog_print_trans_dquot(char **ptr, int len, int *i, int num_ops)
 {
-    xfs_dq_logformat_t		*f;
-    xfs_dq_logformat_t		lbuf = {0};
+    struct xfs_dq_logformat		*f;
+    struct xfs_dq_logformat		lbuf = {0};
     struct xfs_disk_dquot	ddq;
     struct xlog_op_header		*head = NULL;
     int				num, skip;
@@ -704,14 +704,14 @@ xlog_print_trans_dquot(char **ptr, int len, int *i, int num_ops)
      * print dquot header region
      *
      * memmove to ensure 8-byte alignment for the long longs in
-     * xfs_dq_logformat_t structure
+     * struct xfs_dq_logformat structure
      */
-    memmove(&lbuf, *ptr, min(sizeof(xfs_dq_logformat_t), len));
+    memmove(&lbuf, *ptr, min(sizeof(struct xfs_dq_logformat), len));
     f = &lbuf;
     (*i)++;					/* bump index */
     *ptr += len;
 
-    if (len == sizeof(xfs_dq_logformat_t)) {
+    if (len == sizeof(struct xfs_dq_logformat)) {
 	printf(_("#regs: %d   id: 0x%x"), f->qlf_size, f->qlf_id);
 	printf(_("  blkno: %lld  len: %d  boff: %d\n"),
 		(long long)f->qlf_blkno, f->qlf_len, f->qlf_boffset);
