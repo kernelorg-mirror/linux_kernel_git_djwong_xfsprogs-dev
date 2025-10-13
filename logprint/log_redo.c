@@ -19,7 +19,7 @@ xfs_efi_copy_format(
 	int			  continued)
 {
 	uint i;
-	uint nextents = ((xfs_efi_log_format_t *)buf)->efi_nextents;
+	uint nextents = ((struct xfs_efi_log_format *)buf)->efi_nextents;
 	uint dst_len = xfs_efi_log_format_sizeof(nextents);
 	uint len32 = xfs_efi_log_format32_sizeof(nextents);
 	uint len64 = xfs_efi_log_format64_sizeof(nextents);
@@ -68,18 +68,18 @@ xlog_print_trans_efi(
 	int			continued)
 {
 	const char		*item_name = "EFI?";
-	xfs_efi_log_format_t	*src_f, *f = NULL;
+	struct xfs_efi_log_format	*src_f, *f = NULL;
 	uint			dst_len;
 	struct xfs_extent		*ex;
 	int			i;
 	int			error = 0;
-	int			core_size = offsetof(xfs_efi_log_format_t, efi_extents);
+	int			core_size = offsetof(struct xfs_efi_log_format, efi_extents);
 
 	/*
 	 * memmove to ensure 8-byte alignment for the long longs in
-	 * xfs_efi_log_format_t structure
+	 * struct xfs_efi_log_format structure
 	 */
-	if ((src_f = (xfs_efi_log_format_t *)malloc(src_len)) == NULL) {
+	if ((src_f = (struct xfs_efi_log_format *)malloc(src_len)) == NULL) {
 		fprintf(stderr, _("%s: xlog_print_trans_efi: malloc failed\n"), progname);
 		exit(1);
 	}
@@ -95,7 +95,7 @@ xlog_print_trans_efi(
 		goto error;
 	}
 
-	if ((f = (xfs_efi_log_format_t *)malloc(dst_len)) == NULL) {
+	if ((f = (struct xfs_efi_log_format *)malloc(dst_len)) == NULL) {
 		fprintf(stderr, _("%s: xlog_print_trans_efi: malloc failed\n"), progname);
 		exit(1);
 	}
@@ -138,12 +138,12 @@ xlog_recover_print_efi(
 	struct xlog_recover_item *item)
 {
 	const char		*item_name = "EFI?";
-	xfs_efi_log_format_t	*f, *src_f;
+	struct xfs_efi_log_format	*f, *src_f;
 	struct xfs_extent		*ex;
 	int			i;
 	uint			src_len, dst_len;
 
-	src_f = (xfs_efi_log_format_t *)item->ri_buf[0].iov_base;
+	src_f = (struct xfs_efi_log_format *)item->ri_buf[0].iov_base;
 	src_len = item->ri_buf[0].iov_len;
 	/*
 	 * An xfs_efi_log_format structure contains a variable length array
@@ -151,9 +151,9 @@ xlog_recover_print_efi(
 	 * Each element is of size xfs_extent_32_t or xfs_extent_64_t.
 	 * Need to convert to native format.
 	 */
-	dst_len = sizeof(xfs_efi_log_format_t) +
+	dst_len = sizeof(struct xfs_efi_log_format) +
 		(src_f->efi_nextents) * sizeof(struct xfs_extent);
-	if ((f = (xfs_efi_log_format_t *)malloc(dst_len)) == NULL) {
+	if ((f = (struct xfs_efi_log_format *)malloc(dst_len)) == NULL) {
 		fprintf(stderr, _("%s: xlog_recover_print_efi: malloc failed\n"),
 			progname);
 		exit(1);
