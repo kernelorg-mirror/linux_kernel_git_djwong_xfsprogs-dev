@@ -188,7 +188,7 @@ xlog_print_find_tid(xlog_tid_t tid, uint was_cont)
 static int
 xlog_print_trans_header(char **ptr, int len)
 {
-    xfs_trans_header_t  *h;
+    struct xfs_trans_header  *h;
     char		*cptr = *ptr;
     uint32_t          magic;
     char                *magic_c = (char *)&magic;
@@ -206,11 +206,11 @@ xlog_print_trans_header(char **ptr, int len)
 		magic_c[0], magic_c[1], magic_c[2], magic_c[3]);
 #endif
     }
-    if (len != sizeof(xfs_trans_header_t)) {
+    if (len != sizeof(struct xfs_trans_header)) {
 	printf(_("   Not enough data to decode further\n"));
 	return 1;
     }
-    h = (xfs_trans_header_t *)cptr;
+    h = (struct xfs_trans_header *)cptr;
     printf(_("     tid: %x  num_items: %d\n"),
 	   h->th_tid, h->th_num_items);
     return 0;
