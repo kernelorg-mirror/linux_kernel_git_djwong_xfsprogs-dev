@@ -1026,7 +1026,7 @@ xlog_recover_add_to_cont_trans(
 		/* finish copying rest of trans header */
 		xlog_recover_add_item(&trans->r_itemq);
 		ptr = (char *) &trans->r_theader +
-				sizeof(xfs_trans_header_t) - len;
+				sizeof(struct xfs_trans_header) - len;
 		memcpy(ptr, dp, len); /* d, s, l */
 		return 0;
 	}
@@ -1079,7 +1079,7 @@ xlog_recover_add_to_trans(
 			ASSERT(0);
 			return XFS_ERROR(EIO);
 		}
-		if (len == sizeof(xfs_trans_header_t))
+		if (len == sizeof(struct xfs_trans_header))
 			xlog_recover_add_item(&trans->r_itemq);
 		memcpy(&trans->r_theader, dp, len); /* d, s, l */
 		return 0;
