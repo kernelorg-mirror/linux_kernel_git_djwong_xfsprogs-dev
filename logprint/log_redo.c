@@ -793,7 +793,7 @@ xlog_print_trans_attri(
 	int				*i)
 {
 	struct xfs_attri_log_format	*src_f = NULL;
-	xlog_op_header_t		*head = NULL;
+	struct xlog_op_header		*head = NULL;
 	void				*name_ptr = NULL;
 	void				*new_name_ptr = NULL;
 	void				*value_ptr = NULL;
@@ -850,7 +850,7 @@ xlog_print_trans_attri(
 	if (name_len > 0) {
 		printf(_("\n"));
 		(*i)++;
-		head = (xlog_op_header_t *)*ptr;
+		head = (struct xlog_op_header *)*ptr;
 		xlog_print_op_header(head, *i, ptr);
 		name_ptr = *ptr;
 		error = xlog_print_trans_attri_name(ptr,
@@ -862,7 +862,7 @@ xlog_print_trans_attri(
 	if (new_name_len > 0) {
 		printf(_("\n"));
 		(*i)++;
-		head = (xlog_op_header_t *)*ptr;
+		head = (struct xlog_op_header *)*ptr;
 		xlog_print_op_header(head, *i, ptr);
 		new_name_ptr = *ptr;
 		error = xlog_print_trans_attri_name(ptr,
@@ -874,7 +874,7 @@ xlog_print_trans_attri(
 	if (value_len > 0) {
 		printf(_("\n"));
 		(*i)++;
-		head = (xlog_op_header_t *)*ptr;
+		head = (struct xlog_op_header *)*ptr;
 		xlog_print_op_header(head, *i, ptr);
 		value_ptr = *ptr;
 		error = xlog_print_trans_attri_value(ptr,
@@ -886,7 +886,7 @@ xlog_print_trans_attri(
 	if (new_value_len > 0) {
 		printf(_("\n"));
 		(*i)++;
-		head = (xlog_op_header_t *)*ptr;
+		head = (struct xlog_op_header *)*ptr;
 		xlog_print_op_header(head, *i, ptr);
 		new_value_ptr = *ptr;
 		error = xlog_print_trans_attri_value(ptr,
