@@ -674,7 +674,7 @@ xlog_find_tail(
 	xfs_daddr_t		*tail_blk)
 {
 	xlog_rec_header_t	*rhead;
-	xlog_op_header_t	*op_head;
+	struct xlog_op_header	*op_head;
 	char			*offset = NULL;
 	struct xfs_buf		*bp;
 	int			error, i, found;
@@ -808,7 +808,7 @@ xlog_find_tail(
 		if (error)
 			goto done;
 
-		op_head = (xlog_op_header_t *)offset;
+		op_head = (struct xlog_op_header *)offset;
 		if (op_head->oh_flags & XLOG_UNMOUNT_TRANS) {
 			/*
 			 * Set tail and last sync so that newly written
@@ -1199,7 +1199,7 @@ xlog_recover_process_data(
 {
 	char			*lp;
 	int			num_logops;
-	xlog_op_header_t	*ohead;
+	struct xlog_op_header	*ohead;
 	struct xlog_recover	*trans;
 	xlog_tid_t		tid;
 	int			error;
@@ -1214,9 +1214,9 @@ xlog_recover_process_data(
 		return (XFS_ERROR(EIO));
 
 	while ((dp < lp) && num_logops) {
-		ASSERT(dp + sizeof(xlog_op_header_t) <= lp);
-		ohead = (xlog_op_header_t *)dp;
-		dp += sizeof(xlog_op_header_t);
+		ASSERT(dp + sizeof(struct xlog_op_header) <= lp);
+		ohead = (struct xlog_op_header *)dp;
+		dp += sizeof(struct xlog_op_header);
 		if (ohead->oh_clientid != XFS_TRANSACTION &&
 		    ohead->oh_clientid != XFS_LOG) {
 			xfs_warn(log->l_mp, "%s: bad clientid 0x%x",
