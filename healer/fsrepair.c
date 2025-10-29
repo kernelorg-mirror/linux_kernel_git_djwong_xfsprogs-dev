@@ -164,7 +164,7 @@ try_repair_rtgroup(
 static void
 try_repair_inode(
 	struct healer_ctx			*ctx,
-	const struct hme_prefix			*pfx,
+	const struct hme_prefix			*orig_pfx,
 	int					mnt_fd,
 	const struct xfs_health_monitor_event	*hme)
 {
@@ -182,12 +182,24 @@ try_repair_inode(
 		{0,		0},
 	};
 #undef X
-	const struct u32_scrub *f;
+	struct hme_prefix	new_pfx;
+	const struct hme_prefix	*pfx = orig_pfx;
+	const struct u32_scrub	*f;
 
 	foreach_scrub_type(f, hme->e.inode.mask, INODE_STRUCTURES) {
 		enum repair_outcome	outcome =
 			xfs_repair_metadata(mnt_fd, f->scrub_type,
 					0, hme->e.inode.ino, hme->e.inode.gen);
+
+		/*
+		 * Try again to find the file path, maybe we fixed the dir
+		 * tree.
+		 */
+		if (!hme_prefix_has_path(pfx)) {
+			lookup_path(ctx, hme, &new_pfx);
+			if (hme_prefix_has_path(&new_pfx))
+				pfx = &new_pfx;
+		}
 
 		pthread_mutex_lock(&ctx->conlock);
 		report_health_repair(pfx, hme, f->event_mask, outcome);
