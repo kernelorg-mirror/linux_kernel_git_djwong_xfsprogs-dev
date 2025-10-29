@@ -112,9 +112,13 @@ out_buf:
 	return ret;
 }
 
-/* Walk all parent pointers of this handle.  Returns 0 or positive errno. */
-int
-handle_walk_parents(
+/*
+ * Walk all parent pointers of this handle using the given fd to query the
+ * filesystem.  Returns 0 or positive errno.
+ */
+static int
+handle_walk_parents_fd(
+	int			fd,
 	const void		*hanp,
 	size_t			hlen,
 	size_t			bufsize,
@@ -123,20 +127,10 @@ handle_walk_parents(
 {
 	struct xfs_getparents_by_handle	gph = { };
 	void			*buf;
-	char			*mntpt;
-	int			fd;
 	int			ret;
 
 	if (hlen != sizeof(struct xfs_handle))
 		return EINVAL;
-
-	/*
-	 * This function doesn't modify the handle, but we don't want to have
-	 * to bump the libhandle major version just to change that.
-	 */
-	fd = handle_to_fsfd((void *)hanp, &mntpt);
-	if (fd < 0)
-		return errno;
 
 	buf = alloc_records(&gph.gph_request, bufsize);
 	if (!buf)
@@ -158,6 +152,29 @@ out_buf:
 	return ret;
 }
 
+/* Walk all parent pointers of this handle.  Returns 0 or positive errno. */
+int
+handle_walk_parents(
+	const void		*hanp,
+	size_t			hlen,
+	size_t			bufsize,
+	walk_parent_fn		fn,
+	void			*arg)
+{
+	char			*mntpt;
+	int			fd;
+
+	/*
+	 * This function doesn't modify the handle, but we don't want to have
+	 * to bump the libhandle major version just to change that.
+	 */
+	fd = handle_to_fsfd((void *)hanp, &mntpt);
+	if (fd < 0)
+		return errno;
+
+	return handle_walk_parents_fd(fd, hanp, hlen, bufsize, fn, arg);
+}
+
 struct walk_ppaths_info {
 	/* Callback */
 	walk_path_fn		fn;
@@ -169,7 +186,11 @@ struct walk_ppaths_info {
 	/* Path that we're constructing. */
 	struct path_list	*path;
 
+	/* Use this much memory per call. */
 	size_t			ioctl_bufsize;
+
+	/* Use this fd for calling the getparents ioctl. */
+	int			mntfd;
 };
 
 /*
@@ -200,8 +221,14 @@ find_parent_component(
 		return errno;
 	path_list_add_parent_component(wpi->path, pc);
 
-	ret = handle_walk_parents(&rec->p_handle, sizeof(rec->p_handle),
-			wpi->ioctl_bufsize, find_parent_component, wpi);
+	if (wpi->mntfd >= 0)
+		ret = handle_walk_parents_fd(wpi->mntfd, &rec->p_handle,
+				sizeof(rec->p_handle), wpi->ioctl_bufsize,
+				find_parent_component, wpi);
+	else
+		ret = handle_walk_parents(&rec->p_handle,
+				sizeof(rec->p_handle), wpi->ioctl_bufsize,
+				find_parent_component, wpi);
 
 	path_list_del_component(wpi->path, pc);
 	path_component_free(pc);
@@ -222,6 +249,7 @@ handle_walk_paths(
 {
 	struct walk_ppaths_info	wpi = {
 		.ioctl_bufsize	= ioctl_bufsize,
+		.mntfd		= -1,
 	};
 	int			ret;
 
@@ -240,6 +268,41 @@ handle_walk_paths(
 	wpi.arg = arg;
 
 	ret = handle_walk_parents(hanp, hlen, ioctl_bufsize,
+			find_parent_component, &wpi);
+
+	path_list_free(wpi.path);
+	return ret;
+}
+
+/*
+ * Call the given function on all known paths from the vfs root to the inode
+ * described in the handle using an already open mountpoint and fd.  Returns 0
+ * for success or positive errno.
+ */
+int
+handle_walk_paths_fd(
+	const char		*mntpt,
+	int			mntfd,
+	const void		*hanp,
+	size_t			hlen,
+	size_t			ioctl_bufsize,
+	walk_path_fn		fn,
+	void			*arg)
+{
+	struct walk_ppaths_info	wpi = {
+		.ioctl_bufsize	= ioctl_bufsize,
+		.mntfd		= mntfd,
+		.mntpt		= (char *)mntpt,
+	};
+	int			ret;
+
+	wpi.path = path_list_init();
+	if (!wpi.path)
+		return errno;
+	wpi.fn = fn;
+	wpi.arg = arg;
+
+	ret = handle_walk_parents_fd(mntfd, hanp, hlen, ioctl_bufsize,
 			find_parent_component, &wpi);
 
 	path_list_free(wpi.path);
