@@ -33,6 +33,39 @@ open_health_monitor(
 	return ioctl(mnt_fd, XFS_IOC_HEALTH_MONITOR, &hmo);
 }
 
+/* Report either the file handle or its path, if we can. */
+void
+lookup_path(
+	struct healer_ctx			*ctx,
+	const struct xfs_health_monitor_event	*hme,
+	struct hme_prefix			*pfx)
+{
+	uint64_t				ino = 0;
+	uint32_t				gen = 0;
+	int					ret;
+
+	if (!healer_has_parent(ctx))
+		return;
+
+	switch (hme->domain) {
+	case XFS_HEALTH_MONITOR_DOMAIN_INODE:
+		ino = hme->e.inode.ino;
+		gen = hme->e.inode.gen;
+		break;
+	case XFS_HEALTH_MONITOR_DOMAIN_FILERANGE:
+		ino = hme->e.filerange.ino;
+		gen = hme->e.filerange.gen;
+		break;
+	default:
+		return;
+	}
+
+	ret = weakhandle_getpath_for(ctx->wh, ino, gen, pfx->path,
+			sizeof(pfx->path));
+	if (ret)
+		hme_prefix_clear_path(pfx);
+}
+
 /* Decide if this event can only be reported upon, and not acted upon. */
 static bool
 event_not_actionable(
@@ -84,6 +117,13 @@ handle_event(
 	const bool will_repair = event_repairable(ctx, hme);
 
 	hme_prefix_init(&pfx, ctx->mntpoint);
+
+	/*
+	 * Try to look up the file name for the file we're about to log or
+	 * about to repair (which always logs).
+	 */
+	if (loggable || will_repair)
+		lookup_path(ctx, hme, &pfx);
 
 	/*
 	 * Non-actionable events should always be logged, because they are 100%
@@ -147,9 +187,10 @@ setup_monitor(
 
 	/*
 	 * Open weak-referenced file handle to mountpoint so that we can
-	 * reconnect to the mountpoint to start repairs.
+	 * reconnect to the mountpoint to start repairs or to look up file
+	 * paths for logging.
 	 */
-	if (ctx->want_repair) {
+	if (ctx->want_repair || healer_has_parent(ctx)) {
 		ret = weakhandle_alloc(ctx->mnt.fd, ctx->mntpoint,
 				ctx->fsname, &ctx->wh);
 		if (ret) {
