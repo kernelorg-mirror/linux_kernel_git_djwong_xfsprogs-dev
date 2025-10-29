@@ -55,6 +55,10 @@ static inline bool healer_has_parent(const struct healer_ctx *ctx)
 	return ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_PARENT;
 }
 
+void lookup_path(struct healer_ctx *ctx,
+		const struct xfs_health_monitor_event *hme,
+		struct hme_prefix *pfx);
+
 /* repair.c */
 int repair_metadata(struct healer_ctx *ctx, const struct hme_prefix *pfx,
 		const struct xfs_health_monitor_event *hme);
@@ -65,5 +69,7 @@ int weakhandle_alloc(int fd, const char *mountpoint, const struct fs_path *fsp,
 		struct weakhandle **whp);
 int weakhandle_reopen(struct weakhandle *wh, int *fd);
 void weakhandle_free(struct weakhandle **whp);
+int weakhandle_getpath_for(struct weakhandle *wh, uint64_t ino, uint32_t gen,
+		char *path, size_t pathlen);
 
 #endif /* XFS_HEALER_XFS_HEALER_H_ */
