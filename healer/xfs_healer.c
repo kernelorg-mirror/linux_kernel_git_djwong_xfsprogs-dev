@@ -88,9 +88,9 @@ monitor(
 
 	/*
 	 * Open weak-referenced file handle to mountpoint before we go any
-	 * further.
+	 * further.  Needed for repairs or file path lookups.
 	 */
-	if (ctx->want_repair) {
+	if (ctx->want_repair || healer_has_parent(ctx)) {
 		ret = weakhandle_alloc(ctx->mnt.fd, ctx->mntpoint,
 				ctx->fs_path, &ctx->wh);
 		if (ret) {

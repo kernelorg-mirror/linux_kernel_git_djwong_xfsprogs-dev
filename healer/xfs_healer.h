@@ -61,6 +61,9 @@ const char *fs_structname(uint32_t what);
 const char *ag_structname(uint32_t what);
 const char *rtg_structname(uint32_t what);
 const char *inode_structname(uint32_t what);
+void report_inode_location(struct healer_ctx *ctx,
+		const struct xfs_health_monitor_event *hme, char *path,
+		size_t pathlen);
 
 /* repair.c */
 int repair_metadata(struct healer_ctx *ctx,
@@ -72,5 +75,7 @@ int weakhandle_alloc(int fd, const char *mountpoint, const struct fs_path *fsp,
 		struct weakhandle **whp);
 int weakhandle_reopen(struct weakhandle *wh, int *fd);
 void weakhandle_free(struct weakhandle **whp);
+int weakhandle_getpath_for(struct weakhandle *wh, uint64_t ino, uint32_t gen,
+		char *path, size_t pathlen);
 
 #endif /* XFS_HEALER_XFS_HEALER_H_ */

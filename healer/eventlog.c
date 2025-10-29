@@ -294,16 +294,15 @@ report_loggable(
 	struct healer_ctx			*ctx,
 	const struct xfs_health_monitor_event	*hme)
 {
+	char					path[MAXPATHLEN];
+
 	switch (hme->domain) {
 	case XFS_HEALTH_MONITOR_DOMAIN_INODE:
 		DEFINE_INODE_STRINGS(INODE_STRUCTURES);
 
+		report_inode_location(ctx, hme, path, MAXPATHLEN);
 		pthread_mutex_lock(&ctx->conlock);
-		printf("%s %s %llu %s 0x%x ", ctx->mntpoint,
-				_("ino"),
-				(unsigned long long)hme->e.inode.ino,
-				_("gen"),
-				hme->e.inode.gen);
+		printf("%s ", path);
 		print_u32_flags(hme->e.inode.mask, INODE_STRUCTURES);
 		printf(": ");
 		print_health_type(hme->type);
@@ -362,13 +361,10 @@ report_loggable(
 		break;
 
 	case XFS_HEALTH_MONITOR_DOMAIN_FILERANGE:
+		report_inode_location(ctx, hme, path, MAXPATHLEN);
 		pthread_mutex_lock(&ctx->conlock);
-		printf("%s %s %llu %s 0x%x %s %llu %s %llu: ",
-				ctx->mntpoint,
-				_("ino"),
-				(unsigned long long)hme->e.filerange.ino,
-				_("gen"),
-				hme->e.filerange.gen,
+		printf("%s %s %llu %s %llu: ",
+				path,
 				_("pos"),
 				(unsigned long long)hme->e.filerange.pos,
 				_("len"),
@@ -408,4 +404,40 @@ report_event(
 	/* Deal with everything else. */
 	if (ctx->log)
 		report_loggable(ctx, hme);
+}
+
+/* Report either the file handle or its path, if we can. */
+void
+report_inode_location(
+	struct healer_ctx			*ctx,
+	const struct xfs_health_monitor_event	*hme,
+	char					*path,
+	size_t					pathlen)
+{
+	uint64_t				ino = 0;
+	uint32_t				gen = 0;
+	int					ret;
+
+	switch (hme->domain) {
+	case XFS_HEALTH_MONITOR_DOMAIN_INODE:
+		ino = hme->e.inode.ino;
+		gen = hme->e.inode.gen;
+		break;
+	case XFS_HEALTH_MONITOR_DOMAIN_FILERANGE:
+		ino = hme->e.filerange.ino;
+		gen = hme->e.filerange.gen;
+		break;
+	default:
+		return;
+	}
+
+	if (healer_has_parent(ctx)) {
+		ret = weakhandle_getpath_for(ctx->wh, ino, gen, path, pathlen);
+		if (!ret)
+			return;
+	}
+
+	snprintf(path, pathlen, "%s %s %llu %s 0x%x", ctx->mntpoint,
+			_("ino"), (unsigned long long)ino,
+			_("gen"), gen);
 }

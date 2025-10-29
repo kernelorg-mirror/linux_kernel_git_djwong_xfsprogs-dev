@@ -193,7 +193,9 @@ try_repair_inode(
 	};
 #undef X
 	const struct u32_scrub *f;
+	char			path[MAXPATHLEN];
 
+	report_inode_location(ctx, hme, path, MAXPATHLEN);
 	foreach_scrub_type(f, hme->e.inode.mask, INODE_STRUCTURES) {
 		uint32_t oflags = __xfs_repair_metadata(mnt_fd, f->scrub_type,
 						0, hme->e.inode.ino,
@@ -203,10 +205,7 @@ try_repair_inode(
 		const char *what = fs_structname(f->flag);
 
 		pthread_mutex_lock(&ctx->conlock);
-		printf("%s: %s 0x%llx %s 0x%x %s: %s\n", ctx->mntpoint,
-				_("inode"),
-				(unsigned long long)hme->e.inode.ino,
-				_("gen"), hme->e.inode.gen, what, report);
+		printf("%s: %s: %s\n", path, what, report);
 		fflush(stdout);
 		pthread_mutex_unlock(&ctx->conlock);
 	}
