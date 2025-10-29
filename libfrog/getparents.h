@@ -39,4 +39,8 @@ int fd_to_path(int fd, size_t ioctl_bufsize, char *path, size_t pathlen);
 int handle_to_path(const void *hanp, size_t hlen, size_t ioctl_bufsize,
 		char *path, size_t pathlen);
 
+int handle_walk_paths_fd(const char *mntpt, int mntfd, const void *hanp,
+		size_t hanlen, size_t ioctl_bufsize, walk_path_fn fn,
+		void *arg);
+
 #endif /* __LIBFROG_GETPARENTS_H_ */
