@@ -24,6 +24,7 @@ fsproperties.c \
 fsprops.c \
 getparents.c \
 histogram.c \
+healthevent.c \
 file_attr.c \
 list_sort.c \
 linux.c \
@@ -55,6 +56,7 @@ fsproperties.h \
 fsprops.h \
 getparents.h \
 handle_priv.h \
+healthevent.h \
 histogram.h \
 file_attr.h \
 logging.h \
