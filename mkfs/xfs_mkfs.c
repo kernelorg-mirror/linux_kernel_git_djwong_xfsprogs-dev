@@ -1044,7 +1044,7 @@ struct sb_feat_args {
 	bool	inode_align;		/* XFS_SB_VERSION_ALIGNBIT */
 	bool	nci;			/* XFS_SB_VERSION_BORGBIT */
 	bool	lazy_sb_counters;	/* XFS_SB_VERSION2_LAZYSBCOUNTBIT */
-	bool	parent_pointers;	/* XFS_SB_VERSION2_PARENTBIT */
+	bool	parent_pointers;	/* XFS_SB_FEAT_INCOMPAT_PARENT */
 	bool	projid32bit;		/* XFS_SB_VERSION2_PROJID32BIT */
 	bool	crcs_enabled;		/* XFS_SB_VERSION2_CRCBIT */
 	bool	dirftype;		/* XFS_SB_VERSION2_FTYPE */
@@ -5984,11 +5984,12 @@ main(
 			.rmapbt = true,
 			.reflink = true,
 			.inobtcnt = true,
-			.parent_pointers = false,
+			.parent_pointers = true,
 			.nodalign = false,
 			.nortalign = false,
 			.bigtime = true,
 			.nrext64 = true,
+			.exchrange = true,
 			/*
 			 * When we decide to enable a new feature by default,
 			 * please remember to update the mkfs conf files.
