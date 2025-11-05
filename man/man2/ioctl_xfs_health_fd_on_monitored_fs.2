@@ -1,0 +1,75 @@
+.\" Copyright (c) 2025-2026, Oracle.  All rights reserved.
+.\"
+.\" %%%LICENSE_START(GPLv2+_DOC_FULL)
+.\" SPDX-License-Identifier: GPL-2.0+
+.\" %%%LICENSE_END
+.TH IOCTL-XFS-HEALTH-FD-ON-MONITORED-FS 2 2026-01-04 "XFS"
+.SH NAME
+ioctl_xfs_health_fd_on_monitored_fs \- check if the given fd belongs to the same fs being monitored
+.SH SYNOPSIS
+.br
+.B #include <xfs/xfs_fs.h>
+.PP
+.BI "int ioctl(int " healthmon_fd ", XFS_IOC_HEALTH_FD_ON_MONITORED_FS, struct xfs_health_file_on_monitored_fs *" arg );
+.SH DESCRIPTION
+This XFS healthmon fd ioctl asks the kernel driver if the file descriptor
+passed in via
+.I arg
+points to a file on the same filesystem that is being monitored by
+.IR healthmon_fd .
+The file descriptor is conveyed in a structure of the following form:
+.PP
+.in +4n
+.nf
+struct xfs_health_file_on_monitored_fs {
+	__s32 fd;
+	__u32 flags;
+};
+.fi
+.in
+.PP
+The field
+.I flags
+must be zero.
+.PP
+The field
+.I fd
+is a descriptor of an open file.
+.PP
+The argument
+.I healthmon_fd
+must be a file opened via the
+.B XFS_IOC_HEALTH_MONITOR
+ioctl.
+.SH RETURN VALUE
+On error, \-1 is returned, and
+.I errno
+is set to indicate the error.
+If the file descriptor points to a file on the same filesystem that is being
+monitored, 0 is returned.
+.PP
+.SH ERRORS
+Error codes can be one of, but are not limited to, the following:
+.TP
+.B ESTALE
+The open file is not on the same filesystem that is being monitored.
+.TP
+.B EINVAL
+One or more of the arguments specified is invalid.
+.TP
+.B EBADF
+.I arg.fd
+does not refer to an open file.
+.TP
+.B EFAULT
+The
+.I arg
+structure could not be copied into the kernel.
+.TP
+.B ENOTTY
+.I healthmon_fd
+is not a XFS health monitoring file.
+.SH CONFORMING TO
+This API is specific to XFS filesystem on the Linux kernel.
+.SH SEE ALSO
+.BR ioctl_xfs_health_monitor (2)
