@@ -1,0 +1,456 @@
+.\" Copyright (c) 2025, Oracle.  All rights reserved.
+.\"
+.\" %%%LICENSE_START(GPLv2+_DOC_FULL)
+.\" SPDX-License-Identifier: GPL-2.0+
+.\" %%%LICENSE_END
+.TH IOCTL-XFS-HEALTH-MONITOR 2 2025-11-05 "XFS"
+.SH NAME
+ioctl_xfs_health_monitor \- read filesystem health events from the kernel
+.SH SYNOPSIS
+.br
+.B #include <xfs/xfs_fs.h>
+.PP
+.BI "int ioctl(int " dest_fd ", XFS_IOC_HEALTH_MONITOR, struct xfs_health_monitor *" arg );
+.SH DESCRIPTION
+This XFS ioctl asks the kernel driver to create a pseudo-file from which
+information about adverse filesystem health events can be read.
+This new file will be installed into the file descriptor table of the calling
+process as a read-only file, and will have the close-on-exec flag set.
+.PP
+The specific behaviors of this health monitor file are requested via a
+structure of the following form:
+.PP
+.in +4n
+.nf
+struct xfs_health_monitor {
+	__u64 flags;
+	__u8  format;
+	__u8  pad1[7];
+	__u64 pad2[2];
+};
+.fi
+.in
+.PP
+The fields
+.I pad1
+and
+.I pad2
+must be zero.
+.PP
+The field
+.I format
+controls the format of the event data that can be read:
+.RS 0.4i
+.TP
+.B XFS_HEALTH_MONITOR_FMT_V0
+Event data will be presented in discrete objects of type struct
+xfs_health_monitor_event.
+See below for more information.
+.RE
+
+.PD 1
+.PP
+The field
+.I flags
+control the behavior of the monitor.
+.RS 0.4i
+.TP
+.B XFS_HEALTH_MONITOR_VERBOSE
+Return all health events, including affirmations of healthy metadata.
+.RE
+.SH RETURN VALUE
+On error, \-1 is returned, and
+.I errno
+is set to indicate the error.
+Otherwise, the return value is a new file descriptor.
+.PP
+.SH ERRORS
+Error codes can be one of, but are not limited to, the following:
+.TP
+.B EPERM
+The caller does not have permission to open a health monitor.
+Calling programs must have administrative capability, run in the initial user
+namespace, and the
+.I fd
+passed to ioctl must be the root directory of an XFS filesystem.
+.TP
+.B EINVAL
+One or more of the arguments specified is invalid.
+.TP
+.B EFAULT
+The argument could not be copied into the kernel.
+.TP
+.B ENOMEM
+There was not sufficient memory to construct the health monitor.
+.SH EVENT FORMAT
+Calling programs retrieve XFS health events by calling
+.BR read (2)
+on the returned file descriptor.
+The read buffer must be large enough to hold at least one event object.
+Partial objects will not be returned; instead, a short read will occur.
+
+Events will be returned in the following format:
+
+.PP
+.in +4n
+.nf
+struct xfs_health_monitor_event {
+	__u32	domain;
+	__u32	type;
+	__u64	time_ns;
+
+	union {
+		struct xfs_health_monitor_lost lost;
+		struct xfs_health_monitor_fs fs;
+		struct xfs_health_monitor_group group;
+		struct xfs_health_monitor_inode inode;
+		struct xfs_health_monitor_shutdown shutdown;
+		struct xfs_health_monitor_media media;
+		struct xfs_health_monitor_filerange filerange;
+	} e;
+
+	__u64	pad[2];
+};
+.fi
+.in
+.PP
+The field
+.I time_ns
+records the timestamp at which the health event was generated, in units of
+nanoseconds since the Unix epoch.
+.PP
+The field
+.I pad
+will be zero.
+.PP
+The field
+.I domain
+indicates the scope of the filesystem affected by the event:
+.RS 0.4i
+.TP
+.B XFS_HEALTH_MONITOR_DOMAIN_MOUNT
+The entire filesystem is affected.
+.TP
+.B XFS_HEALTH_MONITOR_DOMAIN_FS
+Metadata concerning the entire filesystem is affected.
+Details are available through the
+.I fs
+field.
+.TP
+.B XFS_HEALTH_MONITOR_DOMAIN_AG
+Metadata concerning a specific allocation group is affected.
+Details are available through the
+.I group
+field.
+.TP
+.B XFS_HEALTH_MONITOR_DOMAIN_RTGROUP
+Metadata concerning a specific realtime allocation group is affected.
+Details are available through the
+.I group
+field.
+.TP
+.B XFS_HEALTH_MONITOR_DOMAIN_INODE
+File metadata is affected.
+Details are available through the
+.I inode
+field.
+.TP
+.B XFS_HEALTH_MONITOR_DOMAIN_DATADEV
+The main data volume is affected.
+Details are available through the
+.I media
+field.
+.TP
+.B XFS_HEALTH_MONITOR_DOMAIN_RTDEV
+The realtime volume is affected.
+Details are available through the
+.I media
+field.
+.TP
+.B XFS_HEALTH_MONITOR_DOMAIN_LOGDEV
+The external log is affected.
+Details are available through the
+.I media
+field.
+.TP
+.B XFS_HEALTH_MONITOR_DOMAIN_FILERANGE
+File data is affected.
+Details are available through the
+.I filerange
+field.
+.RE
+
+.PP
+The field
+.I type
+indicates what was affected by a health event:
+.RS 0.4i
+.PP
+The following types apply to events from the
+.B MOUNT
+domain.
+.RS 0.4i
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_RUNNING
+This filesystem health monitor is now running.
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_LOST
+Health events were lost.
+Details are available through the
+.I lost
+field.
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_UNMOUNT
+The filesystem is being unmounted.
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_SHUTDOWN
+The filesystem has shut down due to problems.
+Details are available through the
+.I shutdown
+field.
+.RE
+.PP
+The following three types apply to events from the
+.BR FS ,
+.BR AG ,
+.BR RTGROUP ,
+and
+.B INODE
+domains.
+.RS 0.4i
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_SICK
+Filesystem metadata has been scanned by online fsck and found to be corrupt.
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_CORRUPT
+A metadata corruption problem was encountered during a filesystem operation
+outside of fsck.
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_HEALTHY
+Filesystem metadata has either been scanned by online fsck and found to be
+in good condition, or it has been repaired to good condition.
+.RE
+.PP
+The following type applies to events from the
+.BR DATADEV ,
+.BR RTDEV ,
+and
+.B LOGDEV
+domains.
+.RS 0.4i
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_MEDIA_ERROR
+A media error has been observed on one of the storage devices that can be
+attached to an XFS filesystem.
+.RE
+.PP
+The following types apply to events from the
+.B FILERANGE
+domain.
+.RS 0.4i
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_BUFREAD
+An attempt to read (or readahead) from a file failed with an I/O error.
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_BUFWRITE
+An attempt to write dirty data to storage failed with an I/O error.
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_DIOREAD
+A direct read of file data from storage failed with an I/O error.
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_DIOWRITE
+A direct write of file data to storage failed with an I/O error.
+.TP
+.B XFS_HEALTH_MONITOR_TYPE_DATALOST
+A latent media error was discovered on the storage backing part of this file.
+.RE
+.RE
+
+.PP
+The union
+.I e
+contains further details about the health event:
+
+.RS 0.4i
+.PP
+The kernel will use no more than 32KiB of memory per monitoring file to queue
+health events.
+If this limit is exceeded, an event will be generated to describe how many
+events were lost:
+
+.in +4n
+.nf
+struct xfs_health_monitor_lost {
+	__u64	count;
+};
+.fi
+.in
+.PP
+The
+.I count
+field records the number of events lost.
+
+.PP
+If whole-filesystem metadata experiences a health event, the exact type of
+that metadata is recorded as follows:
+
+.in +4n
+.nf
+struct xfs_health_monitor_fs {
+	__u32	mask;
+};
+.fi
+.in
+.PP
+The
+.I mask
+field will contain
+.I XFS_FSOP_GEOM_SICK_*
+flags that are documented in the
+.BR ioctl_xfs_fsgeometry (2)
+manual page.
+
+.PP
+If an allocation group (realtime or data) experiences a health event,
+the exact type and location of the metadata is recorded as follows:
+
+.in +4n
+.nf
+struct xfs_health_monitor_group {
+	__u32	mask;
+	__u32	gno;
+};
+.fi
+.in
+.PP
+The
+.I mask
+field will contain
+.I XFS_AG_SICK_*
+flags that are documented in the
+.BR ioctl_xfs_ag_geometry (2)
+manual page, or the
+.I XFS_RTGROUP_SICK_*
+flags that are documented by the
+.BR ioctl_xfs_rtgroup_geometry (2)
+manual page.
+.PP
+The
+.I gno
+field will contain the group number.
+
+.PP
+If a file experiences a health event, the exact type and handle to the file
+is recorded as follows:
+
+.in +4n
+.nf
+struct xfs_health_monitor_inode {
+	__u32	mask;
+	__u32	gen;
+	__u64	ino;
+};
+.fi
+.in
+.PP
+The
+.I mask
+field will contain
+.I XFS_BS_SICK_*
+flags that are documented by the
+.BR ioctl_xfs_bulkstat (2)
+manual page.
+.PP
+The
+.I ino
+and
+.I gen
+fields describe a handle to the affected file.
+
+.PP
+If the filesystem shuts down abnormally, the exact reasons are recorded as
+follows:
+
+.in +4n
+.nf
+struct xfs_health_monitor_shutdown {
+	__u32	reasons;
+};
+.fi
+.in
+.PP
+The
+.I reasons
+field is a combination of the following values:
+.RS 0.4i
+.TP
+.B XFS_HEALTH_SHUTDOWN_META_IO_ERROR
+Metadata I/O errors were encountered.
+.TP
+.B XFS_HEALTH_SHUTDOWN_LOG_IO_ERROR
+Log I/O errors were encountered.
+.TP
+.B XFS_HEALTH_SHUTDOWN_FORCE_UMOUNT
+The filesystem was forcibly shut down by an administrator.
+.TP
+.B XFS_HEALTH_SHUTDOWN_CORRUPT_INCORE
+In-memory metadata are corrupt.
+.TP
+.B XFS_HEALTH_SHUTDOWN_CORRUPT_ONDISK
+On-disk metadata are corrupt.
+.TP
+.B XFS_HEALTH_SHUTDOWN_DEVICE_REMOVED
+Storage devices were removed.
+.RE
+
+.PP
+If a media error is discovered on the storage device, the exact location is
+recorded as follows:
+
+.in +4n
+.nf
+struct xfs_health_monitor_media {
+	__u64	daddr;
+	__u64	bbcount;
+};
+.fi
+.in
+.PP
+The
+.I daddr
+and
+.I bbcount
+fields describe the range of the storage that were lost.
+Both are provided in units of 512-byte blocks.
+
+.PP
+If a problem is discovered with regular file data, the handle of the file
+and the exact range of the file are recorded as follows:
+
+.in +4n
+.nf
+struct xfs_health_monitor_filerange {
+	__u64	pos;
+	__u64	len;
+	__u64	ino;
+	__u32	gen;
+};
+.fi
+.in
+.PP
+The
+.I ino
+and
+.I gen
+fields describe a handle to the affected file.
+The
+.I pos
+and
+.I len
+fields describe the range of the file data that are affected.
+Both are provided in units of bytes.
+.RE
+.SH CONFORMING TO
+This API is specific to XFS filesystem on the Linux kernel.
+.SH SEE ALSO
+.BR ioctl_xfs_health_samefs (2)
