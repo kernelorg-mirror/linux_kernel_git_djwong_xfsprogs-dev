@@ -1,0 +1,76 @@
+.\" Copyright (c) 2025, Oracle.  All rights reserved.
+.\"
+.\" %%%LICENSE_START(GPLv2+_DOC_FULL)
+.\" SPDX-License-Identifier: GPL-2.0+
+.\" %%%LICENSE_END
+.TH IOCTL-XFS-REPORT-MEDIA-ERROR 2 2025-11-05 "XFS"
+.SH NAME
+ioctl_xfs_report_media_error \- report a media error to the kernel for health event generation
+.SH SYNOPSIS
+.br
+.B #include <xfs/xfs_fs.h>
+.PP
+.BI "int ioctl(int " fd ", XFS_IOC_REPORT_MEDIA_ERROR, struct xfs_media_error_report *" arg );
+.SH DESCRIPTION
+Report a media error to the kernel so that it can generate health events
+for the health monitoring system and fsnotify.
+Details of the media error are conveyed in a structure of the following form:
+.PP
+.in +4n
+.nf
+struct xfs_media_error_report {
+	__u64	flags;
+	__u64	daddr;
+	__u64	bbcount;
+	__u64	pad;
+};
+.fi
+.in
+.PP
+The field
+.I pad
+must be zero.
+.PP
+The fields
+.I daddr
+and
+.I bbcount
+are the affected range of the storage device.
+Both values must be in units of 512-byte blocks.
+.PP
+The field
+.I flags
+must be one of the following values:
+.RS 0.4i
+.TP
+.B XFS_MEDIA_ERROR_DATADEV
+The main data device is affected.
+.TP
+.B XFS_MEDIA_ERROR_LOGDEV
+The external log device is affected.
+.TP
+.B XFS_MEDIA_ERROR_RTDEV
+The realtime device is affected.
+.RE
+.SH RETURN VALUE
+On error, \-1 is returned, and
+.I errno
+is set to indicate the error.
+.PP
+.SH ERRORS
+Error codes can be one of, but are not limited to, the following:
+.TP
+.B EPERM
+The calling process does not have sufficient privilege.
+.TP
+.B EINVAL
+One or more of the arguments specified is invalid.
+.TP
+.B EFAULT
+The
+.I arg
+structure could not be copied into the kernel.
+.SH CONFORMING TO
+This API is specific to XFS filesystem on the Linux kernel.
+.SH SEE ALSO
+.BR ioctl_xfs_health_monitor (2)
