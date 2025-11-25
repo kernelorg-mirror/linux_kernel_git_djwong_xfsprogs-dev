@@ -143,7 +143,7 @@ xfs_log_calc_unit_res(
  *
  * Returns true on success, fail otherwise.
  */
-bool
+static bool
 current_fixed_time(
 	struct			timespec64 *tv)
 {
@@ -586,7 +586,7 @@ void xfs_inode_mark_sick(struct xfs_inode *ip, unsigned int mask) { }
  *
  * Returns true on success, fail otherwise.
  */
-bool
+static bool
 get_deterministic_seed(
 	uint32_t	*result)
 {
