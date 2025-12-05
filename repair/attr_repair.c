@@ -636,7 +636,7 @@ process_leaf_attr_block(
 	int		*repair)
 {
 	xfs_attr_leaf_entry_t *entry;
-	int  i, start, stop, clearit, usedbs, firstb, thissize;
+	int i, j, start, stop, clearit, usedbs, firstb, thissize;
 	da_freemap_t *attr_freemap;
 	struct xfs_attr3_icleaf_hdr leafhdr;
 
@@ -754,6 +754,47 @@ process_leaf_attr_block(
 			firstb = be16_to_cpu(entry->nameidx);
 
 	} /* end the loop */
+
+	/*
+	 * Check the freemap for inconsistencies.  If we encounter problems,
+	 * it's easier to zero the freemap and set leafhdr.holes = 1 so that
+	 * xfs_attr3_leaf_add will compact the block if it doesn't find space
+	 * in the freemap.
+	 */
+	for (j = 0; j < XFS_ATTR_LEAF_MAPSIZE; j++) {
+		if (leafhdr.freemap[j].size == 0) {
+			if (leafhdr.freemap[j].base > 0) {
+				if (no_modify) {
+					do_log(
+ _("empty freemap entry %d in attr block %u, inode %" PRIu64 " has nonzero base, would clear\n"),
+						j, da_bno, ino);
+				} else {
+					do_warn(
+ _("empty freemap entry %d in attr block %u, inode %" PRIu64 " has nonzero base, clearing\n"),
+						j, da_bno, ino);
+					leafhdr.freemap[j].base = 0;
+					leafhdr.holes = 1;
+					*repair = 1;
+				}
+			}
+		} else if (set_da_freemap(mp, attr_freemap,
+				leafhdr.freemap[j].base,
+				leafhdr.freemap[j].base + leafhdr.freemap[j].size)) {
+			if (no_modify) {
+				do_warn(
+ _("freemap entry %d in attr block %u, inode %" PRIu64 " claims used space, would clear\n"),
+					j, da_bno, ino);
+			} else {
+				do_warn(
+ _("freemap entry %d in attr block %u, inode %" PRIu64 " claims used space, clearing\n"),
+					j, da_bno, ino);
+				leafhdr.freemap[j].base = 0;
+				leafhdr.freemap[j].size = 0;
+				leafhdr.holes = 1;
+				*repair = 1;
+			}
+		}
+	}
 
 	if (!clearit) {
 		/* verify the header information is correct */
