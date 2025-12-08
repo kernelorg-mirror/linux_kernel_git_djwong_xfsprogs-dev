@@ -571,8 +571,7 @@ process_leaf_attr_remote(
 	    !libxfs_attr_namecheck(entry->flags, remotep->name,
 				   remotep->namelen) ||
 	    be32_to_cpu(entry->hashval) != computed ||
-	    be32_to_cpu(entry->hashval) < last_hashval ||
-	    be32_to_cpu(remotep->valueblk) == 0) {
+	    be32_to_cpu(entry->hashval) < last_hashval) {
 		do_warn(
 	_("inconsistent remote attribute entry %d in attr block %u, ino %" PRIu64 "\n"), i, da_bno, ino);
 		return -1;
@@ -589,6 +588,19 @@ process_leaf_attr_remote(
  _("parent pointer found in attribute entry %d in attr block %u, inode %"
    PRIu64 " with bogus remote value\n"),
 					i, da_bno, ino);
+		return -1;
+	}
+
+	/*
+	 * Ignore incomplete xattrs as long as everything else checks out.
+	 * These xattrs do not point to remote blocks.
+	 */
+	if (entry->flags & XFS_ATTR_INCOMPLETE)
+		goto out;
+
+	if (be32_to_cpu(remotep->valueblk) == 0) {
+		do_warn(
+	_("inconsistent remote attribute entry %d in attr block %u, ino %" PRIu64 "\n"), i, da_bno, ino);
 		return -1;
 	}
 
@@ -708,12 +720,17 @@ process_leaf_attr_block(
 		}
 
 		if (entry->flags & XFS_ATTR_INCOMPLETE) {
-			/* we are inconsistent state. get rid of us */
-			do_warn(
-	_("attribute entry #%d in attr block %u, inode %" PRIu64 " is INCOMPLETE\n"),
+			/*
+			 * If we encounter an incomplete xattr entry in a leaf
+			 * block, this most likely means that the filesystem
+			 * went down whilst trying to set this xattr.  This is
+			 * benign since incomplete xattrs are not shown to
+			 * userspace.  Hash value and name checks are still
+			 * enforced.
+			 */
+			do_log(
+	_("attribute entry #%d in attr block %u, inode %" PRIu64 " is incomplete, ignoring\n"),
 				i, da_bno, ino);
-			clearit = 1;
-			break;
 		}
 
 		/* mark the entry used */
