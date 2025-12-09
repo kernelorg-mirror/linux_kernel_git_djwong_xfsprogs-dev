@@ -3720,17 +3720,28 @@ open_devices(
 		zt->rt.zone_capacity = zt->data.zone_capacity;
 		zt->rt.nr_zones = zt->data.nr_zones - zt->data.nr_conv_zones;
 	} else if (cfg->sb_feat.zoned && !cfg->rtstart && !xi->rt.dev) {
-		/*
-		 * By default reserve at 1% of the total capacity (rounded up to
-		 * the next power of two) for metadata, but match the minimum we
-		 * enforce elsewhere. This matches what SMR HDDs provide.
-		 */
-		uint64_t rt_target_size = max((xi->data.size + 99) / 100,
-					      BTOBB(300 * 1024 * 1024));
+		if (cfg->dblocks) {
+			/*
+			 * If the user specified the size of the data device
+			 * but not the start of the internal rt device, set
+			 * the internal rt volume to start at the end of the
+			 * data device.
+			 */
+			cfg->rtstart = cfg->dblocks << (cfg->blocklog - BBSHIFT);
+		} else {
+			/*
+			 * By default reserve at 1% of the total capacity
+			 * (rounded up to the next power of two) for metadata,
+			 * but match the minimum we enforce elsewhere. This
+			 * matches what SMR HDDs provide.
+			 */
+			uint64_t rt_target_size = max((xi->data.size + 99) / 100,
+						      BTOBB(300 * 1024 * 1024));
 
-		cfg->rtstart = 1;
-		while (cfg->rtstart < rt_target_size)
-			cfg->rtstart <<= 1;
+			cfg->rtstart = 1;
+			while (cfg->rtstart < rt_target_size)
+				cfg->rtstart <<= 1;
+		}
 	}
 
 	if (cfg->rtstart) {
