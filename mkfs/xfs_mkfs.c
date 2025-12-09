@@ -3696,6 +3696,36 @@ _("log stripe unit (%d bytes) is too large (maximum is 256KiB)\n"
 
 }
 
+static uint64_t
+calc_rtstart(
+	const struct mkfs_params	*cfg,
+	const struct libxfs_init	*xi)
+{
+	uint64_t			rt_target_size;
+	uint64_t			rtstart = 1;
+
+	if (cfg->dblocks) {
+		/*
+		 * If the user specified the size of the data device but not
+		 * the start of the internal rt device, set the internal rt
+		 * volume to start at the end of the data device.
+		 */
+		return cfg->dblocks << (cfg->blocklog - BBSHIFT);
+	}
+
+	/*
+	 * By default reserve at 1% of the total capacity (rounded up to the
+	 * next power of two) for metadata, but match the minimum we enforce
+	 * elsewhere. This matches what SMR HDDs provide.
+	 */
+	rt_target_size = max((xi->data.size + 99) / 100,
+			     BTOBB(300 * 1024 * 1024));
+
+	while (rtstart < rt_target_size)
+		rtstart <<= 1;
+	return rtstart;
+}
+
 static void
 open_devices(
 	struct mkfs_params	*cfg,
@@ -3720,17 +3750,7 @@ open_devices(
 		zt->rt.zone_capacity = zt->data.zone_capacity;
 		zt->rt.nr_zones = zt->data.nr_zones - zt->data.nr_conv_zones;
 	} else if (cfg->sb_feat.zoned && !cfg->rtstart && !xi->rt.dev) {
-		/*
-		 * By default reserve at 1% of the total capacity (rounded up to
-		 * the next power of two) for metadata, but match the minimum we
-		 * enforce elsewhere. This matches what SMR HDDs provide.
-		 */
-		uint64_t rt_target_size = max((xi->data.size + 99) / 100,
-					      BTOBB(300 * 1024 * 1024));
-
-		cfg->rtstart = 1;
-		while (cfg->rtstart < rt_target_size)
-			cfg->rtstart <<= 1;
+		cfg->rtstart = calc_rtstart(cfg, xi);
 	}
 
 	if (cfg->rtstart) {
