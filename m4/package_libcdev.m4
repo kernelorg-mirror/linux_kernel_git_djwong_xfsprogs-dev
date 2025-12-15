@@ -347,3 +347,21 @@ puts(strerror_r(0, buf, sizeof(buf)));
     CFLAGS="$OLD_CFLAGS"
     AC_SUBST(strerror_r_returns_string)
   ])
+
+#
+# Check if blkzoned.h defines BLK_ZONE_COND_ACTIVE
+#
+AC_DEFUN([AC_HAVE_BLK_ZONE_COND_ACTIVE],
+  [AC_MSG_CHECKING([for BLK_ZONE_COND_ACTIVE])
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <linux/blkzoned.h>
+  ]], [[
+int foo = BLK_ZONE_COND_ACTIVE;
+  ]])
+    ], have_blk_zone_cond_active=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_blk_zone_cond_active)
+  ])
