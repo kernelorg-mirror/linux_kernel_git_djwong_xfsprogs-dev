@@ -21,11 +21,11 @@ xfs_log_dump(
 	int			r;
 	uint			last_cycle = -1;
 	xfs_daddr_t		blkno, dupblkno;
-	xlog_rec_header_t	*hdr;
+	struct xlog_rec_header	*hdr;
 	char			buf[XLOG_HEADER_SIZE];
 
 	dupblkno = 0;
-	hdr = (xlog_rec_header_t *)buf;
+	hdr = (struct xlog_rec_header *)buf;
 	xlog_print_lseek(log, fd, 0, SEEK_SET);
 	for (blkno = 0; blkno < log->l_logBBsize; blkno++) {
 		r = read(fd, buf, sizeof(buf));
