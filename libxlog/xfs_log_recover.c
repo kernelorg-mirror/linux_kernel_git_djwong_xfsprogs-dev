@@ -1324,33 +1324,39 @@ xlog_unpack_data_crc(
 	return 0;
 }
 
+/*
+ * Cycles over XLOG_CYCLE_DATA_SIZE overflow into the extended header that was
+ * added for v2 logs.  Addressing for the cycles array there is off by one,
+ * because the first batch of cycles is in the original header.
+ */
+static inline __be32 *xlog_cycle_data(struct xlog_rec_header *rhead, unsigned i)
+{
+	if (i >= XLOG_CYCLE_DATA_SIZE) {
+		unsigned	j = i / XLOG_CYCLE_DATA_SIZE;
+		unsigned	k = i % XLOG_CYCLE_DATA_SIZE;
+
+		return &rhead->h_ext[j - 1].xh_cycle_data[k];
+	}
+
+	return &rhead->h_cycle_data[i];
+}
+
 STATIC int
 xlog_unpack_data(
 	struct xlog_rec_header	*rhead,
 	char			*dp,
 	struct xlog		*log)
 {
-	int			i, j, k;
+	int			i;
 	int			error;
 
 	error = xlog_unpack_data_crc(rhead, dp, log);
 	if (error)
 		return error;
 
-	for (i = 0; i < BTOBB(be32_to_cpu(rhead->h_len)) &&
-		  i < XLOG_CYCLE_DATA_SIZE; i++) {
-		*(__be32 *)dp = *(__be32 *)&rhead->h_cycle_data[i];
+	for (i = 0; i < BTOBB(be32_to_cpu(rhead->h_len)); i++) {
+		*(__be32 *)dp = *xlog_cycle_data(rhead, i);
 		dp += BBSIZE;
-	}
-
-	if (xfs_has_logv2(log->l_mp)) {
-		xlog_in_core_2_t *xhdr = (xlog_in_core_2_t *)rhead;
-		for ( ; i < BTOBB(be32_to_cpu(rhead->h_len)); i++) {
-			j = i / XLOG_CYCLE_DATA_SIZE;
-			k = i % XLOG_CYCLE_DATA_SIZE;
-			*(__be32 *)dp = xhdr[j].hic_xheader.xh_cycle_data[k];
-			dp += BBSIZE;
-		}
 	}
 
 	return 0;
