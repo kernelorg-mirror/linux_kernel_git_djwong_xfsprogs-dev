@@ -1297,7 +1297,7 @@ libxfs_log_header(
 	libxfs_get_block_t	*nextfunc,
 	void			*private)
 {
-	xlog_rec_header_t	*head = (xlog_rec_header_t *)caddr;
+	struct xlog_rec_header	*head = (struct xlog_rec_header *)caddr;
 	char			*p = caddr;
 	__be32			cycle_lsn;
 	int			i, len;
