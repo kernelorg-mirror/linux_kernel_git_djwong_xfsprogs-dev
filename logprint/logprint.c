@@ -24,6 +24,7 @@ int	print_buffer;
 int	print_overwrite;
 int     print_no_data;
 int     print_no_print;
+int	print_host_endian;
 static int	print_operation = OP_PRINT;
 static struct libxfs_init x;
 
@@ -37,6 +38,7 @@ Options:\n\
     -d	            dump the log in log-record format\n\
     -e	            exit when an error is found in the log\n\
     -f	            specified device is actually a file\n\
+    -h		    print hex data in host-endian order\n\
     -l <device>     filename of external log\n\
     -n	            don't try and interpret log data\n\
     -o	            print buffer data in hex\n\
@@ -170,6 +172,9 @@ main(int argc, char **argv)
 			case 'l':
 				x.log.name = optarg;
 				x.log.isfile = 1;
+				break;
+			case 'h':
+				print_host_endian = 1;
 				break;
 			case 'i':
 				print_inode++;
