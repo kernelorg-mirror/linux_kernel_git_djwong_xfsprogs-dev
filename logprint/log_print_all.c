@@ -55,8 +55,8 @@ xlog_recover_print_data(
 
 		while (j < nums) {
 			if ((j % 8) == 0)
-				printf("%2x ", j);
-			printf("%8x ", *dp);
+				printf("%2x: ", j);
+			printf("%08x ", be32_to_cpu(*dp));
 			dp++;
 			j++;
 			if ((j % 8) == 0)
