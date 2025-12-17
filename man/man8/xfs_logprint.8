@@ -76,6 +76,10 @@ This might happen if an image copy of a filesystem has been made into
 an ordinary file with
 .BR xfs_copy (8).
 .TP
+.B \-h
+Print u32 hex dump data in host-endian order.
+The default is to print without any endian decoding.
+.TP
 .BI \-l " logdev"
 External log device. Only for those filesystems which use an external log.
 .TP
