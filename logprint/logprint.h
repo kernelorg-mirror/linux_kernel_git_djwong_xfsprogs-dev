@@ -16,6 +16,7 @@ extern int	print_transactions;
 extern int	print_overwrite;
 extern int	print_no_data;
 extern int	print_no_print;
+extern int	print_host_endian;
 
 /* exports */
 extern time64_t xlog_extract_dinode_ts(const xfs_log_timestamp_t);
