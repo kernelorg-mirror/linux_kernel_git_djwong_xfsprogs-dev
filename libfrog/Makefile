@@ -35,6 +35,7 @@ ptvar.c \
 radix-tree.c \
 randbytes.c \
 scrub.c \
+systemd.c \
 util.c \
 workqueue.c
 
@@ -67,6 +68,7 @@ radix-tree.h \
 randbytes.h \
 scrub.h \
 statx.h \
+systemd.h \
 workqueue.h
 
 GETTEXT_PY = \
