@@ -190,6 +190,11 @@ AC_HAVE_TRIVIAL_AUTO_VAR_INIT
 AC_STRERROR_R_RETURNS_STRING
 AC_HAVE_BLK_ZONE_COND_ACTIVE
 AC_HAVE_CLOSE_RANGE
+AC_HAVE_LISTMOUNT
+if test "$have_listmount" = "yes"; then
+	AC_HAVE_LISTMOUNT_NS_FD
+fi
+AC_HAVE_FANOTIFY_MOUNTINFO
 
 if test "$enable_ubsan" = "yes" || test "$enable_ubsan" = "probe"; then
         AC_PACKAGE_CHECK_UBSAN
