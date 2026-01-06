@@ -89,6 +89,14 @@ ifeq ($(HAVE_GETFSMAP),yes)
 CFILES += fsmap.c
 endif
 
+ifeq ($(HAVE_LISTMOUNT),yes)
+CFILES += listmount.c
+LCFLAGS += -DHAVE_LISTMOUNT
+ ifeq ($(HAVE_LISTMOUNT_NS_FD),yes)
+  CFLAGS += -DHAVE_LISTMOUNT_NS_FD
+ endif # listmount mnt_ns_fd
+endif
+
 default: depend $(LTCOMMAND)
 
 include $(BUILDRULES)
