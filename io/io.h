@@ -163,3 +163,9 @@ void			exchangerange_init(void);
 void			fsprops_init(void);
 void			aginfo_init(void);
 void			healthmon_init(void);
+
+#ifdef HAVE_LISTMOUNT
+void			listmount_init(void);
+#else
+# define		listmount_init()	do { } while (0)
+#endif
