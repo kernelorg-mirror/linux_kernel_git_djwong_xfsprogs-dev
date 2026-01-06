@@ -94,6 +94,7 @@ init_commands(void)
 	fsprops_init();
 	healthmon_init();
 	verifymedia_init();
+	listmount_init();
 }
 
 /*
