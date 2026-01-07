@@ -4579,10 +4579,11 @@ adjust_nr_zones(
 				cfg->rgsize;
 
 	if (cfg->rgcount > max_zones) {
-		fprintf(stderr,
+		if (cli->rtsize)
+			fprintf(stderr,
 _("Warning: not enough zones (%lu/%u) for backing requested rt size due to\n"
   "over-provisioning needs, writable size will be less than %s\n"),
-			cfg->rgcount, max_zones, cli->rtsize);
+				cfg->rgcount, max_zones, cli->rtsize);
 		cfg->rgcount = max_zones;
 	}
 	new_rtblocks = (cfg->rgcount * cfg->rgsize);
