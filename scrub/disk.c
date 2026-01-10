@@ -190,6 +190,7 @@ disk_open(
 	disk = calloc(1, sizeof(struct disk));
 	if (!disk)
 		return NULL;
+	disk->d_verify_fd = -1;
 
 	disk->d_fd = open(pathname, O_RDONLY | O_DIRECT | O_NOATIME);
 	if (disk->d_fd < 0)
@@ -266,6 +267,18 @@ disk_close(
 #define LBASIZE(d)		(1ULL << (d)->d_lbalog)
 #define BTOLBA(d, bytes)	(((uint64_t)(bytes) + LBASIZE(d) - 1) >> (d)->d_lbalog)
 
+#ifndef BTOBB
+# define BTOBB(bytes)		((uint64_t)((bytes) + 511) >> 9)
+#endif
+
+#ifndef BTOBBT
+# define BTOBBT(bytes)		((uint64_t)(bytes) >> 9)
+#endif
+
+#ifndef BBTOB
+# define BBTOB(bytes)		((uint64_t)(bytes) << 9)
+#endif
+
 /* Simulate disk errors. */
 static int
 disk_simulate_read_error(
@@ -329,7 +342,8 @@ disk_read_verify(
 	struct disk		*disk,
 	void			*buf,
 	uint64_t		start,
-	uint64_t		length)
+	uint64_t		length,
+	bool			single_step)
 {
 	if (debug) {
 		int		ret;
@@ -343,6 +357,29 @@ disk_read_verify(
 		/* Don't actually issue the IO */
 		if (getenv("XFS_SCRUB_DISK_VERIFY_SKIP"))
 			return length;
+	}
+
+	if (disk->d_verify_fd >= 0) {
+		const uint64_t	orig_start_daddr = BTOBBT(start);
+		struct xfs_verify_media me = {
+			.start_daddr	= orig_start_daddr,
+			.end_daddr	= BTOBB(start + length),
+			.dev		= disk->d_verify_disk,
+		};
+		int		ret;
+
+		if (single_step)
+			me.flags |= XFS_VERIFY_REPORT_ERRORS;
+
+		ret = ioctl(disk->d_verify_fd, XFS_IOC_VERIFY_MEDIA, &me);
+		if (ret < 0)
+			return ret;
+		if (me.ioerror) {
+			errno = me.ioerror;
+			return -1;
+		}
+
+		return BBTOB(me.start_daddr - orig_start_daddr);
 	}
 
 	/* Convert to logical block size. */
