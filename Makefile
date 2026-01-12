@@ -69,6 +69,10 @@ ifeq ("$(ENABLE_SCRUB)","yes")
 TOOL_SUBDIRS += scrub
 endif
 
+ifeq ("$(ENABLE_HEALER)","yes")
+TOOL_SUBDIRS += healer
+endif
+
 ifneq ("$(XGETTEXT)","")
 TOOL_SUBDIRS += po
 endif
@@ -100,6 +104,7 @@ mkfs: libxcmd
 spaceman: libxcmd libhandle
 scrub: libhandle libxcmd
 rtcp: libfrog
+healer: libhandle
 
 ifeq ($(HAVE_BUILDDEFS), yes)
 include $(BUILDRULES)
