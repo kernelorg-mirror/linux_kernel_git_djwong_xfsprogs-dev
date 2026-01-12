@@ -11,6 +11,8 @@ INSTALL_HEALER = install-healer
 LTCOMMAND = xfs_healer
 
 CFILES = \
+fsrepair.c \
+weakhandle.c \
 xfs_healer.c
 
 HFILES = \
