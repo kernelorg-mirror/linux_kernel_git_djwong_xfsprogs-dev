@@ -14,6 +14,9 @@ struct flag_map {
 void mask_to_string(const struct flag_map *map, unsigned long long mask,
 		const char *delimiter, char *buf, size_t bufsize);
 
+const char *lowest_set_mask_string(const struct flag_map *map,
+		unsigned long long mask);
+
 const char *value_to_string(const struct flag_map *map,
 		unsigned long long value);
 
