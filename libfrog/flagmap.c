@@ -45,6 +45,23 @@ mask_to_string(
 }
 
 /*
+ * Given a mapping of bits to strings and a bitmask, return the string
+ * corresponding to the lowest set bit in the mask.
+ */
+const char *
+lowest_set_mask_string(
+	const struct flag_map	*map,
+	unsigned long long	mask)
+{
+	for (; map->string; map++) {
+		if (mask & map->flag)
+			return _(map->string);
+	}
+
+	return _("unknown flag");
+}
+
+/*
  * Given a mapping of values to strings and a value, return the matching string
  * or confusion.
  */
