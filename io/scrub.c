@@ -13,12 +13,14 @@
 #include "libfrog/fsgeom.h"
 #include "libfrog/scrub.h"
 #include "libfrog/logging.h"
+#include "libfrog/systemd.h"
 #include "io.h"
 #include "list.h"
 
 static struct cmdinfo scrub_cmd;
 static struct cmdinfo repair_cmd;
 static const struct cmdinfo scrubv_cmd;
+static const struct cmdinfo svcname_cmd;
 
 static void
 scrub_help(void)
@@ -356,6 +358,7 @@ scrub_init(void)
 
 	add_command(&scrub_cmd);
 	add_command(&scrubv_cmd);
+	add_command(&svcname_cmd);
 }
 
 static void
@@ -729,4 +732,63 @@ static const struct cmdinfo scrubv_cmd = {
 	.flags		= CMD_NOMAP_OK,
 	.oneline	= N_("vectored metadata scrub"),
 	.help		= scrubv_help,
+};
+
+static void
+svcname_help(void)
+{
+	printf(_(
+"\n"
+" Print the systemd service name for the given paths.\n"
+"\n"
+"Supported features: bigtime, inobtcount, nrext64, exchange.\n"));
+}
+
+static int
+svcname_f(
+	int		argc,
+	char		**argv)
+{
+	const char	*template = "xfs_scrub@.service";
+	int		c;
+	int		error;
+
+	while ((c = getopt(argc, argv, "sht:")) != EOF) {
+		switch (c) {
+		case 's':
+			template = "xfs_scrub@.service";
+			break;
+		case 'h':
+			template = "xfs_healer@.service";
+			break;
+		case 't':
+			template = optarg;
+			break;
+		default:
+			svcname_help();
+			return 0;
+		}
+	}
+
+	for (c = optind; c < argc; c++) {
+		char	unitname[PATH_MAX];
+
+		error = systemd_path_instance_unit_name(template, argv[c],
+				unitname, sizeof(unitname));
+		if (error)
+			perror(argv[c]);
+		printf("%s\n", unitname);
+	}
+
+	return 0;
+}
+
+static const struct cmdinfo svcname_cmd = {
+	.name		= "svcname",
+	.cfunc		= svcname_f,
+	.argmin		= -1,
+	.argmax		= -1,
+	.flags		= CMD_NOFILE_OK | CMD_NOMAP_OK,
+	.oneline	= N_("print systemd service names"),
+	.help		= svcname_help,
 };
