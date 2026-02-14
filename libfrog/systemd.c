@@ -11,6 +11,28 @@
 
 #include "libfrog/systemd.h"
 
+static void
+close_fds(void)
+{
+	int max_fd = sysconf(_SC_OPEN_MAX);
+	int fd;
+#ifdef HAVE_CLOSE_RANGE
+	int ret;
+#endif
+
+	if (max_fd < 1)
+		max_fd = 1024;
+
+#ifdef HAVE_CLOSE_RANGE
+	ret = close_range(STDERR_FILENO + 1, max_fd, 0);
+	if (!ret)
+		return;
+#endif
+
+	for (fd = STDERR_FILENO + 1; fd < max_fd; fd++)
+		close(fd);
+}
+
 /*
  * Compute the systemd instance unit name for a given path.
  *
@@ -55,6 +77,8 @@ systemd_path_instance_unit_name(
 			perror(path);
 			goto fail;
 		}
+
+		close_fds();
 
 		ret = execvp("systemd-escape", argv);
 		if (ret)
@@ -128,6 +152,8 @@ systemd_manage_unit(
 			(char *)unitname,
 			NULL,
 		};
+
+		close_fds();
 
 		ret = execvp("systemctl", argv);
 		if (ret)

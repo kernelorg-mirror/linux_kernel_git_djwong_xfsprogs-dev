@@ -86,6 +86,10 @@ else
 HAVE_GETTEXT = False
 endif
 
+ifeq ($(HAVE_CLOSE_RANGE),yes)
+CFLAGS += -DHAVE_CLOSE_RANGE
+endif
+
 default: ltdepend $(LTLIBRARY) $(GETTEXT_PY)
 
 crc32table.h: gen_crc32table.c crc32defs.h
