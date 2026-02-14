@@ -749,17 +749,17 @@ svcname_f(
 	int		argc,
 	char		**argv)
 {
-	const char	*template = "xfs_scrub@.service";
+	const char	*template = XFS_SCRUB_SVCNAME;
 	int		c;
 	int		error;
 
 	while ((c = getopt(argc, argv, "sht:")) != EOF) {
 		switch (c) {
 		case 's':
-			template = "xfs_scrub@.service";
+			template = XFS_SCRUB_SVCNAME;
 			break;
 		case 'h':
-			template = "xfs_healer@.service";
+			template = XFS_HEALER_SVCNAME;
 			break;
 		case 't':
 			template = optarg;
