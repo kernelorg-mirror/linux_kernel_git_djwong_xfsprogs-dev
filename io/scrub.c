@@ -775,9 +775,12 @@ svcname_f(
 
 		error = systemd_path_instance_unit_name(template, argv[c],
 				unitname, sizeof(unitname));
-		if (error)
-			perror(argv[c]);
-		printf("%s\n", unitname);
+		if (error) {
+			if (errno)
+				perror(argv[c]);
+		} else {
+			printf("%s\n", unitname);
+		}
 	}
 
 	return 0;

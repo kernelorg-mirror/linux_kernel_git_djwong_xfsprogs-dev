@@ -46,11 +46,11 @@ systemd_path_instance_unit_name(
 	char			*unitname,
 	size_t			unitnamelen)
 {
-	FILE			*fp;
-	char			*s;
+	size_t			i;
 	ssize_t			bytes;
 	pid_t			child_pid;
 	int			pipe_fds[2];
+	int			child_status;
 	int			ret;
 
 	ret = pipe(pipe_fds);
@@ -88,23 +88,27 @@ fail:
 		exit(EXIT_FAILURE);
 	}
 
-	/* parent scrapes the output */
-	fp = fdopen(pipe_fds[0], "r");
-	s = fgets(unitname, unitnamelen, fp);
-	fclose(fp);
+	/*
+	 * Close our connection to stdin so that the read won't hang if the
+	 * child exits without writing anything to stdout.
+	 */
 	close(pipe_fds[1]);
+	bytes = read(pipe_fds[0], unitname, unitnamelen);
+	close(pipe_fds[0]);
 
-	waitpid(child_pid, NULL, 0);
-
-	if (!s) {
-		errno = ENOENT;
+	waitpid(child_pid, &child_status, 0);
+	if (!WIFEXITED(child_status) || WEXITSTATUS(child_status) != 0) {
+		errno = 0;
 		return -1;
 	}
 
 	/* trim off trailing newline */
-	bytes = strlen(s);
-	if (s[bytes - 1] == '\n')
-		s[bytes - 1] = 0;
+	for (i = 0; i < bytes; i++) {
+		if (unitname[i] == '\n') {
+			unitname[i] = 0;
+			break;
+		}
+	}
 
 	return 0;
 }
