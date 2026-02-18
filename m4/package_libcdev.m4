@@ -365,3 +365,22 @@ int foo = BLK_ZONE_COND_ACTIVE;
        AC_MSG_RESULT(no))
     AC_SUBST(have_blk_zone_cond_active)
   ])
+
+#
+# Check if close_range exists
+#
+AC_DEFUN([AC_HAVE_CLOSE_RANGE],
+  [AC_MSG_CHECKING([for close_range])
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <linux/close_range.h>
+  ]], [[
+close_range(0, 0, 0);
+  ]])
+    ], have_close_range=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_close_range)
+  ])

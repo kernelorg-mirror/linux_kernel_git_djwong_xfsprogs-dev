@@ -36,6 +36,7 @@ ptvar.c \
 radix-tree.c \
 randbytes.c \
 scrub.c \
+systemd.c \
 util.c \
 workqueue.c
 
@@ -69,6 +70,7 @@ radix-tree.h \
 randbytes.h \
 scrub.h \
 statx.h \
+systemd.h \
 workqueue.h
 
 GETTEXT_PY = \
@@ -82,6 +84,10 @@ ifeq ($(ENABLE_GETTEXT),yes)
 HAVE_GETTEXT = True
 else
 HAVE_GETTEXT = False
+endif
+
+ifeq ($(HAVE_CLOSE_RANGE),yes)
+CFLAGS += -DHAVE_CLOSE_RANGE
 endif
 
 default: ltdepend $(LTLIBRARY) $(GETTEXT_PY)
