@@ -98,6 +98,9 @@ LCFLAGS += -DHAVE_LISTMOUNT
  endif # listmount mnt_ns_fd
 endif
 
+CFLAGS+=-DXFS_SCRUB_SVCNAME=\"$(XFS_SCRUB_SVCNAME)\"
+CFLAGS+=-DXFS_HEALER_SVCNAME=\"$(XFS_HEALER_SVCNAME)\"
+
 default: depend $(LTCOMMAND)
 
 include $(BUILDRULES)

@@ -63,6 +63,7 @@ PKG_STATE_DIR	= @localstatedir@/lib/@pkg_name@
 
 XFS_SCRUB_ALL_AUTO_MEDIA_SCAN_STAMP=$(PKG_STATE_DIR)/xfs_scrub_all_media.stamp
 XFS_SCRUB_SVCNAME=xfs_scrub@.service
+XFS_HEALER_SVCNAME=xfs_healer@.service
 
 CC		= @cc@
 BUILD_CC	= @BUILD_CC@
