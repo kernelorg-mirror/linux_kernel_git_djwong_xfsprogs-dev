@@ -1,0 +1,8 @@
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# Copyright (c) 2024-2026 Oracle.  All rights reserved.
+# Author: Darrick J. Wong <djwong@kernel.org>
+#
+enable system-xfs_healer.slice
+enable xfs_healer@.service
+enable xfs_healer_start.service
