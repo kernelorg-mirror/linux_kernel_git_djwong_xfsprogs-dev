@@ -366,3 +366,81 @@ close_range(0, 0, 0);
        AC_MSG_RESULT(no))
     AC_SUBST(have_close_range)
   ])
+
+#
+# Check if listmount and statmount exist.  Note that statmount came first (6.8)
+# and listmount came later (6.9).
+#
+AC_DEFUN([AC_HAVE_LISTMOUNT],
+  [AC_MSG_CHECKING([for listmount])
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <linux/mount.h>
+#include <sys/syscall.h>
+#include <alloca.h>
+  ]], [[
+	struct mnt_id_req	req = {
+		.size		= sizeof(req),
+	};
+	struct statmount	smbuf;
+
+	syscall(SYS_statmount, &req, &smbuf, 0, 0);
+	syscall(SYS_listmount, &req, NULL, 0, 0);
+  ]])
+    ], have_listmount=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_listmount)
+  ])
+
+#
+# Check if mnt_id_req::mnt_ns_fd exists.  This replaced mnt_id_req::spare in
+# 6.18.
+#
+AC_DEFUN([AC_HAVE_LISTMOUNT_NS_FD],
+  [AC_MSG_CHECKING([for struct mnt_id_req::mnt_ns_fd])
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <linux/mount.h>
+#include <sys/syscall.h>
+#include <alloca.h>
+  ]], [[
+	struct mnt_id_req	req = {
+		.mnt_ns_fd	= 555,
+	};
+
+	syscall(SYS_listmount, &req, NULL, 0, 0);
+  ]])
+    ], have_listmount_ns_fd=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_listmount_ns_fd)
+  ])
+
+#
+# Check if fanotify will give us mount notifications
+#
+AC_DEFUN([AC_HAVE_FANOTIFY_MOUNTINFO],
+  [AC_MSG_CHECKING([for fanotify mount events])
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/fanotify.h>
+  ]], [[
+	struct fanotify_event_info_mnt info;
+
+	int fan_fd = fanotify_init(FAN_REPORT_MNT, 0);
+	fanotify_mark(fan_fd, FAN_MARK_ADD | FAN_MARK_MNTNS, FAN_MNT_ATTACH,
+			-1, NULL);
+  ]])
+    ], have_fanotify_mountinfo=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_fanotify_mountinfo)
+  ])
