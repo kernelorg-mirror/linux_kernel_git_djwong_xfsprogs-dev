@@ -169,7 +169,7 @@ endif
 
 FCFLAGS = -I.
 
-LTLIBS = $(LIBPTHREAD) $(LIBRT)
+LTLIBS = $(LIBPTHREAD) $(LIBRT) $(LIBFROG)
 
 # don't try linking xfs_repair with a debug libxfs.
 DEBUG = -DNDEBUG
