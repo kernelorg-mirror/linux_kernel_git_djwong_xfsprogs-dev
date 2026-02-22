@@ -225,12 +225,45 @@ verify_simulate_read_error(
 	return 0;
 }
 
+/* Use the XFS media verification ioctl to do the media scan */
+static ssize_t
+ioctl_verify(
+	int			verify_fd,
+	enum xfs_device		dev,
+	uint64_t		start,
+	uint64_t		length,
+	bool			single_step)
+{
+	const uint64_t	orig_start_daddr = BTOBBT(start);
+	struct xfs_verify_media	me = {
+		.me_start_daddr	= orig_start_daddr,
+		.me_end_daddr	= BTOBB(start + length),
+		.me_dev		= dev,
+		.me_rest_us	= bg_mode > 2 ? bg_mode - 1 : 0,
+	};
+	int			ret;
+
+	if (single_step)
+		me.me_flags |= XFS_VERIFY_MEDIA_REPORT;
+
+	ret = ioctl(verify_fd, XFS_IOC_VERIFY_MEDIA, &me);
+	if (ret < 0)
+		return ret;
+	if (me.me_ioerror) {
+		errno = me.me_ioerror;
+		return -1;
+	}
+
+	return BBTOB(me.me_start_daddr - orig_start_daddr);
+}
+
 /* Read-verify an extent of a disk device. */
 static ssize_t
 read_verify_one(
 	struct read_verify_pool	*rvp,
 	struct read_verify	*rv,
-	ssize_t			len)
+	ssize_t			len,
+	bool			single_step)
 {
 	if (debug) {
 		int		ret;
@@ -246,8 +279,11 @@ read_verify_one(
 			return len;
 	}
 
-	return disk_read_verify(rvp->ctx->verify_disks[rvp->dev], rvp->readbuf,
-			rv->io_start, len);
+	if (rvp->ctx->no_verify_ioctl)
+		return disk_read_verify(rvp->ctx->verify_disks[rvp->dev],
+				rvp->readbuf, rv->io_start, len);
+	return ioctl_verify(rvp->ctx->mnt.fd, rvp->dev, rv->io_start, len,
+			single_step);
 }
 
 /*
@@ -279,7 +315,7 @@ read_verify(
 		len = min(rv->io_length, io_max_size);
 		dbg_printf("diskverify %u %"PRIu64" %zu\n", rvp->dev,
 				rv->io_start, len);
-		sz = read_verify_one(rvp, rv, len);
+		sz = read_verify_one(rvp, rv, len, io_max_size <= rvp->miniosz);
 		if (sz == len && io_max_size < rvp->miniosz) {
 			/*
 			 * If the verify request was 100% successful and less
