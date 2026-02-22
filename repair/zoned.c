@@ -3,7 +3,7 @@
  * Copyright (c) 2024 Christoph Hellwig.
  */
 #include <ctype.h>
-#include "libxfs_priv.h"
+#include "xfs_platform.h"
 #include "libxfs.h"
 #include "xfs_zones.h"
 #include "libfrog/zones.h"

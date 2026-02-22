@@ -4,7 +4,7 @@
  * All Rights Reserved.
  */
 
-#include "libxfs_priv.h"
+#include "xfs_platform.h"
 #include "libxfs.h"
 #include "libxfs_io.h"
 #include "init.h"
