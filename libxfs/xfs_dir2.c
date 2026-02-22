@@ -115,10 +115,10 @@ xfs_da_mount(
 	ASSERT(mp->m_sb.sb_versionnum & XFS_SB_VERSION_DIRV2BIT);
 	ASSERT(xfs_dir2_dirblock_bytes(&mp->m_sb) <= XFS_MAX_BLOCKSIZE);
 
-	mp->m_dir_geo = kzalloc(sizeof(struct xfs_da_geometry),
-				GFP_KERNEL | __GFP_RETRY_MAYFAIL);
-	mp->m_attr_geo = kzalloc(sizeof(struct xfs_da_geometry),
-				GFP_KERNEL | __GFP_RETRY_MAYFAIL);
+	mp->m_dir_geo = kzalloc_obj(struct xfs_da_geometry,
+				    GFP_KERNEL | __GFP_RETRY_MAYFAIL);
+	mp->m_attr_geo = kzalloc_obj(struct xfs_da_geometry,
+				     GFP_KERNEL | __GFP_RETRY_MAYFAIL);
 	if (!mp->m_dir_geo || !mp->m_attr_geo) {
 		kfree(mp->m_dir_geo);
 		kfree(mp->m_attr_geo);
@@ -247,7 +247,7 @@ xfs_dir_init(
 	if (error)
 		return error;
 
-	args = kzalloc(sizeof(*args), GFP_KERNEL | __GFP_NOFAIL);
+	args = kzalloc_obj(*args, GFP_KERNEL | __GFP_NOFAIL);
 	if (!args)
 		return -ENOMEM;
 
@@ -340,7 +340,7 @@ xfs_dir_createname(
 		XFS_STATS_INC(dp->i_mount, xs_dir_create);
 	}
 
-	args = kzalloc(sizeof(*args), GFP_KERNEL | __GFP_NOFAIL);
+	args = kzalloc_obj(*args, GFP_KERNEL | __GFP_NOFAIL);
 	if (!args)
 		return -ENOMEM;
 
@@ -436,8 +436,7 @@ xfs_dir_lookup(
 	ASSERT(S_ISDIR(VFS_I(dp)->i_mode));
 	XFS_STATS_INC(dp->i_mount, xs_dir_lookup);
 
-	args = kzalloc(sizeof(*args),
-			GFP_KERNEL | __GFP_NOLOCKDEP | __GFP_NOFAIL);
+	args = kzalloc_obj(*args, GFP_KERNEL | __GFP_NOLOCKDEP | __GFP_NOFAIL);
 	args->geo = dp->i_mount->m_dir_geo;
 	args->name = name->name;
 	args->namelen = name->len;
@@ -502,7 +501,7 @@ xfs_dir_removename(
 	ASSERT(S_ISDIR(VFS_I(dp)->i_mode));
 	XFS_STATS_INC(dp->i_mount, xs_dir_remove);
 
-	args = kzalloc(sizeof(*args), GFP_KERNEL | __GFP_NOFAIL);
+	args = kzalloc_obj(*args, GFP_KERNEL | __GFP_NOFAIL);
 	if (!args)
 		return -ENOMEM;
 
@@ -562,7 +561,7 @@ xfs_dir_replace(
 	if (rval)
 		return rval;
 
-	args = kzalloc(sizeof(*args), GFP_KERNEL | __GFP_NOFAIL);
+	args = kzalloc_obj(*args, GFP_KERNEL | __GFP_NOFAIL);
 	if (!args)
 		return -ENOMEM;
 
