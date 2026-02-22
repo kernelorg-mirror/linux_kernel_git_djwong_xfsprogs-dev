@@ -3,7 +3,7 @@
  * Copyright (c) 2000-2005 Silicon Graphics, Inc.
  * All Rights Reserved.
  */
-#include "libxfs_priv.h"
+#include "xfs_platform.h"
 #include "xfs_log_format.h"
 #include "xfs_bit.h"
 
