@@ -1825,6 +1825,30 @@ See the
 .B print
 command.
 .TP
+.BI "svcname [ \-h | \-m | \-s | \-t " template " ] " path
+Print the systemd service name for a given filesystem path.
+.RE
+.RS 1.0i
+.PD 0
+.TP
+.B \-h
+Print the systemd service name for xfs_healer.
+
+.TP
+.B \-m
+Print the systemd service name for xfs_scrub_media.
+
+.TP
+.B \-s
+Print the systemd service name for xfs_scrub.
+
+.TP
+.BI "\-t " template
+Print the systemd service name for the given template.
+.RE
+.PD
+
+.TP
 .B quit
 Exit
 .BR xfs_io .

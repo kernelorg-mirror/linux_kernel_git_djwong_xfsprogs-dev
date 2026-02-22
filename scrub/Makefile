@@ -8,8 +8,6 @@ include $(builddefs)
 
 SCRUB_PREREQS=$(HAVE_GETFSMAP)
 
-scrub_media_svcname=xfs_scrub_media@.service
-
 ifeq ($(SCRUB_PREREQS),yes)
 LTCOMMAND = xfs_scrub
 INSTALL_SCRUB = install-scrub
@@ -22,7 +20,7 @@ INSTALL_SCRUB += install-systemd
 SYSTEMD_SERVICES=\
 	$(XFS_SCRUB_SVCNAME) \
 	xfs_scrub_fail@.service \
-	$(scrub_media_svcname) \
+	$(XFS_SCRUB_MEDIA_SVCNAME) \
 	xfs_scrub_media_fail@.service \
 	xfs_scrub_all.service \
 	xfs_scrub_all_fail.service \
@@ -123,7 +121,7 @@ $(XFS_SCRUB_ALL_PROG): $(XFS_SCRUB_ALL_PROG).in $(builddefs) $(TOPDIR)/libfrog/g
 	@echo "    [SED]    $@"
 	$(Q)$(SED) -e "s|@sbindir@|$(PKG_SBIN_DIR)|g" \
 		   -e "s|@scrub_svcname@|$(XFS_SCRUB_SVCNAME)|g" \
-		   -e "s|@scrub_media_svcname@|$(scrub_media_svcname)|g" \
+		   -e "s|@scrub_media_svcname@|$(XFS_SCRUB_MEDIA_SVCNAME)|g" \
 		   -e "s|@pkg_version@|$(PKG_VERSION)|g" \
 		   -e "s|@stampfile@|$(XFS_SCRUB_ALL_AUTO_MEDIA_SCAN_STAMP)|g" \
 		   -e "s|@scrub_service_args@|$(XFS_SCRUB_SERVICE_ARGS)|g" \
