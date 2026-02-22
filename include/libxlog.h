@@ -99,9 +99,9 @@ extern int	xlog_do_recovery_pass(struct xlog *log, xfs_daddr_t head_blk,
 extern int	xlog_recover_do_trans(struct xlog *log, struct xlog_recover *trans,
 				int pass);
 extern int	xlog_header_check_recover(xfs_mount_t *mp,
-				xlog_rec_header_t *head);
+				struct xlog_rec_header *head);
 extern int	xlog_header_check_mount(xfs_mount_t *mp,
-				xlog_rec_header_t *head);
+				struct xlog_rec_header *head);
 
 #define xlog_assign_atomic_lsn(l,a,b) ((void) 0)
 #define xlog_assign_grant_head(l,a,b) ((void) 0)
