@@ -3,7 +3,7 @@
  * Copyright (c) 2023-2025 Christoph Hellwig.
  * Copyright (c) 2024-2025, Western Digital Corporation or its affiliates.
  */
-#include "libxfs_priv.h"
+#include "xfs_platform.h"
 #include "xfs.h"
 #include "xfs_fs.h"
 #include "xfs_shared.h"
