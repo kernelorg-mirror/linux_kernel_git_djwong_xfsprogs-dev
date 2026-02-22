@@ -79,7 +79,9 @@ static int
 weakhandle_reopen_from(
 	struct weakhandle	*wh,
 	const char		*path,
-	int			*fd)
+	int			*fd,
+	weakhandle_fd_t		is_acceptable,
+	void			*data)
 {
 	void			*hanp;
 	size_t			hlen;
@@ -101,6 +103,11 @@ weakhandle_reopen_from(
 		goto out_handle;
 	}
 
+	if (is_acceptable && !is_acceptable(mnt_fd, data)) {
+		errno = ESTALE;
+		goto out_handle;
+	}
+
 	free_handle(hanp, hlen);
 	*fd = mnt_fd;
 	return 0;
@@ -116,7 +123,9 @@ out_mntfd:
 int
 weakhandle_reopen(
 	struct weakhandle	*wh,
-	int			*fd)
+	int			*fd,
+	weakhandle_fd_t		is_acceptable,
+	void			*data)
 {
 	const size_t		smbuf_size =
 		libfrog_statmount_sizeof(PATH_MAX);
@@ -126,7 +135,7 @@ weakhandle_reopen(
 	int			ret;
 
 	/* First try reopening using the original mountpoint */
-	ret = weakhandle_reopen_from(wh, wh->mntpoint, fd);
+	ret = weakhandle_reopen_from(wh, wh->mntpoint, fd, is_acceptable, data);
 	if (!ret)
 		return 0;
 
@@ -140,7 +149,8 @@ weakhandle_reopen(
 			STATMOUNT_MNT_POINT, smbuf, smbuf_size);
 	if (ret || !(smbuf->mask & STATMOUNT_MNT_POINT))
 		goto fallback;
-	ret = weakhandle_reopen_from(wh, smbuf->str + smbuf->mnt_point, fd);
+	ret = weakhandle_reopen_from(wh, smbuf->str + smbuf->mnt_point, fd,
+			is_acceptable, data);
 	if (!ret)
 		return 0;
 
@@ -159,7 +169,8 @@ fallback:
 		if (strcmp(mnt->mnt_fsname, wh->fsname))
 			continue;
 
-		ret = weakhandle_reopen_from(wh, mnt->mnt_dir, fd);
+		ret = weakhandle_reopen_from(wh, mnt->mnt_dir, fd,
+				is_acceptable, data);
 		if (!ret)
 			break;
 	}
@@ -244,7 +255,7 @@ weakhandle_getpath_for(
 	fakehandle.ha_fid.fid_ino = ino;
 	fakehandle.ha_fid.fid_gen = gen;
 
-	ret = weakhandle_reopen(wh, &mnt_fd);
+	ret = weakhandle_reopen(wh, &mnt_fd, NULL, NULL);
 	if (ret)
 		return ret;
 
