@@ -213,6 +213,22 @@ no_property:
 	goto summarize;
 }
 
+/* Does the XFS driver support media scanning its own disks? */
+static void
+configure_xfs_verify(
+	struct scrub_ctx	*ctx)
+{
+	struct xfs_verify_media	me = {
+		/* just probe for support using an empty range */
+		.me_start_daddr	= 0,
+		.me_end_daddr	= 0,
+		.me_dev		= XFS_DEV_DATA,
+	};
+
+	if (ioctl(ctx->mnt.fd, XFS_IOC_VERIFY_MEDIA, &me))
+		ctx->no_verify_ioctl = true;
+}
+
 /*
  * Bind to the mountpoint, read the XFS geometry, bind to the block devices.
  * Anything we've already built will be cleaned up by scrub_cleanup.
@@ -378,6 +394,8 @@ _("Unable to find realtime device path."));
 			return ECANCELED;
 		}
 	}
+
+	configure_xfs_verify(ctx);
 
 	/*
 	 * Everything's set up, which means any failures recorded after
