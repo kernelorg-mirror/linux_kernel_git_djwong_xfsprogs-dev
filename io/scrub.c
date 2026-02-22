@@ -13,12 +13,14 @@
 #include "libfrog/fsgeom.h"
 #include "libfrog/scrub.h"
 #include "libfrog/logging.h"
+#include "libfrog/systemd.h"
 #include "io.h"
 #include "list.h"
 
 static struct cmdinfo scrub_cmd;
 static struct cmdinfo repair_cmd;
 static const struct cmdinfo scrubv_cmd;
+static const struct cmdinfo svcname_cmd;
 
 static void
 scrub_help(void)
@@ -356,6 +358,7 @@ scrub_init(void)
 
 	add_command(&scrub_cmd);
 	add_command(&scrubv_cmd);
+	add_command(&svcname_cmd);
 }
 
 static void
@@ -729,4 +732,76 @@ static const struct cmdinfo scrubv_cmd = {
 	.flags		= CMD_NOMAP_OK,
 	.oneline	= N_("vectored metadata scrub"),
 	.help		= scrubv_help,
+};
+
+static void
+svcname_help(void)
+{
+	printf(_(
+"\n"
+" Print the systemd service instance name for the given paths.\n"
+"\n"
+" -h         Print the instance name for a xfs_healer instance.\n"
+" -m         Print the instance name for a xfs_scrub_media instance.\n"
+" -s         Print the instance name for a xfs_scrub instance.\n"
+" -t templ   Use templ as a template for the service name.\n"
+"\n"
+" Example:\n"
+" 'svcname -s /mnt' - print the xfs_scrub service name for /mnt.\n"));
+}
+
+static int
+svcname_f(
+	int		argc,
+	char		**argv)
+{
+	const char	*template = XFS_SCRUB_SVCNAME;
+	int		c;
+	int		error;
+
+	while ((c = getopt(argc, argv, "shmt:")) != EOF) {
+		switch (c) {
+		case 's':
+			template = XFS_SCRUB_SVCNAME;
+			break;
+		case 'm':
+			template = XFS_SCRUB_MEDIA_SVCNAME;
+			break;
+		case 'h':
+			template = XFS_HEALER_SVCNAME;
+			break;
+		case 't':
+			template = optarg;
+			break;
+		default:
+			svcname_help();
+			return 0;
+		}
+	}
+
+	for (c = optind; c < argc; c++) {
+		char	unitname[PATH_MAX];
+
+		error = systemd_path_instance_unit_name(template, argv[c],
+				unitname, sizeof(unitname));
+		if (error) {
+			if (errno)
+				perror(argv[c]);
+		} else {
+			printf("%s\n", unitname);
+		}
+	}
+
+	return 0;
+}
+
+static const struct cmdinfo svcname_cmd = {
+	.name		= "svcname",
+	.cfunc		= svcname_f,
+	.argmin		= -1,
+	.argmax		= -1,
+	.flags		= CMD_NOFILE_OK | CMD_NOMAP_OK,
+	.args		= N_("[-h | -m | -s | -t template] path [paths...]"),
+	.oneline	= N_("print systemd service names"),
+	.help		= svcname_help,
 };

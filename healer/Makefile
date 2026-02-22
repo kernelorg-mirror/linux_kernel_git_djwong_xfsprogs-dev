@@ -27,7 +27,6 @@ LLDFLAGS = -static
 
 ifeq ($(HAVE_SYSTEMD),yes)
 INSTALL_HEALER += install-systemd
-XFS_HEALER_SVCNAME=xfs_healer@.service
 SYSTEMD_SERVICES = \
 	system-xfs_healer.slice \
 	$(XFS_HEALER_SVCNAME)
