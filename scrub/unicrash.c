@@ -130,6 +130,9 @@ struct unicrash {
 /* More than one variation selector in a row. */
 #define UNICRASH_VARIATION_RUN	((__force badname_t)(1U << 7))
 
+/* Multiple names resolve to the same case-insensitive string. */
+#define UNICRASH_SAMECASE	((__force badname_t)(1U << 8))
+
 /* FULL STOP (aka period), 0x2E */
 #define UCHAR_PERIOD		((UChar32)'.')
 
@@ -897,9 +900,44 @@ _("Unicode name \"%s\" in %s could be confused with \"%s\"."),
 				bad1, what, bad2);
 	}
 
+	/*
+	 * Two names are identical, according to a case-insensitive comparison.
+	 * This is allowed, but 'A' and 'a' pointing to different things could
+	 * confuse a user.
+	 */
+	if (badflags & UNICRASH_SAMECASE) {
+		str_warn(uc->ctx, descr_render(dsc),
+_("Unicode name \"%s\" in %s could be confused with \"%s\" if copied to a case-folding archive or filesystem."),
+				bad1, what, bad2);
+		goto out;
+	}
+
 out:
 	free(bad1);
 	free(bad2);
+}
+
+static inline bool
+is_case_collision(
+	struct unicrash		*uc,
+	const struct name_entry	*entry,
+	const struct name_entry	*new_entry)
+{
+	/* normalized string isn't even the same length */
+	if (new_entry->normstrlen != entry->normstrlen)
+		return false;
+
+	/* case-folded names are not the same */
+	if (u_strcasecmp(new_entry->normstr, entry->normstr,
+				U_FOLD_CASE_DEFAULT))
+		return false;
+
+	/* same case-folded names with different inumbers are bad */
+	if (uc->compare_ino)
+	       return entry->ino != new_entry->ino;
+
+	/* same case-folded names is a collision */
+	return true;
 }
 
 /*
@@ -946,6 +984,14 @@ unicrash_add(
 		    !u_strcmp(new_entry->normstr, entry->normstr) &&
 		    (uc->compare_ino ? entry->ino != new_entry->ino : true)) {
 			badflags |= UNICRASH_NOT_UNIQUE;
+			*existing_entry = entry;
+			break;
+		}
+
+		/* Case-insensitive comparison identical? */
+		if (report_case_collisions &&
+		    is_case_collision(uc, entry, new_entry)) {
+			badflags |= UNICRASH_SAMECASE;
 			*existing_entry = entry;
 			break;
 		}
