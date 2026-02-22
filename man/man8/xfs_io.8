@@ -1766,6 +1766,72 @@ Set the given filesystem properties to the specified values.
 .TP
 .BI "removefsprops " name " [ " names "... ]"
 Remove the given filesystem properties.
+.TP
+.BI "listmount [ \-f " mask " ] [ \-i " mnt_id " ] [ \-n " path " ] [ \-r ] [ \-t" fstype " ]"
+Print information about the mounted filesystems in a particular mount
+namespace.
+The information returned by this call corresponds to the information returned
+by the
+.BR statmount (2)
+system call.
+
+.RE
+.RS 1.0i
+.PD 0
+.TP
+.BI "\-f " mask
+Pass this numeric argument as the mask argument to
+.BR statmount (8).
+Defaults to all bits set, to retrieve all possible information.
+
+.TP
+.BI "\-i " mnt_id
+Only return information for mounts below this mount in the mount tree.
+Defaults to the root directory.
+
+.TP
+.BI "\-n " path
+Return information for the mount namespace given by this procfs path.
+For a given process, the path will most likely look like
+.BI /proc/ $pid /ns/mnt
+though any path can be provided.
+Defaults to the mount namespace of the
+.B xfs_io
+process itself.
+
+.TP
+.B \-r
+Print raw bitmasks instead of converting them to strings.
+
+.TP
+.BI "\-t " fstype
+Only return information for filesystems of this type.
+If not specified, no filtering is performed.
+.RE
+
+.TP
+.BI "statmount [ \-f " mask " ] [ \-r ]"
+Print information about the mounted filesystem for each open file.
+The information returned by this call corresponds to the information returned
+by the
+.BR statmount (2)
+system call.
+
+.RE
+.RS 1.0i
+.PD 0
+.TP
+.BI "\-f " mask
+Pass this numeric argument as the mask argument to
+.BR statmount (8).
+Defaults to all bits set, to retrieve all possible information.
+
+.TP
+.B \-r
+Print raw bitmasks instead of converting them to strings.
+
+.RE
+.PD
 
 .SH OTHER COMMANDS
 .TP
