@@ -79,6 +79,7 @@ struct scrub_ctx {
 
 	/* Data block read verification buffer */
 	void			*readbuf;
+	bool			no_verify_ioctl;
 
 	/* Mutable scrub state; use lock. */
 	pthread_mutex_t		lock;
