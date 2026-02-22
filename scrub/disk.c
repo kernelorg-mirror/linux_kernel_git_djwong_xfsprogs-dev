@@ -190,6 +190,7 @@ disk_open(
 	disk = calloc(1, sizeof(struct disk));
 	if (!disk)
 		return NULL;
+	disk->d_verify_fd = -1;
 
 	disk->d_fd = open(pathname, O_RDONLY | O_DIRECT | O_NOATIME);
 	if (disk->d_fd < 0)
@@ -323,13 +324,45 @@ disk_simulate_read_error(
 	return 0;
 }
 
+/* Use the XFS media verification ioctl to do the media scan */
+static ssize_t
+disk_ioctl_verify(
+	struct disk		*disk,
+	uint64_t		start,
+	uint64_t		length,
+	bool			single_step)
+{
+	const uint64_t	orig_start_daddr = BTOBBT(start);
+	struct xfs_verify_media	me = {
+		.me_start_daddr	= orig_start_daddr,
+		.me_end_daddr	= BTOBB(start + length),
+		.me_dev		= disk->d_verify_disk,
+		.me_rest_us	= bg_mode > 2 ? bg_mode - 1 : 0,
+	};
+	int			ret;
+
+	if (single_step)
+		me.me_flags |= XFS_VERIFY_MEDIA_REPORT;
+
+	ret = ioctl(disk->d_verify_fd, XFS_IOC_VERIFY_MEDIA, &me);
+	if (ret < 0)
+		return ret;
+	if (me.me_ioerror) {
+		errno = me.me_ioerror;
+		return -1;
+	}
+
+	return BBTOB(me.me_start_daddr - orig_start_daddr);
+}
+
 /* Read-verify an extent of a disk device. */
 ssize_t
 disk_read_verify(
 	struct disk		*disk,
 	void			*buf,
 	uint64_t		start,
-	uint64_t		length)
+	uint64_t		length,
+	bool			single_step)
 {
 	if (debug) {
 		int		ret;
@@ -344,6 +377,9 @@ disk_read_verify(
 		if (getenv("XFS_SCRUB_DISK_VERIFY_SKIP"))
 			return length;
 	}
+
+	if (disk->d_verify_fd >= 0)
+		return disk_ioctl_verify(disk, start, length, single_step);
 
 	/* Convert to logical block size. */
 	if (disk->d_flags & DISK_FLAG_SCSI_VERIFY)
