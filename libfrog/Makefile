@@ -19,11 +19,13 @@ bulkstat.c \
 convert.c \
 crc32.c \
 file_exchange.c \
+flagmap.c \
 fsgeom.c \
 fsproperties.c \
 fsprops.c \
 getparents.c \
 histogram.c \
+healthevent.c \
 file_attr.c \
 list_sort.c \
 linux.c \
@@ -51,11 +53,13 @@ dahashselftest.h \
 div64.h \
 fakelibattr.h \
 file_exchange.h \
+flagmap.h \
 fsgeom.h \
 fsproperties.h \
 fsprops.h \
 getparents.h \
 handle_priv.h \
+healthevent.h \
 histogram.h \
 file_attr.h \
 logging.h \
