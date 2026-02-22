@@ -26,6 +26,7 @@
 #include "xfs_trans_space.h"
 #include "defer_item.h"
 #include "xfs_health.h"
+#include "xfs_attr_leaf.h"
 
 struct kmem_cache		*xfs_parent_args_cache;
 
@@ -199,8 +200,8 @@ xfs_parent_addname(
 	xfs_inode_to_parent_rec(&ppargs->rec, dp);
 	xfs_parent_da_args_init(&ppargs->args, tp, &ppargs->rec, child,
 			child->i_ino, parent_name);
-	xfs_attr_defer_add(&ppargs->args, XFS_ATTR_DEFER_SET);
-	return 0;
+
+	return xfs_attr_setname(&ppargs->args, 0);
 }
 
 /* Remove a parent pointer to reflect a dirent removal. */
@@ -221,8 +222,8 @@ xfs_parent_removename(
 	xfs_inode_to_parent_rec(&ppargs->rec, dp);
 	xfs_parent_da_args_init(&ppargs->args, tp, &ppargs->rec, child,
 			child->i_ino, parent_name);
-	xfs_attr_defer_add(&ppargs->args, XFS_ATTR_DEFER_REMOVE);
-	return 0;
+
+	return xfs_attr_removename(&ppargs->args);
 }
 
 /* Replace one parent pointer with another to reflect a rename. */
@@ -247,12 +248,13 @@ xfs_parent_replacename(
 			child->i_ino, old_name);
 
 	xfs_inode_to_parent_rec(&ppargs->new_rec, new_dp);
+
 	ppargs->args.new_name = new_name->name;
 	ppargs->args.new_namelen = new_name->len;
 	ppargs->args.new_value = &ppargs->new_rec;
 	ppargs->args.new_valuelen = sizeof(struct xfs_parent_rec);
-	xfs_attr_defer_add(&ppargs->args, XFS_ATTR_DEFER_REPLACE);
-	return 0;
+
+	return xfs_attr_replacename(&ppargs->args, 0);
 }
 
 /*
