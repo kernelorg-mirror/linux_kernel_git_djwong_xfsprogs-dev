@@ -39,7 +39,10 @@ report_zones_cb(
 	if (!rtg_rmap(rtg))
 		do_warn(_("no rmap inode for zone %u."), rgno);
 	else
-		libxfs_zone_validate(zone, rtg, &write_pointer);
+		libxfs_validate_blk_zone(mp, zone, rtg_rgno(rtg),
+				xfs_rtgroup_raw_size(mp),
+				mp->m_groups[XG_TYPE_RTG].blocks,
+				&write_pointer);
 	libxfs_rtgroup_rele(rtg);
 }
 
