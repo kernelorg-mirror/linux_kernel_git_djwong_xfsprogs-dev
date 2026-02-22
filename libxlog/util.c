@@ -67,7 +67,7 @@ xlog_is_dirty(
 }
 
 static int
-header_check_uuid(xfs_mount_t *mp, xlog_rec_header_t *head)
+header_check_uuid(xfs_mount_t *mp, struct xlog_rec_header *head)
 {
     char uu_log[64], uu_sb[64];
 
@@ -89,7 +89,7 @@ header_check_uuid(xfs_mount_t *mp, xlog_rec_header_t *head)
 }
 
 int
-xlog_header_check_recover(xfs_mount_t *mp, xlog_rec_header_t *head)
+xlog_header_check_recover(xfs_mount_t *mp, struct xlog_rec_header *head)
 {
     if (print_record_header)
 	printf(_("\nLOG REC AT LSN cycle %d block %d (0x%x, 0x%x)\n"),
@@ -125,7 +125,7 @@ xlog_header_check_recover(xfs_mount_t *mp, xlog_rec_header_t *head)
 }
 
 int
-xlog_header_check_mount(xfs_mount_t *mp, xlog_rec_header_t *head)
+xlog_header_check_mount(xfs_mount_t *mp, struct xlog_rec_header *head)
 {
     if (platform_uuid_is_null(&head->h_fs_uuid)) return 0;
     if (header_check_uuid(mp, head)) {
