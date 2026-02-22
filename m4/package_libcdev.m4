@@ -452,3 +452,27 @@ AC_DEFUN([AC_HAVE_STATMOUNT_SUPPORTED_MASK],
     AC_SUBST(have_statmount_supported_mask)
     AC_SUBST(need_internal_statmount)
   ])
+
+#
+# Check if fanotify will give us mount notifications (6.15).
+#
+AC_DEFUN([AC_HAVE_FANOTIFY_MOUNTINFO],
+  [AC_MSG_CHECKING([for fanotify mount events])
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <stdlib.h>
+#include <fcntl.h>
+#include <sys/fanotify.h>
+  ]], [[
+	struct fanotify_event_info_mnt info;
+
+	int fan_fd = fanotify_init(FAN_REPORT_MNT, 0);
+	fanotify_mark(fan_fd, FAN_MARK_ADD | FAN_MARK_MNTNS, FAN_MNT_ATTACH,
+			-1, NULL);
+  ]])
+    ], have_fanotify_mountinfo=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_fanotify_mountinfo)
+  ])
