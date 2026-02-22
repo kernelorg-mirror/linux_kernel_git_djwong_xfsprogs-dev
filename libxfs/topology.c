@@ -10,7 +10,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#include "libxfs_priv.h"
+#include "xfs_platform.h"
 #include "libxcmd.h"
 #include <blkid/blkid.h>
 #include "xfs_multidisk.h"
