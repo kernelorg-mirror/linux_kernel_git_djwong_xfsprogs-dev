@@ -110,6 +110,12 @@ AC_ARG_ENABLE(libicu,
 [  --enable-libicu=[yes/no]  Enable Unicode name scanning in xfs_scrub (libicu) [default=probe]],,
 	enable_libicu=probe)
 
+# Enable xfs_healer build
+AC_ARG_ENABLE(healer,
+[  --enable-healer=[yes/no]  Enable build of xfs_healer utility [[default=yes]]],,
+	enable_healer=yes)
+AC_SUBST(enable_healer)
+
 #
 # If the user specified a libdir ending in lib64 do not append another
 # 64 to the library names.
