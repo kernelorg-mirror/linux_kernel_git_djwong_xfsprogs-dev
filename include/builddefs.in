@@ -124,6 +124,7 @@ HAVE_LISTMOUNT = @have_listmount@
 HAVE_LISTMOUNT_NS_FD = @have_listmount_ns_fd@
 HAVE_STATMOUNT_SUPPORTED_MASK = @have_statmount_supported_mask@
 NEED_INTERNAL_STATMOUNT = @need_internal_statmount@
+HAVE_FANOTIFY_MOUNTINFO = @have_fanotify_mountinfo@
 
 GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall
 #	   -Wbitwise -Wno-transparent-union -Wno-old-initializer -Wno-decl
@@ -157,6 +158,10 @@ LIBICU_LIBS = @libicu_LIBS@
 LIBICU_CFLAGS = @libicu_CFLAGS@
 ifeq ($(HAVE_LIBURCU_ATOMIC64),yes)
 PCFLAGS += -DHAVE_LIBURCU_ATOMIC64
+endif
+
+ifeq ($(ENABLE_HEALER)$(HAVE_SYSTEMD)$(HAVE_LISTMOUNT)$(HAVE_FANOTIFY_MOUNTINFO),yesyesyesyes)
+HAVE_HEALER_START_DEPS = yes
 endif
 
 SANITIZER_CFLAGS += @addrsan_cflags@ @threadsan_cflags@ @ubsan_cflags@ @autovar_init_cflags@

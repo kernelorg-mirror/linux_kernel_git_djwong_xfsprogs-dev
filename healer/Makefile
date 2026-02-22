@@ -9,6 +9,7 @@ include $(builddefs)
 INSTALL_HEALER = install-healer
 
 LTCOMMAND = xfs_healer
+BUILD_TARGETS = $(LTCOMMAND)
 
 CFILES = \
 fsrepair.c \
@@ -31,9 +32,18 @@ SYSTEMD_SERVICES=\
 	system-xfs_healer.slice \
 	$(XFS_HEALER_SVCNAME)
 OPTIONAL_TARGETS += $(SYSTEMD_SERVICES)
-endif
+endif # HAVE_SYSTEMD
 
-default: depend $(LTCOMMAND) $(SYSTEMD_SERVICES)
+ifeq ($(HAVE_HEALER_START_DEPS),yes)
+BUILD_TARGETS += xfs_healer_start
+SYSTEMD_SERVICES += xfs_healer_start.service
+endif # xfs_healer_start deps
+
+default: depend $(BUILD_TARGETS) $(SYSTEMD_SERVICES)
+
+xfs_healer_start: $(SUBDIRS) xfs_healer_start.o $(LTDEPENDENCIES)
+	@echo "    [LD]     $@"
+	$(Q)$(LTLINK) -o $@ $(LDFLAGS) xfs_healer_start.o $(LDLIBS)
 
 %.service: %.service.in $(builddefs)
 	@echo "    [SED]    $@"
@@ -46,7 +56,7 @@ install: $(INSTALL_HEALER)
 
 install-healer: default
 	$(INSTALL) -m 755 -d $(PKG_LIBEXEC_DIR)
-	$(INSTALL) -m 755 $(LTCOMMAND) $(PKG_LIBEXEC_DIR)
+	$(INSTALL) -m 755 $(BUILD_TARGETS) $(PKG_LIBEXEC_DIR)
 
 install-systemd: default
 	$(INSTALL) -m 755 -d $(SYSTEMD_SYSTEM_UNIT_DIR)
