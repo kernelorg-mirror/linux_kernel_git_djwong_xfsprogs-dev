@@ -60,6 +60,8 @@ static inline void *kmalloc(size_t size, gfp_t flags)
 
 #define kzalloc(size, gfp)	kvmalloc((size), (gfp) | __GFP_ZERO)
 #define kvzalloc(size, gfp)	kzalloc((size), (gfp))
+#define kmalloc_array(n, size, gfp)	kvmalloc((n) * (size), (gfp))
+#define kcalloc(n, size, gfp)	kmalloc_array((n), (size), (gfp) | __GFP_ZERO)
 
 static inline void kfree(const void *ptr)
 {
