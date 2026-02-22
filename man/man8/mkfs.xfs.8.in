@@ -152,9 +152,21 @@ location they were specified at.
 .BI \-c " configuration_file_option"
 This option specifies the files that mkfs configuration will be obtained from.
 The valid
-.I configuration_file_option
-is:
+.I configuration_file_options
+are:
 .RS 1.2i
+.TP
+.BI defaults= name
+Default configuration options will be sourced from the file specified by the
+.I name
+option string.
+This option can be use either an absolute or relative path to the configuration
+file to be read.
+Sample configuration files can be found in @mkfs_cfg_dir@.
+Options specified through the default configuration file can be overridden by
+a configuration file specified via
+.B options=
+or command line arguments, in that order.
 .TP
 .BI options= name
 The configuration options will be sourced from the file specified by the
