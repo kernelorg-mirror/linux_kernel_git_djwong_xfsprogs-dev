@@ -51,7 +51,8 @@ CFILES = \
 	sync.c \
 	sync_file_range.c \
 	truncate.c \
-	utimes.c
+	utimes.c \
+	verify_media.c
 
 LLDLIBS = $(LIBXCMD) $(LIBHANDLE) $(LIBFROG) $(LIBPTHREAD) $(LIBUUID)
 LTDEPENDENCIES = $(LIBXCMD) $(LIBHANDLE) $(LIBFROG)
