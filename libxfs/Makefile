@@ -26,7 +26,7 @@ HFILES = \
 	listxattr.h \
 	init.h \
 	iunlink.h \
-	libxfs_priv.h \
+	xfs_platform.h \
 	linux-err.h \
 	topology.h \
 	buf_mem.h \

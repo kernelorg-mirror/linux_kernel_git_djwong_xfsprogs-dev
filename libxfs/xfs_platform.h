@@ -34,8 +34,8 @@
  * define a guard and something we can check to determine what include context
  * we are running from.
  */
-#ifndef __LIBXFS_INTERNAL_XFS_H__
-#define __LIBXFS_INTERNAL_XFS_H__
+#ifndef _XFS_PLATFORM_H
+#define _XFS_PLATFORM_H
 
 /* CONFIG_XFS_* must be defined to 1 to work with IS_ENABLED() */
 #define CONFIG_XFS_RT 1
@@ -604,4 +604,4 @@ int xfs_bmap_last_extent(struct xfs_trans *tp, struct xfs_inode *ip,
 #define irix_sgid_inherit		(false)
 #define vfsgid_in_group_p(...)		(false)
 
-#endif	/* __LIBXFS_INTERNAL_XFS_H__ */
+#endif	/* _XFS_PLATFORM_H */

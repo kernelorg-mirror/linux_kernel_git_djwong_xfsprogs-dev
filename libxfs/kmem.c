@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 
 
-#include "libxfs_priv.h"
+#include "xfs_platform.h"
 
 /*
  * Simple memory interface
