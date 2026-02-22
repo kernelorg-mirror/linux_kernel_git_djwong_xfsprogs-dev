@@ -165,6 +165,9 @@ bool				use_force_rebuild;
 /* Should we count informational messages as warnings? */
 bool				info_is_warning;
 
+/* Should we warn about case collision between names in dirs/attrs? */
+bool				report_case_collisions;
+
 #define SCRUB_RET_SUCCESS	(0)	/* no problems left behind */
 #define SCRUB_RET_CORRUPT	(1)	/* corruption remains on fs */
 #define SCRUB_RET_UNOPTIMIZED	(2)	/* fs could be optimized */
@@ -635,6 +638,9 @@ enum o_opt_nums {
 	IWARN = 0,
 	FSTRIM_PCT,
 	AUTOFSCK,
+#ifdef HAVE_LIBICU
+	CASE_COLLISION,
+#endif
 	O_MAX_OPTS,
 };
 
@@ -642,6 +648,9 @@ static char *o_opts[] = {
 	[IWARN]			= "iwarn",
 	[FSTRIM_PCT]		= "fstrim_pct",
 	[AUTOFSCK]		= "autofsck",
+#ifdef HAVE_LIBICU
+	[CASE_COLLISION]	= "case_collision",
+#endif
 	[O_MAX_OPTS]		= NULL,
 };
 
@@ -702,6 +711,16 @@ parse_o_opts(
 			}
 			ctx->mode = SCRUB_MODE_NONE;
 			break;
+#ifdef HAVE_LIBICU
+		case CASE_COLLISION:
+			if (val) {
+				fprintf(stderr,
+ _("-o case_collision does not take an argument\n"));
+				usage();
+			}
+			report_case_collisions = true;
+			break;
+#endif /* HAVE_LIBICU */
 		default:
 			usage();
 			break;
