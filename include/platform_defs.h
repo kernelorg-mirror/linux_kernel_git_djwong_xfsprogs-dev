@@ -74,6 +74,14 @@ typedef unsigned short umode_t;
 
 extern int	platform_nproc(void);
 
+/* 64-bit seconds counter that works independently of the C library time_t. */
+typedef long long int time64_t;
+
+struct timespec64 {
+	time64_t	tv_sec;			/* seconds */
+	long		tv_nsec;		/* nanoseconds */
+};
+
 #define NSEC_PER_SEC	(1000000000ULL)
 #define NSEC_PER_USEC	(1000ULL)
 
