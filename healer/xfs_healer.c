@@ -6,6 +6,7 @@
 #include "xfs.h"
 #include <pthread.h>
 #include <stdlib.h>
+#include <sys/xattr.h>
 
 #include "platform_defs.h"
 #include "libfrog/fsgeom.h"
@@ -13,6 +14,7 @@
 #include "libfrog/healthevent.h"
 #include "libfrog/workqueue.h"
 #include "libfrog/systemd.h"
+#include "libfrog/fsproperties.h"
 #include "xfs_healer.h"
 
 /* Program name; needed for libfrog error reports. */
@@ -154,6 +156,63 @@ healer_nproc(
 	return ctx->foreground ? platform_nproc() : 1;
 }
 
+enum want_repair {
+	WR_REPAIR,
+	WR_LOG_ONLY,
+	WR_EXIT,
+};
+
+/* Determine want_repair from the autofsck filesystem property. */
+static enum want_repair
+want_repair_from_autofsck(
+	struct healer_ctx	*ctx)
+{
+	char			valuebuf[FSPROP_MAX_VALUELEN + 1] = { 0 };
+	enum fsprop_autofsck	shval;
+	ssize_t			ret;
+
+	/*
+	 * Any OS error (including ENODATA) or string parsing error is treated
+	 * the same as an unrecognized value.
+	 */
+	ret = fgetxattr(ctx->mnt.fd, VFS_FSPROP_AUTOFSCK_NAME, valuebuf,
+			FSPROP_MAX_VALUELEN);
+	if (ret < 0)
+		goto no_advice;
+
+	shval = fsprop_autofsck_read(valuebuf);
+	switch (shval) {
+	case FSPROP_AUTOFSCK_NONE:
+		/* don't run at all */
+		ret = WR_EXIT;
+		break;
+	case FSPROP_AUTOFSCK_CHECK:
+	case FSPROP_AUTOFSCK_OPTIMIZE:
+		/* log events, do not repair */
+		ret = WR_LOG_ONLY;
+		break;
+	case FSPROP_AUTOFSCK_REPAIR:
+		/* repair stuff */
+		ret = WR_REPAIR;
+		break;
+	case FSPROP_AUTOFSCK_UNSET:
+		goto no_advice;
+	}
+
+	return ret;
+
+no_advice:
+	/*
+	 * For an unrecognized value, log but do not fix runtime corruption if
+	 * backref metadata are enabled.  If no backref metadata are available,
+	 * the fs is too old so don't run at all.
+	 */
+	if (healer_has_rmapbt(ctx) || healer_has_parent(ctx))
+		return WR_LOG_ONLY;
+
+	return WR_EXIT;
+}
+
 enum mon_state {
 	MON_START,
 	MON_EXIT,
@@ -175,15 +234,46 @@ setup_monitor(
 		return MON_ERROR;
 	}
 
-	if (ctx->want_repair) {
-		/* Check that the kernel supports repairs at all. */
-		if (!healer_can_repair(ctx)) {
+	if (ctx->autofsck) {
+		switch (want_repair_from_autofsck(ctx)) {
+		case WR_EXIT:
+			printf("%s: %s\n", ctx->mntpoint,
+ _("Disabling daemon per autofsck directive."));
+			fflush(stdout);
+			close(ctx->mnt.fd);
+			return MON_EXIT;
+		case WR_REPAIR:
+			ctx->want_repair = 1;
+			printf("%s: %s\n", ctx->mntpoint,
+ _("Automatically repairing per autofsck directive."));
+			fflush(stdout);
+			break;
+		case WR_LOG_ONLY:
+			ctx->want_repair = 0;
+			ctx->log = 1;
+			printf("%s: %s\n", ctx->mntpoint,
+ _("Only logging errors per autofsck directive."));
+			fflush(stdout);
+			break;
+		}
+	}
+
+	/* Check that the kernel supports repairs at all. */
+	if (ctx->want_repair && !healer_can_repair(ctx)) {
+		if (!ctx->autofsck) {
 			fprintf(stderr, "%s: %s\n", ctx->mntpoint,
  _("XFS online repair is not supported, exiting"));
 			close(ctx->mnt.fd);
 			return MON_ERROR;
 		}
 
+		printf("%s: %s\n", ctx->mntpoint,
+ _("XFS online repair is not supported, will report only"));
+		fflush(stdout);
+		ctx->want_repair = 0;
+	}
+
+	if (ctx->want_repair) {
 		/* Check for backref metadata that makes repair effective. */
 		if (!healer_has_rmapbt(ctx))
 			fprintf(stderr, "%s: %s\n", ctx->mntpoint,
@@ -390,6 +480,7 @@ usage(void)
 	fprintf(stderr, _("  --debug       Enable debugging messages.\n"));
 	fprintf(stderr, _("  --everything  Capture all events.\n"));
 	fprintf(stderr, _("  --foreground  Process events as soon as possible.\n"));
+	fprintf(stderr, _("  --no-autofsck Do not use the \"autofsck\" fs property to decide to repair.\n"));
 	fprintf(stderr, _("  --quiet       Do not log health events to stdout.\n"));
 	fprintf(stderr, _("  --repair      Always repair corrupt metadata.\n"));
 	fprintf(stderr, _("  --supported   Check that health monitoring is supported.\n"));
@@ -403,6 +494,7 @@ enum long_opt_nr {
 	LOPT_EVERYTHING,
 	LOPT_FOREGROUND,
 	LOPT_HELP,
+	LOPT_NO_AUTOFSCK,
 	LOPT_QUIET,
 	LOPT_REPAIR,
 	LOPT_SUPPORTED,
@@ -418,6 +510,7 @@ main(
 	struct healer_ctx	ctx = {
 		.conlock	= (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER,
 		.log		= 1,
+		.autofsck	= 1,
 	};
 	int			option_index;
 	int			vflag = 0;
@@ -434,6 +527,7 @@ main(
 		[LOPT_EVERYTHING]  = {"everything", no_argument, &ctx.everything, 1 },
 		[LOPT_FOREGROUND]  = {"foreground", no_argument, &ctx.foreground, 1 },
 		[LOPT_HELP]	   = {"help", no_argument, NULL, 0 },
+		[LOPT_NO_AUTOFSCK] = {"no-autofsck", no_argument, &ctx.autofsck, 0 },
 		[LOPT_QUIET]	   = {"quiet", no_argument, &ctx.log, 0 },
 		[LOPT_REPAIR]	   = {"repair", no_argument, &ctx.want_repair, 1 },
 		[LOPT_SUPPORTED]   = {"supported", no_argument, &ctx.support_check, 1 },
@@ -470,6 +564,8 @@ main(
 
 	if (optind != argc - 1)
 		usage();
+	if (ctx.want_repair)
+		ctx.autofsck = 0;
 
 	ctx.mntpoint = argv[optind];
 	ctx.fsname = find_fsname(ctx.mntpoint);
