@@ -17,6 +17,7 @@ RequiresMountsFor=%f
 [Service]
 Type=exec
 Environment=SERVICE_MODE=1
+ExecCondition=@pkg_libexec_dir@/xfs_healer --supported %f
 ExecStart=@pkg_libexec_dir@/xfs_healer %f
 SyslogIdentifier=%N
 
