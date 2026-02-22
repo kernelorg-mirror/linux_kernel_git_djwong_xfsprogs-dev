@@ -65,9 +65,6 @@
 #include "libfrog/crc32c.h"
 
 #include <sys/xattr.h>
-#ifdef HAVE_GETRANDOM_NONBLOCK
-#include <sys/random.h>
-#endif
 
 /* Zones used in libxfs allocations that aren't in shared header files */
 extern struct kmem_cache *xfs_buf_item_cache;
@@ -132,9 +129,6 @@ extern char    *progname;
 
 #define XFS_IGET_CREATE			0x1
 #define XFS_IGET_UNTRUSTED		0x2
-
-extern void cmn_err(int, char *, ...);
-enum ce { CE_DEBUG, CE_CONT, CE_NOTE, CE_WARN, CE_ALERT, CE_PANIC };
 
 #define xfs_info(mp,fmt,args...)	cmn_err(CE_CONT, _(fmt), ## args)
 #define xfs_info_ratelimited(mp,fmt,args...) cmn_err(CE_CONT, _(fmt), ## args)
@@ -213,12 +207,6 @@ static inline bool WARN_ON(bool expr) {
 
 #define percpu_counter_read_positive(x)	((*x) > 0 ? (*x) : 0)
 #define percpu_counter_sum_positive(x)	((*x) > 0 ? (*x) : 0)
-
-#ifdef HAVE_GETRANDOM_NONBLOCK
-uint32_t get_random_u32(void);
-#else
-#define get_random_u32()	(0)
-#endif
 
 #define PAGE_SIZE		getpagesize()
 extern unsigned int PAGE_SHIFT;
@@ -566,11 +554,6 @@ void xfs_log_item_init(struct xfs_mount *mp, struct xfs_log_item *lip, int type,
 #define XFS_STATS_CALC_INDEX(member)	0
 #define XFS_STATS_INC_OFF(mp, off)
 #define XFS_STATS_ADD_OFF(mp, off, val)
-
-typedef unsigned char u8;
-unsigned int hweight8(unsigned int w);
-unsigned int hweight32(unsigned int w);
-unsigned int hweight64(__u64 w);
 
 #define xfs_buf_cache_init(bch)		(0)
 #define xfs_buf_cache_destroy(bch)	((void)0)
