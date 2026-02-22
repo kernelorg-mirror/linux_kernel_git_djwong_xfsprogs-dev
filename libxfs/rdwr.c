@@ -5,7 +5,7 @@
  */
 
 
-#include "libxfs_priv.h"
+#include "xfs_platform.h"
 #include "init.h"
 #include "xfs_fs.h"
 #include "xfs_shared.h"
