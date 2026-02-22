@@ -80,7 +80,9 @@ void run_full_repair(struct healer_ctx *ctx);
 /* weakhandle.c */
 int weakhandle_alloc(int fd, const char *mountpoint, uint64_t mnt_id,
 		const char *fsname, struct weakhandle **whp);
-int weakhandle_reopen(struct weakhandle *wh, int *fd);
+typedef bool (*weakhandle_fd_t)(int mnt_fd, void *data);
+int weakhandle_reopen(struct weakhandle *wh, int *fd,
+		weakhandle_fd_t is_acceptable, void *data);
 void weakhandle_free(struct weakhandle **whp);
 int weakhandle_getpath_for(struct weakhandle *wh, uint64_t ino, uint32_t gen,
 		char *path, size_t pathlen);
