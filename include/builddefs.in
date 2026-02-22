@@ -115,6 +115,7 @@ HAVE_GETRANDOM_NONBLOCK = @have_getrandom_nonblock@
 HAVE_LIBICU = @have_libicu@
 HAVE_SYSTEMD = @have_systemd@
 SYSTEMD_SYSTEM_UNIT_DIR = @systemd_system_unit_dir@
+SYSTEMD_SYSTEM_PRESET_DIR = @systemd_system_preset_dir@
 HAVE_CROND = @have_crond@
 CROND_DIR = @crond_dir@
 HAVE_UDEV = @have_udev@
