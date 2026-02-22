@@ -12,6 +12,7 @@
 #include "libfrog/paths.h"
 #include "libfrog/healthevent.h"
 #include "libfrog/workqueue.h"
+#include "libfrog/systemd.h"
 #include "xfs_healer.h"
 
 /* Program name; needed for libfrog error reports. */
@@ -470,5 +471,5 @@ out_events:
 	teardown_monitor(&ctx);
 	free((char *)ctx.fsname);
 out:
-	return ret != 0 ? EXIT_FAILURE : EXIT_SUCCESS;
+	return systemd_service_exit(ret);
 }
