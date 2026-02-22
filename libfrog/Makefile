@@ -82,6 +82,10 @@ else
 HAVE_GETTEXT = False
 endif
 
+ifeq ($(HAVE_GETRANDOM_NONBLOCK),yes)
+LCFLAGS += -DHAVE_GETRANDOM_NONBLOCK
+endif
+
 default: ltdepend $(LTLIBRARY) $(GETTEXT_PY)
 
 crc32table.h: gen_crc32table.c crc32defs.h
