@@ -1165,7 +1165,7 @@ xfs_rtalloc_query_range(
 
 	if (start > end)
 		return -EINVAL;
-	if (start == end || start >= rtg->rtg_extents)
+	if (start >= rtg->rtg_extents)
 		return 0;
 
 	end = min(end, rtg->rtg_extents - 1);
