@@ -83,8 +83,8 @@ current_fixed_time(
 			epoch = strtoll(source_date_epoch, &endp, 10);
 			if (errno != 0 || *endp != '\0') {
 				fprintf(stderr,
-			"%s: SOURCE_DATE_EPOCH '%s' invalid timestamp, ignoring.\n",
-				progname, source_date_epoch);
+ _("%s: SOURCE_DATE_EPOCH '%s' invalid timestamp, ignoring.\n"),
+						progname, source_date_epoch);
 
 				return false;
 			}
