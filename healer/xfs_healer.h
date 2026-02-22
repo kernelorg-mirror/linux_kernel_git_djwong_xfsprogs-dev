@@ -72,6 +72,7 @@ void lookup_path(struct healer_ctx *ctx,
 int repair_metadata(struct healer_ctx *ctx, const struct hme_prefix *pfx,
 		const struct xfs_health_monitor_event *hme);
 bool healer_can_repair(struct healer_ctx *ctx);
+void run_full_repair(struct healer_ctx *ctx);
 
 /* weakhandle.c */
 int weakhandle_alloc(int fd, const char *mountpoint, const char *fsname,
@@ -80,5 +81,7 @@ int weakhandle_reopen(struct weakhandle *wh, int *fd);
 void weakhandle_free(struct weakhandle **whp);
 int weakhandle_getpath_for(struct weakhandle *wh, uint64_t ino, uint32_t gen,
 		char *path, size_t pathlen);
+int weakhandle_instance_unit_name(struct weakhandle *wh, const char *template,
+		char *unitname, size_t unitnamelen);
 
 #endif /* XFS_HEALER_XFS_HEALER_H_ */
