@@ -59,6 +59,18 @@ event_loggable(
 	return ctx->log || event_not_actionable(hme);
 }
 
+/* Are we going to try a repair? */
+static inline bool
+event_repairable(
+	const struct healer_ctx			*ctx,
+	const struct xfs_health_monitor_event	*hme)
+{
+	if (event_not_actionable(hme))
+		return false;
+
+	return ctx->want_repair && hme->type == XFS_HEALTH_MONITOR_TYPE_SICK;
+}
+
 /* Handle an event asynchronously. */
 static void
 handle_event(
@@ -70,6 +82,7 @@ handle_event(
 	struct xfs_health_monitor_event	*hme = arg;
 	struct healer_ctx		*ctx = wq->wq_ctx;
 	const bool loggable = event_loggable(ctx, hme);
+	const bool will_repair = event_repairable(ctx, hme);
 
 	hme_prefix_init(&pfx, ctx->mntpoint);
 
@@ -82,6 +95,10 @@ handle_event(
 		hme_report_event(&pfx, hme);
 		pthread_mutex_unlock(&ctx->conlock);
 	}
+
+	/* Initiate a repair if appropriate. */
+	if (will_repair)
+		repair_metadata(ctx, &pfx, hme);
 
 	free(hme);
 }
@@ -154,6 +171,40 @@ setup_monitor(
 		fprintf(stderr, "%s: %s\n", ctx->mntpoint,
 				_("Not a XFS mount point."));
 		goto out_mnt_fd;
+	}
+
+	if (ctx->want_repair) {
+		/* Check that the kernel supports repairs at all. */
+		if (!healer_can_repair(ctx)) {
+			fprintf(stderr, "%s: %s\n", ctx->mntpoint,
+ _("XFS online repair is not supported, exiting"));
+			goto out_mnt_fd;
+		}
+
+		/* Check for backref metadata that makes repair effective. */
+		if (!healer_has_rmapbt(ctx))
+			fprintf(stderr, "%s: %s\n", ctx->mntpoint,
+ _("XFS online repair is less effective without rmap btrees."));
+
+		if (!healer_has_parent(ctx))
+			fprintf(stderr, "%s: %s\n", ctx->mntpoint,
+ _("XFS online repair is less effective without parent pointers."));
+
+	}
+
+	/*
+	 * Open weak-referenced file handle to mountpoint so that we can
+	 * reconnect to the mountpoint to start repairs.
+	 */
+	if (ctx->want_repair) {
+		ret = weakhandle_alloc(ctx->mnt.fd, ctx->mntpoint,
+				ctx->fsname, &ctx->wh);
+		if (ret) {
+			fprintf(stderr, "%s: %s: %s\n", ctx->mntpoint,
+					_("creating weak fshandle"),
+					strerror(errno));
+			goto out_mnt_fd;
+		}
 	}
 
 	/*
@@ -287,6 +338,7 @@ teardown_monitor(
 		ctx->mon_fp = NULL;
 	}
 	free(ctx->mon_buf);
+	weakhandle_free(&ctx->wh);
 	ctx->mon_buf = NULL;
 }
 
@@ -301,6 +353,7 @@ usage(void)
 	fprintf(stderr, _("  --everything  Capture all events.\n"));
 	fprintf(stderr, _("  --foreground  Process events as soon as possible.\n"));
 	fprintf(stderr, _("  --quiet       Do not log health events to stdout.\n"));
+	fprintf(stderr, _("  --repair      Always repair corrupt metadata.\n"));
 	fprintf(stderr, _("  -V            Print version.\n"));
 
 	exit(EXIT_FAILURE);
@@ -312,6 +365,7 @@ enum long_opt_nr {
 	LOPT_FOREGROUND,
 	LOPT_HELP,
 	LOPT_QUIET,
+	LOPT_REPAIR,
 
 	LOPT_MAX,
 };
@@ -342,6 +396,7 @@ main(
 		[LOPT_FOREGROUND]  = {"foreground", no_argument, &ctx.foreground, 1 },
 		[LOPT_HELP]	   = {"help", no_argument, NULL, 0 },
 		[LOPT_QUIET]	   = {"quiet", no_argument, &ctx.log, 0 },
+		[LOPT_REPAIR]	   = {"repair", no_argument, &ctx.want_repair, 1 },
 
 		[LOPT_MAX]	   = {NULL, 0, NULL, 0 },
 	};
