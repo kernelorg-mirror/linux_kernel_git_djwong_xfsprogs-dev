@@ -137,61 +137,6 @@ xfs_log_calc_unit_res(
 	return unit_bytes;
 }
 
-/*
- * current_fixed_time() tries to detect if SOURCE_DATE_EPOCH is in our
- * environment, and set input timespec's timestamp to that value.
- *
- * Returns true on success, fail otherwise.
- */
-static bool
-current_fixed_time(
-	struct			timespec64 *tv)
-{
-	/*
-	 * To avoid many getenv() we'll use an initialization static flag, so
-	 * we only read once.
-	 */
-	static bool		enabled = false;
-	static bool		read_env = false;
-	static time64_t		epoch;
-	char			*endp;
-	char			*source_date_epoch;
-
-	if (!read_env) {
-		read_env = true;
-		source_date_epoch = getenv("SOURCE_DATE_EPOCH");
-		if (source_date_epoch && source_date_epoch[0] != '\0') {
-			errno = 0;
-			epoch = strtoll(source_date_epoch, &endp, 10);
-			if (errno != 0 || *endp != '\0') {
-				fprintf(stderr,
-			"%s: SOURCE_DATE_EPOCH '%s' invalid timestamp, ignoring.\n",
-				progname, source_date_epoch);
-
-				return false;
-			}
-
-			enabled = true;
-		}
-	}
-
-	/*
-	 * This will happen only if we successfully read a valid
-	 * SOURCE_DATE_EPOCH and properly initiated the epoch value.
-	 */
-	if (read_env && enabled) {
-		tv->tv_sec = epoch;
-		tv->tv_nsec = 0;
-		return true;
-	}
-
-	/*
-	 * We initialized but had no valid SOURCE_DATE_EPOCH so we fall back
-	 * to regular behaviour.
-	 */
-	return false;
-}
-
 struct timespec64
 current_time(struct inode *inode)
 {
@@ -364,17 +309,6 @@ error:
 	return error;
 }
 
-void
-cmn_err(int level, char *fmt, ...)
-{
-	va_list	ap;
-
-	va_start(ap, fmt);
-	vfprintf(stderr, fmt, ap);
-	fputs("\n", stderr);
-	va_end(ap);
-}
-
 /*
  * Warnings specifically for verifier errors.  Differentiate CRC vs. invalid
  * values, and omit the stack trace unless the error level is tuned high.
@@ -513,31 +447,6 @@ libxfs_zero_extent(
 	return libxfs_device_zero(xfs_find_bdev_for_inode(ip), sector, size);
 }
 
-unsigned int
-hweight8(unsigned int w)
-{
-	unsigned int res = w - ((w >> 1) & 0x55);
-	res = (res & 0x33) + ((res >> 2) & 0x33);
-	return (res + (res >> 4)) & 0x0F;
-}
-
-unsigned int
-hweight32(unsigned int w)
-{
-	unsigned int res = w - ((w >> 1) & 0x55555555);
-	res = (res & 0x33333333) + ((res >> 2) & 0x33333333);
-	res = (res + (res >> 4)) & 0x0F0F0F0F;
-	res = res + (res >> 8);
-	return (res + (res >> 16)) & 0x000000FF;
-}
-
-unsigned int
-hweight64(__u64 w)
-{
-	return hweight32((unsigned int)w) +
-	       hweight32((unsigned int)(w >> 32));
-}
-
 /* xfs_health.c */
 
 /* Mark a per-fs metadata healed. */
@@ -578,75 +487,6 @@ void xfs_btree_mark_sick(struct xfs_btree_cur *cur) { }
 void xfs_dirattr_mark_sick(struct xfs_inode *ip, int whichfork) { }
 void xfs_da_mark_sick(struct xfs_da_args *args) { }
 void xfs_inode_mark_sick(struct xfs_inode *ip, unsigned int mask) { }
-
-/*
- * get_deterministic_seed() tries to detect if DETERMINISTIC_SEED=1 is in our
- * environment, and set our result to 0x53454544 (SEED) instead of
- * extracting from getrandom().
- *
- * Returns true on success, fail otherwise.
- */
-static bool
-get_deterministic_seed(
-	uint32_t	*result)
-{
-	/*
-	 * To avoid many getenv() we'll use an initialization static flag, so
-	 * we only read once.
-	 */
-	static bool	enabled = false;
-	static bool	read_env = false;
-	static uint32_t	deterministic_seed = 0x53454544; /* SEED */
-	char		*seed_env;
-
-	if (!read_env) {
-		read_env = true;
-		seed_env = getenv("DETERMINISTIC_SEED");
-		if (seed_env && strcmp(seed_env, "1") == 0)
-			enabled = true;
-	}
-
-	/*
-	 * This will happen only if we successfully read DETERMINISTIC_SEED=1.
-	 */
-	if (read_env && enabled) {
-		*result = deterministic_seed;
-
-		return true;
-	}
-
-	/*
-	 * We initialized but had no DETERMINISTIC_SEED=1 in env so we fall
-	 * back to regular behaviour.
-	 */
-	return false;
-}
-
-#ifdef HAVE_GETRANDOM_NONBLOCK
-uint32_t
-get_random_u32(void)
-{
-	uint32_t	ret;
-	ssize_t		sz;
-
-	/*
-	 * Check for DETERMINISTIC_SEED in environment, it means we're
-	 * creating a reproducible filesystem.
-	 * If it fails, fall back to returning getrandom() like we used to do.
-	 */
-	if (get_deterministic_seed(&ret))
-		return ret;
-	/*
-	 * Try to extract a u32 of randomness from /dev/urandom.  If that
-	 * fails, fall back to returning zero like we used to do.
-	 */
-	sz = getrandom(&ret, sizeof(ret), GRND_NONBLOCK);
-	if (sz != sizeof(ret))
-		return 0;
-
-	return ret;
-}
-#endif
 
 /*
  * Write a buffer to a file on the data device.  There must not be sparse holes
