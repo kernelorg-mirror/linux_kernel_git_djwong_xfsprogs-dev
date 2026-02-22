@@ -28,6 +28,7 @@ struct healer_ctx {
 	int			want_repair;
 	int			print_svcname;
 	int			support_check;
+	int			autofsck;
 
 	/* fd and fs geometry for mount */
 	struct xfs_fd		mnt;
