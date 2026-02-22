@@ -8,6 +8,9 @@
 
 extern char *progname;
 
+struct weakhandle;
+struct hme_prefix;
+
 /*
  * When running in environments with restrictive security policies, healer
  * might not be allowed to access the global mount tree.  However, processes
@@ -22,6 +25,7 @@ struct healer_ctx {
 	int			log;
 	int			everything;
 	int			foreground;
+	int			want_repair;
 
 	/* fd and fs geometry for mount */
 	struct xfs_fd		mnt;
@@ -31,6 +35,9 @@ struct healer_ctx {
 
 	/* Shared reference to the getmntent fsname for reconnecting */
 	const char		*fsname;
+
+	/* weak file handle so we can reattach to filesystem */
+	struct weakhandle	*wh;
 
 	/* file stream of monitor and buffer */
 	FILE			*mon_fp;
@@ -43,5 +50,26 @@ struct healer_ctx {
 	struct workqueue	event_queue;
 	bool			queue_active;
 };
+
+static inline bool healer_has_rmapbt(const struct healer_ctx *ctx)
+{
+	return ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_RMAPBT;
+}
+
+static inline bool healer_has_parent(const struct healer_ctx *ctx)
+{
+	return ctx->mnt.fsgeom.flags & XFS_FSOP_GEOM_FLAGS_PARENT;
+}
+
+/* repair.c */
+int repair_metadata(struct healer_ctx *ctx, const struct hme_prefix *pfx,
+		const struct xfs_health_monitor_event *hme);
+bool healer_can_repair(struct healer_ctx *ctx);
+
+/* weakhandle.c */
+int weakhandle_alloc(int fd, const char *mountpoint, const char *fsname,
+		struct weakhandle **whp);
+int weakhandle_reopen(struct weakhandle *wh, int *fd);
+void weakhandle_free(struct weakhandle **whp);
 
 #endif /* XFS_HEALER_XFS_HEALER_H_ */
