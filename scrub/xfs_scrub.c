@@ -19,6 +19,7 @@
 #include "unicrash.h"
 #include "progress.h"
 #include "libfrog/histogram.h"
+#include "libfrog/systemd.h"
 
 /*
  * XFS Online Metadata Scrub (and Repair)
@@ -866,8 +867,7 @@ main(
 	if (stdout_isatty && !progress_fp)
 		progress_fp = fdopen(1, "w+");
 
-	if (getenv("SERVICE_MODE"))
-		is_service = true;
+	is_service = systemd_is_service();
 
 	/* Initialize overall phase stats. */
 	error = phase_start(&all_pi, 0, NULL);
@@ -960,29 +960,15 @@ out_unicrash:
 	hist_free(&ctx.datadev_hist);
 	hist_free(&ctx.rtdev_hist);
 
-	/*
-	 * If we're being run as a service, the return code must fit the LSB
-	 * init script action error guidelines, which is to say that we
-	 * compress all errors to 1 ("generic or unspecified error", LSB 5.0
-	 * section 22.2) and hope the admin will scan the log for what
-	 * actually happened.
-	 *
-	 * We have to sleep 2 seconds here because journald uses the pid to
-	 * connect our log messages to the systemd service.  This is critical
-	 * for capturing all the log messages if the scrub fails, because the
-	 * fail service uses the service name to gather log messages for the
-	 * error report.
-	 *
-	 * Note: We don't count a lack of kernel support as a service failure
-	 * because we haven't determined that there's anything wrong with the
-	 * filesystem.
-	 */
 	if (is_service) {
-		sleep(2);
+		/*
+		 * Note: We don't count a lack of kernel support as a service
+		 * failure because we haven't determined that there's anything
+		 * wrong with the filesystem.
+		 */
 		if (!ctx.scrub_setup_succeeded)
-			return 0;
-		if (ret != SCRUB_RET_SUCCESS)
-			return 1;
+			ret = 0;
+		return systemd_service_exit(ret);
 	}
 
 	return ret;
