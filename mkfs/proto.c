@@ -374,6 +374,17 @@ writefile(
 			break;
 		}
 
+		/*
+		 * If we pass an unaligned range to libxfs_file_write, it will
+		 * zero the unaligned head and tail parts of each block.  If
+		 * the fd filesystem has a smaller blocksize, then we can end
+		 * up writing to the same block twice, causing unwanted zeroing
+		 * and hence data corruption.
+		 */
+		data_pos = rounddown_64(data_pos, mp->m_sb.sb_blocksize);
+		hole_pos = min(roundup_64(hole_pos, mp->m_sb.sb_blocksize),
+			       statbuf.st_size);
+
 		writefile_range(ip, fname, fd, data_pos, hole_pos - data_pos);
 		data_pos = lseek(fd, hole_pos, SEEK_DATA);
 	}
