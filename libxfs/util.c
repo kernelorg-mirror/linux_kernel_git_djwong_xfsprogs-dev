@@ -650,7 +650,8 @@ get_random_u32(void)
 
 /*
  * Write a buffer to a file on the data device.  There must not be sparse holes
- * or unwritten extents.
+ * or unwritten extents, and the blocks underneath the file range will be
+ * completely overwritten.
  */
 int
 libxfs_file_write(
@@ -697,7 +698,7 @@ libxfs_file_write(
 		if (block_off > 0)
 			memset((char *)bp->b_addr, 0, block_off);
 		count = min(len, XFS_FSB_TO_B(mp, map.br_blockcount));
-		memmove(bp->b_addr, buf + block_off, count);
+		memmove(bp->b_addr + block_off, buf, count);
 		bcount = BBTOB(bp->b_length);
 		if (count < bcount)
 			memset((char *)bp->b_addr + block_off + count, 0,
