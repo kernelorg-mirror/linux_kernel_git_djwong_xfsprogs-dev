@@ -5824,6 +5824,7 @@ set_autofsck(
 	}
 
 	libxfs_irele(args.dp);
+	free(p);
 }
 
 /* Write the realtime superblock */
