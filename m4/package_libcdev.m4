@@ -366,3 +366,89 @@ close_range(0, 0, 0);
        AC_MSG_RESULT(no))
     AC_SUBST(have_close_range)
   ])
+
+#
+# Check if listmount and statmount exist.  Note that statmount came first (6.8)
+# and listmount came later (6.9), so we'll refuse both if either is missing.
+#
+AC_DEFUN([AC_HAVE_LISTMOUNT],
+  [AC_MSG_CHECKING([for listmount])
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <linux/mount.h>
+#include <sys/syscall.h>
+#include <alloca.h>
+  ]], [[
+	struct mnt_id_req	req = {
+		.size		= sizeof(req),
+	};
+	struct statmount	smbuf;
+
+	syscall(SYS_statmount, &req, &smbuf, 0, 0);
+	syscall(SYS_listmount, &req, NULL, 0, 0);
+  ]])
+    ], have_listmount=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_listmount)
+  ])
+
+#
+# Check if mnt_id_req::mnt_ns_fd exists.  This replaced mnt_id_req::spare in
+# 6.18, though earlier kernels allowed userspace to assign to spare.
+#
+AC_DEFUN([AC_HAVE_LISTMOUNT_NS_FD],
+  [AC_MSG_CHECKING([for struct mnt_id_req::mnt_ns_fd])
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <linux/mount.h>
+#include <sys/syscall.h>
+#include <alloca.h>
+  ]], [[
+	struct mnt_id_req	req = {
+		.mnt_ns_fd	= 555,
+	};
+
+	syscall(SYS_listmount, &req, NULL, 0, 0);
+  ]])
+    ], have_listmount_ns_fd=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_listmount_ns_fd)
+  ])
+
+#
+# Check if statmount::supported_mask (and hence sb_source) exists.  We need
+# sb_source for xfs_healer_start; and supported_mask for the xfs_io wrapper.
+# sb_source was added in 6.13 and supported_mask in 6.15.
+#
+AC_DEFUN([AC_HAVE_STATMOUNT_SUPPORTED_MASK],
+  [AC_MSG_CHECKING([for struct statmount::supported_mask])
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <unistd.h>
+#include <linux/mount.h>
+#include <sys/syscall.h>
+#include <alloca.h>
+  ]], [[
+	struct mnt_id_req	req = {
+		.mnt_ns_fd	= 555,
+	};
+	struct statmount	smbuf = {
+		.supported_mask	= 1,
+	};
+
+	syscall(SYS_statmount, &req, &smbuf, 0, 0);
+  ]])
+    ], have_statmount_supported_mask=yes
+       AC_MSG_RESULT(yes),
+       need_internal_statmount=yes
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_statmount_supported_mask)
+    AC_SUBST(need_internal_statmount)
+  ])

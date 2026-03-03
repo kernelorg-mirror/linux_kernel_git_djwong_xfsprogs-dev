@@ -119,6 +119,10 @@ UDEV_RULE_DIR = @udev_rule_dir@
 HAVE_LIBURCU_ATOMIC64 = @have_liburcu_atomic64@
 STRERROR_R_RETURNS_STRING = @strerror_r_returns_string@
 HAVE_CLOSE_RANGE = @have_close_range@
+HAVE_LISTMOUNT = @have_listmount@
+HAVE_LISTMOUNT_NS_FD = @have_listmount_ns_fd@
+HAVE_STATMOUNT_SUPPORTED_MASK = @have_statmount_supported_mask@
+NEED_INTERNAL_STATMOUNT = @need_internal_statmount@
 
 GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall
 #	   -Wbitwise -Wno-transparent-union -Wno-old-initializer -Wno-decl
@@ -140,6 +144,9 @@ PCFLAGS+= -DOVERRIDE_SYSTEM_FSCRYPT_POLICY_V2
 endif
 ifeq ($(NEED_INTERNAL_STATX),yes)
 PCFLAGS+= -DOVERRIDE_SYSTEM_STATX
+endif
+ifeq ($(NEED_INTERNAL_STATMOUNT),yes)
+PCFLAGS+= -DOVERRIDE_SYSTEM_STATMOUNT
 endif
 ifeq ($(HAVE_GETFSMAP),yes)
 PCFLAGS+= -DHAVE_GETFSMAP
