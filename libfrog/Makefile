@@ -96,6 +96,15 @@ ifeq ($(HAVE_CLOSE_RANGE),yes)
 CFLAGS += -DHAVE_CLOSE_RANGE
 endif
 
+ifeq ($(HAVE_LISTMOUNT),yes)
+CFILES += statmount.c
+HFILES += statmount.h
+endif
+
+ifeq ($(HAVE_LISTMOUNT_NS_FD),yes)
+CFLAGS+=-DHAVE_LISTMOUNT_NS_FD
+endif
+
 default: ltdepend $(LTLIBRARY) $(GETTEXT_PY)
 
 crc32table.h: gen_crc32table.c crc32defs.h
