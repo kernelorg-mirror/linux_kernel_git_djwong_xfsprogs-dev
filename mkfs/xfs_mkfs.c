@@ -3624,10 +3624,8 @@ check_lsunit:
 		lsunit = cli->lsunit;
 	else if (cli_opt_set(&lopts, L_SU))
 		lsu = getnum(cli->lsu, &lopts, L_SU);
-	else if (cfg->lsectorsize > XLOG_HEADER_SIZE)
-		lsu = cfg->blocksize; /* lsunit matches filesystem block size */
 
-	if (cli->lsu) {
+	if (lsu) {
 		/* verify if lsu is a multiple block size */
 		if (lsu % cfg->blocksize != 0) {
 			fprintf(stderr,
@@ -3651,14 +3649,22 @@ _("log stripe unit (%d) must be a multiple of the block size (%d)\n"),
 	if (lsunit) {
 		/* convert from 512 byte blocks to fs blocks */
 		cfg->lsunit = DTOBT(lsunit, cfg->blocklog);
-	} else if (cfg->sb_feat.log_version == 2 &&
-		   cfg->loginternal && cfg->dsunit) {
-		/* lsunit and dsunit now in fs blocks */
-		cfg->lsunit = cfg->dsunit;
-	} else if (cfg->sb_feat.log_version == 2 &&
-		   !cfg->loginternal) {
-		/* use the external log device properties */
-		cfg->lsunit = DTOBT(ft->log.sunit, cfg->blocklog);
+	} else if (cfg->sb_feat.log_version == 2 && cfg->loginternal) {
+		if (cfg->dsunit) {
+			/* lsunit and dsunit now in fs blocks */
+			cfg->lsunit = cfg->dsunit;
+		} else if (cfg->lsectorsize > XLOG_HEADER_SIZE) {
+			/* lsunit matches filesystem block size */
+			cfg->lsunit = 1;
+		}
+	} else if (cfg->sb_feat.log_version == 2 && !cfg->loginternal) {
+		if (ft->log.sunit > 0) {
+			/* use the external log device properties */
+			cfg->lsunit = DTOBT(ft->log.sunit, cfg->blocklog);
+		} else if (cfg->lsectorsize > XLOG_HEADER_SIZE) {
+			/* lsunit matches filesystem block size */
+			cfg->lsunit = 1;
+		}
 	}
 
 	if (cfg->sb_feat.log_version == 2 &&
