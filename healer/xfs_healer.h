@@ -39,6 +39,9 @@ struct healer_ctx {
 	/* Shared reference to the getmntent fsname for reconnecting */
 	const char		*fsname;
 
+	/* Mount id for faster reconnecting */
+	uint64_t		mnt_id;
+
 	/* weak file handle so we can reattach to filesystem */
 	struct weakhandle	*wh;
 
@@ -75,8 +78,8 @@ bool healer_can_repair(struct healer_ctx *ctx);
 void run_full_repair(struct healer_ctx *ctx);
 
 /* weakhandle.c */
-int weakhandle_alloc(int fd, const char *mountpoint, const char *fsname,
-		struct weakhandle **whp);
+int weakhandle_alloc(int fd, const char *mountpoint, uint64_t mnt_id,
+		const char *fsname, struct weakhandle **whp);
 int weakhandle_reopen(struct weakhandle *wh, int *fd);
 void weakhandle_free(struct weakhandle **whp);
 int weakhandle_getpath_for(struct weakhandle *wh, uint64_t ino, uint32_t gen,
