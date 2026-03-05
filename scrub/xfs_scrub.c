@@ -710,6 +710,13 @@ parse_o_opts(
 	}
 }
 
+enum long_opt_nr {
+	LOPT_HELP,
+	LOPT_SVCNAME,
+
+	LOPT_MAX,
+};
+
 int
 main(
 	int			argc,
@@ -717,11 +724,15 @@ main(
 {
 	struct scrub_ctx	ctx = {
 		.fstrim_block_pct = FSTRIM_BLOCK_PCT_DEFAULT,
+		.lock		= (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER,
+		.mode		= SCRUB_MODE_REPAIR,
+		.error_action	= ERRORS_CONTINUE,
 	};
 	struct phase_rusage	all_pi;
 	char			*mtab = NULL;
 	FILE			*progress_fp = NULL;
 	struct fs_path		*fsp;
+	int			option_index;
 	int			vflag = 0;
 	int			c;
 	int			fd;
@@ -742,11 +753,25 @@ main(
 		goto out_unicrash;
 	}
 
-	pthread_mutex_init(&ctx.lock, NULL);
-	ctx.mode = SCRUB_MODE_REPAIR;
-	ctx.error_action = ERRORS_CONTINUE;
-	while ((c = getopt(argc, argv, "a:bC:de:kM:m:no:pTvxV")) != EOF) {
+	struct option long_options[] = {
+		[LOPT_HELP]	   = {"help", no_argument, NULL, 0 },
+		[LOPT_SVCNAME]	   = {"svcname", no_argument, &ctx.print_svcname, 1 },
+
+		[LOPT_MAX]	   = {NULL, 0, NULL, 0 },
+	};
+
+	while ((c = getopt_long(argc, argv, "a:bC:de:kM:m:no:pTvxV",
+				long_options, &option_index)) != EOF) {
 		switch (c) {
+		case 0:
+			switch (option_index) {
+			case LOPT_HELP:
+				usage();
+				break;
+			default:
+				break;
+			}
+			break;
 		case 'a':
 			ctx.max_errors = cvt_u64(optarg, 10);
 			if (errno) {
@@ -859,6 +884,23 @@ main(
 	ctx.mntpoint = argv[optind];
 	if (!ctx.actual_mntpoint)
 		ctx.actual_mntpoint = ctx.mntpoint;
+
+	if (ctx.print_svcname) {
+		char		unitname[PATH_MAX];
+		const char	*template =
+			scrub_data ? XFS_SCRUB_MEDIA_SVCNAME :
+				     XFS_SCRUB_SVCNAME;
+
+		ret = systemd_path_instance_unit_name(template,
+				ctx.mntpoint, unitname, sizeof(unitname));
+		if (ret) {
+			perror(ctx.mntpoint);
+			return EXIT_FAILURE;
+		}
+
+		printf("%s\n", unitname);
+		return EXIT_SUCCESS;
+	}
 
 	stdout_isatty = isatty(STDOUT_FILENO);
 	stderr_isatty = isatty(STDERR_FILENO);
