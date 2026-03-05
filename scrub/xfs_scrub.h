@@ -108,6 +108,9 @@ struct scrub_ctx {
 	 * this much space per volume.
 	 */
 	double			fstrim_block_pct;
+
+	/* CLI options, must be int */
+	int			print_svcname;
 };
 
 /*
