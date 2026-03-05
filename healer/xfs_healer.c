@@ -15,6 +15,7 @@
 #include "libfrog/workqueue.h"
 #include "libfrog/systemd.h"
 #include "libfrog/fsproperties.h"
+#include "libfrog/statmount.h"
 #include "xfs_healer.h"
 
 /* Program name; needed for libfrog error reports. */
@@ -163,11 +164,43 @@ try_capture_fsinfo(
 {
 	struct mntent		*mnt;
 	FILE			*mtp;
-	char			rpath[PATH_MAX], rmnt_dir[PATH_MAX];
+	const size_t		smbuf_size =
+		libfrog_statmount_sizeof(PATH_MAX + 128);
+	struct statmount	*smbuf = alloca(smbuf_size);
+	char			*rmnt_dir = smbuf->str;
+	char			rpath[PATH_MAX];
+	int			ret;
 
 	if (!realpath(ctx->mntpoint, rpath))
 		return -1;
 
+	/*
+	 * In Linux 7.0 we can do statmount on an open file, which means that
+	 * we can capture the mnt_id, mount point, and fsname, which can help
+	 * us find a mount --move'd elsewhere in the directory tree.
+	 */
+	ret = libfrog_fstatmount(ctx->mnt.fd, STATMOUNT_MNT_POINT, smbuf,
+			smbuf_size);
+	if (ret || !(smbuf->mask & STATMOUNT_MNT_POINT))
+		goto fallback;
+	if (strcmp(rpath, smbuf->str + smbuf->mnt_point))
+		goto fallback;
+
+	ret = libfrog_fstatmount(ctx->mnt.fd,
+			STATMOUNT_SB_SOURCE | STATMOUNT_MNT_BASIC,
+			smbuf, smbuf_size);
+	if (ret || !(smbuf->mask & STATMOUNT_SB_SOURCE))
+		goto fallback;
+
+	ctx->fsname = strdup(smbuf->str + smbuf->sb_source);
+	ctx->mnt_id = smbuf->mnt_id;
+	return 0;
+
+fallback:
+	/*
+	 * If statmount isn't available for whatever reason, fall back to
+	 * walking the mount table via getmntent.
+	 */
 	mtp = setmntent(_PATH_PROC_MOUNTS, "r");
 	if (mtp == NULL)
 		return -1;
@@ -341,7 +374,7 @@ setup_monitor(
 	 * paths for logging.
 	 */
 	if (ctx->want_repair || healer_has_parent(ctx)) {
-		ret = weakhandle_alloc(ctx->mnt.fd, ctx->mntpoint,
+		ret = weakhandle_alloc(ctx->mnt.fd, ctx->mntpoint, ctx->mnt_id,
 				ctx->fsname, &ctx->wh);
 		if (ret) {
 			fprintf(stderr, "%s: %s: %s\n", ctx->mntpoint,

@@ -14,6 +14,7 @@
 #include "libfrog/getparents.h"
 #include "libfrog/paths.h"
 #include "libfrog/systemd.h"
+#include "libfrog/statmount.h"
 #include "xfs_healer.h"
 
 struct weakhandle {
@@ -22,6 +23,9 @@ struct weakhandle {
 
 	/* Shared reference to the getmntent fsname for reconnecting */
 	const char		*fsname;
+
+	/* Mount id for faster reconnecting */
+	uint64_t		mnt_id;
 
 	/* handle to root dir */
 	void			*hanp;
@@ -33,6 +37,7 @@ int
 weakhandle_alloc(
 	int			fd,
 	const char		*mountpoint,
+	uint64_t		mnt_id,
 	const char		*fsname,
 	struct weakhandle	**whp)
 {
@@ -51,6 +56,7 @@ weakhandle_alloc(
 		return -1;
 
 	wh->mntpoint = mountpoint;
+	wh->mnt_id = mnt_id;
 	wh->fsname = fsname;
 
 	ret = fd_to_handle(fd, &wh->hanp, &wh->hlen);
@@ -112,6 +118,9 @@ weakhandle_reopen(
 	struct weakhandle	*wh,
 	int			*fd)
 {
+	const size_t		smbuf_size =
+		libfrog_statmount_sizeof(PATH_MAX);
+	struct statmount	*smbuf = alloca(smbuf_size);
 	FILE			*mtab;
 	struct mntent		*mnt;
 	int			ret;
@@ -121,6 +130,21 @@ weakhandle_reopen(
 	if (!ret)
 		return 0;
 
+	/*
+	 * The original mountpoint didn't work, which means the mount might
+	 * have been moved.  Look up the mountpoint for the mount id that we
+	 * captured earlier, which is a quick lookup if there are many mounts.
+	 * Note that @ret is nonzero here.
+	 */
+	ret = libfrog_statmount(wh->mnt_id, DEFAULT_MOUNTNS_FD,
+			STATMOUNT_MNT_POINT, smbuf, smbuf_size);
+	if (ret || !(smbuf->mask & STATMOUNT_MNT_POINT))
+		goto fallback;
+	ret = weakhandle_reopen_from(wh, smbuf->str + smbuf->mnt_point, fd);
+	if (!ret)
+		return 0;
+
+fallback:
 	/*
 	 * That didn't work, so now walk /proc/mounts to find a mount with the
 	 * same fsname (aka xfs data device path) as when we started.
