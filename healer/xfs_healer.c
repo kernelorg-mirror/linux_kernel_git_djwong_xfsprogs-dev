@@ -407,6 +407,7 @@ enum long_opt_nr {
 	LOPT_HELP,
 	LOPT_QUIET,
 	LOPT_REPAIR,
+	LOPT_SVCNAME,
 
 	LOPT_MAX,
 };
@@ -438,6 +439,7 @@ main(
 		[LOPT_HELP]	   = {"help", no_argument, NULL, 0 },
 		[LOPT_QUIET]	   = {"quiet", no_argument, &ctx.log, 0 },
 		[LOPT_REPAIR]	   = {"repair", no_argument, &ctx.want_repair, 1 },
+		[LOPT_SVCNAME]	   = {"svcname", no_argument, &ctx.print_svcname, 1 },
 
 		[LOPT_MAX]	   = {NULL, 0, NULL, 0 },
 	};
@@ -473,6 +475,20 @@ main(
 		usage();
 
 	ctx.mntpoint = argv[optind];
+
+	if (ctx.print_svcname) {
+		char	unitname[PATH_MAX];
+
+		ret = systemd_path_instance_unit_name(XFS_HEALER_SVCNAME,
+				ctx.mntpoint, unitname, sizeof(unitname));
+		if (ret) {
+			perror(ctx.mntpoint);
+			return EXIT_FAILURE;
+		}
+
+		printf("%s\n", unitname);
+		return EXIT_SUCCESS;
+	}
 
 	ret = setup_monitor(&ctx);
 	if (ret)
