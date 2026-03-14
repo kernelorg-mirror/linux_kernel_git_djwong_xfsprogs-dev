@@ -571,7 +571,13 @@ process_leaf_attr_remote(
 	    !libxfs_attr_namecheck(entry->flags, remotep->name,
 				   remotep->namelen) ||
 	    be32_to_cpu(entry->hashval) != computed ||
-	    be32_to_cpu(entry->hashval) < last_hashval ||
+	    be32_to_cpu(entry->hashval) < last_hashval) {
+		do_warn(
+	_("inconsistent remote attribute entry %d in attr block %u, ino %" PRIu64 "\n"), i, da_bno, ino);
+		return -1;
+	}
+
+	if (!(entry->flags & XFS_ATTR_INCOMPLETE) &&
 	    be32_to_cpu(remotep->valueblk) == 0) {
 		do_warn(
 	_("inconsistent remote attribute entry %d in attr block %u, ino %" PRIu64 "\n"), i, da_bno, ino);
@@ -591,6 +597,9 @@ process_leaf_attr_remote(
 					i, da_bno, ino);
 		return -1;
 	}
+
+	if (entry->flags & XFS_ATTR_INCOMPLETE)
+		goto out;
 
 	value = malloc(be32_to_cpu(remotep->valuelen));
 	if (value == NULL) {
@@ -708,12 +717,15 @@ process_leaf_attr_block(
 		}
 
 		if (entry->flags & XFS_ATTR_INCOMPLETE) {
-			/* we are inconsistent state. get rid of us */
-			do_warn(
+			/*
+			 * Warn about incomplete xattrs but don't zap the
+			 * entire attr fork because that causes loss of
+			 * security labels.  The kernel can handle stray
+			 * incomplete attr entries.
+			 */
+			do_log(
 	_("attribute entry #%d in attr block %u, inode %" PRIu64 " is INCOMPLETE\n"),
 				i, da_bno, ino);
-			clearit = 1;
-			break;
 		}
 
 		/* mark the entry used */
