@@ -645,7 +645,7 @@ check_rmap(
 
 	/* Schedule the read verify command for (eventual) running. */
 	scheduled = try_read_verify_schedule_io(rs, rvp, map->fmr_physical,
-			map->fmr_length, vs);
+			map->fmr_length);
 	if (scheduled)
 		return 0;
 
@@ -656,7 +656,7 @@ check_rmap(
 	}
 
 	scheduled = try_read_verify_schedule_io(rs, rvp, map->fmr_physical,
-			map->fmr_length, vs);
+			map->fmr_length);
 	assert(scheduled);
 	return 0;
 }
@@ -761,7 +761,7 @@ phase6_func(
 		goto out_dbad;
 	}
 
-	ret = read_verify_pool_alloc(ctx, ctx->datadev, remember_ioerr,
+	ret = read_verify_pool_alloc(ctx, ctx->datadev, remember_ioerr, &vs,
 			&vs.rvp_data);
 	if (ret) {
 		str_liberror(ctx, ret, _("creating datadev media verifier"));
@@ -769,7 +769,7 @@ phase6_func(
 	}
 	if (ctx->logdev) {
 		ret = read_verify_pool_alloc(ctx, ctx->logdev, remember_ioerr,
-				&vs.rvp_log);
+				&vs, &vs.rvp_log);
 		if (ret) {
 			str_liberror(ctx, ret,
 					_("creating logdev media verifier"));
@@ -778,7 +778,7 @@ phase6_func(
 	}
 	if (ctx->rtdev) {
 		ret = read_verify_pool_alloc(ctx, ctx->rtdev, remember_ioerr,
-				&vs.rvp_realtime);
+				&vs, &vs.rvp_realtime);
 		if (ret) {
 			str_liberror(ctx, ret,
 					_("creating rtdev media verifier"));

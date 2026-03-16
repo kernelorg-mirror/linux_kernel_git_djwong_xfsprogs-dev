@@ -49,7 +49,6 @@ rvp_io_max_size(void)
 #define RVP_IO_BATCH_LOCALITY	(65536)
 
 struct read_verify {
-	void			*io_end_arg;
 	uint64_t		io_start;	/* bytes */
 	uint64_t		io_length;	/* bytes */
 };
@@ -60,6 +59,7 @@ struct read_verify_pool {
 	void			*readbuf;	/* read buffer */
 	struct ptcounter	*verified_bytes;
 	struct disk		*disk;		/* which disk? */
+	void			*ioerr_arg;
 	read_verify_ioerr_fn_t	ioerr_fn;	/* io error callback */
 	size_t			miniosz;	/* minimum io size, bytes */
 
@@ -81,6 +81,7 @@ read_verify_pool_alloc(
 	struct scrub_ctx		*ctx,
 	struct disk			*disk,
 	read_verify_ioerr_fn_t		ioerr_fn,
+	void				*ioerr_arg,
 	struct read_verify_pool		**prvp)
 {
 	struct read_verify_pool		*rvp;
@@ -105,6 +106,7 @@ read_verify_pool_alloc(
 	rvp->ctx = ctx;
 	rvp->disk = disk;
 	rvp->ioerr_fn = ioerr_fn;
+	rvp->ioerr_arg = ioerr_arg;
 	ret = -workqueue_create(&rvp->wq, (struct xfs_mount *)rvp,
 			verifier_threads == 1 ? 0 : verifier_threads);
 	if (ret)
@@ -223,14 +225,14 @@ read_verify(
 					rvp->disk->d_fd, rv->io_start, sz,
 					read_error);
 			rvp->ioerr_fn(rvp->ctx, rvp->disk, rv->io_start, sz,
-					read_error, rv->io_end_arg);
+					read_error, rvp->ioerr_arg);
 		} else if (sz == 0) {
 			/* No bytes at all?  Did we hit the end of the disk? */
 			dbg_printf("EOF %d @ %"PRIu64" %zu err %d\n",
 					rvp->disk->d_fd, rv->io_start, sz,
 					read_error);
 			rvp->ioerr_fn(rvp->ctx, rvp->disk, rv->io_start, sz,
-					read_error, rv->io_end_arg);
+					read_error, rvp->ioerr_arg);
 			break;
 		} else if (sz < len) {
 			/*
@@ -291,7 +293,6 @@ read_verify_schedule_now(
 		return errno;
 	}
 
-	tmp->io_end_arg = rs->io_end_arg;
 	tmp->io_start = rs->io_start;
 	tmp->io_length = rs->io_length;
 
@@ -318,8 +319,7 @@ try_read_verify_schedule_io(
 	struct read_verify_schedule	*rs,
 	struct read_verify_pool		*rvp,
 	uint64_t			start,
-	uint64_t			length,
-	void				*end_arg)
+	uint64_t			length)
 {
 	uint64_t			req_end;
 	uint64_t			rv_end;
@@ -338,7 +338,6 @@ try_read_verify_schedule_io(
 		rs->rvp = rvp;
 		rs->io_start = start;
 		rs->io_length = length;
-		rs->io_end_arg = end_arg;
 
 		return true;
 	}
@@ -348,7 +347,7 @@ try_read_verify_schedule_io(
 	 * reporting is the same, and the two extents are close,
 	 * we can combine them.
 	 */
-	if (rs->rvp == rvp && rs->io_length > 0 && end_arg == rs->io_end_arg &&
+	if (rs->rvp == rvp && rs->io_length > 0 &&
 	    ((start >= rs->io_start && start <= rv_end + RVP_IO_BATCH_LOCALITY) ||
 	     (rs->io_start >= start &&
 	      rs->io_start <= req_end + RVP_IO_BATCH_LOCALITY))) {
