@@ -77,47 +77,46 @@ dev_to_pool(
 	abort();
 }
 
-/* Find the device major/minor for a given file descriptor. */
-static dev_t
-disk_to_dev(
+/* Return fsmap device for XFS device index. */
+static uint32_t
+to_fsmap_dev(
 	struct scrub_ctx	*ctx,
-	struct disk		*disk)
+	enum xfs_device		dev)
 {
-	if (ctx->mnt.fsgeom.rtstart) {
-		if (disk == ctx->datadev)
-			return XFS_DEV_DATA;
-		if (disk == ctx->logdev)
-			return XFS_DEV_LOG;
-		if (disk == ctx->rtdev)
-			return XFS_DEV_RT;
-	} else {
-		if (disk == ctx->datadev)
-			return ctx->fsinfo.fs_datadev;
-		if (disk == ctx->logdev)
-			return ctx->fsinfo.fs_logdev;
-		if (disk == ctx->rtdev)
-			return ctx->fsinfo.fs_rtdev;
+	if (ctx->mnt.fsgeom.rtstart)
+		return dev;
+
+	switch (dev) {
+	case XFS_DEV_DATA:
+		return ctx->fsinfo.fs_datadev;
+	case XFS_DEV_LOG:
+		return ctx->fsinfo.fs_logdev;
+	case XFS_DEV_RT:
+		return ctx->fsinfo.fs_rtdev;
+	default:
+		abort();
 	}
-	abort();
 }
 
 /* Find the incore bad blocks bitmap for a given disk. */
 static struct bitmap *
 bitmap_for_disk(
-	struct scrub_ctx		*ctx,
-	struct disk			*disk,
+	enum xfs_device			dev,
 	struct media_verify_state	*vs)
 {
-	if (disk == ctx->datadev)
+	switch (dev) {
+	case XFS_DEV_DATA:
 		return vs->d_bad;
-	if (disk == ctx->rtdev)
+	case XFS_DEV_RT:
 		return vs->r_bad;
-	return NULL;
+	default:
+		return NULL;
+	}
 }
 
 struct disk_ioerr_report {
 	struct scrub_ctx	*ctx;
-	struct disk		*disk;
+	enum xfs_device		dev;
 };
 
 struct owner_decode {
@@ -522,7 +521,7 @@ report_ioerr(
 	struct disk_ioerr_report	*dioerr = arg;
 
 	/* Go figure out which blocks are bad from the fsmap. */
-	keys[0].fmr_device = disk_to_dev(dioerr->ctx, dioerr->disk);
+	keys[0].fmr_device = to_fsmap_dev(dioerr->ctx, dioerr->dev);
 	keys[0].fmr_physical = start;
 	keys[1].fmr_device = keys[0].fmr_device;
 	keys[1].fmr_physical = start + length - 1;
@@ -537,18 +536,15 @@ report_ioerr(
 static int
 report_disk_ioerrs(
 	struct scrub_ctx		*ctx,
-	struct disk			*disk,
-	struct media_verify_state	*vs)
+	struct media_verify_state	*vs,
+	enum xfs_device			dev)
 {
+	struct bitmap			*tree = bitmap_for_disk(dev, vs);
 	struct disk_ioerr_report	dioerr = {
 		.ctx			= ctx,
-		.disk			= disk,
+		.dev			= dev,
 	};
-	struct bitmap			*tree;
 
-	if (!disk)
-		return 0;
-	tree = bitmap_for_disk(ctx, disk, vs);
 	if (!tree)
 		return 0;
 	return -bitmap_iterate(tree, report_ioerr, &dioerr);
@@ -569,13 +565,13 @@ report_all_media_errors(
 	if (vs->r_trunc)
 		str_corrupt(ctx, ctx->mntpoint, _("rt device truncated"));
 
-	ret = report_disk_ioerrs(ctx, ctx->datadev, vs);
+	ret = report_disk_ioerrs(ctx, vs, XFS_DEV_DATA);
 	if (ret) {
 		str_liberror(ctx, ret, _("walking datadev io errors"));
 		return ret;
 	}
 
-	ret = report_disk_ioerrs(ctx, ctx->rtdev, vs);
+	ret = report_disk_ioerrs(ctx, vs, XFS_DEV_RT);
 	if (ret) {
 		str_liberror(ctx, ret, _("walking rtdev io errors"));
 		return ret;
@@ -703,7 +699,7 @@ out_destroy:
 static void
 remember_ioerr(
 	struct scrub_ctx		*ctx,
-	struct disk			*disk,
+	enum xfs_device			dev,
 	uint64_t			start,
 	uint64_t			length,
 	int				error,
@@ -714,16 +710,21 @@ remember_ioerr(
 	int				ret;
 
 	if (!length) {
-		if (disk == ctx->datadev)
+		switch (dev) {
+		case XFS_DEV_DATA:
 			vs->d_trunc = true;
-		else if (disk == ctx->logdev)
+			break;
+		case XFS_DEV_LOG:
 			vs->l_trunc = true;
-		else if (disk == ctx->rtdev)
+			break;
+		case XFS_DEV_RT:
 			vs->r_trunc = true;
+			break;
+		}
 		return;
 	}
 
-	tree = bitmap_for_disk(ctx, disk, vs);
+	tree = bitmap_for_disk(dev, vs);
 	if (!tree) {
 		str_liberror(ctx, ENOENT, _("finding bad block bitmap"));
 		return;
@@ -761,14 +762,14 @@ phase6_func(
 		goto out_dbad;
 	}
 
-	ret = read_verify_pool_alloc(ctx, ctx->datadev, remember_ioerr, &vs,
+	ret = read_verify_pool_alloc(ctx, XFS_DEV_DATA, remember_ioerr, &vs,
 			&vs.rvp_data);
 	if (ret) {
 		str_liberror(ctx, ret, _("creating datadev media verifier"));
 		goto out_rbad;
 	}
-	if (ctx->logdev) {
-		ret = read_verify_pool_alloc(ctx, ctx->logdev, remember_ioerr,
+	if (ctx->fsinfo.fs_log) {
+		ret = read_verify_pool_alloc(ctx, XFS_DEV_LOG, remember_ioerr,
 				&vs, &vs.rvp_log);
 		if (ret) {
 			str_liberror(ctx, ret,
@@ -776,8 +777,8 @@ phase6_func(
 			goto out_datapool;
 		}
 	}
-	if (ctx->rtdev) {
-		ret = read_verify_pool_alloc(ctx, ctx->rtdev, remember_ioerr,
+	if (ctx->fsinfo.fs_rt) {
+		ret = read_verify_pool_alloc(ctx, XFS_DEV_RT, remember_ioerr,
 				&vs, &vs.rvp_realtime);
 		if (ret) {
 			str_liberror(ctx, ret,
@@ -888,11 +889,11 @@ phase6_estimate(
 	 * can contribute to the progress counter.  Hence we need to set
 	 * nr_threads appropriately to handle that many threads.
 	 */
-	*nr_threads = disk_heads(ctx->datadev);
-	if (ctx->rtdev)
-		*nr_threads += disk_heads(ctx->rtdev);
-	if (ctx->logdev)
-		*nr_threads += disk_heads(ctx->logdev);
+	*nr_threads = disk_heads(ctx->verify_disks[XFS_DEV_DATA]);
+	if (ctx->verify_disks[XFS_DEV_RT])
+		*nr_threads += disk_heads(ctx->verify_disks[XFS_DEV_RT]);
+	if (ctx->verify_disks[XFS_DEV_LOG])
+		*nr_threads += disk_heads(ctx->verify_disks[XFS_DEV_LOG]);
 	*rshift = 20;
 	return 0;
 }
