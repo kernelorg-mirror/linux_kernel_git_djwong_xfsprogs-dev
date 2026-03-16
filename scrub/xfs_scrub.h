@@ -57,10 +57,8 @@ struct scrub_ctx {
 	struct statvfs		mnt_sv;
 	struct statfs		mnt_sf;
 
-	/* Open block devices */
-	struct disk		*datadev;
-	struct disk		*logdev;
-	struct disk		*rtdev;
+	/* Open block devices for legacy verify */
+	struct disk		*verify_disks[XFS_DEV_RT + 1];
 
 	/* What does the user want us to do? */
 	enum scrub_mode		mode;

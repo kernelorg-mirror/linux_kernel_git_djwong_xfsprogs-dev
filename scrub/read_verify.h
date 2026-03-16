@@ -8,7 +8,6 @@
 
 struct scrub_ctx;
 struct read_verify_pool;
-struct disk;
 
 struct read_verify_schedule {
 	struct read_verify_pool	*rvp;
@@ -18,10 +17,10 @@ struct read_verify_schedule {
 
 /* Function called when an IO error happens. */
 typedef void (*read_verify_ioerr_fn_t)(struct scrub_ctx *ctx,
-		struct disk *disk, uint64_t start, uint64_t length,
+		enum xfs_device dev, uint64_t start, uint64_t length,
 		int error, void *arg);
 
-int read_verify_pool_alloc(struct scrub_ctx *ctx, struct disk *disk,
+int read_verify_pool_alloc(struct scrub_ctx *ctx, enum xfs_device dev,
 		read_verify_ioerr_fn_t ioerr_fn, void *ioerr_arg,
 		struct read_verify_pool **prvp);
 void read_verify_pool_abort(struct read_verify_pool *rvp);

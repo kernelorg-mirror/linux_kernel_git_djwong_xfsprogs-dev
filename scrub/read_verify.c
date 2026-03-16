@@ -58,10 +58,10 @@ struct read_verify_pool {
 	struct scrub_ctx	*ctx;		/* scrub context */
 	void			*readbuf;	/* read buffer */
 	struct ptcounter	*verified_bytes;
-	struct disk		*disk;		/* which disk? */
 	void			*ioerr_arg;
 	read_verify_ioerr_fn_t	ioerr_fn;	/* io error callback */
 	size_t			miniosz;	/* minimum io size, bytes */
+	enum xfs_device		dev;		/* which device? */
 
 	/*
 	 * Store a runtime error code here so that we can stop the pool and
@@ -73,19 +73,19 @@ struct read_verify_pool {
 /*
  * Create a thread pool to run read verifiers.
  *
- * @disk is the disk we want to verify.
  * @ioerr_fn will be called when IO errors occur.
  */
 int
 read_verify_pool_alloc(
 	struct scrub_ctx		*ctx,
-	struct disk			*disk,
+	enum xfs_device			dev,
 	read_verify_ioerr_fn_t		ioerr_fn,
 	void				*ioerr_arg,
 	struct read_verify_pool		**prvp)
 {
 	struct read_verify_pool		*rvp;
-	unsigned int			verifier_threads = disk_heads(disk);
+	unsigned int			verifier_threads =
+		disk_heads(ctx->verify_disks[XFS_DEV_DATA]);
 	int				ret;
 
 	if (rvp_io_max_size() % ctx->mnt.fsgeom.blocksize)
@@ -104,7 +104,7 @@ read_verify_pool_alloc(
 		goto out_buf;
 	rvp->miniosz = ctx->mnt.fsgeom.blocksize;
 	rvp->ctx = ctx;
-	rvp->disk = disk;
+	rvp->dev = dev;
 	rvp->ioerr_fn = ioerr_fn;
 	rvp->ioerr_arg = ioerr_arg;
 	ret = -workqueue_create(&rvp->wq, (struct xfs_mount *)rvp,
@@ -179,10 +179,10 @@ read_verify(
 	while (rv->io_length > 0) {
 		read_error = 0;
 		len = min(rv->io_length, io_max_size);
-		dbg_printf("diskverify %d %"PRIu64" %zu\n", rvp->disk->d_fd,
+		dbg_printf("diskverify %u %"PRIu64" %zu\n", rvp->dev,
 				rv->io_start, len);
-		sz = disk_read_verify(rvp->disk, rvp->readbuf, rv->io_start,
-				len);
+		sz = disk_read_verify(rvp->ctx->verify_disks[rvp->dev],
+				rvp->readbuf, rv->io_start, len);
 		if (sz == len && io_max_size < rvp->miniosz) {
 			/*
 			 * If the verify request was 100% successful and less
@@ -221,17 +221,15 @@ read_verify(
 			 * io_start to the next miniosz block.
 			 */
 			sz = rvp->miniosz - (rv->io_start % rvp->miniosz);
-			dbg_printf("IOERR %d @ %"PRIu64" %zu err %d\n",
-					rvp->disk->d_fd, rv->io_start, sz,
-					read_error);
-			rvp->ioerr_fn(rvp->ctx, rvp->disk, rv->io_start, sz,
+			dbg_printf("IOERR %u @ %"PRIu64" %zu err %d\n",
+					rvp->dev, rv->io_start, sz, read_error);
+			rvp->ioerr_fn(rvp->ctx, rvp->dev, rv->io_start, sz,
 					read_error, rvp->ioerr_arg);
 		} else if (sz == 0) {
 			/* No bytes at all?  Did we hit the end of the disk? */
-			dbg_printf("EOF %d @ %"PRIu64" %zu err %d\n",
-					rvp->disk->d_fd, rv->io_start, sz,
-					read_error);
-			rvp->ioerr_fn(rvp->ctx, rvp->disk, rv->io_start, sz,
+			dbg_printf("EOF %u @ %"PRIu64" %zu err %d\n",
+					rvp->dev, rv->io_start, sz, read_error);
+			rvp->ioerr_fn(rvp->ctx, rvp->dev, rv->io_start, sz,
 					read_error, rvp->ioerr_arg);
 			break;
 		} else if (sz < len) {
@@ -245,8 +243,8 @@ read_verify(
 			 * next full block.
 			 */
 			io_max_size = rvp->miniosz - (sz % rvp->miniosz);
-			dbg_printf("SHORT %d READ @ %"PRIu64" %zu try for %zd\n",
-					rvp->disk->d_fd, rv->io_start, sz,
+			dbg_printf("SHORT %u READ @ %"PRIu64" %zu try for %zd\n",
+					rvp->dev, rv->io_start, sz,
 					io_max_size);
 		} else {
 			/* We should never get back more bytes than we asked. */
@@ -279,8 +277,8 @@ read_verify_schedule_now(
 	if (!rvp)
 		return 0;
 
-	dbg_printf("verify fd %d start %"PRIu64" len %"PRIu64"\n",
-			rvp->disk->d_fd, rs->io_start, rs->io_length);
+	dbg_printf("verify dev %u start %"PRIu64" len %"PRIu64"\n",
+			rvp->dev, rs->io_start, rs->io_length);
 
 	/* Worker thread saw a runtime error, don't queue more. */
 	if (rvp->runtime_error)

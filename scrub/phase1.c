@@ -96,12 +96,12 @@ scrub_cleanup(
 
 	if (ctx->fshandle)
 		free_handle(ctx->fshandle, ctx->fshandle_len);
-	if (ctx->rtdev)
-		disk_close(ctx->rtdev);
-	if (ctx->logdev)
-		disk_close(ctx->logdev);
-	if (ctx->datadev)
-		disk_close(ctx->datadev);
+	if (ctx->verify_disks[XFS_DEV_DATA])
+		disk_close(ctx->verify_disks[XFS_DEV_DATA]);
+	if (ctx->verify_disks[XFS_DEV_LOG])
+		disk_close(ctx->verify_disks[XFS_DEV_LOG]);
+	if (ctx->verify_disks[XFS_DEV_RT])
+		disk_close(ctx->verify_disks[XFS_DEV_RT]);
 	fshandle_destroy();
 	error = -xfd_close(&ctx->mnt);
 	if (error)
@@ -349,13 +349,13 @@ _("Unable to find realtime device path."));
 	}
 
 	/* Open the raw devices. */
-	ctx->datadev = disk_open(ctx->fsinfo.fs_name);
-	if (!ctx->datadev) {
+	ctx->verify_disks[XFS_DEV_DATA] = disk_open(ctx->fsinfo.fs_name);
+	if (!ctx->verify_disks[XFS_DEV_DATA]) {
 		str_error(ctx, ctx->mntpoint, _("Unable to open data device."));
 		return ECANCELED;
 	}
 
-	ctx->nr_io_threads = disk_heads(ctx->datadev);
+	ctx->nr_io_threads = disk_heads(ctx->verify_disks[XFS_DEV_DATA]);
 	if (verbose) {
 		fprintf(stdout, _("%s: using %d threads to scrub.\n"),
 				ctx->mntpoint, scrub_nproc(ctx));
@@ -363,16 +363,16 @@ _("Unable to find realtime device path."));
 	}
 
 	if (ctx->fsinfo.fs_log) {
-		ctx->logdev = disk_open(ctx->fsinfo.fs_log);
-		if (!ctx->logdev) {
+		ctx->verify_disks[XFS_DEV_LOG] = disk_open(ctx->fsinfo.fs_log);
+		if (!ctx->verify_disks[XFS_DEV_LOG]) {
 			str_error(ctx, ctx->mntpoint,
 				_("Unable to open external log device."));
 			return ECANCELED;
 		}
 	}
 	if (ctx->fsinfo.fs_rt) {
-		ctx->rtdev = disk_open(ctx->fsinfo.fs_rt);
-		if (!ctx->rtdev) {
+		ctx->verify_disks[XFS_DEV_RT] = disk_open(ctx->fsinfo.fs_rt);
+		if (!ctx->verify_disks[XFS_DEV_RT]) {
 			str_error(ctx, ctx->mntpoint,
 				_("Unable to open realtime device."));
 			return ECANCELED;
