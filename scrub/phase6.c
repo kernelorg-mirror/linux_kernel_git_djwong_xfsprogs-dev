@@ -761,16 +761,14 @@ phase6_func(
 		goto out_dbad;
 	}
 
-	ret = read_verify_pool_alloc(ctx, ctx->datadev,
-			ctx->mnt.fsgeom.blocksize, remember_ioerr,
+	ret = read_verify_pool_alloc(ctx, ctx->datadev, remember_ioerr,
 			&vs.rvp_data);
 	if (ret) {
 		str_liberror(ctx, ret, _("creating datadev media verifier"));
 		goto out_rbad;
 	}
 	if (ctx->logdev) {
-		ret = read_verify_pool_alloc(ctx, ctx->logdev,
-				ctx->mnt.fsgeom.blocksize, remember_ioerr,
+		ret = read_verify_pool_alloc(ctx, ctx->logdev, remember_ioerr,
 				&vs.rvp_log);
 		if (ret) {
 			str_liberror(ctx, ret,
@@ -779,8 +777,7 @@ phase6_func(
 		}
 	}
 	if (ctx->rtdev) {
-		ret = read_verify_pool_alloc(ctx, ctx->rtdev,
-				ctx->mnt.fsgeom.blocksize, remember_ioerr,
+		ret = read_verify_pool_alloc(ctx, ctx->rtdev, remember_ioerr,
 				&vs.rvp_realtime);
 		if (ret) {
 			str_liberror(ctx, ret,
