@@ -23,7 +23,7 @@ typedef void (*read_verify_ioerr_fn_t)(struct scrub_ctx *ctx,
 		int error, void *arg);
 
 int read_verify_pool_alloc(struct scrub_ctx *ctx, struct disk *disk,
-		size_t miniosz, read_verify_ioerr_fn_t ioerr_fn,
+		read_verify_ioerr_fn_t ioerr_fn,
 		struct read_verify_pool **prvp);
 void read_verify_pool_abort(struct read_verify_pool *rvp);
 int read_verify_pool_flush(struct read_verify_pool *rvp);
