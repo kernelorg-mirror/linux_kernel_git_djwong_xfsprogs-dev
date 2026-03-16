@@ -168,6 +168,88 @@ read_verify_pool_destroy(
 	free(rvp);
 }
 
+/* Simulate disk errors. */
+static int
+verify_simulate_read_error(
+	struct read_verify_pool	*rvp,
+	uint64_t		start,
+	ssize_t			*length)
+{
+	static int64_t		interval;
+	uint64_t		start_interval;
+
+	/* Simulated disk errors are disabled. */
+	if (interval < 0)
+		return 0;
+
+	/* Figure out the disk read error interval. */
+	if (interval == 0) {
+		char		*p;
+
+		/* Pretend there's bad media every so often, in bytes. */
+		p = getenv("XFS_SCRUB_DISK_ERROR_INTERVAL");
+		if (p == NULL) {
+			interval = -1;
+			return 0;
+		}
+		interval = strtoull(p, NULL, 10);
+		interval &= (rvp->miniosz - 1);
+	}
+	if (interval <= 0) {
+		interval = -1;
+		return 0;
+	}
+
+	/*
+	 * We simulate disk errors by pretending that there are media errors at
+	 * predetermined intervals across the disk.  If a read verify request
+	 * crosses one of those intervals we shorten it so that the next read
+	 * will start on an interval threshold.  If the read verify request
+	 * starts on an interval threshold, we send back EIO as if it had
+	 * failed.
+	 */
+	if ((start % interval) == 0) {
+		dbg_printf("dev %u: simulating disk error at %"PRIu64".\n",
+				rvp->dev, start);
+		return EIO;
+	}
+
+	start_interval = start / interval;
+	if (start_interval != (start + *length) / interval) {
+		*length = ((start_interval + 1) * interval) - start;
+		dbg_printf(
+"dev %u: simulating short read at %"PRIu64" to length %"PRIu64".\n",
+				rvp->dev, start, *length);
+	}
+
+	return 0;
+}
+
+/* Read-verify an extent of a disk device. */
+static ssize_t
+read_verify_one(
+	struct read_verify_pool	*rvp,
+	struct read_verify	*rv,
+	ssize_t			len)
+{
+	if (debug) {
+		int		ret;
+
+		ret = verify_simulate_read_error(rvp, rv->io_start, &len);
+		if (ret) {
+			errno = ret;
+			return -1;
+		}
+
+		/* Don't actually issue the IO */
+		if (getenv("XFS_SCRUB_DISK_VERIFY_SKIP"))
+			return len;
+	}
+
+	return disk_read_verify(rvp->ctx->verify_disks[rvp->dev], rvp->readbuf,
+			rv->io_start, len);
+}
+
 /*
  * Issue a read-verify IO in big batches.
  */
@@ -197,8 +279,7 @@ read_verify(
 		len = min(rv->io_length, io_max_size);
 		dbg_printf("diskverify %u %"PRIu64" %zu\n", rvp->dev,
 				rv->io_start, len);
-		sz = disk_read_verify(rvp->ctx->verify_disks[rvp->dev],
-				rvp->readbuf, rv->io_start, len);
+		sz = read_verify_one(rvp, rv, len);
 		if (sz == len && io_max_size < rvp->miniosz) {
 			/*
 			 * If the verify request was 100% successful and less
