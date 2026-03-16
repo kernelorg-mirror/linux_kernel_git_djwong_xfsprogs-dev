@@ -33,4 +33,6 @@ bool try_read_verify_schedule_io(struct read_verify_schedule *rs,
 
 int read_verify_bytes(struct read_verify_pool *rvp, uint64_t *bytes);
 
+unsigned int read_verify_nproc(struct scrub_ctx *ctx);
+
 #endif /* XFS_SCRUB_READ_VERIFY_H_ */
