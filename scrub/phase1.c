@@ -213,8 +213,39 @@ no_property:
 	goto summarize;
 }
 
+/*
+ * We can't do XFS_IOC_VERIFY_MEDIA media verification, so we need to fall back
+ * to reading the disk.  We already opened the data device, now we need to open
+ * the rt and log devices for media verification.
+ */
+static int
+configure_xfs_verify_fallback(
+	struct scrub_ctx	*ctx)
+{
+	if (ctx->fsinfo.fs_log) {
+		ctx->verify_disks[XFS_DEV_LOG] = disk_open(ctx->fsinfo.fs_log);
+		if (!ctx->verify_disks[XFS_DEV_LOG]) {
+			str_error(ctx, ctx->mntpoint,
+				_("Unable to open external log device."));
+			return ECANCELED;
+		}
+	}
+
+	if (ctx->fsinfo.fs_rt) {
+		ctx->verify_disks[XFS_DEV_RT] = disk_open(ctx->fsinfo.fs_rt);
+		if (!ctx->verify_disks[XFS_DEV_RT]) {
+			str_error(ctx, ctx->mntpoint,
+				_("Unable to open realtime device."));
+			return ECANCELED;
+		}
+	}
+
+	ctx->no_verify_ioctl = true;
+	return 0;
+}
+
 /* Does the XFS driver support media scanning its own disks? */
-static void
+static bool
 configure_xfs_verify(
 	struct scrub_ctx	*ctx)
 {
@@ -225,8 +256,7 @@ configure_xfs_verify(
 		.me_dev		= XFS_DEV_DATA,
 	};
 
-	if (ioctl(ctx->mnt.fd, XFS_IOC_VERIFY_MEDIA, &me))
-		ctx->no_verify_ioctl = true;
+	return ioctl(ctx->mnt.fd, XFS_IOC_VERIFY_MEDIA, &me) == 0;
 }
 
 /*
@@ -378,24 +408,19 @@ _("Unable to find realtime device path."));
 		fflush(stdout);
 	}
 
-	if (ctx->fsinfo.fs_log) {
-		ctx->verify_disks[XFS_DEV_LOG] = disk_open(ctx->fsinfo.fs_log);
-		if (!ctx->verify_disks[XFS_DEV_LOG]) {
-			str_error(ctx, ctx->mntpoint,
-				_("Unable to open external log device."));
-			return ECANCELED;
-		}
+	if (configure_xfs_verify(ctx)) {
+		/*
+		 * ioctl-based media verification is enabled and we already set
+		 * nr_io_threads from the data device, so we no longer need to
+		 * keep this open.
+		 */
+		disk_close(ctx->verify_disks[XFS_DEV_DATA]);
+		ctx->verify_disks[XFS_DEV_DATA] = NULL;
+	} else {
+		error = configure_xfs_verify_fallback(ctx);
+		if (error)
+			return error;
 	}
-	if (ctx->fsinfo.fs_rt) {
-		ctx->verify_disks[XFS_DEV_RT] = disk_open(ctx->fsinfo.fs_rt);
-		if (!ctx->verify_disks[XFS_DEV_RT]) {
-			str_error(ctx, ctx->mntpoint,
-				_("Unable to open realtime device."));
-			return ECANCELED;
-		}
-	}
-
-	configure_xfs_verify(ctx);
 
 	/*
 	 * Everything's set up, which means any failures recorded after
