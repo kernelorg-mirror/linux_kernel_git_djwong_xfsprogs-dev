@@ -23,6 +23,7 @@
 #include "vfs.h"
 #include "common.h"
 #include "libfrog/bulkstat.h"
+#include "libfrog/ptvar.h"
 
 /*
  * Phase 6: Verify data file integrity.
@@ -39,6 +40,8 @@
 /* Verify disk blocks with GETFSMAP */
 
 struct media_verify_state {
+	struct ptvar		*verify_schedules;
+
 	struct read_verify_pool	*rvp_data;
 	struct read_verify_pool	*rvp_log;
 	struct read_verify_pool	*rvp_realtime;
@@ -604,6 +607,8 @@ check_rmap(
 {
 	struct media_verify_state	*vs = arg;
 	struct read_verify_pool		*rvp;
+	struct read_verify_schedule	*rs;
+	bool				scheduled;
 	int				ret;
 
 	rvp = dev_to_pool(ctx, vs, map->fmr_device);
@@ -632,15 +637,40 @@ check_rmap(
 
 	/* XXX: Filter out directory data blocks. */
 
+	rs = ptvar_get(vs->verify_schedules, &ret);
+	if (ret) {
+		str_liberror(ctx, -ret, _("grabbing media verify schedule"));
+		return -ret;
+	}
+
 	/* Schedule the read verify command for (eventual) running. */
-	ret = read_verify_schedule_io(rvp, map->fmr_physical, map->fmr_length,
-			vs);
+	scheduled = try_read_verify_schedule_io(rs, rvp, map->fmr_physical,
+			map->fmr_length, vs);
+	if (scheduled)
+		return 0;
+
+	ret = read_verify_schedule_now(rs);
 	if (ret) {
 		str_liberror(ctx, ret, _("scheduling media verify command"));
 		return ret;
 	}
 
+	scheduled = try_read_verify_schedule_io(rs, rvp, map->fmr_physical,
+			map->fmr_length, vs);
+	assert(scheduled);
 	return 0;
+}
+
+/* Initiate any scheduled verifications now. */
+static int
+force_one_verify(
+	struct ptvar			*ptv,
+	void				*data,
+	void				*foreach_arg)
+{
+	struct read_verify_schedule	*rs = data;
+
+	return read_verify_schedule_now(rs);
 }
 
 /* Wait for read/verify actions to finish, then return # bytes checked. */
@@ -654,10 +684,6 @@ clean_pool(
 
 	if (!rvp)
 		return 0;
-
-	ret = read_verify_force_io(rvp);
-	if (ret)
-		return ret;
 
 	ret = read_verify_pool_flush(rvp);
 	if (ret)
@@ -737,7 +763,7 @@ phase6_func(
 
 	ret = read_verify_pool_alloc(ctx, ctx->datadev,
 			ctx->mnt.fsgeom.blocksize, remember_ioerr,
-			scrub_nproc(ctx), &vs.rvp_data);
+			&vs.rvp_data);
 	if (ret) {
 		str_liberror(ctx, ret, _("creating datadev media verifier"));
 		goto out_rbad;
@@ -745,7 +771,7 @@ phase6_func(
 	if (ctx->logdev) {
 		ret = read_verify_pool_alloc(ctx, ctx->logdev,
 				ctx->mnt.fsgeom.blocksize, remember_ioerr,
-				scrub_nproc(ctx), &vs.rvp_log);
+				&vs.rvp_log);
 		if (ret) {
 			str_liberror(ctx, ret,
 					_("creating logdev media verifier"));
@@ -755,16 +781,31 @@ phase6_func(
 	if (ctx->rtdev) {
 		ret = read_verify_pool_alloc(ctx, ctx->rtdev,
 				ctx->mnt.fsgeom.blocksize, remember_ioerr,
-				scrub_nproc(ctx), &vs.rvp_realtime);
+				&vs.rvp_realtime);
 		if (ret) {
 			str_liberror(ctx, ret,
 					_("creating rtdev media verifier"));
 			goto out_logpool;
 		}
 	}
-	ret = scrub_scan_all_spacemaps(ctx, check_rmap, &vs);
+
+	ret = -ptvar_alloc(scrub_scan_spacemaps_nproc(ctx),
+			sizeof(struct read_verify_schedule), NULL,
+			&vs.verify_schedules);
 	if (ret)
 		goto out_rtpool;
+
+	ret = scrub_scan_all_spacemaps(ctx, check_rmap, &vs);
+	if (ret)
+		goto out_schedules;
+
+	ret = -ptvar_foreach(vs.verify_schedules, force_one_verify, NULL);
+	if (ret) {
+		str_liberror(ctx, ret, _("flushing read verify commands"));
+		goto out_schedules;
+	}
+	ptvar_free(vs.verify_schedules);
+	vs.verify_schedules = NULL;
 
 	ret = clean_pool(vs.rvp_data, &ctx->bytes_checked);
 	if (ret)
@@ -798,6 +839,8 @@ phase6_func(
 	bitmap_free(&vs.d_bad);
 	return ret;
 
+out_schedules:
+	ptvar_free(vs.verify_schedules);
 out_rtpool:
 	if (vs.rvp_realtime) {
 		read_verify_pool_abort(vs.rvp_realtime);

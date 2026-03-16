@@ -7,7 +7,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/statvfs.h>
-#include "libfrog/ptvar.h"
 #include "libfrog/workqueue.h"
 #include "libfrog/paths.h"
 #include "xfs_scrub.h"
@@ -60,7 +59,6 @@ struct read_verify_pool {
 	struct scrub_ctx	*ctx;		/* scrub context */
 	void			*readbuf;	/* read buffer */
 	struct ptcounter	*verified_bytes;
-	struct ptvar		*rvstate;	/* combines read requests */
 	struct disk		*disk;		/* which disk? */
 	read_verify_ioerr_fn_t	ioerr_fn;	/* io error callback */
 	size_t			miniosz;	/* minimum io size, bytes */
@@ -78,8 +76,6 @@ struct read_verify_pool {
  * @disk is the disk we want to verify.
  * @miniosz is the minimum size of an IO to expect (in bytes).
  * @ioerr_fn will be called when IO errors occur.
- * @submitter_threads is the number of threads that may be sending verify
- * requests at any given time.
  */
 int
 read_verify_pool_alloc(
@@ -87,7 +83,6 @@ read_verify_pool_alloc(
 	struct disk			*disk,
 	size_t				miniosz,
 	read_verify_ioerr_fn_t		ioerr_fn,
-	unsigned int			submitter_threads,
 	struct read_verify_pool		**prvp)
 {
 	struct read_verify_pool		*rvp;
@@ -118,19 +113,13 @@ read_verify_pool_alloc(
 	rvp->ctx = ctx;
 	rvp->disk = disk;
 	rvp->ioerr_fn = ioerr_fn;
-	ret = -ptvar_alloc(submitter_threads, sizeof(struct read_verify),
-			NULL, &rvp->rvstate);
-	if (ret)
-		goto out_counter;
 	ret = -workqueue_create(&rvp->wq, (struct xfs_mount *)rvp,
 			verifier_threads == 1 ? 0 : verifier_threads);
 	if (ret)
-		goto out_rvstate;
+		goto out_counter;
 	*prvp = rvp;
 	return 0;
 
-out_rvstate:
-	ptvar_free(rvp->rvstate);
 out_counter:
 	ptcounter_free(rvp->verified_bytes);
 out_buf:
@@ -164,7 +153,6 @@ read_verify_pool_destroy(
 	struct read_verify_pool		*rvp)
 {
 	workqueue_destroy(&rvp->wq);
-	ptvar_free(rvp->rvstate);
 	ptcounter_free(rvp->verified_bytes);
 	free(rvp->readbuf);
 	free(rvp);
@@ -285,17 +273,20 @@ read_verify(
 		rvp->runtime_error = ret;
 }
 
-/* Queue a read verify request. */
-static int
-read_verify_queue(
-	struct read_verify_pool		*rvp,
-	struct read_verify		*rv)
+/* Queue a read verify request immediately. */
+int
+read_verify_schedule_now(
+	struct read_verify_schedule	*rs)
 {
+	struct read_verify_pool		*rvp = rs->rvp;
 	struct read_verify		*tmp;
 	bool				ret;
 
+	if (!rvp)
+		return 0;
+
 	dbg_printf("verify fd %d start %"PRIu64" len %"PRIu64"\n",
-			rvp->disk->d_fd, rv->io_start, rv->io_length);
+			rvp->disk->d_fd, rs->io_start, rs->io_length);
 
 	/* Worker thread saw a runtime error, don't queue more. */
 	if (rvp->runtime_error)
@@ -308,7 +299,9 @@ read_verify_queue(
 		return errno;
 	}
 
-	memcpy(tmp, rv, sizeof(*tmp));
+	tmp->io_end_arg = rs->io_end_arg;
+	tmp->io_start = rs->io_start;
+	tmp->io_length = rs->io_length;
 
 	ret = -workqueue_add(&rvp->wq, read_verify, 0, tmp);
 	if (ret) {
@@ -317,25 +310,27 @@ read_verify_queue(
 		return ret;
 	}
 
-	rv->io_length = 0;
+	/* Reset the schedule */
+	rs->rvp = NULL;
+	rs->io_length = 0;
 	return 0;
 }
 
 /*
- * Issue an IO request.  We'll batch subsequent requests if they're
- * within 64k of each other
+ * Schedule a read verification request.  We'll batch subsequent requests if
+ * they're within 64k of each other.  Returns true if the schedule was updated,
+ * or false if the caller should call read_verify_schedule_now().
  */
-int
-read_verify_schedule_io(
+bool
+try_read_verify_schedule_io(
+	struct read_verify_schedule	*rs,
 	struct read_verify_pool		*rvp,
 	uint64_t			start,
 	uint64_t			length,
 	void				*end_arg)
 {
-	struct read_verify		*rv;
 	uint64_t			req_end;
 	uint64_t			rv_end;
-	int				ret;
 
 	assert(rvp->readbuf);
 
@@ -343,67 +338,35 @@ read_verify_schedule_io(
 	start &= ~(rvp->miniosz - 1);
 	length = roundup(length, rvp->miniosz);
 
-	rv = ptvar_get(rvp->rvstate, &ret);
-	if (ret)
-		return -ret;
 	req_end = start + length;
-	rv_end = rv->io_start + rv->io_length;
+	rv_end = rs->io_start + rs->io_length;
+
+	/* If the schedule is empty, stash the new IO. */
+	if (!rs->rvp) {
+		rs->rvp = rvp;
+		rs->io_start = start;
+		rs->io_length = length;
+		rs->io_end_arg = end_arg;
+
+		return true;
+	}
 
 	/*
-	 * If we have a stashed IO, we haven't changed fds, the error
+	 * If we have a stashed IO, we haven't changed pools, the error
 	 * reporting is the same, and the two extents are close,
 	 * we can combine them.
 	 */
-	if (rv->io_length > 0 &&
-	    end_arg == rv->io_end_arg &&
-	    ((start >= rv->io_start && start <= rv_end + RVP_IO_BATCH_LOCALITY) ||
-	     (rv->io_start >= start &&
-	      rv->io_start <= req_end + RVP_IO_BATCH_LOCALITY))) {
-		rv->io_start = min(rv->io_start, start);
-		rv->io_length = max(req_end, rv_end) - rv->io_start;
-	} else  {
-		/* Otherwise, issue the stashed IO (if there is one) */
-		if (rv->io_length > 0) {
-			int	res;
+	if (rs->rvp == rvp && rs->io_length > 0 && end_arg == rs->io_end_arg &&
+	    ((start >= rs->io_start && start <= rv_end + RVP_IO_BATCH_LOCALITY) ||
+	     (rs->io_start >= start &&
+	      rs->io_start <= req_end + RVP_IO_BATCH_LOCALITY))) {
+		rs->io_start = min(rs->io_start, start);
+		rs->io_length = max(req_end, rv_end) - rs->io_start;
 
-			res = read_verify_queue(rvp, rv);
-			if (res)
-				return res;
-		}
-
-		/* Stash the new IO. */
-		rv->io_start = start;
-		rv->io_length = length;
-		rv->io_end_arg = end_arg;
+		return true;
 	}
 
-	return 0;
-}
-
-/* Force any per-thread stashed IOs into the verifier. */
-static int
-force_one_io(
-	struct ptvar		*ptv,
-	void			*data,
-	void			*foreach_arg)
-{
-	struct read_verify_pool	*rvp = foreach_arg;
-	struct read_verify	*rv = data;
-
-	if (rv->io_length == 0)
-		return 0;
-
-	return -read_verify_queue(rvp, rv);
-}
-
-/* Force any stashed IOs into the verifier. */
-int
-read_verify_force_io(
-	struct read_verify_pool		*rvp)
-{
-	assert(rvp->readbuf);
-
-	return -ptvar_foreach(rvp->rvstate, force_one_io, rvp);
+	return false;
 }
 
 /* How many bytes has this process verified? */
