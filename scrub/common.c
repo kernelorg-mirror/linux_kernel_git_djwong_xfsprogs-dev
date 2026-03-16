@@ -275,7 +275,7 @@ scrub_nproc(
 {
 	if (force_nr_threads)
 		return force_nr_threads;
-	return ctx->nr_io_threads;
+	return ctx->nr_scan_threads;
 }
 
 /*
