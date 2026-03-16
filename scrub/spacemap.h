@@ -18,4 +18,9 @@ int scrub_iterate_fsmap(struct scrub_ctx *ctx, struct fsmap *keys,
 int scrub_scan_all_spacemaps(struct scrub_ctx *ctx, scrub_fsmap_iter_fn fn,
 		void *arg);
 
+static inline unsigned int scrub_scan_spacemaps_nproc(struct scrub_ctx *ctx)
+{
+	return scrub_nproc(ctx);
+}
+
 #endif /* XFS_SCRUB_SPACEMAP_H_ */
