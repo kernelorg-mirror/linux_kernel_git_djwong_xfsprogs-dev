@@ -74,14 +74,12 @@ struct read_verify_pool {
  * Create a thread pool to run read verifiers.
  *
  * @disk is the disk we want to verify.
- * @miniosz is the minimum size of an IO to expect (in bytes).
  * @ioerr_fn will be called when IO errors occur.
  */
 int
 read_verify_pool_alloc(
 	struct scrub_ctx		*ctx,
 	struct disk			*disk,
-	size_t				miniosz,
 	read_verify_ioerr_fn_t		ioerr_fn,
 	struct read_verify_pool		**prvp)
 {
@@ -89,13 +87,7 @@ read_verify_pool_alloc(
 	unsigned int			verifier_threads = disk_heads(disk);
 	int				ret;
 
-	/*
-	 * The minimum IO size must be a multiple of the disk sector size
-	 * and a factor of the max io size.
-	 */
-	if (miniosz % disk->d_lbasize)
-		return EINVAL;
-	if (rvp_io_max_size() % miniosz)
+	if (rvp_io_max_size() % ctx->mnt.fsgeom.blocksize)
 		return EINVAL;
 
 	rvp = calloc(1, sizeof(struct read_verify_pool));
@@ -109,7 +101,7 @@ read_verify_pool_alloc(
 	ret = ptcounter_alloc(verifier_threads, &rvp->verified_bytes);
 	if (ret)
 		goto out_buf;
-	rvp->miniosz = miniosz;
+	rvp->miniosz = ctx->mnt.fsgeom.blocksize;
 	rvp->ctx = ctx;
 	rvp->disk = disk;
 	rvp->ioerr_fn = ioerr_fn;
