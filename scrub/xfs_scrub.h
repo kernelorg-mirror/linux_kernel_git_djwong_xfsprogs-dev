@@ -70,7 +70,7 @@ struct scrub_ctx {
 	struct xfs_fd		mnt;
 
 	/* Number of threads for metadata scrubbing */
-	unsigned int		nr_io_threads;
+	unsigned int		nr_scan_threads;
 
 	/* XFS specific geometry */
 	struct fs_path		fsinfo;

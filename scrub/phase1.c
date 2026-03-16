@@ -355,7 +355,7 @@ _("Unable to find realtime device path."));
 		return ECANCELED;
 	}
 
-	ctx->nr_io_threads = disk_heads(ctx->verify_disks[XFS_DEV_DATA]);
+	ctx->nr_scan_threads = disk_heads(ctx->verify_disks[XFS_DEV_DATA]);
 	if (verbose) {
 		fprintf(stdout, _("%s: using %d threads to scrub.\n"),
 				ctx->mntpoint, scrub_nproc(ctx));
