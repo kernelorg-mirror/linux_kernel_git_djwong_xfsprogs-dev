@@ -51,7 +51,6 @@ rvp_io_max_size(void)
 
 struct read_verify {
 	void			*io_end_arg;
-	struct disk		*io_disk;
 	uint64_t		io_start;	/* bytes */
 	uint64_t		io_length;	/* bytes */
 };
