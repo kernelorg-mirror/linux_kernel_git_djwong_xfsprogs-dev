@@ -885,11 +885,11 @@ phase6_estimate(
 	 * can contribute to the progress counter.  Hence we need to set
 	 * nr_threads appropriately to handle that many threads.
 	 */
-	*nr_threads = disk_heads(ctx->verify_disks[XFS_DEV_DATA]);
-	if (ctx->verify_disks[XFS_DEV_RT])
-		*nr_threads += disk_heads(ctx->verify_disks[XFS_DEV_RT]);
-	if (ctx->verify_disks[XFS_DEV_LOG])
-		*nr_threads += disk_heads(ctx->verify_disks[XFS_DEV_LOG]);
+	*nr_threads = read_verify_nproc(ctx);
+	if (ctx->fsinfo.fs_rt)
+		*nr_threads = read_verify_nproc(ctx);
+	if (ctx->fsinfo.fs_log)
+		*nr_threads = read_verify_nproc(ctx);
 	*rshift = 20;
 	return 0;
 }

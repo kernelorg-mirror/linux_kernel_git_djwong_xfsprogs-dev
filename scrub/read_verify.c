@@ -70,6 +70,22 @@ struct read_verify_pool {
 	int			runtime_error;
 };
 
+unsigned int
+read_verify_nproc(
+	struct scrub_ctx		*ctx)
+{
+	if (force_nr_threads)
+		return force_nr_threads;
+
+	/*
+	 * Throwing all CPUs at verifying seems like a bad idea for foreground
+	 * scrub, as does abusing I/O opt/min as that says absolutely nothing
+	 * about parallelism.  The authors observed diminishing returns on
+	 * verification speed past 8 IO threads, so that's the default.
+	 */
+	return 8;
+}
+
 /*
  * Create a thread pool to run read verifiers.
  *
@@ -84,8 +100,8 @@ read_verify_pool_alloc(
 	struct read_verify_pool		**prvp)
 {
 	struct read_verify_pool		*rvp;
-	unsigned int			verifier_threads =
-		disk_heads(ctx->verify_disks[XFS_DEV_DATA]);
+	const unsigned int		verifier_threads =
+		read_verify_nproc(ctx);
 	int				ret;
 
 	if (rvp_io_max_size() % ctx->mnt.fsgeom.blocksize)
