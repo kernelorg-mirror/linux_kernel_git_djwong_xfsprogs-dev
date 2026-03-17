@@ -27,10 +27,7 @@
  * pool takes care of issuing multiple IOs to the device, if possible.
  */
 
-/*
- * Perform all IO in 32M chunks.  This cannot exceed 65536 sectors
- * because that's the biggest SCSI VERIFY(16) we dare to send.
- */
+/* Perform all verification IO in 32M chunks. */
 #define RVP_IO_MAX_SIZE		(33554432)
 
 /*

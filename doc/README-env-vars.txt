@@ -17,7 +17,6 @@ Known debug tweaks (pass -d and set the environment variable):
 XFS_SCRUB_FORCE_ERROR        -- pretend all metadata is corrupt
 XFS_SCRUB_FORCE_REPAIR       -- repair all metadata even if it's ok
 XFS_SCRUB_NO_KERNEL          -- pretend there is no kernel ioctl
-XFS_SCRUB_NO_SCSI_VERIFY     -- disable SCSI VERIFY (if present)
 XFS_SCRUB_PHASE              -- run only this scrub phase
 XFS_SCRUB_THREADS            -- start exactly this number of threads
 
