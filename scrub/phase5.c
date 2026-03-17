@@ -897,10 +897,8 @@ _("Filesystem has errors, skipping connectivity checks."));
 	scrub_report_preen_triggers(ctx);
 out_lock:
 	pthread_mutex_destroy(&ncs.lock);
-	if (ncs.new_deferred)
-		bitmap_free(&ncs.new_deferred);
-	if (ncs.cur_deferred)
-		bitmap_free(&ncs.cur_deferred);
+	bitmap_free(&ncs.new_deferred);
+	bitmap_free(&ncs.cur_deferred);
 	return ret;
 }
 
