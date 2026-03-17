@@ -109,6 +109,9 @@ bitmap_free(
 	struct bitmap_node	*ext;
 
 	bmap = *bmapp;
+	if (!bmap)
+		return;
+
 	avl_for_each_safe(bmap->bt_tree, node, n) {
 		ext = container_of(node, struct bitmap_node, btn_node);
 		free(ext);
