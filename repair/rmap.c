@@ -752,8 +752,7 @@ err_slab:
 err:
 	if (agflbp)
 		libxfs_buf_relse(agflbp);
-	if (own_ag_bitmap)
-		bitmap_free(&own_ag_bitmap);
+	bitmap_free(&own_ag_bitmap);
 	return error;
 }
 
