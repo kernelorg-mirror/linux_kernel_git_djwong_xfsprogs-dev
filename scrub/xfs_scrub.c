@@ -120,6 +120,9 @@
  * Available even in non-debug mode:
  * SERVICE_MODE			-- compress all error codes to 1 for LSB
  *				   service action compliance
+ * XFS_SCRUB_VERIFY_MAX_SIZE    -- maximum size of media verification requests
+ * XFS_SCRUB_VERIFY_BATCH_LOCALITY -- coalesce sparse areas of up to this size
+ *                                    to batch verification requests
  */
 
 /* Program name; needed for libfrog error reports. */
