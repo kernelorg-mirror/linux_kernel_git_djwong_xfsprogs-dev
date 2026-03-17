@@ -28,23 +28,36 @@
  */
 
 /* Perform all verification IO in 32M chunks. */
-#define RVP_IO_MAX_SIZE		(33554432)
+#define RVP_IO_MAX_SIZE			(32ULL << 20)
 
 /*
- * If we're running in the background then we perform IO in 128k chunks
+ * If we're running in the background then we perform IO in 256k chunks
  * to reduce the load on the IO subsystem.
  */
-#define RVP_BACKGROUND_IO_MAX_SIZE	(131072)
+#define RVP_BG_IO_MAX_SIZE		(256ULL << 10)
 
 /* What's the real maximum IO size? */
 static inline unsigned int
 rvp_io_max_size(void)
 {
-	return bg_mode > 0 ? RVP_BACKGROUND_IO_MAX_SIZE : RVP_IO_MAX_SIZE;
+	return bg_mode > 0 ? RVP_BG_IO_MAX_SIZE : RVP_IO_MAX_SIZE;
 }
 
-/* Tolerate 64k holes in adjacent read verify requests. */
-#define RVP_IO_BATCH_LOCALITY	(65536)
+/* Tolerate 2M holes in adjacent read verify requests. */
+#define RVP_IO_BATCH_LOCALITY		(2ULL << 20)
+
+/*
+ * Tolerate 256k holes in adjacent read verify requests when running in the
+ * background.
+ */
+#define RVP_BG_IO_BATCH_LOCALITY	(256ULL << 10)
+
+/* How many holes are we willing to verify to reduce IO count? */
+static inline unsigned int
+rvp_io_batch_locality(void)
+{
+	return bg_mode > 0 ? RVP_BG_IO_BATCH_LOCALITY : RVP_IO_BATCH_LOCALITY;
+}
 
 struct read_verify {
 	uint64_t		io_start;	/* bytes */
@@ -487,6 +500,7 @@ try_read_verify_schedule_io(
 {
 	uint64_t			req_end;
 	uint64_t			rv_end;
+	const unsigned int		locality = rvp_io_batch_locality();
 
 	assert(rvp->readbuf);
 
@@ -512,9 +526,9 @@ try_read_verify_schedule_io(
 	 * we can combine them.
 	 */
 	if (rs->rvp == rvp && rs->io_length > 0 &&
-	    ((start >= rs->io_start && start <= rv_end + RVP_IO_BATCH_LOCALITY) ||
+	    ((start >= rs->io_start && start <= rv_end + locality) ||
 	     (rs->io_start >= start &&
-	      rs->io_start <= req_end + RVP_IO_BATCH_LOCALITY))) {
+	      rs->io_start <= req_end + locality))) {
 		rs->io_start = min(rs->io_start, start);
 		rs->io_length = max(req_end, rv_end) - rs->io_start;
 
