@@ -38,10 +38,30 @@
 #define RVP_BG_IO_MAX_SIZE		KILOBYTES(256)
 
 /* What's the real maximum IO size? */
-static inline unsigned int
-rvp_io_max_size(void)
+static unsigned int
+rvp_io_max_size(
+	const struct scrub_ctx	*ctx)
 {
-	return bg_mode > 0 ? RVP_BG_IO_MAX_SIZE : RVP_IO_MAX_SIZE;
+	static unsigned int	res;
+	char			*p;
+
+	if (res)
+		return res;
+
+	p = getenv("XFS_SCRUB_VERIFY_MAX_SIZE");
+	if (p) {
+		long long	r = cvtnum(ctx->mnt.fsgeom.blocksize,
+					   ctx->mnt.fsgeom.sectsize, p);
+
+		if (r >= ctx->mnt.fsgeom.blocksize && r <= GIGABYTES(2) &&
+		    r <= SSIZE_MAX) {
+			res = r;
+			return res;
+		}
+	}
+
+	res = bg_mode > 0 ? RVP_BG_IO_MAX_SIZE : RVP_IO_MAX_SIZE;
+	return res;
 }
 
 /* Tolerate 2M holes in adjacent read verify requests. */
@@ -54,10 +74,29 @@ rvp_io_max_size(void)
 #define RVP_BG_IO_BATCH_LOCALITY	KILOBYTES(256)
 
 /* How many holes are we willing to verify to reduce IO count? */
-static inline unsigned int
-rvp_io_batch_locality(void)
+static unsigned int
+rvp_io_batch_locality(
+	const struct scrub_ctx	*ctx)
 {
-	return bg_mode > 0 ? RVP_BG_IO_BATCH_LOCALITY : RVP_IO_BATCH_LOCALITY;
+	static unsigned int	res;
+	char			*p;
+
+	if (res)
+		return res;
+
+	p = getenv("XFS_SCRUB_VERIFY_BATCH_LOCALITY");
+	if (p) {
+		long long	r = cvtnum(ctx->mnt.fsgeom.blocksize,
+					   ctx->mnt.fsgeom.sectsize, p);
+
+		if (r >= ctx->mnt.fsgeom.blocksize && r <= GIGABYTES(2)) {
+			res = r;
+			return res;
+		}
+	}
+
+	res = bg_mode > 0 ? RVP_BG_IO_BATCH_LOCALITY : RVP_IO_BATCH_LOCALITY;
+	return res;
 }
 
 struct read_verify {
@@ -112,17 +151,18 @@ read_verify_pool_alloc(
 	struct read_verify_pool		*rvp;
 	const unsigned int		verifier_threads =
 		read_verify_nproc(ctx);
+	const unsigned int		maxsize =
+		rvp_io_max_size(ctx);
 	int				ret;
 
-	if (rvp_io_max_size() % ctx->mnt.fsgeom.blocksize)
+	if (maxsize % ctx->mnt.fsgeom.blocksize)
 		return EINVAL;
 
 	rvp = calloc(1, sizeof(struct read_verify_pool));
 	if (!rvp)
 		return errno;
 
-	ret = posix_memalign((void **)&rvp->readbuf, page_size,
-			rvp_io_max_size());
+	ret = posix_memalign((void **)&rvp->readbuf, page_size, maxsize);
 	if (ret)
 		goto out_free;
 	ret = ptcounter_alloc(verifier_threads, &rvp->verified_bytes);
@@ -361,7 +401,7 @@ read_verify(
 	if (rvp->runtime_error)
 		return;
 
-	io_max_size = rvp_io_max_size();
+	io_max_size = rvp_io_max_size(rvp->ctx);
 
 	while (rv->io_length > 0) {
 		read_error = 0;
@@ -514,7 +554,8 @@ try_read_verify_schedule_io(
 {
 	uint64_t			req_end;
 	uint64_t			rv_end;
-	const unsigned int		locality = rvp_io_batch_locality();
+	const unsigned int		locality =
+		rvp_io_batch_locality(rvp->ctx);
 
 	assert(rvp->readbuf);
 
