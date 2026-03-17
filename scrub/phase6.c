@@ -782,9 +782,13 @@ phase6_func(
 	 * If the verify flush didn't work or we found no bad blocks, we're
 	 * done!  No errors detected.
 	 */
-	if (ret || ret2 || ret3)
+	if (ret || ret2 || ret3) {
+		ret |= ret2 | ret3; /* caller only cares about non-zero/zero */
 		goto out_rbad;
-	if (bitmap_empty(vs.d_bad) && bitmap_empty(vs.r_bad))
+	}
+	if (bitmap_empty(vs.d_bad) && !vs.d_trunc &&
+	    bitmap_empty(vs.r_bad) && !vs.r_trunc &&
+	    !vs.l_trunc)
 		goto out_rbad;
 
 	/* Scan the whole dir tree to see what matches the bad extents. */
