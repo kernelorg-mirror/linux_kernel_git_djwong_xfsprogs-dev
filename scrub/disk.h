@@ -6,7 +6,6 @@
 #ifndef XFS_SCRUB_DISK_H_
 #define XFS_SCRUB_DISK_H_
 
-#define DISK_FLAG_SCSI_VERIFY	0x1
 struct disk {
 	struct stat	d_sb;
 	int		d_fd;
@@ -15,7 +14,6 @@ struct disk {
 	unsigned int	d_flags;
 	unsigned int	d_blksize;	/* bytes */
 	uint64_t	d_size;		/* bytes */
-	uint64_t	d_start;	/* bytes */
 };
 
 unsigned int disk_heads(struct disk *disk);
