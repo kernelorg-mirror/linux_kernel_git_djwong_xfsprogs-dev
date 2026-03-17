@@ -45,12 +45,10 @@ struct media_verify_state {
 	struct read_verify_pool	*rvp_data;
 	struct read_verify_pool	*rvp_log;
 	struct read_verify_pool	*rvp_realtime;
-	struct bitmap		*d_bad;		/* bytes */
-	struct bitmap		*r_bad;		/* bytes */
-	struct bitmap		*l_bad;		/* bytes */
-	bool			d_trunc:1;
-	bool			r_trunc:1;
-	bool			l_trunc:1;
+
+	struct read_verify_out	dout;
+	struct read_verify_out	lout;
+	struct read_verify_out	rout;
 };
 
 /* Find the fd for a given device identifier. */
@@ -107,11 +105,11 @@ bitmap_for_disk(
 {
 	switch (dev) {
 	case XFS_DEV_DATA:
-		return vs->d_bad;
+		return vs->dout.failmap;
 	case XFS_DEV_RT:
-		return vs->r_bad;
+		return vs->rout.failmap;
 	case XFS_DEV_LOG:
-		return vs->l_bad;
+		return vs->lout.failmap;
 	default:
 		return NULL;
 	}
@@ -216,9 +214,9 @@ report_data_loss(
 		return 0;
 
 	if (fsx->fsx_xflags & FS_XFLAG_REALTIME)
-		bmp = vs->r_bad;
+		bmp = vs->rout.failmap;
 	else
-		bmp = vs->d_bad;
+		bmp = vs->dout.failmap;
 
 	return -bitmap_iterate_range(bmp, bmap->bm_physical, bmap->bm_length,
 			report_badfile, br);
@@ -236,7 +234,7 @@ report_attr_loss(
 {
 	struct badfile_report		*br = arg;
 	struct media_verify_state	*vs = br->vs;
-	struct bitmap			*bmp = vs->d_bad;
+	struct bitmap			*bmp = vs->dout.failmap;
 
 	/* Complain about attr fork extents that don't look right. */
 	if (bmap->bm_flags & (BMV_OF_PREALLOC | BMV_OF_DELALLOC)) {
@@ -561,11 +559,11 @@ report_all_media_errors(
 {
 	int				ret;
 
-	if (vs->d_trunc)
+	if (vs->dout.truncated)
 		str_corrupt(ctx, ctx->mntpoint, _("data device truncated"));
-	if (vs->l_trunc)
+	if (vs->lout.truncated)
 		str_corrupt(ctx, ctx->mntpoint, _("log device truncated"));
-	if (vs->r_trunc)
+	if (vs->rout.truncated)
 		str_corrupt(ctx, ctx->mntpoint, _("rt device truncated"));
 
 	ret = report_disk_ioerrs(ctx, XFS_DEV_DATA, vs);
@@ -687,9 +685,8 @@ force_one_verify(
 static int
 clean_pool(
 	struct read_verify_pool	*rvp,
-	unsigned long long	*bytes_checked)
+	struct read_verify_out	*out)
 {
-	uint64_t		pool_checked;
 	int			ret;
 
 	if (!rvp)
@@ -699,54 +696,17 @@ clean_pool(
 	if (ret)
 		goto out_destroy;
 
-	ret = read_verify_bytes(rvp, &pool_checked);
-	if (ret)
-		goto out_destroy;
+	ret = read_verify_take_output(rvp, out);
 
-	*bytes_checked += pool_checked;
 out_destroy:
 	read_verify_pool_destroy(rvp);
 	return ret;
 }
 
-/* Remember a media error for later. */
-static void
-remember_ioerr(
-	struct scrub_ctx		*ctx,
-	enum xfs_device			dev,
-	uint64_t			start,
-	uint64_t			length,
-	int				error,
-	void				*arg)
+static inline bool
+media_ok(const struct read_verify_out *out)
 {
-	struct media_verify_state	*vs = arg;
-	struct bitmap			*tree;
-	int				ret;
-
-	if (!length) {
-		switch (dev) {
-		case XFS_DEV_DATA:
-			vs->d_trunc = true;
-			break;
-		case XFS_DEV_LOG:
-			vs->l_trunc = true;
-			break;
-		case XFS_DEV_RT:
-			vs->r_trunc = true;
-			break;
-		}
-		return;
-	}
-
-	tree = bitmap_for_disk(dev, vs);
-	if (!tree) {
-		str_liberror(ctx, ENOENT, _("finding bad block bitmap"));
-		return;
-	}
-
-	ret = -bitmap_set(tree, start, length);
-	if (ret)
-		str_liberror(ctx, ret, _("setting bad block bitmap"));
+	return (!out->failmap || bitmap_empty(out->failmap)) && !out->truncated;
 }
 
 /*
@@ -764,33 +724,13 @@ phase6_func(
 	struct media_verify_state	vs = { NULL };
 	int				ret, ret2, ret3;
 
-	ret = -bitmap_alloc(&vs.d_bad);
-	if (ret) {
-		str_liberror(ctx, ret, _("creating datadev badblock bitmap"));
-		return ret;
-	}
-
-	ret = -bitmap_alloc(&vs.r_bad);
-	if (ret) {
-		str_liberror(ctx, ret, _("creating realtime badblock bitmap"));
-		goto out_dbad;
-	}
-
-	ret = -bitmap_alloc(&vs.l_bad);
-	if (ret) {
-		str_liberror(ctx, ret, _("creating log badblock bitmap"));
-		goto out_rbad;
-	}
-
-	ret = read_verify_pool_alloc(ctx, XFS_DEV_DATA, remember_ioerr, &vs,
-			&vs.rvp_data);
+	ret = read_verify_pool_alloc(ctx, XFS_DEV_DATA, &vs.rvp_data);
 	if (ret) {
 		str_liberror(ctx, ret, _("creating datadev media verifier"));
-		goto out_lbad;
+		return ret;
 	}
 	if (ctx->fsinfo.fs_log) {
-		ret = read_verify_pool_alloc(ctx, XFS_DEV_LOG, remember_ioerr,
-				&vs, &vs.rvp_log);
+		ret = read_verify_pool_alloc(ctx, XFS_DEV_LOG, &vs.rvp_log);
 		if (ret) {
 			str_liberror(ctx, ret,
 					_("creating logdev media verifier"));
@@ -798,8 +738,7 @@ phase6_func(
 		}
 	}
 	if (ctx->fsinfo.fs_rt) {
-		ret = read_verify_pool_alloc(ctx, XFS_DEV_RT, remember_ioerr,
-				&vs, &vs.rvp_realtime);
+		ret = read_verify_pool_alloc(ctx, XFS_DEV_RT, &vs.rvp_realtime);
 		if (ret) {
 			str_liberror(ctx, ret,
 					_("creating rtdev media verifier"));
@@ -825,17 +764,22 @@ phase6_func(
 	ptvar_free(vs.verify_schedules);
 	vs.verify_schedules = NULL;
 
-	ret = clean_pool(vs.rvp_data, &ctx->bytes_checked);
+	ret = clean_pool(vs.rvp_data, &vs.dout);
 	if (ret)
 		str_liberror(ctx, ret, _("flushing datadev verify pool"));
 
-	ret2 = clean_pool(vs.rvp_log, &ctx->bytes_checked);
+	ret2 = clean_pool(vs.rvp_log, &vs.lout);
 	if (ret2)
 		str_liberror(ctx, ret2, _("flushing logdev verify pool"));
 
-	ret3 = clean_pool(vs.rvp_realtime, &ctx->bytes_checked);
+	ret3 = clean_pool(vs.rvp_realtime, &vs.rout);
 	if (ret3)
 		str_liberror(ctx, ret3, _("flushing rtdev verify pool"));
+
+	/* below this point the read_verify_pools are freed */
+
+	ctx->bytes_checked = vs.dout.bytes_verified + vs.rout.bytes_verified +
+			     vs.lout.bytes_verified;
 
 	/*
 	 * If the verify flush didn't work or we found no bad blocks, we're
@@ -843,19 +787,19 @@ phase6_func(
 	 */
 	if (ret || ret2 || ret3) {
 		ret |= ret2 | ret3; /* caller only cares about non-zero/zero */
-		goto out_lbad;
+		goto out_failmap;
 	}
-	if (bitmap_empty(vs.d_bad) && !vs.d_trunc &&
-	    bitmap_empty(vs.r_bad) && !vs.r_trunc &&
-	    bitmap_empty(vs.l_bad) && !vs.l_trunc)
-		goto out_lbad;
+	if (media_ok(&vs.dout) && media_ok(&vs.rout) && media_ok(&vs.lout))
+		goto out_failmap;
 
 	/* Scan the whole dir tree to see what matches the bad extents. */
 	ret = report_all_media_errors(ctx, &vs);
 
-	bitmap_free(&vs.l_bad);
-	bitmap_free(&vs.r_bad);
-	bitmap_free(&vs.d_bad);
+out_failmap:
+	bitmap_free(&vs.dout.failmap);
+	bitmap_free(&vs.lout.failmap);
+	bitmap_free(&vs.rout.failmap);
+
 	return ret;
 
 out_schedules:
@@ -873,12 +817,6 @@ out_logpool:
 out_datapool:
 	read_verify_pool_abort(vs.rvp_data);
 	read_verify_pool_destroy(vs.rvp_data);
-out_lbad:
-	bitmap_free(&vs.l_bad);
-out_rbad:
-	bitmap_free(&vs.r_bad);
-out_dbad:
-	bitmap_free(&vs.d_bad);
 	return ret;
 }
 

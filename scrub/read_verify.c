@@ -9,6 +9,7 @@
 #include <sys/statvfs.h>
 #include "libfrog/workqueue.h"
 #include "libfrog/paths.h"
+#include "libfrog/bitmap.h"
 #include "xfs_scrub.h"
 #include "common.h"
 #include "counter.h"
@@ -58,8 +59,6 @@ struct read_verify_pool {
 	struct scrub_ctx	*ctx;		/* scrub context */
 	void			*readbuf;	/* read buffer */
 	struct ptcounter	*verified_bytes;
-	void			*ioerr_arg;
-	read_verify_ioerr_fn_t	ioerr_fn;	/* io error callback */
 	size_t			miniosz;	/* minimum io size, bytes */
 	enum xfs_device		dev;		/* which device? */
 
@@ -68,6 +67,10 @@ struct read_verify_pool {
 	 * return it to the caller.
 	 */
 	int			runtime_error;
+
+	/* outputs: a bad block bitmap and a truncated flag */
+	struct bitmap		*failmap;
+	bool			truncated;
 };
 
 unsigned int
@@ -88,15 +91,11 @@ read_verify_nproc(
 
 /*
  * Create a thread pool to run read verifiers.
- *
- * @ioerr_fn will be called when IO errors occur.
  */
 int
 read_verify_pool_alloc(
 	struct scrub_ctx		*ctx,
 	enum xfs_device			dev,
-	read_verify_ioerr_fn_t		ioerr_fn,
-	void				*ioerr_arg,
 	struct read_verify_pool		**prvp)
 {
 	struct read_verify_pool		*rvp;
@@ -121,8 +120,6 @@ read_verify_pool_alloc(
 	rvp->miniosz = ctx->mnt.fsgeom.blocksize;
 	rvp->ctx = ctx;
 	rvp->dev = dev;
-	rvp->ioerr_fn = ioerr_fn;
-	rvp->ioerr_arg = ioerr_arg;
 	ret = -workqueue_create(&rvp->wq, (struct xfs_mount *)rvp,
 			verifier_threads == 1 ? 0 : verifier_threads);
 	if (ret)
@@ -163,6 +160,7 @@ read_verify_pool_destroy(
 	struct read_verify_pool		*rvp)
 {
 	workqueue_destroy(&rvp->wq);
+	bitmap_free(&rvp->failmap);
 	ptcounter_free(rvp->verified_bytes);
 	free(rvp->readbuf);
 	free(rvp);
@@ -286,6 +284,39 @@ read_verify_one(
 			single_step);
 }
 
+/* Remember a media error for later. */
+static int
+read_verify_error(
+	struct read_verify_pool		*rvp,
+	uint64_t			start,
+	uint64_t			length,
+	int				error)
+{
+	int				ret;
+
+	if (!length) {
+		rvp->truncated = true;
+		return 0;
+	}
+
+	if (!rvp->failmap) {
+		ret = -bitmap_alloc(&rvp->failmap);
+		if (ret) {
+			str_liberror(rvp->ctx, ret,
+ _("allocating bad block bitmap"));
+			return ret;
+		}
+	}
+
+	ret = -bitmap_set(rvp->failmap, start, length);
+	if (ret) {
+		str_liberror(rvp->ctx, ret, _("setting bad block bitmap"));
+		return ret;
+	}
+
+	return 0;
+}
+
 /*
  * Issue a read-verify IO in big batches.
  */
@@ -356,14 +387,18 @@ read_verify(
 			sz = rvp->miniosz - (rv->io_start % rvp->miniosz);
 			dbg_printf("IOERR %u @ %"PRIu64" %zu err %d\n",
 					rvp->dev, rv->io_start, sz, read_error);
-			rvp->ioerr_fn(rvp->ctx, rvp->dev, rv->io_start, sz,
-					read_error, rvp->ioerr_arg);
+			ret = read_verify_error(rvp, rv->io_start, sz,
+					read_error);
+			if (ret)
+				goto out_err;
 		} else if (sz == 0) {
 			/* No bytes at all?  Did we hit the end of the disk? */
 			dbg_printf("EOF %u @ %"PRIu64" %zu err %d\n",
 					rvp->dev, rv->io_start, sz, read_error);
-			rvp->ioerr_fn(rvp->ctx, rvp->dev, rv->io_start, sz,
-					read_error, rvp->ioerr_arg);
+			ret = read_verify_error(rvp, rv->io_start, sz,
+					read_error);
+			if (ret)
+				goto out_err;
 			break;
 		} else if (sz < len) {
 			/*
@@ -392,6 +427,7 @@ read_verify(
 		background_sleep();
 	}
 
+out_err:
 	free(rv);
 	ret = ptcounter_add(rvp->verified_bytes, verified);
 	if (ret)
@@ -491,11 +527,24 @@ try_read_verify_schedule_io(
 	return false;
 }
 
-/* How many bytes has this process verified? */
+/*
+ * Take the outputs of the read verification.  Caller must free the failmap
+ * bitmap if one is returned.
+ */
 int
-read_verify_bytes(
+read_verify_take_output(
 	struct read_verify_pool		*rvp,
-	uint64_t			*bytes_checked)
+	struct read_verify_out		*out)
 {
-	return ptcounter_value(rvp->verified_bytes, bytes_checked);
+	int				ret;
+
+	out->truncated = rvp->truncated;
+
+	ret = ptcounter_value(rvp->verified_bytes, &out->bytes_verified);
+	if (ret)
+		return ret;
+
+	out->failmap = rvp->failmap;
+	rvp->failmap = NULL;
+	return 0;
 }
