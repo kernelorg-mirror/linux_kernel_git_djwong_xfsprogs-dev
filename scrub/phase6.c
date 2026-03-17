@@ -123,16 +123,16 @@ struct owner_decode {
 };
 
 static const struct owner_decode special_owners[] = {
-	{XFS_FMR_OWN_FREE,	"free space"},
-	{XFS_FMR_OWN_UNKNOWN,	"unknown owner"},
-	{XFS_FMR_OWN_FS,	"static FS metadata"},
-	{XFS_FMR_OWN_LOG,	"journalling log"},
-	{XFS_FMR_OWN_AG,	"per-AG metadata"},
-	{XFS_FMR_OWN_INOBT,	"inode btree blocks"},
-	{XFS_FMR_OWN_INODES,	"inodes"},
-	{XFS_FMR_OWN_REFC,	"refcount btree"},
-	{XFS_FMR_OWN_COW,	"CoW staging"},
-	{XFS_FMR_OWN_DEFECTIVE,	"bad blocks"},
+	{XFS_FMR_OWN_FREE,	N_("free space")},
+	{XFS_FMR_OWN_UNKNOWN,	N_("unknown owner")},
+	{XFS_FMR_OWN_FS,	N_("static FS metadata")},
+	{XFS_FMR_OWN_LOG,	N_("journalling log")},
+	{XFS_FMR_OWN_AG,	N_("per-AG metadata")},
+	{XFS_FMR_OWN_INOBT,	N_("inode btree blocks")},
+	{XFS_FMR_OWN_INODES,	N_("inodes")},
+	{XFS_FMR_OWN_REFC,	N_("refcount btree")},
+	{XFS_FMR_OWN_COW,	N_("CoW staging")},
+	{XFS_FMR_OWN_DEFECTIVE,	N_("bad blocks")},
 	{0, NULL},
 };
 
@@ -145,7 +145,7 @@ decode_special_owner(
 
 	while (od->descr) {
 		if (od->owner == owner)
-			return od->descr;
+			return _(od->descr);
 		od++;
 	}
 
