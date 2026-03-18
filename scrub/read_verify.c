@@ -9,6 +9,7 @@
 #include <sys/statvfs.h>
 #include "libfrog/workqueue.h"
 #include "libfrog/paths.h"
+#include "libfrog/bitmap.h"
 #include "xfs_scrub.h"
 #include "common.h"
 #include "counter.h"
@@ -58,8 +59,6 @@ struct read_verify_pool {
 	struct scrub_ctx	*ctx;		/* scrub context */
 	void			*readbuf;	/* read buffer */
 	struct ptcounter	*verified_bytes;
-	void			*ioerr_arg;
-	read_verify_ioerr_fn_t	ioerr_fn;	/* io error callback */
 	size_t			miniosz;	/* minimum io size, bytes */
 	enum xfs_device		dev;		/* which device? */
 
@@ -68,6 +67,10 @@ struct read_verify_pool {
 	 * return it to the caller.
 	 */
 	int			runtime_error;
+
+	/* outputs: a bad block bitmap and a truncated flag */
+	struct bitmap		*failmap;
+	bool			truncated;
 };
 
 unsigned int
@@ -88,15 +91,11 @@ read_verify_nproc(
 
 /*
  * Create a thread pool to run read verifiers.
- *
- * @ioerr_fn will be called when IO errors occur.
  */
 int
 read_verify_pool_alloc(
 	struct scrub_ctx		*ctx,
 	enum xfs_device			dev,
-	read_verify_ioerr_fn_t		ioerr_fn,
-	void				*ioerr_arg,
 	struct read_verify_pool		**prvp)
 {
 	struct read_verify_pool		*rvp;
@@ -121,8 +120,6 @@ read_verify_pool_alloc(
 	rvp->miniosz = ctx->mnt.fsgeom.blocksize;
 	rvp->ctx = ctx;
 	rvp->dev = dev;
-	rvp->ioerr_fn = ioerr_fn;
-	rvp->ioerr_arg = ioerr_arg;
 	ret = -workqueue_create(&rvp->wq, (struct xfs_mount *)rvp,
 			verifier_threads == 1 ? 0 : verifier_threads);
 	if (ret)
@@ -146,7 +143,8 @@ read_verify_pool_abort(
 {
 	if (!rvp->runtime_error)
 		rvp->runtime_error = ECANCELED;
-	workqueue_terminate(&rvp->wq);
+	if (!rvp->wq.terminated)
+		workqueue_terminate(&rvp->wq);
 }
 
 /* Finish up any read verification work. */
@@ -163,6 +161,7 @@ read_verify_pool_destroy(
 	struct read_verify_pool		*rvp)
 {
 	workqueue_destroy(&rvp->wq);
+	bitmap_free(&rvp->failmap);
 	ptcounter_free(rvp->verified_bytes);
 	free(rvp->readbuf);
 	free(rvp);
@@ -286,6 +285,39 @@ read_verify_one(
 			single_step);
 }
 
+/* Remember a media error for later. */
+static int
+read_verify_error(
+	struct read_verify_pool		*rvp,
+	uint64_t			start,
+	uint64_t			length,
+	int				error)
+{
+	int				ret;
+
+	if (!length) {
+		rvp->truncated = true;
+		return 0;
+	}
+
+	if (!rvp->failmap) {
+		ret = -bitmap_alloc(&rvp->failmap);
+		if (ret) {
+			str_liberror(rvp->ctx, ret,
+ _("allocating bad block bitmap"));
+			return ret;
+		}
+	}
+
+	ret = -bitmap_set(rvp->failmap, start, length);
+	if (ret) {
+		str_liberror(rvp->ctx, ret, _("setting bad block bitmap"));
+		return ret;
+	}
+
+	return 0;
+}
+
 /*
  * Issue a read-verify IO in big batches.
  */
@@ -356,14 +388,18 @@ read_verify(
 			sz = rvp->miniosz - (rv->io_start % rvp->miniosz);
 			dbg_printf("IOERR %u @ %"PRIu64" %zu err %d\n",
 					rvp->dev, rv->io_start, sz, read_error);
-			rvp->ioerr_fn(rvp->ctx, rvp->dev, rv->io_start, sz,
-					read_error, rvp->ioerr_arg);
+			ret = read_verify_error(rvp, rv->io_start, sz,
+					read_error);
+			if (ret)
+				goto out_err;
 		} else if (sz == 0) {
 			/* No bytes at all?  Did we hit the end of the disk? */
 			dbg_printf("EOF %u @ %"PRIu64" %zu err %d\n",
 					rvp->dev, rv->io_start, sz, read_error);
-			rvp->ioerr_fn(rvp->ctx, rvp->dev, rv->io_start, sz,
-					read_error, rvp->ioerr_arg);
+			ret = read_verify_error(rvp, rv->io_start, sz,
+					read_error);
+			if (ret)
+				goto out_err;
 			break;
 		} else if (sz < len) {
 			/*
@@ -392,6 +428,7 @@ read_verify(
 		background_sleep();
 	}
 
+out_err:
 	free(rv);
 	ret = ptcounter_add(rvp->verified_bytes, verified);
 	if (ret)
@@ -491,11 +528,69 @@ try_read_verify_schedule_io(
 	return false;
 }
 
-/* How many bytes has this process verified? */
-int
-read_verify_bytes(
-	struct read_verify_pool		*rvp,
-	uint64_t			*bytes_checked)
+/* Did read verification succeed? */
+bool
+read_verify_ok(
+	const struct read_verify_pool	*rvp)
 {
-	return ptcounter_value(rvp->verified_bytes, bytes_checked);
+	return rvp->failmap == NULL && !rvp->truncated;
+}
+
+/* Did the verification unexpectedly stop early due to short reads? */
+bool
+read_verify_truncated(
+	const struct read_verify_pool	*rvp)
+{
+	return rvp->truncated;
+}
+
+/* How many bytes has this pool verified? */
+uint64_t
+read_verify_progress(
+	const struct read_verify_pool	*rvp)
+{
+	uint64_t			ret = 0;
+
+	ptcounter_value(rvp->verified_bytes, &ret);
+	return ret;
+}
+
+/* Call @fn for every media failure this pool observed. */
+int
+read_verify_iterate_failed(
+	struct read_verify_pool		*rvp,
+	int				(*fn)(uint64_t, uint64_t, void *),
+	void				*arg)
+{
+	if (!rvp->failmap)
+		return 0;
+
+	return -bitmap_iterate(rvp->failmap, fn, arg);
+}
+
+/* Call @fn for every media failure this pool observed in the given range. */
+int
+read_verify_iterate_failed_range(
+	struct read_verify_pool		*rvp,
+	uint64_t			start,
+	uint64_t			length,
+	int				(*fn)(uint64_t, uint64_t, void *),
+	void				*arg)
+{
+	if (!rvp->failmap)
+		return 0;
+
+	return -bitmap_iterate_range(rvp->failmap, start, length, fn, arg);
+}
+
+/* Were there any media failures within the given range? */
+bool
+read_verify_has_failed(
+	struct read_verify_pool		*rvp,
+	uint64_t			start,
+	uint64_t			length)
+{
+	if (rvp->failmap)
+		return bitmap_test(rvp->failmap, start, length);
+	return false;
 }
