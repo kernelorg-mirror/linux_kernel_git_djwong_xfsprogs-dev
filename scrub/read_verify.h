@@ -21,7 +21,6 @@ typedef void (*read_verify_ioerr_fn_t)(struct scrub_ctx *ctx,
 		int error, void *arg);
 
 int read_verify_pool_alloc(struct scrub_ctx *ctx, enum xfs_device dev,
-		read_verify_ioerr_fn_t ioerr_fn, void *ioerr_arg,
 		struct read_verify_pool **prvp);
 void read_verify_pool_abort(struct read_verify_pool *rvp);
 int read_verify_pool_flush(struct read_verify_pool *rvp);
@@ -31,7 +30,17 @@ int read_verify_schedule_now(struct read_verify_schedule *rs);
 bool try_read_verify_schedule_io(struct read_verify_schedule *rs,
 		struct read_verify_pool *rvp, uint64_t start, uint64_t length);
 
-int read_verify_bytes(struct read_verify_pool *rvp, uint64_t *bytes);
+bool read_verify_ok(const struct read_verify_pool *rvp);
+bool read_verify_truncated(const struct read_verify_pool *rvp);
+uint64_t read_verify_progress(const struct read_verify_pool *rvp);
+
+int read_verify_iterate_failed(struct read_verify_pool *rvp,
+		int (*fn)(uint64_t, uint64_t, void *), void *arg);
+int read_verify_iterate_failed_range(struct read_verify_pool *rvp,
+		uint64_t start, uint64_t length,
+		int (*fn)(uint64_t, uint64_t, void *), void *arg);
+bool read_verify_has_failed(struct read_verify_pool *rvp, uint64_t start,
+		uint64_t len);
 
 unsigned int read_verify_nproc(struct scrub_ctx *ctx);
 
