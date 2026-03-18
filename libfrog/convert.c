@@ -173,13 +173,6 @@ cvt_u16(
 	return i;
 }
 
-#define EXABYTES(x)	((long long)(x) << 60)
-#define PETABYTES(x)	((long long)(x) << 50)
-#define TERABYTES(x)	((long long)(x) << 40)
-#define GIGABYTES(x)	((long long)(x) << 30)
-#define MEGABYTES(x)	((long long)(x) << 20)
-#define KILOBYTES(x)	((long long)(x) << 10)
-
 long long
 cvtnum(
 	size_t		blksize,

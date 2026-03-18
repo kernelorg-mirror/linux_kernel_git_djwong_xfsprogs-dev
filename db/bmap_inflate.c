@@ -437,7 +437,7 @@ bmapinflate_f(
 	struct xfs_trans	*tp;
 	char			*p;
 	unsigned long long	nextents = 0;
-	unsigned long long	dirty_bytes = 60U << 20; /* 60MiB */
+	unsigned long long	dirty_bytes = MEGABYTES(60);
 	unsigned long long	dirty_blocks;
 	unsigned int		resblks;
 	bool			estimate = false;
