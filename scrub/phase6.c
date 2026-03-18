@@ -551,7 +551,7 @@ report_all_media_errors(
 
 	ret = report_disk_ioerrs(ctx, vs, XFS_DEV_DATA);
 	if (ret) {
-		str_liberror(ctx, ret, _("walking datadev io errors"));
+		str_liberror(ctx, ret, _("walking data device io errors"));
 		return ret;
 	}
 
@@ -563,7 +563,7 @@ report_all_media_errors(
 
 	ret = report_disk_ioerrs(ctx, vs, XFS_DEV_RT);
 	if (ret) {
-		str_liberror(ctx, ret, _("walking rtdev io errors"));
+		str_liberror(ctx, ret, _("walking rt device io errors"));
 		return ret;
 	}
 
@@ -725,14 +725,14 @@ phase6_func(
 
 	ret = alloc_pool(ctx, &vs, XFS_DEV_DATA);
 	if (ret) {
-		str_liberror(ctx, ret, _("creating datadev media verifier"));
+		str_liberror(ctx, ret, _("creating data device media verifier"));
 		return ret;
 	}
 	if (ctx->fsinfo.fs_log) {
 		ret = alloc_pool(ctx, &vs, XFS_DEV_LOG);
 		if (ret) {
 			str_liberror(ctx, ret,
-					_("creating logdev media verifier"));
+					_("creating log device media verifier"));
 			goto out_datapool;
 		}
 	}
@@ -740,7 +740,7 @@ phase6_func(
 		ret = alloc_pool(ctx, &vs, XFS_DEV_RT);
 		if (ret) {
 			str_liberror(ctx, ret,
-					_("creating rtdev media verifier"));
+					_("creating rt device media verifier"));
 			goto out_logpool;
 		}
 	}
@@ -765,15 +765,15 @@ phase6_func(
 
 	ret = clean_pool(&vs, XFS_DEV_DATA, &ctx->bytes_checked, &ok);
 	if (ret)
-		str_liberror(ctx, ret, _("flushing datadev verify pool"));
+		str_liberror(ctx, ret, _("flushing data device verify pool"));
 
 	ret2 = clean_pool(&vs, XFS_DEV_LOG, &ctx->bytes_checked, &ok);
 	if (ret2)
-		str_liberror(ctx, ret2, _("flushing logdev verify pool"));
+		str_liberror(ctx, ret2, _("flushing log device verify pool"));
 
 	ret3 = clean_pool(&vs, XFS_DEV_RT, &ctx->bytes_checked, &ok);
 	if (ret3)
-		str_liberror(ctx, ret3, _("flushing rtdev verify pool"));
+		str_liberror(ctx, ret3, _("flushing rt device verify pool"));
 
 	/*
 	 * If the verify flush didn't work or we found no bad blocks, we're
