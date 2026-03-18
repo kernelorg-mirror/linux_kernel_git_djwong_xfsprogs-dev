@@ -28,6 +28,7 @@
 #include "quotacheck.h"
 #include "rcbag_btree.h"
 #include "rt.h"
+#include "libfrog/convert.h"
 
 /*
  * option tables for getsubopt calls
@@ -1321,8 +1322,8 @@ main(int argc, char **argv)
 		}
 
 		max_mem -= mem_used;
-		if (max_mem >= (1 << 30))
-			max_mem = 1 << 30;
+		if (max_mem >= GIGABYTES(1))
+			max_mem = GIGABYTES(1);
 		libxfs_bhash_size = max_mem / (HASH_CACHE_RATIO *
 				(igeo->inode_cluster_size >> 10));
 		if (libxfs_bhash_size < 512)

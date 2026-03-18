@@ -12,6 +12,7 @@
 #include "libfrog/paths.h"
 #include "libfrog/workqueue.h"
 #include "libfrog/histogram.h"
+#include "libfrog/convert.h"
 #include "xfs_scrub.h"
 #include "common.h"
 #include "progress.h"
@@ -51,7 +52,7 @@ fstrim_ok(
  * call so that we can implement decent progress reporting and CPU resource
  * control.  Pick a prime number of gigabytes for interest.
  */
-#define FSTRIM_MAX_BYTES	(11ULL << 30)
+#define FSTRIM_MAX_BYTES	GIGABYTES(11)
 
 /* Trim a certain range of the filesystem. */
 static int

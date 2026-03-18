@@ -6,6 +6,7 @@
 #include <libxfs.h>
 #include "err_protos.h"
 #include "libfrog/bitmap.h"
+#include "libfrog/convert.h"
 #include "slab.h"
 #include "rmap.h"
 #include "incore.h"
@@ -23,7 +24,7 @@ init_rebuild(
 	memset(btr, 0, sizeof(struct bt_rebuild));
 
 	bulkload_init_ag(&btr->newbt, sc, oinfo, NULLFSBLOCK);
-	btr->bload.max_dirty = XFS_B_TO_FSBT(sc->mp, 256U << 10); /* 256K */
+	btr->bload.max_dirty = XFS_B_TO_FSBT(sc->mp, KILOBYTES(256));
 	bulkload_estimate_ag_slack(sc, &btr->bload, est_agfreeblocks);
 }
 

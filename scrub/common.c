@@ -11,6 +11,7 @@
 #include "libfrog/paths.h"
 #include "libfrog/getparents.h"
 #include "libfrog/handle_priv.h"
+#include "libfrog/convert.h"
 #include "xfs_scrub.h"
 #include "common.h"
 #include "progress.h"
@@ -218,18 +219,18 @@ auto_space_units(
 {
 	if (debug > 1)
 		goto no_prefix;
-	if (bytes > (1ULL << 40)) {
+	if (bytes > TERABYTES(1)) {
 		*units = "TiB";
-		return (double)bytes / (1ULL << 40);
-	} else if (bytes > (1ULL << 30)) {
+		return (double)bytes / TERABYTES(1);
+	} else if (bytes > GIGABYTES(1)) {
 		*units = "GiB";
-		return (double)bytes / (1ULL << 30);
-	} else if (bytes > (1ULL << 20)) {
+		return (double)bytes / GIGABYTES(1);
+	} else if (bytes > MEGABYTES(1)) {
 		*units = "MiB";
-		return (double)bytes / (1ULL << 20);
-	} else if (bytes > (1ULL << 10)) {
+		return (double)bytes / MEGABYTES(1);
+	} else if (bytes > KILOBYTES(1)) {
 		*units = "KiB";
-		return (double)bytes / (1ULL << 10);
+		return (double)bytes / KILOBYTES(1);
 	}
 
 no_prefix:

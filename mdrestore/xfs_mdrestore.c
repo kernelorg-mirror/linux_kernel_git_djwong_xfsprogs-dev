@@ -8,6 +8,7 @@
 #include "xfs_metadump.h"
 #include <libfrog/platform.h>
 #include "libfrog/div64.h"
+#include "libfrog/convert.h"
 
 union mdrestore_headers {
 	__be32				magic;
@@ -92,10 +93,10 @@ final_print_progress(
 	if (!mdrestore.show_progress)
 		goto done;
 
-	if (bytes_read <= (*cursor << 20))
+	if (bytes_read <= MEGABYTES(*cursor))
 		goto done;
 
-	print_progress("%lld MB read", howmany_64(bytes_read, 1U << 20));
+	print_progress("%lld MB read", howmany_64(bytes_read, MEGABYTES(1)));
 
 done:
 	if (mdrestore.progress_since_warning)

@@ -15,6 +15,7 @@
 #include "libfrog/dahashselftest.h"
 #include "libfrog/fsproperties.h"
 #include "libfrog/zones.h"
+#include "libfrog/convert.h"
 #include "proto.h"
 #include <ini.h>
 
@@ -558,7 +559,7 @@ static struct opt_params iopts = {
 		  .conflicts = { { NULL, LAST_CONFLICT } },
 		  .convert = true,
 		  .minval = 1,
-		  .maxval = 1ULL << 30, /* 1GiB */
+		  .maxval = GIGABYTES(1),
 		  .defaultval = SUBOPT_NEEDS_VAL,
 		},
 	},
@@ -1576,7 +1577,7 @@ discard_blocks(int fd, uint64_t nsectors, int quiet)
 {
 	uint64_t	offset = 0;
 	/* Discard the device 2G at a time */
-	const uint64_t	step = 2ULL << 30;
+	const uint64_t	step = GIGABYTES(2);
 	const uint64_t	count = BBTOB(nsectors);
 
 	/*

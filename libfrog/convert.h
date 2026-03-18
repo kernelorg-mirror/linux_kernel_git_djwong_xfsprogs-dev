@@ -22,4 +22,11 @@ extern uid_t	uid_from_string(char *user);
 extern gid_t	gid_from_string(char *group);
 extern prid_t	prid_from_string(char *project);
 
+#define EXABYTES(x)	((unsigned long long)(x) << 60)
+#define PETABYTES(x)	((unsigned long long)(x) << 50)
+#define TERABYTES(x)	((unsigned long long)(x) << 40)
+#define GIGABYTES(x)	((unsigned long long)(x) << 30)
+#define MEGABYTES(x)	((unsigned long long)(x) << 20)
+#define KILOBYTES(x)	((unsigned long long)(x) << 10)
+
 #endif	/* __LIBFROG_CONVERT_H__ */
