@@ -18,8 +18,8 @@
 #include "xfs_healer.h"
 
 struct weakhandle {
-	/* Shared reference to the user's mountpoint for logging */
-	const char		*mntpoint;
+	/* Owned reference to the user's mountpoint for logging */
+	char			*mntpoint;
 
 	/* Shared reference to the getmntent fsname for reconnecting */
 	const char		*fsname;
@@ -55,7 +55,9 @@ weakhandle_alloc(
 	if (!wh)
 		return -1;
 
-	wh->mntpoint = mountpoint;
+	wh->mntpoint = strdup(mountpoint);
+	if (!wh->mntpoint)
+		goto out_wh;
 	wh->mnt_id = mnt_id;
 	wh->fsname = fsname;
 
@@ -69,6 +71,28 @@ weakhandle_alloc(
 out_wh:
 	free(wh);
 	return -1;
+}
+
+static void
+update_mntpoint(
+	struct weakhandle	*wh,
+	const char		*path)
+{
+	static pthread_mutex_t	lock = PTHREAD_MUTEX_INITIALIZER;
+	char			*s = strdup(path);
+
+	if (!s)
+		return;
+
+	pthread_mutex_lock(&lock);
+	if (path != wh->mntpoint) {
+		free(wh->mntpoint);
+		wh->mntpoint = s;
+		s = NULL;
+	}
+	pthread_mutex_unlock(&lock);
+
+	free(s);
 }
 
 /*
@@ -107,6 +131,9 @@ weakhandle_reopen_from(
 		errno = ESTALE;
 		goto out_handle;
 	}
+
+	if (path != wh->mntpoint)
+		update_mntpoint(wh, path);
 
 	free_handle(hanp, hlen);
 	*fd = mnt_fd;
@@ -193,6 +220,7 @@ weakhandle_free(
 
 	if (wh) {
 		free_handle(wh->hanp, wh->hlen);
+		free(wh->mntpoint);
 		free(wh);
 	}
 
