@@ -18,6 +18,8 @@ Build-Depends: debhelper (>= 12),
  uuid-dev
 Standards-Version: 4.0.0
 Homepage: https://xfs.wiki.kernel.org/
+Vcs-Browser: https://git.kernel.org/pub/scm/fs/xfs/xfsprogs-dev.git
+Vcs-Git: https://git.kernel.org/pub/scm/fs/xfs/xfsprogs-dev.git -b master
 
 Package: xfsprogs
 Depends: ${shlibs:Depends}, ${misc:Depends}, python3-dbus, python3:any
