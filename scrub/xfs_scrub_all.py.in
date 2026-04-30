@@ -69,12 +69,6 @@ def find_mounts():
 
 	return fs
 
-def backtick(cmd):
-	'''Generator function that yields lines of a program's stdout.'''
-	p = subprocess.Popen(cmd, stdout = subprocess.PIPE)
-	for line in TextIOWrapper(p.stdout, encoding="utf-8"):
-		yield line.strip()
-
 def remove_killfunc(killfuncs, fn):
 	'''Ensure fn is not in killfuncs.'''
 	try:
