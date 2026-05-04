@@ -499,7 +499,6 @@ name_entry_examine(
 {
 	UCharIterator		uiter;
 	UChar32			uchr;
-	uint8_t			mask = 0;
 	unsigned int		ret = 0;
 	/* Don't allow the first codepoint to be a variation */
 	UBool			was_variation = true;
@@ -524,12 +523,6 @@ name_entry_examine(
 			ret |= UNICRASH_CONTROL_CHAR;
 
 		switch (u_charDirection(uchr)) {
-		case U_LEFT_TO_RIGHT:
-			mask |= 0x01;
-			break;
-		case U_RIGHT_TO_LEFT:
-			mask |= 0x02;
-			break;
 		case U_RIGHT_TO_LEFT_OVERRIDE:
 			ret |= UNICRASH_BIDI_OVERRIDE;
 			break;
