@@ -331,6 +331,8 @@ struct kvec {
 #endif
 
 /* xfs_attr.h */
+#ifndef __counted_by_ptr
 #define __counted_by_ptr(member)
+#endif
 
 #endif	/* __XFS_PLATFORM_DEFS_H__ */
