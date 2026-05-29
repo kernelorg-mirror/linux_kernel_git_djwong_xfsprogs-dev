@@ -152,8 +152,13 @@ bulkstat_the_rest(
 	error = -xfrog_bulkstat_alloc_req(
 			orig_breq->hdr.icount - orig_breq->hdr.ocount,
 			start_ino, &new_breq);
-	if (error)
-		return error;
+	if (error) {
+		/*
+		 * Couldn't allocate memory for bulkstat, so we return 0 and
+		 * let the caller single-step.
+		 */
+		return 0;
+	}
 	new_breq->hdr.flags = orig_breq->hdr.flags;
 
 	do {
