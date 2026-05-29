@@ -28,8 +28,8 @@
  * the filesystem if the btree root pointers in the AG headers are wrong.
  * Dependencies cannot cross scrub groups.
  */
-#define DEP(x) (1U << (x))
-static const unsigned int repair_deps[XFS_SCRUB_TYPE_NR] = {
+#define DEP(x) (1ULL << (x))
+static const uint64_t repair_deps[XFS_SCRUB_TYPE_NR] = {
 	[XFS_SCRUB_TYPE_BMBTD]		= DEP(XFS_SCRUB_TYPE_INODE),
 	[XFS_SCRUB_TYPE_BMBTA]		= DEP(XFS_SCRUB_TYPE_INODE),
 	[XFS_SCRUB_TYPE_BMBTC]		= DEP(XFS_SCRUB_TYPE_INODE),
