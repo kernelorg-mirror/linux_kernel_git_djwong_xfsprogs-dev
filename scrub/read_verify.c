@@ -557,7 +557,7 @@ bool
 read_verify_ok(
 	const struct read_verify_pool	*rvp)
 {
-	return rvp->failmap == NULL && !rvp->truncated;
+	return rvp->failmap == NULL && !rvp->truncated && !rvp->runtime_error;
 }
 
 /* Did the verification unexpectedly stop early due to short reads? */
