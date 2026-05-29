@@ -118,6 +118,6 @@ scrub_item_schedule_retry(struct scrub_item *sri, unsigned int scrub_type)
 bool scrub_item_call_kernel_again(struct scrub_item *sri, uint8_t work_mask,
 		const struct scrub_item *old);
 bool scrub_item_schedule_work(struct scrub_item *sri, uint8_t state_flags,
-		const unsigned int *schedule_deps);
+		const uint64_t *schedule_deps);
 
 #endif /* XFS_SCRUB_SCRUB_PRIVATE_H_ */
