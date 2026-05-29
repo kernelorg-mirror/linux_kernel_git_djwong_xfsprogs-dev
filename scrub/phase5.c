@@ -527,7 +527,7 @@ retry_deferred_inodes(
 		ncs->new_deferred = NULL;
 		ncs->fixed_something = false;
 
-		error = -bitmap_iterate(ncs->cur_deferred,
+		error = bitmap_iterate(ncs->cur_deferred,
 				retry_deferred_inode_range, ncs);
 		if (error)
 			return error;
@@ -546,7 +546,7 @@ retry_deferred_inodes(
 	ncs->new_deferred = NULL;
 	ncs->last_call = true;
 
-	error = -bitmap_iterate(ncs->cur_deferred,
+	error = bitmap_iterate(ncs->cur_deferred,
 			retry_deferred_inode_range, ncs);
 	if (error)
 		return error;
