@@ -534,9 +534,9 @@ scrub_item_check_file(
 	return 0;
 }
 
-/* How many items do we have to check? */
+/* How many items do we have to check for per-AG and per-rtgroup work? */
 unsigned int
-scrub_estimate_ag_work(
+scrub_estimate_group_work(
 	struct scrub_ctx		*ctx)
 {
 	const struct xfrog_scrub_descr	*sc;
@@ -553,10 +553,21 @@ scrub_estimate_ag_work(
 		case XFROG_SCRUB_GROUP_FS:
 			estimate++;
 			break;
+		case XFROG_SCRUB_GROUP_RTGROUP:
+			/*
+			 * rtbitmap and rtsummary exist on non-rt/non-rtgroup
+			 * filesystems, but we schedule the other rtgroup
+			 * metadata for scanning (even if it won't do
+			 * anything), so we must include those in the
+			 * estimation as well.
+			 */
+			estimate += max(1, ctx->mnt.fsgeom.rgcount);
+			break;
 		default:
 			break;
 		}
 	}
+
 	return estimate;
 }
 
