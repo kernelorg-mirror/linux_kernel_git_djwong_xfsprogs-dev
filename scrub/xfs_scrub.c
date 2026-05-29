@@ -610,12 +610,20 @@ report_outcome(
 	 * are not corruptions.
 	 */
 	if (ctx->scrub_setup_succeeded && actionable_errors > 0) {
-		char		*msg;
+		char		*msg = NULL;
 
-		if (ctx->mode != SCRUB_MODE_REPAIR)
+		switch (ctx->mode) {
+		case SCRUB_MODE_DRY_RUN:
 			msg = _("%s: Re-run xfs_scrub without -n.\n");
-		else
+			break;
+		case SCRUB_MODE_PREEN:
+			msg = _("%s: Re-run xfs_scrub without -p.\n");
+			break;
+		case SCRUB_MODE_NONE:
+		case SCRUB_MODE_REPAIR:
 			msg = _("%s: Unmount and run xfs_repair.\n");
+			break;
+		}
 
 		fprintf(stderr, msg, ctx->mntpoint);
 	}
