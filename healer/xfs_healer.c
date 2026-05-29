@@ -453,7 +453,7 @@ setup_monitor(
 	 * the kernel as quickly as we can.  Note that the kernel won't accrue
 	 * more than 32K of internal events before it starts dropping them.
 	 */
-	ret = workqueue_create_bound(&ctx->event_queue, ctx, healer_nproc(ctx),
+	ret = -workqueue_create_bound(&ctx->event_queue, ctx, healer_nproc(ctx),
 			1048576 / sizeof(struct xfs_health_monitor_event));
 	if (ret) {
 		errno = ret;
@@ -503,10 +503,12 @@ monitor(
 
 		nr = fread(hme, sizeof(*hme), 1, ctx->mon_fp);
 		if (ferror(ctx->mon_fp)) {
+			int error = errno;
+
 			pthread_mutex_lock(&ctx->conlock);
 			fprintf(stderr, "%s: %s: %s\n", ctx->mntpoint,
 					_("error reading event file"),
-					strerror(ret));
+					strerror(error));
 			pthread_mutex_unlock(&ctx->conlock);
 			free(hme);
 			ret = -1;
@@ -521,7 +523,7 @@ monitor(
 			mounted = false;
 
 		/* handle_event owns hme if the workqueue_add succeeds */
-		ret = workqueue_add(&ctx->event_queue, handle_event, 0, hme);
+		ret = -workqueue_add(&ctx->event_queue, handle_event, 0, hme);
 		if (ret) {
 			pthread_mutex_lock(&ctx->conlock);
 			fprintf(stderr, "%s: %s: %s\n", ctx->mntpoint,
@@ -529,6 +531,7 @@ monitor(
 					strerror(ret));
 			pthread_mutex_unlock(&ctx->conlock);
 			free(hme);
+			ret = -1;
 			break;
 		}
 	} while (nr > 0 && mounted);
