@@ -244,10 +244,6 @@ phase7_func(
 	stat_data = totalcount.dbytes;
 	stat_rt = totalcount.rbytes;
 
-	/* only count internal logs for data device summary */
-	if (!ctx->fsinfo.fs_log)
-		used_data += cvt_off_fsb_to_b(&ctx->mnt, l_blocks);
-
 	/*
 	 * Complain if the counts are off by more than 10% unless
 	 * the inaccuracy is less than 32MB worth of blocks or 100 inodes.
