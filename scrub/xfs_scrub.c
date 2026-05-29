@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <paths.h>
+#include <math.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/statvfs.h>
@@ -683,7 +684,7 @@ parse_o_opts(
 			errno = 0;
 			dval = strtod(val, &endp);
 
-			if (*endp) {
+			if (*endp || isnan(dval)) {
 				fprintf(stderr,
  _("-o fstrim_pct must be a floating point number\n"));
 				usage();
