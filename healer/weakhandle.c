@@ -18,6 +18,9 @@
 #include "xfs_healer.h"
 
 struct weakhandle {
+	/* Synchronizes accesses to mntpoint */
+	pthread_rwlock_t	lock;
+
 	/* Owned reference to the user's mountpoint for logging */
 	char			*mntpoint;
 
@@ -61,13 +64,21 @@ weakhandle_alloc(
 	wh->mnt_id = mnt_id;
 	wh->fsname = fsname;
 
+	ret = pthread_rwlock_init(&wh->lock, NULL);
+	if (ret) {
+		errno = ret;
+		goto out_mntpt;
+	}
+
 	ret = fd_to_handle(fd, &wh->hanp, &wh->hlen);
 	if (ret)
-		goto out_mntpt;
+		goto out_rwlock;
 
 	*whp = wh;
 	return 0;
 
+out_rwlock:
+	pthread_rwlock_destroy(&wh->lock);
 out_mntpt:
 	free(wh->mntpoint);
 out_wh:
@@ -80,19 +91,18 @@ try_update_mntpoint(
 	struct weakhandle	*wh,
 	const char		*path)
 {
-	static pthread_mutex_t	lock = PTHREAD_MUTEX_INITIALIZER;
 	char			*s = strdup(path);
 
 	if (!s)
 		return;
 
-	pthread_mutex_lock(&lock);
+	pthread_rwlock_wrlock(&wh->lock);
 	if (path != wh->mntpoint) {
 		free(wh->mntpoint);
 		wh->mntpoint = s;
 		s = NULL;
 	}
-	pthread_mutex_unlock(&lock);
+	pthread_rwlock_unlock(&wh->lock);
 
 	free(s);
 }
@@ -134,9 +144,6 @@ weakhandle_reopen_from(
 		goto out_handle;
 	}
 
-	if (path != wh->mntpoint)
-		try_update_mntpoint(wh, path);
-
 	free_handle(hanp, hlen);
 	*fd = mnt_fd;
 	return 0;
@@ -164,7 +171,9 @@ weakhandle_reopen(
 	int			ret;
 
 	/* First try reopening using the original mountpoint */
+	pthread_rwlock_rdlock(&wh->lock);
 	ret = weakhandle_reopen_from(wh, wh->mntpoint, fd, is_acceptable, data);
+	pthread_rwlock_unlock(&wh->lock);
 	if (!ret)
 		return 0;
 
@@ -180,8 +189,10 @@ weakhandle_reopen(
 		goto fallback;
 	ret = weakhandle_reopen_from(wh, smbuf->str + smbuf->mnt_point, fd,
 			is_acceptable, data);
-	if (!ret)
+	if (!ret) {
+		try_update_mntpoint(wh, smbuf->str + smbuf->mnt_point);
 		return 0;
+	}
 
 fallback:
 	/*
@@ -200,8 +211,10 @@ fallback:
 
 		ret = weakhandle_reopen_from(wh, mnt->mnt_dir, fd,
 				is_acceptable, data);
-		if (!ret)
+		if (!ret) {
+			try_update_mntpoint(wh, mnt->mnt_dir);
 			break;
+		}
 	}
 
 	if (*fd < 0) {
@@ -221,6 +234,7 @@ weakhandle_free(
 	struct weakhandle	*wh = *whp;
 
 	if (wh) {
+		pthread_rwlock_destroy(&wh->lock);
 		free_handle(wh->hanp, wh->hlen);
 		free(wh->mntpoint);
 		free(wh);
@@ -230,25 +244,30 @@ weakhandle_free(
 }
 
 struct bufvec {
-	char	*buf;
-	size_t	len;
+	struct weakhandle	*wh;
+	char			*buf;
+	size_t			len;
 };
 
 static int
 render_path(
-	const char		*mntpt,
+	const char		*donotuse,
 	const struct path_list	*path,
 	void			*arg)
 {
 	struct bufvec		*args = arg;
-	int			mntpt_len = strlen(mntpt);
+	struct weakhandle	*wh = args->wh;
+	int			mntpt_len;
 	ssize_t			ret;
 
 	/* Trim trailing slashes from the mountpoint */
-	while (mntpt_len > 0 && mntpt[mntpt_len - 1] == '/')
+	pthread_rwlock_rdlock(&wh->lock);
+	mntpt_len = strlen(wh->mntpoint);
+	while (mntpt_len > 0 && wh->mntpoint[mntpt_len - 1] == '/')
 		mntpt_len--;
 
-	ret = snprintf(args->buf, args->len, "%.*s", mntpt_len, mntpt);
+	ret = snprintf(args->buf, args->len, "%.*s", mntpt_len, wh->mntpoint);
+	pthread_rwlock_unlock(&wh->lock);
 	if (ret < 0 || ret >= args->len)
 		return 0;
 
@@ -271,6 +290,7 @@ weakhandle_getpath_for(
 {
 	struct xfs_handle	fakehandle;
 	struct bufvec		bv = {
+		.wh		= wh,
 		.buf		= path,
 		.len		= pathlen,
 	};
@@ -295,7 +315,7 @@ weakhandle_getpath_for(
 	 * path that goes to the rootdir?  With a max filename length of 255
 	 * bytes, we pick 600 for the buffer size.
 	 */
-	ret = handle_walk_paths_fd(wh->mntpoint, mnt_fd, &fakehandle,
+	ret = handle_walk_paths_fd(NULL, mnt_fd, &fakehandle,
 			sizeof(fakehandle), 600, render_path, &bv);
 	switch (ret) {
 	case ECANCELED:
@@ -321,6 +341,11 @@ weakhandle_instance_unit_name(
 	char			*unitname,
 	size_t			unitnamelen)
 {
-	return systemd_path_instance_unit_name(template, wh->mntpoint,
+	int			ret;
+
+	pthread_rwlock_rdlock(&wh->lock);
+	ret = systemd_path_instance_unit_name(template, wh->mntpoint,
 			unitname, unitnamelen);
+	pthread_rwlock_unlock(&wh->lock);
+	return ret;
 }
