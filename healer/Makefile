@@ -37,12 +37,14 @@ INSTALL_HEALER += install-systemd
 SYSTEMD_SERVICES=\
 	system-xfs_healer.slice \
 	$(XFS_HEALER_SVCNAME)
+LDIRT += $(XFS_HEALER_SVCNAME)
 OPTIONAL_TARGETS += $(SYSTEMD_SERVICES)
 endif # HAVE_SYSTEMD
 
 ifeq ($(HAVE_HEALER_START_DEPS),yes)
 BUILD_TARGETS += xfs_healer_start
 SYSTEMD_SERVICES += xfs_healer_start.service
+LDIRT += xfs_healer_start xfs_healer_start.o xfs_healer_start.service
 endif # xfs_healer_start deps
 
 default: depend $(BUILD_TARGETS) $(SYSTEMD_SERVICES)
@@ -62,7 +64,7 @@ install: $(INSTALL_HEALER)
 
 install-healer: default
 	$(INSTALL) -m 755 -d $(PKG_LIBEXEC_DIR)
-	$(INSTALL) -m 755 $(BUILD_TARGETS) $(PKG_LIBEXEC_DIR)
+	$(LTINSTALL) -m 755 $(BUILD_TARGETS) $(PKG_LIBEXEC_DIR)
 
 install-systemd: default
 	$(INSTALL) -m 755 -d $(SYSTEMD_SYSTEM_UNIT_DIR)
