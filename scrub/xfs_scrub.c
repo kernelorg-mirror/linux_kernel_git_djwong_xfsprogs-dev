@@ -749,6 +749,7 @@ main(
 		fprintf(stderr,
 	_("%s: couldn't initialize Unicode library.\n"),
 				progname);
+		ret = SCRUB_RET_OPERROR;
 		goto out_unicrash;
 	}
 
