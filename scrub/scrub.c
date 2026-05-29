@@ -28,8 +28,8 @@
  * Bitmap showing the correctness dependencies between scrub types for scrubs.
  * Dependencies cannot cross scrub groups.
  */
-#define DEP(x) (1U << (x))
-static const unsigned int scrub_deps[XFS_SCRUB_TYPE_NR] = {
+#define DEP(x) (1ULL << (x))
+static const uint64_t scrub_deps[XFS_SCRUB_TYPE_NR] = {
 	[XFS_SCRUB_TYPE_AGF]		= DEP(XFS_SCRUB_TYPE_SB),
 	[XFS_SCRUB_TYPE_AGFL]		= DEP(XFS_SCRUB_TYPE_SB) |
 					  DEP(XFS_SCRUB_TYPE_AGF),
@@ -472,7 +472,7 @@ bool
 scrub_item_schedule_work(
 	struct scrub_item	*sri,
 	uint8_t			state_flags,
-	const unsigned int	*schedule_deps)
+	const uint64_t		*schedule_deps)
 {
 	unsigned int		scrub_type;
 	unsigned int		nr = 0;
@@ -486,7 +486,7 @@ scrub_item_schedule_work(
 			continue;
 
 		foreach_scrub_type(j) {
-			if (schedule_deps[scrub_type] & (1U << j))
+			if (schedule_deps[scrub_type] & (1ULL << j))
 				sri->sri_state[j] |= SCRUB_ITEM_BARRIER;
 		}
 
