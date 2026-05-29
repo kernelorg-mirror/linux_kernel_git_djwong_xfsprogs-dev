@@ -719,7 +719,7 @@ action_list_process(
 {
 	struct action_item		*aitem;
 	struct action_item		*n;
-	int				ret;
+	int				ret = 0;
 
 	list_for_each_entry_safe(aitem, n, &alist->list, list) {
 		if (scrub_excessive_errors(ctx))
