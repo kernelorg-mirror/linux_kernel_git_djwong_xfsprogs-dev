@@ -416,7 +416,7 @@ phase2_estimate(
 	unsigned int		*nr_threads,
 	int			*rshift)
 {
-	*items = scrub_estimate_ag_work(ctx);
+	*items = scrub_estimate_group_work(ctx);
 	*nr_threads = scrub_nproc(ctx);
 	*rshift = 0;
 	return 0;
