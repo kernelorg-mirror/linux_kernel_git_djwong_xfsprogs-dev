@@ -63,11 +63,13 @@ weakhandle_alloc(
 
 	ret = fd_to_handle(fd, &wh->hanp, &wh->hlen);
 	if (ret)
-		goto out_wh;
+		goto out_mntpt;
 
 	*whp = wh;
 	return 0;
 
+out_mntpt:
+	free(wh->mntpoint);
 out_wh:
 	free(wh);
 	return -1;
