@@ -203,7 +203,7 @@ try_repair_inode(
 		{0,		0},
 	};
 #undef X
-	struct hme_prefix	new_pfx;
+	struct hme_prefix	new_pfx = { };
 	const struct hme_prefix	*pfx = orig_pfx;
 	const struct u32_scrub	*f;
 
