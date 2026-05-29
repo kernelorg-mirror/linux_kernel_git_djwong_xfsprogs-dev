@@ -436,6 +436,8 @@ report_ioerr_fsmap(
 		} else {
 			str_corrupt(ctx, buf, _("media error in %s."), type);
 		}
+
+		return 0;
 	}
 
 	if (can_use_pptrs(ctx)) {
@@ -454,6 +456,8 @@ report_ioerr_fsmap(
 				attr ? _("extended attribute") :
 				       _("file data"));
 		str_corrupt(ctx, buf, _("media error in extent map"));
+
+		return 0;
 	}
 
 	/*
