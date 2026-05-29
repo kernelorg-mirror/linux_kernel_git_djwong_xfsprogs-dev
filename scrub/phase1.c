@@ -74,7 +74,8 @@ report_to_kernel(
 	 */
 	if (repair_item_count_needsrepair(&sri) != 0 &&
 	    !debug_tweak_on("XFS_SCRUB_FORCE_REPAIR")) {
-		str_info(ctx, _("Couldn't upload clean bill of health."), NULL);
+		str_info(ctx, ctx->mntpoint,
+_("Couldn't upload clean bill of health."));
 	}
 
 	return 0;
