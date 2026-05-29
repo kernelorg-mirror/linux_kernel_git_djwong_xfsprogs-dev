@@ -149,7 +149,7 @@ fstrim_compute_minlen(
 	 * We can't calculate or query that value directly, so we guesstimate
 	 * that it's 95% of the AG size.
 	 */
-	ag_max_usable = ctx->mnt.fsgeom.agblocks * 95 / 100;
+	ag_max_usable = (uint64_t)ctx->mnt.fsgeom.agblocks * 95 / 100;
 
 	if (debug > 1) {
 		struct histogram_strings hstr = {
