@@ -68,9 +68,9 @@ defer_inode_repair(
 
 	alist = ptvar_get(ictx->repair_ptlists, &ret);
 	if (ret) {
-		str_liberror(ictx->ctx, ret,
+		str_liberror(ictx->ctx, -ret,
  _("getting per-thread inode repair list"));
-		return ret;
+		return -ret;
 	}
 
 	action_list_add(alist, aitem);
