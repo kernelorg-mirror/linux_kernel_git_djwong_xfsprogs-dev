@@ -47,6 +47,8 @@ fail_mail() {
 To: ${recipient}
 From: <${service}@${hostname}>
 Subject: ${service} failure
+Content-Transfer-Encoding: 8bit
+Content-Type: text/plain; charset=UTF-8
 
 So sorry, the automatic ${service} on ${hostname} failed.
 
