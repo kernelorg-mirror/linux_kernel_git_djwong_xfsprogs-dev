@@ -88,6 +88,7 @@ try_repair_wholefs(
 	};
 #undef X
 	const struct u32_scrub	*f;
+	uint32_t		needrepair = hme->e.fs.mask;
 
 	foreach_scrub_type(f, hme->e.fs.mask, FS_STRUCTURES) {
 		enum repair_outcome	outcome =
@@ -99,7 +100,11 @@ try_repair_wholefs(
 
 		if (outcome == REPAIR_FAILED)
 			return NEED_FULL_REPAIR;
+
+		needrepair &= ~f->event_mask;
 	}
+	if (needrepair)
+		return NEED_FULL_REPAIR;
 
 	return REPAIR_DONE;
 }
@@ -127,7 +132,8 @@ try_repair_ag(
 		{0,		0},
 	};
 #undef X
-	const struct u32_scrub *f;
+	const struct u32_scrub	*f;
+	uint32_t		needrepair = hme->e.group.mask;
 
 	foreach_scrub_type(f, hme->e.group.mask, AG_STRUCTURES) {
 		enum repair_outcome	outcome =
@@ -140,7 +146,11 @@ try_repair_ag(
 
 		if (outcome == REPAIR_FAILED)
 			return NEED_FULL_REPAIR;
+
+		needrepair &= ~f->event_mask;
 	}
+	if (needrepair)
+		return NEED_FULL_REPAIR;
 
 	return REPAIR_DONE;
 }
@@ -163,7 +173,8 @@ try_repair_rtgroup(
 		{0,		0},
 	};
 #undef X
-	const struct u32_scrub *f;
+	const struct u32_scrub	*f;
+	uint32_t		needrepair = hme->e.group.mask;
 
 	foreach_scrub_type(f, hme->e.group.mask, RTG_STRUCTURES) {
 		enum repair_outcome	outcome =
@@ -176,7 +187,11 @@ try_repair_rtgroup(
 
 		if (outcome == REPAIR_FAILED)
 			return NEED_FULL_REPAIR;
+
+		needrepair &= ~f->event_mask;
 	}
+	if (needrepair)
+		return NEED_FULL_REPAIR;
 
 	return REPAIR_DONE;
 }
@@ -206,6 +221,7 @@ try_repair_inode(
 	struct hme_prefix	new_pfx = { };
 	const struct hme_prefix	*pfx = orig_pfx;
 	const struct u32_scrub	*f;
+	uint32_t		needrepair = hme->e.inode.mask;
 
 	foreach_scrub_type(f, hme->e.inode.mask, INODE_STRUCTURES) {
 		enum repair_outcome	outcome =
@@ -228,7 +244,11 @@ try_repair_inode(
 
 		if (outcome == REPAIR_FAILED)
 			return NEED_FULL_REPAIR;
+
+		needrepair &= ~f->event_mask;
 	}
+	if (needrepair)
+		return NEED_FULL_REPAIR;
 
 	return REPAIR_DONE;
 }
