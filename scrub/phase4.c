@@ -181,7 +181,7 @@ repair_everything(
 {
 	struct workqueue		wq;
 	int				fixed_anything;
-	int				ret;
+	int				ret, ret2;
 
 	ret = -workqueue_create(&wq, (struct xfs_mount *)ctx,
 			scrub_nproc_workqueue(ctx));
@@ -211,9 +211,12 @@ repair_everything(
 			fixed_anything++;
 	} while (fixed_anything > 0);
 
-	ret = -workqueue_terminate(&wq);
-	if (ret)
-		str_liberror(ctx, ret, _("finishing repair work"));
+	ret2 = -workqueue_terminate(&wq);
+	if (ret2) {
+		str_liberror(ctx, ret2, _("finishing repair work"));
+		if (ret >= 0)
+			ret = ret2;
+	}
 	workqueue_destroy(&wq);
 
 	if (ret < 0)
