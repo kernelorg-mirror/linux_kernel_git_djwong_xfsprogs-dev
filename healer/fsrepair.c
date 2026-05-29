@@ -23,7 +23,7 @@ static enum repair_outcome from_repair_oflags(uint32_t oflags)
 	if (oflags & (XFS_SCRUB_OFLAG_CORRUPT | XFS_SCRUB_OFLAG_INCOMPLETE))
 		return REPAIR_FAILED;
 
-	if (oflags & XFS_SCRUB_OFLAG_XFAIL)
+	if (oflags & (XFS_SCRUB_OFLAG_XFAIL | XFS_SCRUB_OFLAG_XCORRUPT))
 		return REPAIR_PROBABLY_OK;
 
 	if (oflags & XFS_SCRUB_OFLAG_NO_REPAIR_NEEDED)
