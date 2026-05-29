@@ -42,8 +42,11 @@ endif # HAVE_SYSTEMD
 
 ifeq ($(HAVE_HEALER_START_DEPS),yes)
 BUILD_TARGETS += xfs_healer_start
+LDIRT += xfs_healer_start xfs_healer_start.o
 SYSTEMD_SERVICES += xfs_healer_start.service
 endif # xfs_healer_start deps
+
+LDIRT += $(SYSTEMD_SERVICES)
 
 default: depend $(BUILD_TARGETS) $(SYSTEMD_SERVICES)
 
@@ -62,7 +65,7 @@ install: $(INSTALL_HEALER)
 
 install-healer: default
 	$(INSTALL) -m 755 -d $(PKG_LIBEXEC_DIR)
-	$(INSTALL) -m 755 $(BUILD_TARGETS) $(PKG_LIBEXEC_DIR)
+	$(LTINSTALL) -m 755 $(BUILD_TARGETS) $(PKG_LIBEXEC_DIR)
 
 install-systemd: default
 	$(INSTALL) -m 755 -d $(SYSTEMD_SYSTEM_UNIT_DIR)
