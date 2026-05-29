@@ -342,6 +342,8 @@ _("Not an XFS filesystem."));
 	 */
 	if (ctx->mode == SCRUB_MODE_NONE)
 		mode_from_autofsck(ctx);
+	if (ctx->mode == SCRUB_MODE_NONE)
+		return 0;
 
 	/* Do we have kernel-assisted metadata scrubbing? */
 	if (!can_scrub_fs_metadata(ctx) || !can_scrub_inode(ctx) ||
