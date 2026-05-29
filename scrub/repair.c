@@ -28,8 +28,8 @@
  * the filesystem if the btree root pointers in the AG headers are wrong.
  * Dependencies cannot cross scrub groups.
  */
-#define DEP(x) (1U << (x))
-static const unsigned int repair_deps[XFS_SCRUB_TYPE_NR] = {
+#define DEP(x) (1ULL << (x))
+static const uint64_t repair_deps[XFS_SCRUB_TYPE_NR] = {
 	[XFS_SCRUB_TYPE_BMBTD]		= DEP(XFS_SCRUB_TYPE_INODE),
 	[XFS_SCRUB_TYPE_BMBTA]		= DEP(XFS_SCRUB_TYPE_INODE),
 	[XFS_SCRUB_TYPE_BMBTC]		= DEP(XFS_SCRUB_TYPE_INODE),
@@ -250,7 +250,7 @@ repair_item_dependencies_ok(
 	const struct scrub_item	*sri,
 	unsigned int		scrub_type)
 {
-	unsigned int		dep_mask = repair_deps[scrub_type];
+	uint64_t		dep_mask = repair_deps[scrub_type];
 	unsigned int		b;
 
 	for (b = 0; dep_mask && b < XFS_SCRUB_TYPE_NR; b++, dep_mask >>= 1) {
@@ -434,7 +434,7 @@ repair_item_boost_priorities(
 	unsigned int			scrub_type;
 
 	foreach_scrub_type(scrub_type) {
-		unsigned int		dep_mask = repair_deps[scrub_type];
+		uint64_t		dep_mask = repair_deps[scrub_type];
 		unsigned int		b;
 
 		if (repair_item_count_needsrepair(sri) == 0 || !dep_mask)
