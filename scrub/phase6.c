@@ -408,6 +408,7 @@ report_ioerr_fsmap(
 	char			buf[DESCR_BUFSZ];
 	struct ioerr_filerange	*fr = arg;
 	uint64_t		err_off;
+	uint64_t		err_len;
 	int			ret;
 
 	/* Don't care about unwritten extents. */
@@ -476,9 +477,12 @@ report_ioerr_fsmap(
 		return 0;
 	}
 
+	err_len = min(fr->physical + fr->length,
+		      map->fmr_physical + map->fmr_length) -
+		  max(fr->physical, map->fmr_physical);
 	str_unfixable_error(ctx, buf,
  _("media error at data offset %llu length %llu."),
-			err_off, fr->length);
+			map->fmr_offset + err_off, err_len);
 	return 0;
 }
 
