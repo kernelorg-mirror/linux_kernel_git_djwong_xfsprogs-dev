@@ -157,6 +157,28 @@ handle_mount_event(
 	}
 }
 
+/* Make sure listmount actually works so we can start up existing mounts */
+static int
+check_listmount(
+	int			mnt_ns_fd)
+{
+	uint64_t		mnt_ids[1];
+	uint64_t		cursor = LISTMOUNT_INIT_CURSOR;
+	int			ret;
+
+	ret = libfrog_listmount(LSMT_ROOT, mnt_ns_fd, &cursor, mnt_ids, 1);
+	if (ret >= 0)
+		return 0;
+
+	if (errno == ENOSYS)
+		fprintf(stderr, "%s\n",
+ _("This program requires the listmount system call."));
+	else
+		perror("listmount");
+
+	return -1;
+}
+
 #define NR_MNT_IDS		(32)
 
 /* Start healer services for existing XFS mounts. */
@@ -336,6 +358,10 @@ main(
 	}
 
 	if (support_check) {
+		ret = check_listmount(mnt_ns_fd);
+		if (ret)
+			goto out;
+
 		/*
 		 * We're being run as an ExecCondition process and we've
 		 * decided to start the main service.  There is no need to wait
