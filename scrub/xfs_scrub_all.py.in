@@ -100,7 +100,7 @@ class scrub_subprocess(scrub_control):
 		else:
 			cmd += '@scrub_args@'.split()
 		if scrub_media:
-			cmd += '-x'
+			cmd += ['-x']
 		cmd += [mnt]
 		self.cmdline = cmd
 		self.proc = None
