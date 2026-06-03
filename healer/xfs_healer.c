@@ -442,6 +442,7 @@ setup_monitor(
 		perror(ctx->mntpoint);
 		goto out_mon_fd;
 	}
+	mon_fd = -1;
 
 	/* Increase the buffer size so that we can reduce kernel calls */
 	ctx->mon_buf = malloc(BUF_SIZE);
