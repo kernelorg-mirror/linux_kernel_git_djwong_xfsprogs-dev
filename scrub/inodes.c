@@ -360,6 +360,7 @@ bulkstat_for_inumbers(
 enum abort_state {
 	RUNNING = 0,
 	ABORTED,
+	CANCELLED,
 };
 
 static inline int abort_state_ret(enum abort_state s)
@@ -544,8 +545,8 @@ _("Changed too many times during scan; giving up."));
 			goto out;
 		}
 		case ECANCELED:
-			error = 0;
-			fallthrough;
+			si->aborted = CANCELLED;
+			goto out;
 		default:
 			goto err;
 		}
@@ -761,9 +762,22 @@ scan_user_files(
 		case 0:
 			break;
 		case ESTALE:
-		case ECANCELED:
+			/*
+			 * scrub_scan_user_files is only called during phases
+			 * 5 and 6, which is after we've verified all the file
+			 * metadata in the filesystem.  Therefore, an ESTALE
+			 * here means that the file was deleted, so we skip it
+			 * and move on to the next file.
+			 */
 			error = 0;
-			fallthrough;
+			break;
+		case ECANCELED:
+			/*
+			 * Helper function wants us to stop iterating, so stop
+			 * the walk immediately.
+			 */
+			si->aborted = CANCELLED;
+			goto out;
 		default:
 			goto err;
 		}
