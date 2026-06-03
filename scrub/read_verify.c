@@ -383,7 +383,13 @@ read_verify(
 			read_error = errno;
 
 			/* Runtime error, bail out... */
-			if (read_error != EIO && read_error != EILSEQ) {
+			switch (read_error) {
+			case EIO:
+			case EILSEQ:
+			case EREMOTEIO:
+			case ENODATA:
+				break;
+			default:
 				rvp->runtime_error = read_error;
 				return;
 			}
