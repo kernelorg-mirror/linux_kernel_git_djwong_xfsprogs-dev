@@ -357,13 +357,23 @@ bulkstat_for_inumbers(
 	bulkstat_single_step(ctx, inumbers, seen_mask, breq);
 }
 
+enum abort_state {
+	RUNNING = 0,
+	ABORTED,
+};
+
+static inline int abort_state_ret(enum abort_state s)
+{
+	return s == ABORTED ? -1 : 0;
+}
+
 /* BULKSTAT wrapper routines. */
 struct scan_inodes {
 	struct workqueue	wq_bulkstat;
 	scrub_inode_iter_fn	fn;
 	void			*arg;
 	unsigned int		nr_threads;
-	bool			aborted;
+	enum abort_state	aborted;
 };
 
 /*
@@ -530,7 +540,7 @@ retry:
 			}
 			str_info(ctx, descr_render(&dsc_bulkstat),
 _("Changed too many times during scan; giving up."));
-			si->aborted = true;
+			si->aborted = ABORTED;
 			goto out;
 		}
 		case ECANCELED:
@@ -540,7 +550,7 @@ _("Changed too many times during scan; giving up."));
 			goto err;
 		}
 		if (scrub_excessive_errors(ctx)) {
-			si->aborted = true;
+			si->aborted = ABORTED;
 			goto out;
 		}
 		last_ino = scan_ino;
@@ -549,7 +559,7 @@ _("Changed too many times during scan; giving up."));
 err:
 	if (error) {
 		str_liberror(ctx, error, descr_render(&dsc_bulkstat));
-		si->aborted = true;
+		si->aborted = ABORTED;
 	}
 out:
 	free(ichunk);
@@ -594,7 +604,7 @@ scan_ag_inumbers(
 				cvt_ino_to_agino(&ctx->mnt, nextino),
 				cvt_ino_to_agino(&ctx->mnt,
 						ireq->inumbers[0].xi_startino));
-			si->aborted = true;
+			si->aborted = ABORTED;
 			break;
 		}
 		nextino = ireq->hdr.ino;
@@ -611,7 +621,7 @@ scan_ag_inumbers(
 			error = -workqueue_add(&si->wq_bulkstat,
 					scan_ag_bulkstat, agno, ichunk);
 			if (error) {
-				si->aborted = true;
+				si->aborted = ABORTED;
 				str_liberror(ctx, error,
 						_("queueing bulkstat work"));
 				goto out;
@@ -641,7 +651,7 @@ scan_ag_inumbers(
 err:
 	if (error) {
 		str_liberror(ctx, error, descr_render(&dsc));
-		si->aborted = true;
+		si->aborted = ABORTED;
 	}
 out:
 	if (ichunk)
@@ -687,14 +697,14 @@ scrub_scan_all_inodes(
 			si.nr_threads);
 	if (ret) {
 		str_liberror(ctx, ret, _("creating inumbers workqueue"));
-		si.aborted = true;
+		si.aborted = ABORTED;
 		goto kill_bulkstat;
 	}
 
 	for (agno = 0; agno < ctx->mnt.fsgeom.agcount; agno++) {
 		ret = -workqueue_add(&wq_inumbers, scan_ag_inumbers, agno, &si);
 		if (ret) {
-			si.aborted = true;
+			si.aborted = ABORTED;
 			str_liberror(ctx, ret, _("queueing inumbers work"));
 			break;
 		}
@@ -702,7 +712,7 @@ scrub_scan_all_inodes(
 
 	ret = -workqueue_terminate(&wq_inumbers);
 	if (ret) {
-		si.aborted = true;
+		si.aborted = ABORTED;
 		str_liberror(ctx, ret, _("finishing inumbers work"));
 	}
 	workqueue_destroy(&wq_inumbers);
@@ -710,12 +720,12 @@ scrub_scan_all_inodes(
 kill_bulkstat:
 	ret = -workqueue_terminate(&si.wq_bulkstat);
 	if (ret) {
-		si.aborted = true;
+		si.aborted = ABORTED;
 		str_liberror(ctx, ret, _("finishing bulkstat work"));
 	}
 	workqueue_destroy(&si.wq_bulkstat);
 
-	return si.aborted ? -1 : 0;
+	return abort_state_ret(si.aborted);
 }
 
 struct user_bulkstat {
@@ -758,7 +768,7 @@ scan_user_files(
 			goto err;
 		}
 		if (scrub_excessive_errors(ctx)) {
-			si->aborted = true;
+			si->aborted = ABORTED;
 			goto out;
 		}
 	}
@@ -766,7 +776,7 @@ scan_user_files(
 err:
 	if (error) {
 		str_liberror(ctx, error, descr_render(&dsc_bulkstat));
-		si->aborted = true;
+		si->aborted = ABORTED;
 	}
 out:
 	free(ureq);
@@ -824,7 +834,7 @@ scan_user_bulkstat(
 err_ureq:
 	free(ureq);
 err:
-	si->aborted = true;
+	si->aborted = ABORTED;
 	str_liberror(ctx, ret, what);
 	return 0;
 }
@@ -861,12 +871,12 @@ scrub_scan_user_files(
 
 	ret = -workqueue_terminate(&si.wq_bulkstat);
 	if (ret) {
-		si.aborted = true;
+		si.aborted = ABORTED;
 		str_liberror(ctx, ret, _("finishing bulkstat work"));
 	}
 	workqueue_destroy(&si.wq_bulkstat);
 
-	return si.aborted ? -1 : 0;
+	return abort_state_ret(si.aborted);
 }
 
 /* Open a file by handle, returning either the fd or -1 on error. */
