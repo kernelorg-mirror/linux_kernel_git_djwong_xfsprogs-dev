@@ -266,7 +266,7 @@ scrub_scan_all_spacemaps(
 			break;
 		}
 	}
-	if (ctx->fsinfo.fs_rt) {
+	if (ctx->fsinfo.fs_rt || ctx->mnt.fsgeom.rtstart) {
 		for (agno = 0; agno < ctx->mnt.fsgeom.rgcount; agno++) {
 			ret = -workqueue_add(&wq, scan_rtg_rmaps, agno, &sbx);
 			if (ret) {
