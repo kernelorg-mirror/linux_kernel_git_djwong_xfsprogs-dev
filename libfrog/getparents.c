@@ -355,7 +355,7 @@ path_to_string(
 		mntpt_len--;
 
 	ret = snprintf(gpi->buf, gpi->len, "%.*s", mntpt_len, mntpt);
-	if (ret != mntpt_len)
+	if (ret >= gpi->len)
 		return ENAMETOOLONG;
 	gpi->written += ret;
 
