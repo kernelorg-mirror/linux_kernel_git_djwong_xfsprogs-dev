@@ -27,7 +27,8 @@ struct summary_counts {
 	unsigned long long	dbytes;		/* data dev bytes */
 	unsigned long long	rbytes;		/* rt dev bytes */
 	unsigned long long	lbytes;		/* log dev bytes */
-	unsigned long long	next_phys;	/* next phys bytes we see? */
+	unsigned long long	next_dphys;	/* next phys bytes we see on data dev? */
+	unsigned long long	next_rphys;	/* next phys bytes we see on rt dev? */
 	unsigned long long	agbytes;	/* freespace bytes */
 
 	/* Free space histogram, in fsb */
@@ -120,16 +121,21 @@ count_block_summary(
 		break;
 	case XFS_DEV_RT:
 		/* Count realtime extents. */
+		if (counts->next_rphys >= fsmap->fmr_physical + len)
+			return 0;
+		else if (counts->next_rphys > fsmap->fmr_physical)
+			len -= counts->next_rphys - fsmap->fmr_physical;
 		counts->rbytes += len;
+		counts->next_rphys = fsmap->fmr_physical + fsmap->fmr_length;
 		break;
 	case XFS_DEV_DATA:
 		/* Count datadev extents. */
-		if (counts->next_phys >= fsmap->fmr_physical + len)
+		if (counts->next_dphys >= fsmap->fmr_physical + len)
 			return 0;
-		else if (counts->next_phys > fsmap->fmr_physical)
-			len -= counts->next_phys - fsmap->fmr_physical;
+		else if (counts->next_dphys > fsmap->fmr_physical)
+			len -= counts->next_dphys - fsmap->fmr_physical;
 		counts->dbytes += len;
-		counts->next_phys = fsmap->fmr_physical + fsmap->fmr_length;
+		counts->next_dphys = fsmap->fmr_physical + fsmap->fmr_length;
 		break;
 	}
 
