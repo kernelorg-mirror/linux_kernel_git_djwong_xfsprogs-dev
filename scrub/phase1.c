@@ -101,7 +101,8 @@ scrub_cleanup(
 		disk_close(ctx->verify_disks[XFS_DEV_DATA]);
 	if (ctx->verify_disks[XFS_DEV_LOG])
 		disk_close(ctx->verify_disks[XFS_DEV_LOG]);
-	if (ctx->verify_disks[XFS_DEV_RT])
+	if (ctx->verify_disks[XFS_DEV_RT] &&
+	    ctx->verify_disks[XFS_DEV_RT] != ctx->verify_disks[XFS_DEV_DATA])
 		disk_close(ctx->verify_disks[XFS_DEV_RT]);
 	fshandle_destroy();
 	error = -xfd_close(&ctx->mnt);
@@ -232,7 +233,9 @@ configure_xfs_verify_fallback(
 		}
 	}
 
-	if (ctx->fsinfo.fs_rt) {
+	if (ctx->mnt.fsgeom.rtstart) {
+		ctx->verify_disks[XFS_DEV_RT] = ctx->verify_disks[XFS_DEV_DATA];
+	} else if (ctx->fsinfo.fs_rt || ctx->mnt.fsgeom.rtstart) {
 		ctx->verify_disks[XFS_DEV_RT] = disk_open(ctx->fsinfo.fs_rt);
 		if (!ctx->verify_disks[XFS_DEV_RT]) {
 			str_error(ctx, ctx->mntpoint,

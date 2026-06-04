@@ -744,7 +744,7 @@ phase6_func(
 			goto out_datapool;
 		}
 	}
-	if (ctx->fsinfo.fs_rt) {
+	if (ctx->fsinfo.fs_rt || ctx->mnt.fsgeom.rtstart) {
 		ret = alloc_pool(ctx, &vs, XFS_DEV_RT);
 		if (ret) {
 			str_liberror(ctx, ret,
@@ -843,7 +843,7 @@ phase6_estimate(
 	 * nr_threads appropriately to handle that many threads.
 	 */
 	*nr_threads = read_verify_nproc(ctx);
-	if (ctx->fsinfo.fs_rt)
+	if (ctx->fsinfo.fs_rt || ctx->mnt.fsgeom.rtstart)
 		*nr_threads += read_verify_nproc(ctx);
 	if (ctx->fsinfo.fs_log)
 		*nr_threads += read_verify_nproc(ctx);
