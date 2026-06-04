@@ -50,9 +50,14 @@ LDIRT += $(SYSTEMD_SERVICES)
 
 default: depend $(BUILD_TARGETS) $(SYSTEMD_SERVICES)
 
+ifeq ($(CHECKSRC),2)
+xfs_healer_start: $(SUBDIRS) xfs_healer_start.o
+.PHONY: xfs_healer_start
+else
 xfs_healer_start: $(SUBDIRS) xfs_healer_start.o $(LTDEPENDENCIES)
 	@echo "    [LD]     $@"
 	$(Q)$(LTLINK) -o $@ $(LDFLAGS) xfs_healer_start.o $(LDLIBS)
+endif
 
 %.service: %.service.in $(builddefs)
 	@echo "    [SED]    $@"
