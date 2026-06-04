@@ -110,7 +110,10 @@ repair_epilogue(
 	case EDEADLOCK:
 	case EBUSY:
 		/* Filesystem is busy, try again later. */
-		if (debug || verbose)
+		if (repair_flags & XRM_FINAL_WARNING)
+			str_error(ctx, descr_render(dsc),
+_("Filesystem is busy, repair incomplete."));
+		else if (debug || verbose)
 			str_info(ctx, descr_render(dsc),
 _("Filesystem is busy, deferring repair."));
 		return 0;
