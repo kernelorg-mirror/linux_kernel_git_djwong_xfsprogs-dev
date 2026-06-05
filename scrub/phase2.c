@@ -251,6 +251,7 @@ scan_rtgroup_metadata(
 	struct scrub_ctx	*ctx = (struct scrub_ctx *)wq->wq_ctx;
 	struct scan_ctl		*sctl = arg;
 	char			descr[DESCR_BUFSZ];
+	unsigned int		difficulty;
 	bool			defer_repairs;
 	int			ret;
 
@@ -281,7 +282,14 @@ scan_rtgroup_metadata(
 		sctl->aborted = true;
 		return;
 	}
+	if (defer_repairs)
+		goto defer;
 
+	/* Complain about metadata corruptions that might not be fixable. */
+	difficulty = repair_item_difficulty(&sri);
+	warn_repair_difficulties(ctx, difficulty, descr);
+
+defer:
 	/* Everything else gets fixed during phase 4. */
 	ret = defer_fs_repair(ctx, &sri);
 	if (ret) {
