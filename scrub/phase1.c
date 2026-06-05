@@ -178,8 +178,6 @@ mode_from_autofsck(
 		break;
 	}
 
-	fsprops_free_handle(&fph);
-
 summarize:
 	switch (ctx->mode) {
 	case SCRUB_MODE_NONE:
@@ -200,6 +198,7 @@ summarize:
 		break;
 	}
 
+	fsprops_free_handle(&fph);
 	return;
 no_property:
 	/*
