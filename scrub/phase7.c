@@ -127,7 +127,7 @@ count_block_summary(
 		if (counts->next_phys >= fsmap->fmr_physical + len)
 			return 0;
 		else if (counts->next_phys > fsmap->fmr_physical)
-			len = counts->next_phys - fsmap->fmr_physical;
+			len -= counts->next_phys - fsmap->fmr_physical;
 		counts->dbytes += len;
 		counts->next_phys = fsmap->fmr_physical + fsmap->fmr_length;
 		break;
