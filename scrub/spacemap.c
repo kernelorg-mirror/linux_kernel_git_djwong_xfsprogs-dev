@@ -103,10 +103,7 @@ scan_ag_rmaps(
 	bperag = (off_t)ctx->mnt.fsgeom.agblocks *
 		 (off_t)ctx->mnt.fsgeom.blocksize;
 
-	if (ctx->mnt.fsgeom.rtstart)
-		keys[0].fmr_device = XFS_DEV_DATA;
-	else
-		keys[0].fmr_device = ctx->fsinfo.fs_datadev;
+	keys[0].fmr_device = to_fsmap_dev(ctx, XFS_DEV_DATA);
 	keys[0].fmr_physical = agno * bperag;
 	keys[1].fmr_device = keys[0].fmr_device;
 	keys[1].fmr_physical = ((agno + 1) * bperag) - 1;
@@ -143,10 +140,7 @@ scan_rtg_rmaps(
 	off_t			bperrg = bytes_per_rtgroup(&ctx->mnt.fsgeom);
 	int			ret;
 
-	if (ctx->mnt.fsgeom.rtstart)
-		keys[0].fmr_device = XFS_DEV_RT;
-	else
-		keys[0].fmr_device = ctx->fsinfo.fs_rtdev;
+	keys[0].fmr_device = to_fsmap_dev(ctx, XFS_DEV_RT);
 	keys[0].fmr_physical = (xfs_rtblock_t)rgno * bperrg;
 	keys[1].fmr_device = keys[0].fmr_device;
 	keys[1].fmr_physical = ((rgno + 1) * bperrg) - 1;
@@ -210,10 +204,10 @@ scan_rt_rmaps(
 {
 	struct scrub_ctx	*ctx = (struct scrub_ctx *)wq->wq_ctx;
 
-	scan_dev_rmaps(ctx, ctx->fsinfo.fs_rtdev, arg);
+	scan_dev_rmaps(ctx, to_fsmap_dev(ctx, XFS_DEV_RT), arg);
 }
 
-/* Iterate all the reverse mappings of the log device. */
+/* Iterate all the reverse mappings of the external log device. */
 static void
 scan_log_rmaps(
 	struct workqueue	*wq,
@@ -222,8 +216,7 @@ scan_log_rmaps(
 {
 	struct scrub_ctx	*ctx = (struct scrub_ctx *)wq->wq_ctx;
 
-	scan_dev_rmaps(ctx, ctx->mnt.fsgeom.rtstart ? 2 : ctx->fsinfo.fs_logdev,
-			arg);
+	scan_dev_rmaps(ctx, to_fsmap_dev(ctx, XFS_DEV_LOG), arg);
 }
 
 /*

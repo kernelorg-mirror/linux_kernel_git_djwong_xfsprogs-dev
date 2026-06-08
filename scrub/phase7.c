@@ -70,18 +70,9 @@ count_block_summary(
 	void			*arg)
 {
 	struct summary_counts	*counts;
-	enum xfs_device		dev;
+	enum xfs_device		dev = from_fsmap_dev(ctx, fsmap->fmr_device);
 	unsigned long long	len;
 	int			ret;
-
-	if (ctx->mnt.fsgeom.rtstart)
-		dev = fsmap->fmr_device;
-	else if (fsmap->fmr_device == ctx->fsinfo.fs_logdev)
-		dev = XFS_DEV_LOG;
-	else if (fsmap->fmr_device == ctx->fsinfo.fs_rtdev)
-		dev = XFS_DEV_RT;
-	else
-		dev = XFS_DEV_DATA;
 
 	counts = ptvar_get((struct ptvar *)arg, &ret);
 	if (ret) {
