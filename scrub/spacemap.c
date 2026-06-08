@@ -213,7 +213,7 @@ scan_rt_rmaps(
 	scan_dev_rmaps(ctx, ctx->fsinfo.fs_rtdev, arg);
 }
 
-/* Iterate all the reverse mappings of the log device. */
+/* Iterate all the reverse mappings of the external log device. */
 static void
 scan_log_rmaps(
 	struct workqueue	*wq,
@@ -222,7 +222,12 @@ scan_log_rmaps(
 {
 	struct scrub_ctx	*ctx = (struct scrub_ctx *)wq->wq_ctx;
 
-	scan_dev_rmaps(ctx, ctx->mnt.fsgeom.rtstart ? 2 : ctx->fsinfo.fs_logdev,
+	/*
+	 * Internal rt sections (rtstart != 0) means we use synthetic device
+	 * keys for external devices.
+	 */
+	scan_dev_rmaps(ctx, ctx->mnt.fsgeom.rtstart ? XFS_DEV_LOG :
+						      ctx->fsinfo.fs_logdev,
 			arg);
 }
 
