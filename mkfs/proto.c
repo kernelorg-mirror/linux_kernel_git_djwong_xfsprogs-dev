@@ -1674,7 +1674,7 @@ handle_direntry(
 	/* Ensure we're within the limits of PATH_MAX. */
 	size_t avail = PATH_MAX - path_len;
 	size_t wrote = snprintf(path_buf + path_len, avail, "/%s", entry->d_name);
-	if (wrote > avail)
+	if (wrote >= avail)
 		fail(path_buf, ENAMETOOLONG);
 
 	/*
