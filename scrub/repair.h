@@ -96,6 +96,20 @@ repair_item_count_needsrepair(
 	return nr;
 }
 
+static inline unsigned int
+repair_item_count_needswork(
+	const struct scrub_item	*sri)
+{
+	unsigned int		scrub_type;
+	unsigned int		nr = 0;
+
+	foreach_scrub_type(scrub_type)
+		if (sri->sri_state[scrub_type] & (SCRUB_ITEM_REPAIR_ANY |
+						  SCRUB_ITEM_NEEDSCHECK))
+			nr++;
+	return nr;
+}
+
 static inline int
 repair_item_completely(
 	struct scrub_ctx	*ctx,
