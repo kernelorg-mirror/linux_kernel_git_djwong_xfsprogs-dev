@@ -1314,6 +1314,7 @@ writetimestamps(
 }
 
 struct hardlink {
+	dev_t		src_dev;
 	ino_t		src_ino;
 	xfs_ino_t	dst_ino;
 };
@@ -1368,7 +1369,8 @@ get_hardlink_dst_inode(
 	size_t			i = 0;
 
 	for (; i < hardlink_tracker.count; i++, h++) {
-		if (h->src_ino == filestat->st_ino)
+		if (h->src_dev == filestat->st_dev &&
+		    h->src_ino == filestat->st_ino)
 			return h->dst_ino;
 	}
 	return 0;
@@ -1406,6 +1408,7 @@ track_hardlink_inode(
 	}
 
 	h = &hardlink_tracker.entries[hardlink_tracker.count];
+	h->src_dev = filestat->st_dev;
 	h->src_ino = filestat->st_ino;
 	h->dst_ino = dst_ino;
 	hardlink_tracker.count++;
