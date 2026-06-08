@@ -1542,7 +1542,7 @@ create_nondir_inode(
 	char			*src_fname)
 {
 
-	char			link_target[XFS_SYMLINK_MAXLEN];
+	char			link_target[XFS_SYMLINK_MAXLEN + 1];
 	int			error;
 	ssize_t			link_len = 0;
 	struct xfs_inode	*ip;
@@ -1563,10 +1563,10 @@ create_nondir_inode(
 	 * We need to read out our link target and act accordingly.
 	 */
 	if (xname.type == XFS_DIR3_FT_SYMLINK) {
-		link_len = readlink(src_fname, link_target, XFS_SYMLINK_MAXLEN);
+		link_len = readlink(src_fname, link_target, sizeof(link_target));
 		if (link_len < 0)
 			fail(_("could not resolve symlink"), errno);
-		if (link_len >= PATH_MAX)
+		if (link_len > XFS_SYMLINK_MAXLEN)
 			fail(_("symlink target too long"), ENAMETOOLONG);
 		tp = getres(mp, XFS_B_TO_FSB(mp, link_len));
 	} else {
