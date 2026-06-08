@@ -45,48 +45,6 @@ struct media_verify_state {
 	struct read_verify_pool	*rvp[XFS_DEV_RT + 1];
 };
 
-/* Return XFS device index from fsmap device. */
-static enum xfs_device
-from_fsmap_dev(
-	struct scrub_ctx	*ctx,
-	dev_t			dev)
-{
-	if (ctx->mnt.fsgeom.rtstart) {
-		if (dev < XFS_DEV_DATA || dev > XFS_DEV_RT)
-			abort();
-		return dev;
-	}
-
-	if (dev == ctx->fsinfo.fs_datadev)
-		return XFS_DEV_DATA;
-	if (dev == ctx->fsinfo.fs_logdev)
-		return XFS_DEV_LOG;
-	if (dev == ctx->fsinfo.fs_rtdev)
-		return XFS_DEV_RT;
-	abort();
-}
-
-/* Return fsmap device for XFS device index. */
-static uint32_t
-to_fsmap_dev(
-	struct scrub_ctx	*ctx,
-	enum xfs_device		dev)
-{
-	if (ctx->mnt.fsgeom.rtstart)
-		return dev;
-
-	switch (dev) {
-	case XFS_DEV_DATA:
-		return ctx->fsinfo.fs_datadev;
-	case XFS_DEV_LOG:
-		return ctx->fsinfo.fs_logdev;
-	case XFS_DEV_RT:
-		return ctx->fsinfo.fs_rtdev;
-	default:
-		abort();
-	}
-}
-
 struct disk_ioerr_report {
 	struct scrub_ctx	*ctx;
 	enum xfs_device		dev;
