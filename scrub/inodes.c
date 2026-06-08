@@ -879,7 +879,7 @@ scrub_scan_user_files(
 		return -1;
 	}
 
-	while ((ret = scan_user_bulkstat(ctx, &si, &ino)) == 1) {
+	while (!si.aborted && (ret = scan_user_bulkstat(ctx, &si, &ino)) == 1) {
 		/* empty */
 	}
 
