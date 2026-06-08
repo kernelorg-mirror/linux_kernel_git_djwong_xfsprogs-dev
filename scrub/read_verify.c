@@ -471,7 +471,7 @@ read_verify_schedule_now(
 {
 	struct read_verify_pool		*rvp = rs->rvp;
 	struct read_verify		*tmp;
-	bool				ret;
+	int				ret;
 
 	if (!rvp)
 		return 0;
