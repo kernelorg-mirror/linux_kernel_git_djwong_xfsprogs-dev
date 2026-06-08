@@ -879,8 +879,10 @@ scrub_scan_user_files(
 		return -1;
 	}
 
-	while ((ret = scan_user_bulkstat(ctx, &si, &ino)) == 1) {
-		/* empty */
+	while (!si.aborted) {
+		ret = scan_user_bulkstat(ctx, &si, &ino);
+		if (ret != 1)
+			break;
 	}
 
 	ret = -workqueue_terminate(&si.wq_bulkstat);
