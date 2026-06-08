@@ -260,10 +260,11 @@ repair_item_dependencies_ok(
 		if (!(dep_mask & 1))
 			continue;
 		/*
-		 * If this lower level object also needs repair, we can't fix
-		 * the higher level item.
+		 * If this lower level object also needs repair or hasn't been
+		 * scanned yet, we can't fix the higher level item.
 		 */
-		if (sri->sri_state[b] & SCRUB_ITEM_NEEDSREPAIR)
+		if (sri->sri_state[b] & (SCRUB_ITEM_NEEDSREPAIR |
+					 SCRUB_ITEM_NEEDSCHECK))
 			return false;
 	}
 
@@ -855,7 +856,11 @@ repair_item(
 	if (ret)
 		return ret;
 
-	return repair_item_class(ctx, sri, -1, SCRUB_ITEM_PREEN, flags);
+	ret = repair_item_class(ctx, sri, -1, SCRUB_ITEM_PREEN, flags);
+	if (ret)
+		return ret;
+
+	return repair_item_class(ctx, sri, -1, SCRUB_ITEM_NEEDSCHECK, flags);
 }
 
 /* Create an action item around a scrub item that needs repairs. */
@@ -868,7 +873,7 @@ repair_item_to_action_item(
 	struct action_item	*aitem;
 	unsigned int		scrub_type;
 
-	if (repair_item_count_needsrepair(sri) == 0)
+	if (repair_item_count_needswork(sri) == 0)
 		return 0;
 
 	aitem = malloc(sizeof(struct action_item));
@@ -893,6 +898,7 @@ repair_item_to_action_item(
 		if (state[scrub_type] & SCRUB_ITEM_NEEDSCHECK) {
 			state[scrub_type] &= ~SCRUB_ITEM_NEEDSCHECK;
 			state[scrub_type] |= SCRUB_ITEM_CORRUPT;
+			aitem->sri.sri_inconsistent = true;
 		}
 	}
 
