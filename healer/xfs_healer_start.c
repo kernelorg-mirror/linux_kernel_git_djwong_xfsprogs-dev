@@ -67,15 +67,22 @@ examine_mount(
 	int			mnt_ns_fd,
 	uint64_t		mnt_id)
 {
-	size_t			smbuf_size = libfrog_statmount_sizeof(4096);
-	struct statmount	*smbuf = alloca(smbuf_size);
+	/* two paths and a filesystem type string of unknown length */
+	size_t			smbuf_size =
+		libfrog_statmount_sizeof(PATH_MAX * 2 + NAME_MAX);
+	struct statmount	*smbuf = malloc(smbuf_size);
 	int			ret;
+
+	if (!smbuf) {
+		perror("statmount alloc");
+		return;
+	}
 
 	ret = libfrog_statmount(mnt_id, mnt_ns_fd, REQUIRED_STATMOUNT_FIELDS,
 			smbuf, smbuf_size);
 	if (ret) {
 		perror("statmount");
-		return;
+		goto out_smbuf;
 	}
 
 	if (debug) {
@@ -93,11 +100,13 @@ examine_mount(
 	/* Look for mount points for the root dir of an XFS filesystem. */
 	if ((smbuf->mask & REQUIRED_STATMOUNT_FIELDS) !=
 			   REQUIRED_STATMOUNT_FIELDS)
-		return;
+		goto out_smbuf;
 
 	if (!strcmp(smbuf->str + smbuf->fs_type, "xfs") &&
 	    !strcmp(smbuf->str + smbuf->mnt_root, "/"))
 		start_healer(smbuf->str + smbuf->mnt_point);
+out_smbuf:
+	free(smbuf);
 }
 
 /* Translate fanotify mount events into something we can process. */
