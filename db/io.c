@@ -682,8 +682,9 @@ set_iocur_type(
 	const typ_t	*type)
 {
 	/* type's size in basic blocks */
-	int		bb_count = BTOBB(mp->m_sb.sb_sectsize);
+	int		bb_count = iocur_top->blen;
 	int		boff = iocur_top->boff;
+	int		len = iocur_top->len;
 
 	/*
 	 * Inodes are special; verifier checks all inodes in the chunk, the
@@ -709,6 +710,7 @@ set_iocur_type(
 				       iocur_top->data, 0, 0)));
 	set_cur(type, iocur_top->bb, bb_count, DB_RING_IGN, NULL);
 	set_cur_boff(boff);
+	iocur_top->len = len;
 }
 
 static void
