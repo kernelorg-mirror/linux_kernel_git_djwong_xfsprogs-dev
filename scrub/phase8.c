@@ -141,7 +141,6 @@ fstrim_compute_minlen(
 	const struct histogram	*freesp_hist)
 {
 	uint64_t		ret;
-	double			blk_threshold = 0;
 	unsigned int		ag_max_usable;
 
 	/*
@@ -164,9 +163,9 @@ fstrim_compute_minlen(
 			freesp_hist->tot_sum * ctx->fstrim_block_pct);
 
 	if (debug > 1)
-		printf(_("fstrim minlen %lld threshold %lld ag_max_usable %u\n"),
+		printf(_("fstrim minlen %lld threshold %.2f ag_max_usable %u\n"),
 				(unsigned long long)ret,
-				(unsigned long long)blk_threshold,
+				freesp_hist->tot_sum * ctx->fstrim_block_pct,
 				ag_max_usable);
 	if (ret > ag_max_usable)
 		ret = ag_max_usable;
