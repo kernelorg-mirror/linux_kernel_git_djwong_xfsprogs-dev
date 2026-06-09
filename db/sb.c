@@ -63,6 +63,14 @@ metadirfld_count(
 	return xfs_has_metadir(mp) ? 1 : 0;
 }
 
+static int
+zonedfld_count(
+	void		*obj,
+	int		startoff)
+{
+	return xfs_has_zoned(mp) ? 1 : 0;
+}
+
 #define	OFF(f)	bitize(offsetof(struct xfs_dsb, sb_ ## f))
 #define	SZC(f)	szcount(struct xfs_dsb, sb_ ## f)
 const field_t	sb_flds[] = {
@@ -136,6 +144,8 @@ const field_t	sb_flds[] = {
 		FLD_COUNT, TYP_NONE },
 	{ "pad", FLDT_UINT8X, OI(OFF(pad)), metadirfld_count,
 		FLD_COUNT, TYP_NONE },
+	{ "rtstart", FLDT_DRFSBNO, OI(OFF(rtstart)), zonedfld_count, FLD_COUNT, TYP_NONE },
+	{ "rtreserved", FLDT_UINT64D, OI(OFF(rtreserved)), zonedfld_count, FLD_COUNT, TYP_NONE },
 	{ NULL }
 };
 
