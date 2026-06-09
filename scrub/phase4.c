@@ -297,6 +297,10 @@ phase4_estimate(
 	need_fixing = action_list_length(ctx->fs_repair_list) +
 		      action_list_length(ctx->file_repair_list);
 
+	/* fscounters and quotacheck */
+	if (need_fixing)
+		need_fixing += 2;
+
 	*items = need_fixing;
 	*nr_threads = scrub_nproc(ctx) + 1;
 	*rshift = 0;
