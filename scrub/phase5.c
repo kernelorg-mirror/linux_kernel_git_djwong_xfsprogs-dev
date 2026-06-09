@@ -687,8 +687,10 @@ queue_fs_scan(
 	item->abortedp = abortedp;
 
 	ret = -workqueue_add(wq, fs_scan_worker, nr, item);
-	if (ret)
+	if (ret) {
 		str_liberror(ctx, ret, _("queuing fs scan work"));
+		free(item);
+	}
 
 	return ret;
 }
@@ -764,8 +766,10 @@ queue_metapath_scan(
 	item->abortedp = abortedp;
 
 	ret = -workqueue_add(wq, fs_scan_worker, 0, item);
-	if (ret)
+	if (ret) {
 		str_liberror(ctx, ret, _("queuing metapath scan work"));
+		free(item);
+	}
 
 	return ret;
 }
