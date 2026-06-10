@@ -55,10 +55,10 @@ PrivateDevices=true
 # by our sandboxing.  healer doesn't care about project ids anyway.
 InaccessiblePaths=-/etc/projects
 
-# No network access
+# No network access except for systemd service bus for initiating full scans
 PrivateNetwork=true
 ProtectHostname=true
-RestrictAddressFamilies=none
+RestrictAddressFamilies=AF_UNIX
 IPAddressDeny=any
 
 # Don't let the program mess with the kernel configuration at all
