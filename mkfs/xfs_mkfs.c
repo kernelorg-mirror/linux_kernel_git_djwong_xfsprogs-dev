@@ -976,7 +976,7 @@ static struct opt_params mopts = {
 		  .defaultval = 1,
 		},
 		{ .index = M_PQUOTA,
-		  .conflicts = { { &mopts, M_GQNOENFORCE },
+		  .conflicts = { { &mopts, M_PQNOENFORCE },
 				 { NULL, LAST_CONFLICT } },
 		  .minval = 0,
 		  .maxval = 1,
