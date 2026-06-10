@@ -86,11 +86,9 @@ int
 scrub_cleanup(
 	struct scrub_ctx	*ctx)
 {
-	int			error;
+	int			error, error2;
 
 	error = report_to_kernel(ctx);
-	if (error)
-		return error;
 
 	action_list_free(&ctx->file_repair_list);
 	action_list_free(&ctx->fs_repair_list);
@@ -105,9 +103,12 @@ scrub_cleanup(
 	    ctx->verify_disks[XFS_DEV_RT] != ctx->verify_disks[XFS_DEV_DATA])
 		disk_close(ctx->verify_disks[XFS_DEV_RT]);
 	fshandle_destroy();
-	error = -xfd_close(&ctx->mnt);
-	if (error)
+	error2 = -xfd_close(&ctx->mnt);
+	if (error2) {
+		if (!error)
+			error = error2;
 		str_liberror(ctx, error, _("closing mountpoint fd"));
+	}
 	fs_table_destroy();
 
 	return error;
