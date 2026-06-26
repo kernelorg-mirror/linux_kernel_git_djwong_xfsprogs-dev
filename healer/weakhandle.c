@@ -155,6 +155,9 @@ out_mntfd:
 	return -1;
 }
 
+/* three paths, a filesystem type string of unknown length, and options */
+#define MNTENT_BUFLEN		(4 * PATH_MAX + NAME_MAX)
+
 /* Reopen a file handle obtained via weak reference. */
 int
 weakhandle_reopen(
@@ -163,11 +166,13 @@ weakhandle_reopen(
 	weakhandle_fd_t		is_acceptable,
 	void			*data)
 {
+	struct mntent		ent;
 	const size_t		smbuf_size =
 		libfrog_statmount_sizeof(PATH_MAX);
 	struct statmount	*smbuf = alloca(smbuf_size);
 	FILE			*mtab;
 	struct mntent		*mnt;
+	char			*buf;
 	int			ret;
 
 	/* First try reopening using the original mountpoint */
@@ -203,7 +208,13 @@ fallback:
 	if (!mtab)
 		return -1;
 
-	while ((mnt = getmntent(mtab)) != NULL) {
+	buf = malloc(MNTENT_BUFLEN);
+	if (!buf) {
+		ret = -1;
+		goto out_mtab;
+	}
+
+	while ((mnt = getmntent_r(mtab, &ent, buf, MNTENT_BUFLEN)) != NULL) {
 		if (strcmp(mnt->mnt_type, "xfs"))
 			continue;
 		if (strcmp(mnt->mnt_fsname, wh->fsname))
@@ -222,6 +233,8 @@ fallback:
 		ret = -1;
 	}
 
+	free(buf);
+out_mtab:
 	endmntent(mtab);
 	return ret;
 }
