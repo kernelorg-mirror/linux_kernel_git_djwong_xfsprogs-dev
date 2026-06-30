@@ -1285,7 +1285,7 @@ writefsxattrs(
 static void
 writetimestamps(
 	struct xfs_inode	*ip,
-	struct stat		*statbuf)
+	const struct stat	*statbuf)
 {
 	struct timespec64	ts;
 
@@ -1362,20 +1362,25 @@ cleanup_hardlink_tracker(void)
 
 static xfs_ino_t
 get_hardlink_dst_inode(
-	xfs_ino_t	i_ino)
+	const struct stat	*filestat)
 {
-	for (size_t i = 0; i < hardlink_tracker.count; i++) {
-		if (hardlink_tracker.entries[i].src_ino == i_ino)
-			return hardlink_tracker.entries[i].dst_ino;
+	struct hardlink		*h = &hardlink_tracker.entries[0];
+	size_t			i = 0;
+
+	for (; i < hardlink_tracker.count; i++, h++) {
+		if (h->src_ino == filestat->st_ino)
+			return h->dst_ino;
 	}
 	return 0;
 }
 
 static void
 track_hardlink_inode(
-	ino_t	src_ino,
-	xfs_ino_t	dst_ino)
+	const struct stat	*filestat,
+	xfs_ino_t		dst_ino)
 {
+	struct hardlink		*h;
+
 	if (hardlink_tracker.count >= hardlink_tracker.size) {
 		/*
 		 * double for smaller capacity.
@@ -1399,8 +1404,10 @@ track_hardlink_inode(
 		hardlink_tracker.entries = resized_array;
 		hardlink_tracker.size = new_size;
 	}
-	hardlink_tracker.entries[hardlink_tracker.count].src_ino = src_ino;
-	hardlink_tracker.entries[hardlink_tracker.count].dst_ino = dst_ino;
+
+	h = &hardlink_tracker.entries[hardlink_tracker.count];
+	h->src_ino = filestat->st_ino;
+	h->dst_ino = dst_ino;
 	hardlink_tracker.count++;
 }
 
@@ -1415,7 +1422,7 @@ handle_hardlink(
 	struct xfs_mount	*mp,
 	struct xfs_inode	*pip,
 	struct xfs_name		xname,
-	struct stat		file_stat)
+	const struct stat	*file_stat)
 {
 	int			error;
 	xfs_ino_t		dst_ino;
@@ -1429,7 +1436,7 @@ handle_hardlink(
 	 * inode as a regular file type, and later save the source inode in our
 	 * buffer for future consumption.
 	 */
-	dst_ino = get_hardlink_dst_inode(file_stat.st_ino);
+	dst_ino = get_hardlink_dst_inode(file_stat);
 	if (dst_ino == 0)
 		return false;
 
@@ -1536,7 +1543,7 @@ create_nondir_inode(
 	struct cred		creds,
 	struct xfs_name		xname,
 	int			flags,
-	struct stat		file_stat,
+	const struct stat	*file_stat,
 	xfs_dev_t		rdev,
 	int			fd,
 	char			*src_fname)
@@ -1553,7 +1560,8 @@ create_nondir_inode(
 	 * If handle_hardlink() returns true it means the hardlink has been
 	 * correctly found and set, so we don't need to do anything else.
 	 */
-	if (file_stat.st_nlink > 1 && handle_hardlink(mp, pip, xname, file_stat)) {
+	if (file_stat->st_nlink > 1 &&
+	    handle_hardlink(mp, pip, xname, file_stat)) {
 		close(fd);
 		return;
 	}
@@ -1591,7 +1599,7 @@ create_nondir_inode(
 	/*
 	 * Copy over timestamps.
 	 */
-	writetimestamps(ip, &file_stat);
+	writetimestamps(ip, file_stat);
 
 	libxfs_trans_log_inode(tp, ip, flags);
 
@@ -1622,8 +1630,8 @@ create_nondir_inode(
 	 * If we're here it means this is the first time we're encountering an
 	 * hardlink, so we need to store it.
 	 */
-	if (file_stat.st_nlink > 1)
-		track_hardlink_inode(file_stat.st_ino, ip->i_ino);
+	if (file_stat->st_nlink > 1)
+		track_hardlink_inode(file_stat, ip->i_ino);
 
 	libxfs_irele(ip);
 }
@@ -1777,8 +1785,8 @@ handle_direntry(
 		break;
 	}
 
-	create_nondir_inode(mp, pip, fsxp, mode, creds, xname, flags, file_stat,
-			    rdev, fd, fname);
+	create_nondir_inode(mp, pip, fsxp, mode, creds, xname, flags,
+			&file_stat, rdev, fd, fname);
 out:
 	close(pathfd);
 	/* Reset path_buf to original */
