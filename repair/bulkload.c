@@ -32,7 +32,7 @@ bulkload_init_inode(
 	int				whichfork,
 	const struct xfs_owner_info	*oinfo)
 {
-	bulkload_init_ag(bkl, sc, oinfo, XFS_INO_TO_FSB(sc->mp, sc->ip->i_ino));
+	bulkload_init_ag(bkl, sc, oinfo, XFS_INODE_TO_FSB(sc->ip));
 	bkl->ifake.if_fork = kmem_cache_zalloc(xfs_ifork_cache, 0);
 	bkl->ifake.if_fork_size = xfs_inode_fork_size(sc->ip, whichfork);
 }
