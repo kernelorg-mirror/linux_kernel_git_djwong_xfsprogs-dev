@@ -140,7 +140,7 @@ static uint64_t
 xfs_inode_item_sort(
 	struct xfs_log_item	*lip)
 {
-	return INODE_ITEM(lip)->ili_inode->i_ino;
+	return I_INO(INODE_ITEM(lip)->ili_inode);
 }
 
 /*
@@ -316,7 +316,7 @@ xfs_inode_item_init(
 	iip = ip->i_itemp = kmem_cache_zalloc(xfs_ili_cache, 0);
 #ifdef LI_DEBUG
 	fprintf(stderr, "inode_item_init for inode %llu, iip=%p\n",
-		ip->i_ino, iip);
+		I_INO(ip), iip);
 #endif
 
 	spin_lock_init(&iip->ili_lock);

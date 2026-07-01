@@ -289,7 +289,7 @@ writesymlink(
 	xfs_extlen_t		nb = XFS_B_TO_FSB(mp, len);
 	int			error;
 
-	error = -libxfs_symlink_write_target(tp, ip, ip->i_ino, buf, len, nb,
+	error = -libxfs_symlink_write_target(tp, ip, I_INO(ip), buf, len, nb,
 			nb);
 	if (error) {
 		fprintf(stderr,
@@ -417,7 +417,7 @@ writeattr(
 	struct xfs_da_args	args = {
 		.dp		= ip,
 		.geo		= ip->i_mount->m_attr_geo,
-		.owner		= ip->i_ino,
+		.owner		= I_INO(ip),
 		.whichfork	= XFS_ATTR_FORK,
 		.op_flags	= XFS_DA_OP_OKNOENT,
 		.value		= valuebuf,
@@ -548,7 +548,7 @@ newdirent(
 
 	rsv = XFS_DIRENTER_SPACE_RES(mp, name->len);
 
-	error = -libxfs_dir_createname(tp, pip, name, ip->i_ino, rsv);
+	error = -libxfs_dir_createname(tp, pip, name, I_INO(ip), rsv);
 	if (error)
 		fail(_("directory createname error"), error);
 
@@ -927,7 +927,7 @@ parseproto(
 			fail(_("Inode allocation failed"), error);
 		if (!pip) {
 			pip = ip;
-			mp->m_sb.sb_rootino = ip->i_ino;
+			mp->m_sb.sb_rootino = I_INO(ip);
 			libxfs_log_sb(tp);
 			isroot = 1;
 		} else {
@@ -1057,10 +1057,10 @@ create_sb_metadata_file(
 
 	switch (type) {
 	case XFS_RTGI_BITMAP:
-		mp->m_sb.sb_rbmino = ip->i_ino;
+		mp->m_sb.sb_rbmino = I_INO(ip);
 		break;
 	case XFS_RTGI_SUMMARY:
-		mp->m_sb.sb_rsumino = ip->i_ino;
+		mp->m_sb.sb_rsumino = I_INO(ip);
 		break;
 	default:
 		error = EFSCORRUPTED;
@@ -1634,7 +1634,7 @@ create_nondir_inode(
 	 * hardlink, so we need to store it.
 	 */
 	if (file_stat->st_nlink > 1)
-		track_hardlink_inode(file_stat, ip->i_ino);
+		track_hardlink_inode(file_stat, I_INO(ip));
 
 	libxfs_irele(ip);
 }
@@ -1880,7 +1880,7 @@ populate_from_dir(
 	if (error)
 		fail(_("Inode allocation failed"), error);
 
-	mp->m_sb.sb_rootino = ip->i_ino;
+	mp->m_sb.sb_rootino = I_INO(ip);
 	libxfs_log_sb(tp);
 	newdirectory(mp, tp, ip, ip);
 	libxfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);

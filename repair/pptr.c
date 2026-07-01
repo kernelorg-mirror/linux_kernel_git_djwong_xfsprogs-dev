@@ -372,7 +372,7 @@ add_parent_ptr(
 	};
 	struct ag_pptr		ag_pptr = {
 		.child_agino	= XFS_INO_TO_AGINO(mp, ino),
-		.parent_ino	= dp->i_ino,
+		.parent_ino	= I_INO(dp),
 		.parent_gen	= VFS_I(dp)->i_generation,
 		.namelen	= dname.len,
 	};
@@ -407,7 +407,7 @@ add_parent_ptr(
 	dbg_printf(
  _("%s: dp %llu gen 0x%x fname '%s' namehash 0x%x ino %llu namecookie 0x%llx\n"),
 			__func__,
-			(unsigned long long)dp->i_ino,
+			(unsigned long long)I_INO(dp),
 			VFS_I(dp)->i_generation,
 			fname,
 			ag_pptr.namehash,
@@ -438,7 +438,7 @@ remove_garbage_xattrs(
 			.attr_filter	= ga->attr_filter,
 			.namelen	= ga->attrnamelen,
 			.valuelen	= ga->attrvaluelen,
-			.owner		= ip->i_ino,
+			.owner		= I_INO(ip),
 			.geo		= ip->i_mount->m_attr_geo,
 			.whichfork	= XFS_ATTR_FORK,
 			.op_flags	= XFS_DA_OP_OKNOENT | XFS_DA_OP_LOGGED,
@@ -452,7 +452,7 @@ remove_garbage_xattrs(
 				do_error(
  _("allocating %zu bytes to remove ino %llu garbage xattr failed: %s\n"),
 						desired,
-						(unsigned long long)ip->i_ino,
+						(unsigned long long)I_INO(ip),
 						strerror(errno));
 			bufsize = desired;
 		}
@@ -480,7 +480,7 @@ remove_garbage_xattrs(
 		if (error)
 			do_error(
  _("removing ino %llu garbage xattr failed: %s\n"),
-					(unsigned long long)ip->i_ino,
+					(unsigned long long)I_INO(ip),
 					strerror(error));
 	}
 
@@ -515,7 +515,7 @@ record_garbage_xattr(
 		if (!fscan->have_garbage)
 			do_warn(
  _("would delete garbage parent pointer extended attributes in ino %llu\n"),
-					(unsigned long long)ip->i_ino);
+					(unsigned long long)I_INO(ip));
 		fscan->have_garbage = true;
 		return;
 	}
@@ -526,7 +526,7 @@ record_garbage_xattr(
 
 	do_warn(
  _("deleting garbage parent pointer extended attributes in ino %llu\n"),
-			(unsigned long long)ip->i_ino);
+			(unsigned long long)I_INO(ip));
 
 	error = -init_slab(&fscan->garbage_xattr_recs,
 			sizeof(struct garbage_xattr));
@@ -547,20 +547,20 @@ stuffit:
 			&garbage_xattr.attrname_cookie, name, namelen);
 	if (error)
 		do_error(_("storing ino %llu garbage xattr failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 
 	error = -xfblob_store(fscan->garbage_xattr_names,
 			&garbage_xattr.attrvalue_cookie, value, valuelen);
 	if (error)
 		do_error(_("storing ino %llu garbage xattr failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 
 	error = -slab_add(fscan->garbage_xattr_recs, &garbage_xattr);
 	if (error)
 		do_error(_("storing ino %llu garbage xattr rec failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 }
 
@@ -627,7 +627,7 @@ examine_xattr(
 	if (error)
 		do_error(
  _("storing ino %llu parent pointer '%.*s' failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				namelen,
 				(const char *)name,
 				strerror(error));
@@ -635,7 +635,7 @@ examine_xattr(
 	error = -slab_add(fscan->file_pptr_recs, &file_pptr);
 	if (error)
 		do_error(_("storing ino %llu parent pointer rec failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 
 	dbg_printf(
@@ -647,7 +647,7 @@ examine_xattr(
 			(const char *)name,
 			namelen,
 			file_pptr.namehash,
-			(unsigned long long)ip->i_ino,
+			(unsigned long long)I_INO(ip),
 			(unsigned long long)file_pptr.name_cookie,
 			file_pptr.name_in_nameblobs);
 
@@ -690,7 +690,7 @@ add_file_pptr(
 
 	xfs_parent_rec_init(&pptr_rec, ag_pptr->parent_ino,
 			ag_pptr->parent_gen);
-	return -libxfs_parent_set(ip, ip->i_ino, &xname, &pptr_rec, &scratch);
+	return -libxfs_parent_set(ip, I_INO(ip), &xname, &pptr_rec, &scratch);
 }
 
 /* Remove an on disk parent pointer from a file. */
@@ -709,7 +709,7 @@ remove_file_pptr(
 
 	xfs_parent_rec_init(&pptr_rec, file_pptr->parent_ino,
 			file_pptr->parent_gen);
-	return -libxfs_parent_unset(ip, ip->i_ino, &xname, &pptr_rec, &scratch);
+	return -libxfs_parent_unset(ip, I_INO(ip), &xname, &pptr_rec, &scratch);
 }
 
 /* Remove all pptrs from @ip. */
@@ -724,17 +724,17 @@ clear_all_pptrs(
 
 	if (no_modify) {
 		do_warn(_("would delete unlinked ino %llu parent pointers\n"),
-				(unsigned long long)ip->i_ino);
+				(unsigned long long)I_INO(ip));
 		return;
 	}
 
 	do_warn(_("deleting unlinked ino %llu parent pointers\n"),
-			(unsigned long long)ip->i_ino);
+			(unsigned long long)I_INO(ip));
 
 	error = -init_slab_cursor(fscan->file_pptr_recs, NULL, &cur);
 	if (error)
 		do_error(_("init ino %llu pptr cursor failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 
 	while ((file_pptr = pop_slab_cursor(cur)) != NULL) {
@@ -744,7 +744,7 @@ clear_all_pptrs(
 		if (error)
 			do_error(
   _("loading incorrect name for ino %llu parent pointer (ino %llu gen 0x%x namecookie 0x%llx) failed: %s\n"),
-					(unsigned long long)ip->i_ino,
+					(unsigned long long)I_INO(ip),
 					(unsigned long long)file_pptr->parent_ino,
 					file_pptr->parent_gen,
 					(unsigned long long)file_pptr->name_cookie,
@@ -754,7 +754,7 @@ clear_all_pptrs(
 		if (error)
 			do_error(
  _("wiping ino %llu pptr (ino %llu gen 0x%x) failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)file_pptr->parent_ino,
 				file_pptr->parent_gen,
 				strerror(error));
@@ -778,7 +778,7 @@ add_missing_parent_ptr(
 	if (error)
 		do_error(
  _("loading missing name for ino %llu parent pointer (ino %llu gen 0x%x namecookie 0x%llx) failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)ag_pptr->parent_ino,
 				ag_pptr->parent_gen,
 				(unsigned long long)ag_pptr->name_cookie,
@@ -787,7 +787,7 @@ add_missing_parent_ptr(
 	if (no_modify) {
 		do_warn(
  _("would add missing ino %llu parent pointer (ino %llu gen 0x%x name '%.*s')\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)ag_pptr->parent_ino,
 				ag_pptr->parent_gen,
 				ag_pptr->namelen,
@@ -796,7 +796,7 @@ add_missing_parent_ptr(
 	} else {
 		do_warn(
  _("adding missing ino %llu parent pointer (ino %llu gen 0x%x name '%.*s')\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)ag_pptr->parent_ino,
 				ag_pptr->parent_gen,
 				ag_pptr->namelen,
@@ -807,7 +807,7 @@ add_missing_parent_ptr(
 	if (error)
 		do_error(
  _("adding ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
-			(unsigned long long)ip->i_ino,
+			(unsigned long long)I_INO(ip),
 			(unsigned long long)ag_pptr->parent_ino,
 			ag_pptr->parent_gen,
 			ag_pptr->namelen,
@@ -829,7 +829,7 @@ remove_incorrect_parent_ptr(
 	if (error)
 		do_error(
  _("loading incorrect name for ino %llu parent pointer (ino %llu gen 0x%x namecookie 0x%llx) failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)file_pptr->parent_ino,
 				file_pptr->parent_gen,
 				(unsigned long long)file_pptr->name_cookie,
@@ -838,7 +838,7 @@ remove_incorrect_parent_ptr(
 	if (no_modify) {
 		do_warn(
  _("would remove bad ino %llu parent pointer (ino %llu gen 0x%x name '%.*s')\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)file_pptr->parent_ino,
 				file_pptr->parent_gen,
 				file_pptr->namelen,
@@ -848,7 +848,7 @@ remove_incorrect_parent_ptr(
 
 	do_warn(
  _("removing bad ino %llu parent pointer (ino %llu gen 0x%x name '%.*s')\n"),
-			(unsigned long long)ip->i_ino,
+			(unsigned long long)I_INO(ip),
 			(unsigned long long)file_pptr->parent_ino,
 			file_pptr->parent_gen,
 			file_pptr->namelen,
@@ -858,7 +858,7 @@ remove_incorrect_parent_ptr(
 	if (error)
 		do_error(
  _("removing ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
-			(unsigned long long)ip->i_ino,
+			(unsigned long long)I_INO(ip),
 			(unsigned long long)file_pptr->parent_ino,
 			file_pptr->parent_gen,
 			file_pptr->namelen,
@@ -886,7 +886,7 @@ compare_parent_ptrs(
 	if (error)
 		do_error(
  _("loading master-list name for ino %llu parent pointer (ino %llu gen 0x%x namecookie 0x%llx namelen %u) failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)ag_pptr->parent_ino,
 				ag_pptr->parent_gen,
 				(unsigned long long)ag_pptr->name_cookie,
@@ -897,7 +897,7 @@ compare_parent_ptrs(
 	if (error)
 		do_error(
  _("loading file-list name for ino %llu parent pointer (ino %llu gen 0x%x namecookie 0x%llx namelen %u) failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)file_pptr->parent_ino,
 				file_pptr->parent_gen,
 				(unsigned long long)file_pptr->name_cookie,
@@ -919,7 +919,7 @@ reset:
 	if (no_modify) {
 		do_warn(
  _("would update ino %llu parent pointer (ino %llu gen 0x%x name '%.*s') -> (ino %llu gen 0x%x name '%.*s')\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)file_pptr->parent_ino,
 				file_pptr->parent_gen,
 				file_pptr->namelen,
@@ -933,7 +933,7 @@ reset:
 
 	do_warn(
  _("updating ino %llu parent pointer (ino %llu gen 0x%x name '%.*s') -> (ino %llu gen 0x%x name '%.*s')\n"),
-			(unsigned long long)ip->i_ino,
+			(unsigned long long)I_INO(ip),
 			(unsigned long long)file_pptr->parent_ino,
 			file_pptr->parent_gen,
 			file_pptr->namelen,
@@ -948,7 +948,7 @@ reset:
 	if (error)
 		do_error(
 _("erasing ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
-			(unsigned long long)ip->i_ino,
+			(unsigned long long)I_INO(ip),
 			(unsigned long long)file_pptr->parent_ino,
 			file_pptr->parent_gen,
 			file_pptr->namelen,
@@ -964,7 +964,7 @@ _("erasing ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
 	if (error && error != EEXIST)
 		do_error(
  _("updating ino %llu pptr (ino %llu gen 0x%x name '%.*s') failed: %s\n"),
-			(unsigned long long)ip->i_ino,
+			(unsigned long long)I_INO(ip),
 			(unsigned long long)ag_pptr->parent_ino,
 			ag_pptr->parent_gen,
 			ag_pptr->namelen,
@@ -1081,7 +1081,7 @@ crosscheck_file_parent_ptrs(
  _("found dirent referring to ino %llu even though inobt scan moved on to ino %llu?!\n"),
 				(unsigned long long)XFS_AGINO_TO_INO(mp, agno,
 					ag_pptr->child_agino),
-				(unsigned long long)ip->i_ino);
+				(unsigned long long)I_INO(ip));
 		/* does not return */
 	}
 
@@ -1096,7 +1096,7 @@ crosscheck_file_parent_ptrs(
 			&fscan->file_pptr_recs_cur);
 	if (error)
 		do_error(_("init ino %llu parent pointer cursor failed: %s\n"),
-				(unsigned long long)ip->i_ino, strerror(error));
+				(unsigned long long)I_INO(ip), strerror(error));
 
 	do {
 		int	cmp_result;
@@ -1114,7 +1114,7 @@ crosscheck_file_parent_ptrs(
 					(unsigned long long)ag_pptr->parent_ino,
 					ag_pptr->parent_gen,
 					ag_pptr->namelen,
-					(unsigned long long)ip->i_ino,
+					(unsigned long long)I_INO(ip),
 					(unsigned long long)ag_pptr->name_cookie);
 			prev_ag_pptr = ag_pptr;
 			advance_slab_cursor(fscan->ag_pptr_recs_cur);
@@ -1131,7 +1131,7 @@ crosscheck_file_parent_ptrs(
 				(unsigned long long)ag_pptr->parent_ino,
 				ag_pptr->parent_gen,
 				ag_pptr->namelen,
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)ag_pptr->name_cookie);
 
 		if (file_pptr) {
@@ -1141,13 +1141,13 @@ crosscheck_file_parent_ptrs(
 					(unsigned long long)file_pptr->parent_ino,
 					file_pptr->parent_gen,
 					file_pptr->namelen,
-					(unsigned long long)ip->i_ino,
+					(unsigned long long)I_INO(ip),
 					(unsigned long long)file_pptr->name_cookie);
 		} else {
 			dbg_printf(
  _("%s: ran out of parent pointers for ino %llu (file)\n"),
 					__func__,
-					(unsigned long long)ip->i_ino);
+					(unsigned long long)I_INO(ip));
 		}
 
 		cmp_result = cmp_file_to_ag_pptr(file_pptr, ag_pptr);
@@ -1188,7 +1188,7 @@ crosscheck_file_parent_ptrs(
 				(unsigned long long)file_pptr->parent_ino,
 				file_pptr->parent_gen,
 				file_pptr->namelen,
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				(unsigned long long)file_pptr->name_cookie);
 
 		/*
@@ -1223,11 +1223,11 @@ check_file_parent_ptrs(
 		libxfs_trans_cancel(tp);
 	if (error && !no_modify)
 		do_error(_("ino %llu parent pointer scan failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 	if (error) {
 		do_warn(_("ino %llu parent pointer scan failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 		goto out_free;
 	}
@@ -1361,20 +1361,20 @@ erase_pptrs(
 			&garbage_xattr.attrname_cookie, name, namelen);
 	if (error)
 		do_error(_("storing ino %llu garbage pptr failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 
 	error = -xfblob_store(fscan->garbage_xattr_names,
 			&garbage_xattr.attrvalue_cookie, value, valuelen);
 	if (error)
 		do_error(_("storing ino %llu garbage pptr failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 
 	error = -slab_add(fscan->garbage_xattr_recs, &garbage_xattr);
 	if (error)
 		do_error(_("storing ino %llu garbage pptr rec failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 
 	return 0;
@@ -1399,7 +1399,7 @@ try_erase_parent_ptrs(
 	if (no_modify) {
 		do_warn(
  _("would delete garbage parent pointers in metadata ino %llu\n"),
-				(unsigned long long)ip->i_ino);
+				(unsigned long long)I_INO(ip));
 		return;
 	}
 
@@ -1423,7 +1423,7 @@ try_erase_parent_ptrs(
 		libxfs_trans_cancel(tp);
 	if (error)
 		do_warn(_("ino %llu garbage pptr collection failed: %s\n"),
-				(unsigned long long)ip->i_ino,
+				(unsigned long long)I_INO(ip),
 				strerror(error));
 
 	remove_garbage_xattrs(ip, &fscan);

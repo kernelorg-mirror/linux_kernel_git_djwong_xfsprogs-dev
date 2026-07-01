@@ -104,7 +104,7 @@ dqtype_to_inode(
 	if (error)
 		goto out_dp;
 
-	ret = ip->i_ino;
+	ret = I_INO(ip);
 	libxfs_irele(ip);
 out_dp:
 	if (dp)

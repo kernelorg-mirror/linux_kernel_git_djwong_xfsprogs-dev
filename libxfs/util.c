@@ -343,7 +343,7 @@ xfs_inode_verifier_error(
 	xfs_alert(NULL, "Metadata %s detected at %p, inode 0x%llx %s",
 		  error == -EFSBADCRC ? "CRC error" : "corruption",
 		  failaddr ? failaddr : __return_address,
-		  ip->i_ino, name);
+		  I_INO(ip), name);
 }
 
 /*
