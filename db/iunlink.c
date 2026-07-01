@@ -23,7 +23,7 @@ count_rtblocks(
 		dbprintf(
 _("could not read AG %u agino %u extents, err=%d\n"),
 				XFS_INODE_TO_AGNO(ip),
-				XFS_INO_TO_AGINO(ip->i_mount, ip->i_ino),
+				XFS_INODE_TO_AGINO(ip),
 				error);
 		return 0;
 	}

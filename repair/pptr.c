@@ -1051,7 +1051,7 @@ crosscheck_file_parent_ptrs(
 	struct file_pptr	*file_pptr;
 	struct xfs_mount	*mp = ip->i_mount;
 	xfs_agnumber_t		agno = XFS_INODE_TO_AGNO(ip);
-	xfs_agino_t		agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
+	xfs_agino_t		agino = XFS_INODE_TO_AGINO(ip);
 	int			error;
 
 	ag_pptr = peek_slab_cursor(fscan->ag_pptr_recs_cur);
