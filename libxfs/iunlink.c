@@ -44,7 +44,7 @@ xfs_iunlink_log_dinode(
 	int			offset;
 	int			error;
 
-	error = xfs_imap_to_bp(mp, tp, &ip->i_imap, &ibp);
+	error = xfs_read_icluster(mp, tp, ip->i_imap.im_blkno, &ibp);
 	if (error)
 		return error;
 	/*
