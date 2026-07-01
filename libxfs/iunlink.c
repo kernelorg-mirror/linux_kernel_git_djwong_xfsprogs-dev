@@ -66,7 +66,7 @@ xfs_iunlink_log_dinode(
 	}
 
 	trace_xfs_iunlink_update_dinode(mp, pag_agno(iup->pag),
-					XFS_INO_TO_AGINO(mp, ip->i_ino),
+					XFS_INODE_TO_AGINO(ip),
 					be32_to_cpu(dip->di_next_unlinked),
 					iup->next_agino);
 
