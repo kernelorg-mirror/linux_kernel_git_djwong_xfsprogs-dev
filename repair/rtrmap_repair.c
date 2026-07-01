@@ -211,7 +211,7 @@ xrep_rtrmap_build_new_tree(
 	 * Prepare to construct the new fork by initializing the new btree
 	 * structure and creating a fake ifork in the ifakeroot structure.
 	 */
-	libxfs_rmap_ino_bmbt_owner(&oinfo, sc->ip->i_ino, XFS_DATA_FORK);
+	xfs_rmap_inode_bmbt_owner(&oinfo, sc->ip, XFS_DATA_FORK);
 	bulkload_init_inode(&rr->new_fork_info, sc, XFS_DATA_FORK, &oinfo);
 	cur = libxfs_rtrmapbt_init_cursor(NULL, rr->rtg);
 	libxfs_btree_stage_ifakeroot(cur, ifake);
