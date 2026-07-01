@@ -159,7 +159,7 @@ libxfs_iget(
 	ip->i_prev_unlinked = NULLAGINO;
 	spin_lock_init(&VFS_I(ip)->i_lock);
 
-	pag = xfs_perag_get(mp, XFS_INO_TO_AGNO(mp, ip->i_ino));
+	pag = xfs_perag_get(mp, XFS_INODE_TO_AGNO(ip));
 	error = xfs_imap(pag, tp, ip->i_ino, &ip->i_imap, 0);
 	xfs_perag_put(pag);
 
