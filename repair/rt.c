@@ -268,7 +268,7 @@ check_rtfile_contents(
 		if (xfs_has_rtgroups(mp)) {
 			struct xfs_rtbuf_blkinfo	*hdr = bp->b_addr;
 
-			if (hdr->rt_owner != cpu_to_be64(ip->i_ino)) {
+			if (hdr->rt_owner != cpu_to_be64(I_INO(ip))) {
 				do_warn(
  _("corrupt owner in %s at dblock 0x%llx\n"),
 					filename, (unsigned long long)bno);
@@ -461,12 +461,12 @@ mark_rtginode(
 		goto out_corrupt;
 
 	if (xfs_has_rtgroups(rtg_mount(rtg))) {
-		if (bitmap_test(rtg_inodes[type], ip->i_ino, 1)) {
+		if (bitmap_test(rtg_inodes[type], I_INO(ip), 1)) {
 			error = EFSCORRUPTED;
 			goto out_corrupt;
 		}
 
-		error = bitmap_set(rtg_inodes[type], ip->i_ino, 1);
+		error = bitmap_set(rtg_inodes[type], I_INO(ip), 1);
 		if (error)
 			goto out_corrupt;
 	}

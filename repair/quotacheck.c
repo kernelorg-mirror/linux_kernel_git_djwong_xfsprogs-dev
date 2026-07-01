@@ -169,7 +169,7 @@ qc_count_rtblocks(
 	if (error) {
 		do_warn(
 _("could not read ino %"PRIu64" extents, err=%d\n"),
-			ip->i_ino, error);
+			I_INO(ip), error);
 		chkd_flags = 0;
 		return 0;
 	}
@@ -375,7 +375,7 @@ qc_walk_dquot_extent(
 		if (error) {
 			do_warn(
 _("cannot read %s inode %"PRIu64", block %"PRIu64", disk block %"PRIu64", err=%d\n"),
-				qflags_typestr(dquots->type), ip->i_ino,
+				qflags_typestr(dquots->type), I_INO(ip),
 				map->br_startoff + bno,
 				map->br_startblock + bno, error);
 			chkd_flags = 0;
@@ -454,7 +454,7 @@ quotacheck_verify(
 	if (error) {
 		do_warn(
 	_("could not read %s inode %"PRIu64" extents, err=%d\n"),
-			qflags_typestr(type), ip->i_ino, error);
+			qflags_typestr(type), I_INO(ip), error);
 		chkd_flags = 0;
 		goto err;
 	}
@@ -659,7 +659,7 @@ mark_quota_inode(
 	if (error)
 		goto out_corrupt;
 
-	set_quota_inode(type, ip->i_ino);
+	set_quota_inode(type, I_INO(ip));
 	libxfs_irele(ip);
 	return 0;
 

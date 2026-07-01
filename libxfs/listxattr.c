@@ -101,7 +101,7 @@ xattr_walk_leaf(
 	struct xfs_buf			*leaf_bp;
 	int				error;
 
-	error = -libxfs_attr3_leaf_read(tp, ip, ip->i_ino, 0, &leaf_bp);
+	error = -libxfs_attr3_leaf_read(tp, ip, I_INO(ip), 0, &leaf_bp);
 	if (error)
 		return error;
 
@@ -231,7 +231,7 @@ xattr_walk_node(
 		if (bitmap_test(seen_blocks, leafhdr.forw, 1))
 			goto out_bitmap;
 
-		error = -libxfs_attr3_leaf_read(tp, ip, ip->i_ino,
+		error = -libxfs_attr3_leaf_read(tp, ip, I_INO(ip),
 				leafhdr.forw, &leaf_bp);
 		if (error)
 			goto out_bitmap;

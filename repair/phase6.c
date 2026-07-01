@@ -277,7 +277,7 @@ dir_hash_check(
 	if (seeval == DIR_HASH_CK_OK)
 		return 0;
 	do_warn(_("bad hash table for directory inode %" PRIu64 " (%s): "),
-		ip->i_ino, seevalstr[seeval]);
+		I_INO(ip), seevalstr[seeval]);
 	if (!no_modify)
 		do_warn(_("rebuilding\n"));
 	else
@@ -654,8 +654,8 @@ _("Couldn't create rtgroup %u %s inode, error %d\n"),
 	ip = rtg->rtg_inodes[type];
 
 	/* Mark the inode in use. */
-	mark_ino_inuse(mp, ip->i_ino, S_IFREG, mp->m_rtdirip->i_ino);
-	mark_ino_metadata(mp, ip->i_ino);
+	mark_ino_inuse(mp, I_INO(ip), S_IFREG, I_INO(mp->m_rtdirip));
+	mark_ino_metadata(mp, I_INO(ip));
 	return true;
 }
 
@@ -786,7 +786,7 @@ mk_metadir(
 
 	libxfs_trans_ijoin(tp, mp->m_metadirip, 0);
 	libxfs_metafile_set_iflag(tp, mp->m_metadirip, XFS_METAFILE_DIR);
-	mark_ino_metadata(mp, mp->m_metadirip->i_ino);
+	mark_ino_metadata(mp, I_INO(mp->m_metadirip));
 
 	error = -libxfs_trans_commit(tp);
 	if (error)
@@ -905,7 +905,7 @@ mk_orphanage(
 		do_error(
 		_("can't make %s, createname error %d\n"),
 			ORPHANAGE, error);
-	add_parent_ptr(du.ip->i_ino, (unsigned char *)ORPHANAGE, du.dp, false);
+	add_parent_ptr(I_INO(du.ip), (unsigned char *)ORPHANAGE, du.dp, false);
 
 	/*
 	 * We bumped up the link count in the root directory to account
@@ -974,7 +974,7 @@ trunc_metadata_inode(
 	if (err)
 		do_error(
 	_("truncation of metadata inode 0x%llx failed, err=%d\n"),
-				(unsigned long long)ip->i_ino, err);
+				(unsigned long long)I_INO(ip), err);
 }
 
 /*
@@ -1008,7 +1008,7 @@ add_orphan_pptr(
 				sizeof(struct xfs_attr_sf_hdr), true);
 		if (error)
 			do_error(_("can't add attr fork to inode 0x%llx\n"),
-					(unsigned long long)ip->i_ino);
+					(unsigned long long)I_INO(ip));
 	}
 
 	error = -libxfs_parent_addname(tp, ppargs, orphanage_ip, xname, ip);
@@ -1202,7 +1202,7 @@ mv_orphanage(
 	}
 
 	if (xfs_has_parent(mp))
-		add_parent_ptr(ino_p->i_ino, xname.name, orphanage_ip, false);
+		add_parent_ptr(I_INO(ino_p), xname.name, orphanage_ip, false);
 
 	libxfs_irele(ino_p);
 	libxfs_irele(orphanage_ip);
@@ -1303,10 +1303,10 @@ longform_dir2_rebuild(
 	 * orphanage later (the inode number here needs to be valid
 	 * for the libxfs_dir_init() call).
 	 */
-	pip.i_ino = get_inode_parent(irec, ino_offset);
-	if (pip.i_ino == NULLFSINO ||
-	    libxfs_dir_ino_validate(mp, pip.i_ino))
-		pip.i_ino = mp->m_sb.sb_rootino;
+	VFS_I(&pip)->i_ino = get_inode_parent(irec, ino_offset);
+	if (VFS_I(&pip)->i_ino == NULLFSINO ||
+	    libxfs_dir_ino_validate(mp, I_INO(&pip)))
+		VFS_I(&pip)->i_ino = mp->m_sb.sb_rootino;
 
 	nres = libxfs_remove_space_res(mp, 0);
 	error = -libxfs_trans_alloc(mp, &M_RES(mp)->tr_remove, nres, 0, 0, &tp);
@@ -1317,7 +1317,7 @@ longform_dir2_rebuild(
 	error = dir_binval(tp, ip, XFS_DATA_FORK);
 	if (error)
 		do_error(_("error %d invalidating directory %llu blocks\n"),
-				error, (unsigned long long)ip->i_ino);
+				error, (unsigned long long)I_INO(ip));
 
 	if ((error = -libxfs_bmap_last_offset(ip, &lastblock, XFS_DATA_FORK)))
 		do_error(_("xfs_bmap_last_offset failed -- error - %d\n"),
@@ -1435,7 +1435,7 @@ dir2_kill_block(
 	args.trans = tp;
 	args.whichfork = XFS_DATA_FORK;
 	args.geo = mp->m_dir_geo;
-	args.owner = ip->i_ino;
+	args.owner = I_INO(ip);
 	if (da_bno >= mp->m_dir_geo->leafblk && da_bno < mp->m_dir_geo->freeblk)
 		error = -libxfs_da_shrink_inode(&args, da_bno, bp);
 	else
@@ -1443,7 +1443,7 @@ dir2_kill_block(
 				xfs_dir2_da_to_db(mp->m_dir_geo, da_bno), bp);
 	if (error)
 		do_error(_("shrink_inode failed inode %" PRIu64 " block %u\n"),
-			ip->i_ino, da_bno);
+			I_INO(ip), da_bno);
 	error = -libxfs_trans_commit(tp);
 	if (error)
 		do_error(
@@ -1479,14 +1479,14 @@ check_longform_ftype(
 		do_warn(
 _("would fix ftype mismatch (%d/%d) in directory/child inode %" PRIu64 "/%" PRIu64 "\n"),
 			dir_ftype, ino_ftype,
-			ip->i_ino, inum);
+			I_INO(ip), inum);
 		return;
 	}
 
 	do_warn(
 _("fixing ftype mismatch (%d/%d) in directory/child inode %" PRIu64 "/%" PRIu64 "\n"),
 		dir_ftype, ino_ftype,
-		ip->i_ino, inum);
+		I_INO(ip), inum);
 	libxfs_dir2_data_put_ftype(mp, dep, ino_ftype);
 	libxfs_dir2_data_log_entry(da, bp, dep);
 	dir_hash_update_ftype(hashtab, addr, ino_ftype);
@@ -1540,7 +1540,7 @@ longform_dir2_entry_check_data(
 	struct xfs_da_args	da = {
 		.dp = ip,
 		.geo = mp->m_dir_geo,
-		.owner = ip->i_ino,
+		.owner = I_INO(ip),
 	};
 
 
@@ -1633,11 +1633,11 @@ longform_dir2_entry_check_data(
 		if (junkit) {
 			do_warn(
 	_("empty data block %u in directory inode %" PRIu64 ": "),
-				da_bno, ip->i_ino);
+				da_bno, I_INO(ip));
 		} else {
 			do_warn(_
 	("corrupt block %u in directory inode %" PRIu64 ": "),
-				da_bno, ip->i_ino);
+				da_bno, I_INO(ip));
 		}
 		if (!no_modify) {
 			do_warn(_("junking block\n"));
@@ -1663,7 +1663,7 @@ longform_dir2_entry_check_data(
 	if (be32_to_cpu(d->magic) != wantmagic) {
 		do_warn(
 	_("bad directory block magic # %#x for directory inode %" PRIu64 " block %d: "),
-			be32_to_cpu(d->magic), ip->i_ino, da_bno);
+			be32_to_cpu(d->magic), I_INO(ip), da_bno);
 		if (!no_modify) {
 			do_warn(_("fixing magic # to %#x\n"), wantmagic);
 			d->magic = cpu_to_be32(wantmagic);
@@ -1691,7 +1691,7 @@ longform_dir2_entry_check_data(
 			if (lastfree) {
 				do_warn(
 	_("directory inode %" PRIu64 " block %u has consecutive free entries: "),
-					ip->i_ino, da_bno);
+					I_INO(ip), da_bno);
 				if (!no_modify) {
 
 					do_warn(_("joining together\n"));
@@ -1737,7 +1737,7 @@ longform_dir2_entry_check_data(
 			nbad++;
 			if (entry_junked(
 	_("entry \"%s\" in directory inode %" PRIu64 " points to non-existent inode %" PRIu64 ", "),
-					fname, ip->i_ino, inum, NULLFSINO)) {
+					fname, I_INO(ip), inum, NULLFSINO)) {
 				dep->name[0] = '/';
 				libxfs_dir2_data_log_entry(&da, bp, dep);
 			}
@@ -1754,7 +1754,7 @@ longform_dir2_entry_check_data(
 			nbad++;
 			if (entry_junked(
 	_("entry \"%s\" in directory inode %" PRIu64 " points to free inode %" PRIu64 ", "),
-					fname, ip->i_ino, inum, NULLFSINO)) {
+					fname, I_INO(ip), inum, NULLFSINO)) {
 				dep->name[0] = '/';
 				libxfs_dir2_data_log_entry(&da, bp, dep);
 			}
@@ -1770,7 +1770,7 @@ longform_dir2_entry_check_data(
 			nbad++;
 			if (entry_junked(
 	_("entry \"%s\" in regular dir %" PRIu64" points to a metadata inode %" PRIu64 ", "),
-					fname, ip->i_ino, inum, NULLFSINO)) {
+					fname, I_INO(ip), inum, NULLFSINO)) {
 				dep->name[0] = '/';
 				libxfs_dir2_data_log_entry(&da, bp, dep);
 			}
@@ -1786,7 +1786,7 @@ longform_dir2_entry_check_data(
 			nbad++;
 			if (entry_junked(
 	_("entry \"%s\" in metadata dir %" PRIu64" points to a regular inode %" PRIu64 ", "),
-					fname, ip->i_ino, inum, NULLFSINO)) {
+					fname, I_INO(ip), inum, NULLFSINO)) {
 				dep->name[0] = '/';
 				libxfs_dir2_data_log_entry(&da, bp, dep);
 			}
@@ -1804,7 +1804,7 @@ longform_dir2_entry_check_data(
 				nbad++;
 				if (entry_junked(
 	_("%s (ino %" PRIu64 ") in root (%" PRIu64 ") is not a directory, "),
-						ORPHANAGE, inum, ip->i_ino, NULLFSINO)) {
+						ORPHANAGE, inum, I_INO(ip), NULLFSINO)) {
 					dep->name[0] = '/';
 					libxfs_dir2_data_log_entry(&da, bp, dep);
 				}
@@ -1827,7 +1827,7 @@ longform_dir2_entry_check_data(
 			nbad++;
 			if (entry_junked(
 	_("entry \"%s\" (ino %" PRIu64 ") in dir %" PRIu64 " already points to ino %" PRIu64 ", "),
-					fname, inum, ip->i_ino, dup_inum)) {
+					fname, inum, I_INO(ip), dup_inum)) {
 				dep->name[0] = '/';
 				libxfs_dir2_data_log_entry(&da, bp, dep);
 			}
@@ -1858,7 +1858,7 @@ longform_dir2_entry_check_data(
 				nbad++;
 				if (entry_junked(
 	_("entry \"%s\" (ino %" PRIu64 ") in dir %" PRIu64 " is not in the the first block, "), fname,
-						inum, ip->i_ino, NULLFSINO)) {
+						inum, I_INO(ip), NULLFSINO)) {
 					dir_hash_junkit(hashtab, addr);
 					dep->name[0] = '/';
 					libxfs_dir2_data_log_entry(&da, bp, dep);
@@ -1881,7 +1881,7 @@ longform_dir2_entry_check_data(
 		 * '..' is already accounted for or will be taken care
 		 * of when directory is moved to orphanage.
 		 */
-		if (ip->i_ino == inum)  {
+		if (I_INO(ip) == inum)  {
 			ASSERT(no_modify ||
 			       (dep->name[0] == '.' && dep->namelen == 1));
 			add_inode_ref(current_irec, current_ino_offset);
@@ -1891,7 +1891,7 @@ longform_dir2_entry_check_data(
 				nbad++;
 				if (entry_junked(
 	_("entry \"%s\" in dir %" PRIu64 " is not the first entry, "),
-						fname, inum, ip->i_ino, NULLFSINO)) {
+						fname, inum, I_INO(ip), NULLFSINO)) {
 					dir_hash_junkit(hashtab, addr);
 					dep->name[0] = '/';
 					libxfs_dir2_data_log_entry(&da, bp, dep);
@@ -1944,8 +1944,8 @@ longform_dir2_entry_check_data(
 			junkit = 1;
 			do_warn(
 _("entry \"%s\" in dir %" PRIu64" points to an already connected directory inode %" PRIu64 "\n"),
-				fname, ip->i_ino, inum);
-		} else if (parent == ip->i_ino)  {
+				fname, I_INO(ip), inum);
+		} else if (parent == I_INO(ip))  {
 			add_inode_reached(irec, ino_offset);
 			add_inode_ref(current_irec, current_ino_offset);
 		} else if (parent == NULLFSINO) {
@@ -1953,8 +1953,8 @@ _("entry \"%s\" in dir %" PRIu64" points to an already connected directory inode
 			   so, set it as the parent and mark for rebuild */
 			do_warn(
 	_("entry \"%s\" in dir ino %" PRIu64 " doesn't have a .. entry, will set it in ino %" PRIu64 ".\n"),
-				fname, ip->i_ino, inum);
-			set_inode_parent(irec, ino_offset, ip->i_ino);
+				fname, I_INO(ip), inum);
+			set_inode_parent(irec, ino_offset, I_INO(ip));
 			add_inode_reached(irec, ino_offset);
 			add_inode_ref(current_irec, current_ino_offset);
 			add_dotdot_update(XFS_INO_TO_AGNO(mp, inum), irec,
@@ -1963,7 +1963,7 @@ _("entry \"%s\" in dir %" PRIu64" points to an already connected directory inode
 			junkit = 1;
 			do_warn(
 _("entry \"%s\" in dir inode %" PRIu64 " inconsistent with .. value (%" PRIu64 ") in ino %" PRIu64 "\n"),
-				fname, ip->i_ino, parent, inum);
+				fname, I_INO(ip), parent, inum);
 		}
 		if (junkit)  {
 			if (inum == orphanage_ino)
@@ -2086,12 +2086,12 @@ longform_dir2_check_leaf(
 	if (error == EFSBADCRC || error == EFSCORRUPTED || fixit) {
 		do_warn(
 	_("leaf block %u for directory inode %" PRIu64 " bad CRC\n"),
-			da_bno, ip->i_ino);
+			da_bno, I_INO(ip));
 		return 1;
 	} else if (error) {
 		do_error(
 	_("can't read block %u for directory inode %" PRIu64 ", error %d\n"),
-			da_bno, ip->i_ino, error);
+			da_bno, I_INO(ip), error);
 		/* NOTREACHED */
 	}
 
@@ -2108,13 +2108,13 @@ longform_dir2_check_leaf(
 				(char *)&ents[leafhdr.count] > (char *)bestsp) {
 		do_warn(
 	_("leaf block %u for directory inode %" PRIu64 " bad header\n"),
-			da_bno, ip->i_ino);
+			da_bno, I_INO(ip));
 		libxfs_buf_relse(bp);
 		return 1;
 	}
 
 	if (leafhdr.magic == XFS_DIR3_LEAF1_MAGIC) {
-		error = check_da3_header(mp, bp, ip->i_ino);
+		error = check_da3_header(mp, bp, I_INO(ip));
 		if (error) {
 			libxfs_buf_relse(bp);
 			return error;
@@ -2134,7 +2134,7 @@ longform_dir2_check_leaf(
 	if (badtail) {
 		do_warn(
 	_("leaf block %u for directory inode %" PRIu64 " bad tail\n"),
-			da_bno, ip->i_ino);
+			da_bno, I_INO(ip));
 		libxfs_buf_relse(bp);
 		return 1;
 	}
@@ -2195,7 +2195,7 @@ longform_dir2_check_node(
 		if (error) {
 			do_warn(
 	_("can't read leaf block %u for directory inode %" PRIu64 ", error %d\n"),
-				da_bno, ip->i_ino, error);
+				da_bno, I_INO(ip), error);
 			return 1;
 		}
 		leaf = bp->b_addr;
@@ -2207,7 +2207,7 @@ longform_dir2_check_node(
 		      leafhdr.magic == XFS_DA3_NODE_MAGIC)) {
 			do_warn(
 	_("unknown magic number %#x for block %u in directory inode %" PRIu64 "\n"),
-				leafhdr.magic, da_bno, ip->i_ino);
+				leafhdr.magic, da_bno, I_INO(ip));
 			libxfs_buf_relse(bp);
 			return 1;
 		}
@@ -2215,7 +2215,7 @@ longform_dir2_check_node(
 		/* check v5 metadata */
 		if (leafhdr.magic == XFS_DIR3_LEAFN_MAGIC ||
 		    leafhdr.magic == XFS_DA3_NODE_MAGIC) {
-			error = check_da3_header(mp, bp, ip->i_ino);
+			error = check_da3_header(mp, bp, I_INO(ip));
 			if (error) {
 				libxfs_buf_relse(bp);
 				return error;
@@ -2238,7 +2238,7 @@ longform_dir2_check_node(
 		    leafhdr.count < leafhdr.stale) {
 			do_warn(
 	_("leaf block %u for directory inode %" PRIu64 " bad header\n"),
-				da_bno, ip->i_ino);
+				da_bno, I_INO(ip));
 			libxfs_buf_relse(bp);
 			return 1;
 		}
@@ -2270,7 +2270,7 @@ longform_dir2_check_node(
 		if (error) {
 			do_warn(
 	_("can't read freespace block %u for directory inode %" PRIu64 ", error %d\n"),
-				da_bno, ip->i_ino, error);
+				da_bno, I_INO(ip), error);
 			return 1;
 		}
 		free = bp->b_addr;
@@ -2285,13 +2285,13 @@ longform_dir2_check_node(
 		    freehdr.nvalid < freehdr.nused) {
 			do_warn(
 	_("free block %u for directory inode %" PRIu64 " bad header\n"),
-				da_bno, ip->i_ino);
+				da_bno, I_INO(ip));
 			libxfs_buf_relse(bp);
 			return 1;
 		}
 
 		if (freehdr.magic == XFS_DIR3_FREE_MAGIC) {
-			error = check_dir3_header(mp, bp, ip->i_ino);
+			error = check_dir3_header(mp, bp, I_INO(ip));
 			if (error) {
 				libxfs_buf_relse(bp);
 				return error;
@@ -2303,7 +2303,7 @@ longform_dir2_check_node(
 						be16_to_cpu(bests[i])) {
 				do_warn(
 	_("free block %u entry %i for directory ino %" PRIu64 " bad\n"),
-					da_bno, i, ip->i_ino);
+					da_bno, i, I_INO(ip));
 				libxfs_buf_relse(bp);
 				return 1;
 			}
@@ -2313,7 +2313,7 @@ longform_dir2_check_node(
 		if (used != freehdr.nused) {
 			do_warn(
 	_("free block %u for directory inode %" PRIu64 " bad nused\n"),
-				da_bno, ip->i_ino);
+				da_bno, I_INO(ip));
 			libxfs_buf_relse(bp);
 			return 1;
 		}
@@ -2324,7 +2324,7 @@ longform_dir2_check_node(
 		    (freetab->ents[i].v != NULLDATAOFF)) {
 			do_warn(
 	_("missing freetab entry %u for directory inode %" PRIu64 "\n"),
-				i, ip->i_ino);
+				i, I_INO(ip));
 			return 1;
 		}
 	}
@@ -2376,7 +2376,7 @@ longform_dir2_entry_check(
 	/* is this a block, leaf, or node directory? */
 	args.dp = ip;
 	args.geo = mp->m_dir_geo;
-	args.owner = ip->i_ino;
+	args.owner = I_INO(ip);
 	fmt = libxfs_dir2_format(&args, &error);
 
 	/* check directory "data" blocks (ie. name/inode pairs) */
@@ -2734,7 +2734,7 @@ shortform_dir2_entry_check(
 		    inode_is_meta(irec, ino_offset)) {
 			do_warn(
 	_("entry \"%s\" in regular dir %" PRIu64" points to a metadata inode %" PRIu64 ", "),
-					fname, ip->i_ino, lino);
+					fname, I_INO(ip), lino);
 			next_sfep = shortform_dir2_junk(mp, sfp, sfep, lino,
 						&max_size, &i, &bytes_deleted,
 						ino_dirty);
@@ -2749,7 +2749,7 @@ shortform_dir2_entry_check(
 		    !inode_is_meta(irec, ino_offset)) {
 			do_warn(
 	_("entry \"%s\" in metadata dir %" PRIu64" points to a regular inode %" PRIu64 ", "),
-					fname, ip->i_ino, lino);
+					fname, I_INO(ip), lino);
 			next_sfep = shortform_dir2_junk(mp, sfp, sfep, lino,
 						&max_size, &i, &bytes_deleted,
 						ino_dirty);
@@ -3000,7 +3000,7 @@ fix_dotdot(
 
 	libxfs_trans_ijoin(tp, ip, 0);
 
-	error = -libxfs_dir_createname(tp, ip, &xfs_name_dotdot, ip->i_ino,
+	error = -libxfs_dir_createname(tp, ip, &xfs_name_dotdot, I_INO(ip),
 			nres);
 	if (error)
 		do_error(
@@ -3133,7 +3133,7 @@ process_dir_inode(
 					do_error(
 _("error %d fixing shortform directory %llu\n"),
 						error,
-						(unsigned long long)ip->i_ino);
+						(unsigned long long)I_INO(ip));
 			} else  {
 				libxfs_trans_cancel(tp);
 			}
@@ -3189,7 +3189,7 @@ _("error %d fixing shortform directory %llu\n"),
 			libxfs_trans_ijoin(tp, ip, 0);
 
 			error = -libxfs_dir_createname(tp, ip, &xfs_name_dot,
-					ip->i_ino, nres);
+					I_INO(ip), nres);
 			if (error)
 				do_error(
 	_("can't make \".\" entry in dir ino %" PRIu64 ", createname error %d\n"),
@@ -3436,9 +3436,9 @@ reset_rt_metadir_inodes(
 		}
 
 		if (mp->m_rtdirip) {
-			mark_ino_inuse(mp, mp->m_rtdirip->i_ino, S_IFDIR,
-					mp->m_metadirip->i_ino);
-			mark_ino_metadata(mp, mp->m_rtdirip->i_ino);
+			mark_ino_inuse(mp, I_INO(mp->m_rtdirip), S_IFDIR,
+					I_INO(mp->m_metadirip));
+			mark_ino_metadata(mp, I_INO(mp->m_rtdirip));
 		}
 	}
 
@@ -3557,8 +3557,8 @@ _("Couldn't reset link count on %s quota inode, error %d\n"),
 	}
 
 	/* Mark the inode in use. */
-	mark_ino_inuse(mp, ip->i_ino, S_IFREG, dp->i_ino);
-	mark_ino_metadata(mp, ip->i_ino);
+	mark_ino_inuse(mp, I_INO(ip), S_IFREG, I_INO(dp));
+	mark_ino_metadata(mp, I_INO(ip));
 	libxfs_irele(ip);
 	return true;
 bad:
@@ -3584,8 +3584,8 @@ reset_quota_metadir_inodes(
 		do_error(_("failed to create quota metadir (%d)\n"),
 				error);
 
-	mark_ino_inuse(mp, dp->i_ino, S_IFDIR, mp->m_metadirip->i_ino);
-	mark_ino_metadata(mp, dp->i_ino);
+	mark_ino_inuse(mp, I_INO(dp), S_IFDIR, I_INO(mp->m_metadirip));
+	mark_ino_metadata(mp, I_INO(dp));
 
 	ensure_quota_file(dp, XFS_DQTYPE_USER);
 	ensure_quota_file(dp, XFS_DQTYPE_GROUP);
