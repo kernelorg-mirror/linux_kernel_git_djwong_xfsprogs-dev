@@ -65,7 +65,7 @@ get_next_unlinked(
 		dbprintf("\n");
 	}
 
-	error = -libxfs_imap_to_bp(mp, NULL, &ip->i_imap, &ino_bp);
+	error = -libxfs_read_icluster(mp, NULL, ip->i_imap.im_blkno, &ino_bp);
 	if (error) {
 		libxfs_irele(ip);
 		goto bad;
