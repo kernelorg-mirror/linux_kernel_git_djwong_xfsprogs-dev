@@ -331,7 +331,7 @@ list_sfdir(
 	/* . and .. entries */
 	off = xfs_dir2_db_off_to_dataptr(geo, geo->datablk,
 			geo->data_entry_offset);
-	error = dir_emit(args->trans, args->dp, off, ".", -1, dp->i_ino,
+	error = dir_emit(args->trans, args->dp, off, ".", -1, I_INO(dp),
 			XFS_DIR3_FT_DIR, private);
 	if (error)
 		return error;
@@ -503,7 +503,7 @@ listdir(
 		.trans		= tp,
 		.dp		= dp,
 		.geo		= dp->i_mount->m_dir_geo,
-		.owner		= dp->i_ino,
+		.owner		= I_INO(dp),
 	};
 	int			error;
 
@@ -748,7 +748,7 @@ list_leaf_pptrs(
 	struct xfs_buf			*leaf_bp;
 	int				error;
 
-	error = -libxfs_attr3_leaf_read(NULL, ip, ip->i_ino, 0, &leaf_bp);
+	error = -libxfs_attr3_leaf_read(NULL, ip, I_INO(ip), 0, &leaf_bp);
 	if (error)
 		return error;
 
@@ -846,7 +846,7 @@ list_node_pptrs(
 
 		libxfs_trans_brelse(NULL, leaf_bp);
 
-		error = -libxfs_attr3_leaf_read(NULL, ip, ip->i_ino,
+		error = -libxfs_attr3_leaf_read(NULL, ip, I_INO(ip),
 				leafhdr.forw, &leaf_bp);
 		if (error)
 			return error;
@@ -1062,7 +1062,7 @@ create_child(
 	libxfs_trans_ijoin(tp, dp, 0);
 	libxfs_trans_ijoin(tp, ip, 0);
 
-	error = -libxfs_dir_createname(tp, dp, &xname, ip->i_ino, resblks);
+	error = -libxfs_dir_createname(tp, dp, &xname, I_INO(ip), resblks);
 	if (error)
 		goto out_trans;
 
@@ -1076,7 +1076,7 @@ create_child(
 	/* Replace the dotdot entry in the child directory. */
 	if (isdir) {
 		error = -libxfs_dir_replace(tp, ip, &xfs_name_dotdot,
-				dp->i_ino, resblks);
+				I_INO(dp), resblks);
 		if (error)
 			goto out_trans;
 	}
@@ -1287,7 +1287,7 @@ remove_child(
 	if (error)
 		goto out_trans;
 
-	error = -libxfs_dir_removename(tp, dp, &xname, ip->i_ino, resblks);
+	error = -libxfs_dir_removename(tp, dp, &xname, I_INO(ip), resblks);
 	if (error)
 		goto out_trans;
 

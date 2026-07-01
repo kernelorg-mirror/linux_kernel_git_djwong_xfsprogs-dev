@@ -376,7 +376,7 @@ rdump_xattr(
 			.trans		= tp,
 			.dp		= ip,
 			.geo		= mp->m_attr_geo,
-			.owner		= ip->i_ino,
+			.owner		= I_INO(ip),
 			.attr_filter	= attr_flags & XFS_ATTR_NSP_ONDISK_MASK,
 			.namelen	= namelen,
 			.name		= name,

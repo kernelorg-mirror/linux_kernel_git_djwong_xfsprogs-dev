@@ -246,7 +246,7 @@ create_unlinked(
 		dbprintf(_("commit inode: %s\n"), strerror(error));
 
 	dbprintf(_("Created unlinked inode %llu in agno %u\n"),
-			(unsigned long long)ip->i_ino,
+			(unsigned long long)I_INO(ip),
 			XFS_INODE_TO_AGNO(ip));
 	libxfs_irele(ip);
 	return error;

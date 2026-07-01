@@ -72,6 +72,7 @@ struct inode {
 	unsigned long		i_state; /* Not actually used in userspace */
 	uint32_t		i_generation;
 	uint64_t		i_version;
+	uint64_t		i_ino;		/* inode number (agno/agino) */
 	struct timespec64	__i_atime;
 	struct timespec64	__i_mtime;
 	struct timespec64	__i_ctime; /* use inode_*_ctime accessors! */
@@ -218,7 +219,6 @@ static inline bool inode_wrong_type(const struct inode *inode, umode_t mode)
 typedef struct xfs_inode {
 	struct cache_node	i_node;
 	struct xfs_mount	*i_mount;	/* fs mount struct ptr */
-	xfs_ino_t		i_ino;		/* inode number (agno/agino) */
 	struct xfs_imap		i_imap;		/* location for xfs_imap() */
 	struct xfs_ifork	*i_cowfp;	/* copy on write extents */
 	struct xfs_ifork	i_df;		/* data fork */
@@ -365,6 +365,11 @@ static inline xfs_fsize_t XFS_ISIZE(struct xfs_inode *ip)
 	return ip->i_disk_size;
 }
 #define XFS_IS_REALTIME_INODE(ip) ((ip)->i_diflags & XFS_DIFLAG_REALTIME)
+
+static inline uint64_t I_INO(const struct xfs_inode *ip)
+{
+	return VFS_IC(ip)->i_ino;
+}
 
 static inline bool xfs_is_zoned_inode(struct xfs_inode *ip)
 {
