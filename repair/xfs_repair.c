@@ -670,7 +670,7 @@ check_metadir_inode(
 
 	/* If we changed the metadir inode, try reloading it. */
 	if (!mp->m_metadirip ||
-	    mp->m_metadirip->i_ino != mp->m_sb.sb_metadirino) {
+	    I_INO(mp->m_metadirip) != mp->m_sb.sb_metadirino) {
 		if (mp->m_metadirip)
 			libxfs_irele(mp->m_metadirip);
 

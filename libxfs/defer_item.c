@@ -563,7 +563,7 @@ xfs_bmap_update_diff_items(
 	struct xfs_bmap_intent		*ba = bi_entry(a);
 	struct xfs_bmap_intent		*bb = bi_entry(b);
 
-	return cmp_int(ba->bi_owner->i_ino, bb->bi_owner->i_ino);
+	return cmp_int(I_INO(ba->bi_owner), I_INO(bb->bi_owner));
 }
 
 /* Get an BUI. */

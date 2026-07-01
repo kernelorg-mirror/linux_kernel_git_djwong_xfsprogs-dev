@@ -701,7 +701,7 @@ attrlist_print(
 		.whichfork	= XFS_ATTR_FORK,
 		.op_flags	= XFS_DA_OP_OKNOENT,
 		.dp		= ip,
-		.owner		= ip->i_ino,
+		.owner		= I_INO(ip),
 		.trans		= tp,
 		.attr_filter	= attr_flags & XFS_ATTR_NSP_ONDISK_MASK,
 		.name		= name,
