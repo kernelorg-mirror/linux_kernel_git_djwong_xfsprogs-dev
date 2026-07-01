@@ -1050,7 +1050,7 @@ crosscheck_file_parent_ptrs(
 	struct ag_pptr		*ag_pptr, *prev_ag_pptr = NULL;
 	struct file_pptr	*file_pptr;
 	struct xfs_mount	*mp = ip->i_mount;
-	xfs_agnumber_t		agno = XFS_INO_TO_AGNO(mp, ip->i_ino);
+	xfs_agnumber_t		agno = XFS_INODE_TO_AGNO(ip);
 	xfs_agino_t		agino = XFS_INO_TO_AGINO(mp, ip->i_ino);
 	int			error;
 
