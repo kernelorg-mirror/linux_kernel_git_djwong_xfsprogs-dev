@@ -19,6 +19,9 @@ ConditionCapability=CAP_SYS_RAWIO
 ConditionPathIsMountPoint=%f
 RequiresMountsFor=%f
 
+# Terminate service if someone unmounts the filesystem
+BindsTo=%i.mount
+
 [Service]
 Type=oneshot
 Environment=SERVICE_MODE=1
