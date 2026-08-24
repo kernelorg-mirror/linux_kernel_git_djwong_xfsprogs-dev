@@ -6010,6 +6010,7 @@ main(
 			.bigtime = true,
 			.nrext64 = true,
 			.exchrange = true,
+			.metadir = true,
 			/*
 			 * When we decide to enable a new feature by default,
 			 * please remember to update the mkfs conf files.

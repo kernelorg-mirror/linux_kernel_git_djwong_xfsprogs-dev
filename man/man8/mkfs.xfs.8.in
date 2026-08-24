@@ -280,10 +280,14 @@ is used, the inode btree counter feature is not supported and is disabled.
 .TP
 .BI metadir= value
 This option creates an internal directory tree to store filesystem metadata.
+The value is either 0 to disable the feature, or 1 to create the internal
+directory tree.
+If enabled, quota mount options are persisted across mounts without the need
+for respecifying them.
 .IP
 By default,
 .B mkfs.xfs
-will not enable this feature.
+will enable this feature.
 If the option
 .B \-m crc=0
 is used, the metadata directory feature is not supported and is disabled.
