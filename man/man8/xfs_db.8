@@ -969,6 +969,13 @@ Seed the random number generator with this value.
 .BI "help [" command ]
 Print help for one or all commands.
 .TP
+.BI "makecfg [" path ]
+Write a configuration file to the given path that can be re-read by mkfs.xfs
+for a future filesystem format attempt.
+This file will contain only user-visible features.
+Filesystem geometry information is not written to the configuration file.
+If no path is given, the configuration will be printed on standard output.
+.TP
 .B info
 Displays selected geometry information about the filesystem.
 The output will have the same format that
