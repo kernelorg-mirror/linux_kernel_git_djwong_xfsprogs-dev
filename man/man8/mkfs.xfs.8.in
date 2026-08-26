@@ -156,6 +156,14 @@ The valid
 is:
 .RS 1.2i
 .TP
+.BI makecfg= path
+Write a configuration file to the file specified by the
+.I path
+option string.
+This file can be re-read by mkfs.xfs for a future filesystem format attempt.
+This file will contain only user-visible features.
+If no path is given, the configuration will be printed on standard output.
+.TP
 .BI options= name
 The configuration options will be sourced from the file specified by the
 .I name
