@@ -163,6 +163,12 @@ option string.
 This option can be use either an absolute or relative path to the configuration
 file to be read.
 Sample configuration files can be found in @mkfs_cfg_dir@.
+.TP
+.BI makecfg= value
+Write a configuration file to the given path that can be re-read by mkfs.xfs
+for a future filesystem format attempt.
+This file will contain only user-visible features.
+If no path is given, the configuration will be printed on standard output.
 .RE
 .PP
 .PD 0
