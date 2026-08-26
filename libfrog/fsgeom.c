@@ -7,6 +7,10 @@
 #include "bitops.h"
 #include "fsgeom.h"
 #include "util.h"
+#include "list.h"
+#include "libfrog/fsproperties.h"
+#include "xfs_arch.h"
+#include "libxfs/xfs_format.h"
 
 static inline const char *
 rtdev_name(
@@ -249,4 +253,379 @@ xfrog_rtgroup_geometry(
 	if (ret)
 		return -errno;
 	return 0;
+}
+
+enum {
+	M_CRC = 0,
+	M_FINOBT,
+	M_RMAPBT,
+	M_REFLINK,
+	M_INOBTCNT,
+	M_BIGTIME,
+	M_METADIR,
+	M_AUTOFSCK,
+	M_MAX_OPTS,
+};
+
+enum {
+	D_RTINHERIT = 0,
+	D_PROJINHERIT,
+	D_EXTSZINHERIT,
+	D_COWEXTSIZE,
+	D_DAXINHERIT,
+	D_MAX_OPTS,
+};
+
+enum {
+	I_SPINODES = 0,
+	I_NREXT64,
+	I_EXCHANGE,
+	I_MAX_OPTS,
+};
+
+enum {
+	N_PARENT = 0,
+	N_FTYPE,
+	N_VERSION,
+	N_MAX_OPTS,
+};
+
+enum {
+	R_EXTSIZE = 0,
+	R_MAX_OPTS,
+};
+
+struct mkfs_config_opt;
+
+struct mkfs_config_data {
+	const struct xfs_fsop_geom	*fsgeo;
+	const struct fsxattr		*fsx;
+	enum fsprop_autofsck		autofsck;
+};
+
+typedef int (*opt_print_fn)(const struct mkfs_config_opt *opt,
+			    const struct mkfs_config_data *data,
+			    FILE *fp);
+
+struct mkfs_config_opt {
+	const char		*name;
+	uint64_t		fsgeom_flag;
+	uint64_t		xflags_flag;
+	opt_print_fn		print_fn;
+};
+
+struct mkfs_config_section {
+	const char		*ini_section;
+	struct mkfs_config_opt	subopts[16];
+};
+
+static int
+print_fsgeom(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct xfs_fsop_geom	*fsgeo = data->fsgeo;
+	int				ret;
+
+	ret = fprintf(fp, "%s=%d\n", opt->name,
+			!!(fsgeo->flags & opt->fsgeom_flag));
+	if (ret <= 0)
+		return ret;
+	return 0;
+}
+
+static int
+print_xflag(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct fsxattr		*fsx = data->fsx;
+	int				ret;
+
+	if (!(fsx->fsx_xflags & opt->xflags_flag))
+		return 0;
+
+	ret = fprintf(fp, "%s=%d\n", opt->name, 1);
+	if (ret <= 0)
+		return ret;
+	return 0;
+}
+
+static int
+print_projinherit(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct fsxattr		*fsx = data->fsx;
+	int				ret;
+
+	if (fsx->fsx_xflags & FS_XFLAG_PROJINHERIT) {
+		ret = fprintf(fp, "%s=%u\n", opt->name, fsx->fsx_projid);
+		if (ret <= 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int
+print_extszinherit(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct fsxattr		*fsx = data->fsx;
+	int				ret;
+
+	if (fsx->fsx_xflags & FS_XFLAG_EXTSZINHERIT) {
+		ret = fprintf(fp, "%s=%u\n", opt->name, fsx->fsx_extsize);
+		if (ret <= 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int
+print_cowextszinherit(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct fsxattr		*fsx = data->fsx;
+	int				ret;
+
+	if (fsx->fsx_xflags & FS_XFLAG_COWEXTSIZE) {
+		ret = fprintf(fp, "%s=%u\n", opt->name, fsx->fsx_cowextsize);
+		if (ret <= 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int
+print_rtextsize(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct xfs_fsop_geom	*fsgeo = data->fsgeo;
+	int				ret;
+
+	/* No need to emit the rt extent size if it's the minimum */
+	if (fsgeo->rtextsize > (XFS_MIN_RTEXTSIZE / fsgeo->blocksize)) {
+		ret = fprintf(fp, "%s=%u\n", opt->name,
+				fsgeo->rtextsize * fsgeo->blocksize);
+		if (ret <= 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int
+print_dirversion(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct xfs_fsop_geom	*fsgeo = data->fsgeo;
+	int				ret;
+
+	if (fsgeo->flags & XFS_FSOP_GEOM_FLAGS_DIRV2CI)
+		ret = fprintf(fp, "%s=ci\n", opt->name);
+	else
+		ret = fprintf(fp, "%s=2\n", opt->name);
+	if (ret <= 0)
+		return ret;
+	return 0;
+}
+
+static int
+print_autofsck(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	int				ret;
+	const char			*value =
+		fsprop_autofsck_write(data->autofsck);
+
+	if (value) {
+		ret = fprintf(fp, "%s=%s\n", opt->name, value);
+		if (ret <= 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+static const struct mkfs_config_section config_sections[] = {
+	{
+		.ini_section = "metadata",
+		.subopts = {
+			[M_CRC] = {
+				.name		= "crc",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_V5SB,
+			},
+			[M_FINOBT] = {
+				.name		= "finobt",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_FINOBT,
+			},
+			[M_RMAPBT] = {
+				.name		= "rmapbt",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_RMAPBT,
+			},
+			[M_REFLINK] = {
+				.name		= "reflink",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_REFLINK,
+			},
+			[M_INOBTCNT] = {
+				.name		= "inobtcount",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_INOBTCNT,
+			},
+			[M_BIGTIME] = {
+				.name		= "bigtime",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_BIGTIME,
+			},
+			[M_METADIR] = {
+				.name		= "metadir",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_METADIR,
+			},
+			[M_AUTOFSCK] = {
+				.name		= "autofsck",
+				.print_fn	= print_autofsck,
+			},
+			[M_MAX_OPTS] = { },
+		},
+	},
+	{
+		.ini_section			= "data",
+		.subopts = {
+			[D_RTINHERIT] = {
+				.name		= "rtinherit",
+				.xflags_flag	= FS_XFLAG_RTINHERIT,
+			},
+			[D_PROJINHERIT] = {
+				.name		= "projinherit",
+				.print_fn	= print_projinherit,
+			},
+			[D_EXTSZINHERIT] = {
+				.name		= "extszinherit",
+				.print_fn	= print_extszinherit,
+			},
+			[D_COWEXTSIZE] = {
+				.name		= "cowextsize",
+				.print_fn	= print_cowextszinherit,
+			},
+			[D_DAXINHERIT] = {
+				.name		= "daxinherit",
+				.xflags_flag	= FS_XFLAG_DAX,
+			},
+			[D_MAX_OPTS] = { },
+		},
+	},
+	{
+		.ini_section			= "inode",
+		.subopts = {
+			[I_SPINODES] = {
+				.name		= "sparse",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_SPINODES,
+			},
+			[I_NREXT64] = {
+				.name		= "nrext64",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_NREXT64,
+			},
+			[I_EXCHANGE] = {
+				.name		= "exchange",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_EXCHANGE_RANGE,
+			},
+			[I_MAX_OPTS] = { },
+		},
+	},
+	{
+		.ini_section = "naming",
+		.subopts = {
+			[N_PARENT] = {
+				.name		= "parent",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_PARENT,
+			},
+			[N_FTYPE] = {
+				.name		= "ftype",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_FTYPE,
+			},
+			[N_VERSION] = {
+				.name		= "version",
+				.print_fn	= print_dirversion,
+			},
+		},
+	},
+	{
+		.ini_section = "realtime",
+		.subopts = {
+			[R_EXTSIZE] = {
+				.name		= "extsize",
+				.print_fn	= print_rtextsize,
+			},
+			[R_MAX_OPTS] = { },
+		},
+	},
+};
+
+/*
+ * Write a mkfs.xfs configuration file for the user-visible filesystem features
+ * enabled in the corresponding fs geometry and root directory file attribute
+ * structures.
+ *
+ * Note: The regular and COW extent size hints must be in units of fsblocks,
+ * not bytes.
+ */
+int
+xfrog_write_mkfs_config(
+	const struct xfs_fsop_geom		*fsgeo,
+	const struct fsxattr			*fsx,
+	int					autofsck,
+	FILE					*fp)
+{
+	struct mkfs_config_data			d = {
+		.fsgeo				= fsgeo,
+		.fsx				= fsx,
+		.autofsck			= autofsck,
+	};
+	const struct mkfs_config_section	*section = config_sections;
+	const struct mkfs_config_opt		*opt;
+	int					i, j;
+	int					error;
+
+	for (i = 0; i < ARRAY_SIZE(config_sections); i++, section++) {
+		if (i > 0) {
+			error = fprintf(fp, "\n");
+			if (error <= 0)
+				return error;
+		}
+
+		error = fprintf(fp, "[%s]\n", section->ini_section);
+		if (error <= 0)
+			return error;
+
+		opt = section->subopts;
+		for (j = 0;
+		     j < ARRAY_SIZE(section->subopts) && opt->name;
+		     j++, opt++) {
+			if (opt->print_fn)
+				error = opt->print_fn(opt, &d, fp);
+			else if (opt->xflags_flag)
+				error = print_xflag(opt, &d, fp);
+			else if (opt->fsgeom_flag)
+				error = print_fsgeom(opt, &d, fp);
+			if (error)
+				return error;
+		}
+	}
+
+	return fflush(fp);
 }
