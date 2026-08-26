@@ -217,4 +217,7 @@ bytes_per_rtgroup(
 		fsgeo->blocksize;
 }
 
+int xfrog_write_mkfs_config(const struct xfs_fsop_geom *fsgeo,
+		const struct fsxattr *fsx, int autofsck, FILE *fp);
+
 #endif /* __LIBFROG_FSGEOM_H__ */
