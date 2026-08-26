@@ -163,6 +163,10 @@ option string.
 This option can be use either an absolute or relative path to the configuration
 file to be read.
 Sample configuration files can be found in @mkfs_cfg_dir@.
+.TP
+.BI print= value
+If set to 1, print a configuration file that can be read by the mkfs.xfs.
+This file will contain only user-visible features.
 .RE
 .PP
 .PD 0

@@ -61,6 +61,7 @@ enum {
 
 enum {
 	C_OPTFILE = 0,
+	C_PRINTCFG,
 	C_MAX_OPTS,
 };
 
@@ -312,12 +313,19 @@ static struct opt_params copts = {
 	.name = 'c',
 	.subopts = {
 		[C_OPTFILE] = "options",
+		[C_PRINTCFG] = "print",
 		[C_MAX_OPTS] = NULL,
 	},
 	.subopt_params = {
 		{ .index = C_OPTFILE,
 		  .conflicts = { { NULL, LAST_CONFLICT } },
 		  .defaultval = SUBOPT_NEEDS_VAL,
+		},
+		{ .index = C_PRINTCFG,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .minval = 0,
+		  .maxval = 1,
+		  .defaultval = 1,
 		},
 	},
 };
@@ -1103,6 +1111,7 @@ struct cli_params {
 	int	log_concurrency;
 	int	rtvol_concurrency;
 	int	imaxpct;
+	int	printcfg;
 
 	/* parameters where 0 is not a valid value */
 	int64_t	agcount;
@@ -1207,7 +1216,7 @@ usage( void )
 {
 	fprintf(stderr, _("Usage: %s\n\
 /* blocksize */		[-b size=num]\n\
-/* config file */	[-c options=xxx]\n\
+/* config file */	[-c options=xxx,print=0|1]\n\
 /* metadata */		[-m crc=0|1,finobt=0|1,uuid=xxx,rmapbt=0|1,reflink=0|1,\n\
 			    inobtcount=0|1,bigtime=0|1,autofsck=xxx,\n\
 			    metadir=0|1]\n\
@@ -1786,6 +1795,9 @@ cfgfile_opts_parser(
 	switch (subopt) {
 	case C_OPTFILE:
 		cli->cfgfile = getstr(value, opts, subopt);
+		break;
+	case C_PRINTCFG:
+		cli->printcfg = getnum(value, opts, subopt);
 		break;
 	default:
 		return -EINVAL;
@@ -6196,6 +6208,15 @@ main(
 	validate_cowextsize_hint(mp, &cli);
 
 	validate_supported(mp, &cli);
+
+	if (cli.printcfg) {
+		struct xfs_fsop_geom	geo;
+
+		libxfs_fs_geometry(mp, &geo, XFS_FS_GEOM_MAX_STRUCT_VER);
+		error = xfrog_write_mkfs_config(&geo, &cli.fsx, cli.autofsck,
+				stdout);
+		exit(error ? 1 : 0);
+	}
 
 	/* Print the intended geometry of the fs. */
 	if (!quiet || dry_run) {
