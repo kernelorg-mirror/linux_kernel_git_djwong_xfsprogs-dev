@@ -11,15 +11,19 @@ DB_OPTS=""
 DB_DEV_OPTS=""
 REPAIR_OPTS=""
 IO_OPTS=""
+SPACEMAN_OPTS=""
 REPAIR_DEV_OPTS=""
 LOG_OPTS=""
-USAGE="Usage: xfs_admin [-efjlpuV] [-c 0|1] [-L label] [-O v5_feature] [-r rtdev] [-U uuid] device [logdev]"
+USAGE="Usage: xfs_admin [-efjlpuV] [-C cfgfile] [-c 0|1] [-L label] [-O v5_feature] [-r rtdev] [-U uuid] device [logdev]"
 
-while getopts "c:efjlL:O:pr:uU:V" c
+while getopts "C:c:efjlL:O:pr:uU:V" c
 do
 	case $c in
 	c)	REPAIR_OPTS=$REPAIR_OPTS" -c lazycount="$OPTARG
 		require_offline=1
+		;;
+	C)	DB_OPTS=$DB_OPTS" -c 'makecfg "$OPTARG"'"
+		SPACEMAN_OPTS=$SPACEMAN_OPTS" -c 'makecfg "$OPTARG"'"
 		;;
 	e)	DB_OPTS=$DB_OPTS" -c 'version extflg'"
 		require_offline=1
@@ -70,6 +74,13 @@ case $# in
 			if [ -n "$require_offline" ]; then
 				echo "$1: filesystem is mounted."
 				exit 2
+			fi
+
+			if [ -n "$SPACEMAN_OPTS" ]; then
+				eval xfs_spaceman -p xfs_admin $SPACEMAN_OPTS "$mntpt"
+				res=$?
+				test $res -ne 0 && exit $res
+				test -n "$IO_OPTS" || exit $res
 			fi
 
 			if [ -n "$IO_OPTS" ]; then
