@@ -315,7 +315,7 @@ xfs_metadir_create(
  * Begin the process of linking a metadata file by allocating transactions
  * and locking whatever resources we're going to need.
  */
-int
+static int
 xfs_metadir_start_link(
 	struct xfs_metadir_update	*upd)
 {
@@ -362,7 +362,7 @@ out_teardown:
  * The path (up to the final component) must already exist, but the final
  * component must not already exist.
  */
-int
+static int
 xfs_metadir_link(
 	struct xfs_metadir_update	*upd)
 {
@@ -407,7 +407,7 @@ xfs_metadir_link(
 #endif /* ! __KERNEL__ */
 
 /* Commit a metadir update and unlock/drop all resources. */
-int
+static int
 xfs_metadir_commit(
 	struct xfs_metadir_update	*upd)
 {
@@ -497,3 +497,27 @@ xfs_metadir_mkdir(
 
 	return xfs_metadir_create_file(&upd, S_IFDIR, NULL, NULL, ipp);
 }
+
+#ifndef __KERNEL__
+/* Link a metadata file into a metadata directory. */
+int
+xfs_metadir_link_file(
+	struct xfs_metadir_update	*upd)
+{
+	int				error;
+
+	error = xfs_metadir_start_link(upd);
+	if (error)
+		return error;
+
+	error = xfs_metadir_link(upd);
+	if (error) {
+		xfs_metadir_cancel(upd, error);
+		return error;
+	}
+
+	xfs_trans_log_inode(upd->tp, upd->ip, XFS_ILOG_CORE);
+
+	return xfs_metadir_commit(upd);
+}
+#endif /* ! __KERNEL__ */
