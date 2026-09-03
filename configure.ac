@@ -195,6 +195,7 @@ if test "$have_listmount" = "yes"; then
 fi
 AC_HAVE_STATMOUNT_SUPPORTED_MASK
 AC_HAVE_FANOTIFY_MOUNTINFO
+AC_HAVE_QUOTACTL_FD
 
 if test "$enable_ubsan" = "yes" || test "$enable_ubsan" = "probe"; then
         AC_PACKAGE_CHECK_UBSAN

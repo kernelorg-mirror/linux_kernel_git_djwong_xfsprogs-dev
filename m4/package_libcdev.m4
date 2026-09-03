@@ -476,3 +476,22 @@ AC_DEFUN([AC_HAVE_FANOTIFY_MOUNTINFO],
        AC_MSG_RESULT(no))
     AC_SUBST(have_fanotify_mountinfo)
   ])
+
+#
+# Check if we have a quotactl_fd system call (5.14).
+#
+AC_DEFUN([AC_HAVE_QUOTACTL_FD],
+  [AC_MSG_CHECKING([for quotactl_fd])
+    AC_LINK_IFELSE(
+    [AC_LANG_PROGRAM([[
+#define _GNU_SOURCE
+#include <sys/syscall.h>
+#include <unistd.h>
+  ]], [[
+	return syscall(SYS_quotactl_fd);
+  ]])
+    ], have_quotactl_fd=yes
+       AC_MSG_RESULT(yes),
+       AC_MSG_RESULT(no))
+    AC_SUBST(have_quotactl_fd)
+  ])

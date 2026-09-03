@@ -6239,8 +6239,8 @@ main(
 		}
 
 		libxfs_fs_geometry(mp, &geo, XFS_FS_GEOM_MAX_STRUCT_VER);
-		error = xfrog_write_mkfs_config(&geo, &cli.fsx, cli.autofsck,
-				fp);
+		error = xfrog_write_mkfs_config(&geo, cli.sb_feat.qflags,
+				&cli.fsx, cli.autofsck, fp);
 		if (!error)
 			error = fclose(fp);
 		if (error) {

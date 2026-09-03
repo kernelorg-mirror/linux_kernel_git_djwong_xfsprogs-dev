@@ -440,7 +440,8 @@ makecfg_f(
 		close_fp = true;
 	}
 
-	error = xfrog_write_mkfs_config(&geo, &fsx, autofsck, fp);
+	error = xfrog_write_mkfs_config(&geo, mp->m_sb.sb_qflags, &fsx,
+			autofsck, fp);
 	if (error) {
 		if (close_fp)
 			perror(argv[optind]);
