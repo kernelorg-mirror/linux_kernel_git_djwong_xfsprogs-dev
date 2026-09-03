@@ -286,6 +286,7 @@ enum {
 	I_SPINODES = 0,
 	I_NREXT64,
 	I_EXCHANGE,
+	I_PROJID32BIT,
 	I_MAX_OPTS,
 };
 
@@ -299,6 +300,11 @@ enum {
 enum {
 	R_EXTSIZE = 0,
 	R_MAX_OPTS,
+};
+
+enum {
+	L_LAZYSBCNTR,
+	L_MAX_OPTS,
 };
 
 struct mkfs_config_opt;
@@ -339,6 +345,24 @@ print_fsgeom(
 
 	ret = fprintf(fp, "%s=%d\n", opt->name,
 			!!(fsgeo->flags & opt->fsgeom_flag));
+	if (ret <= 0)
+		return ret;
+	return 0;
+}
+
+static int
+print_fsgeom_only_if_missing(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct xfs_fsop_geom	*fsgeo = data->fsgeo;
+	int				ret;
+
+	if (fsgeo->flags & opt->fsgeom_flag)
+		return 0;
+
+	ret = fprintf(fp, "%s=0\n", opt->name);
 	if (ret <= 0)
 		return ret;
 	return 0;
@@ -618,7 +642,22 @@ static const struct mkfs_config_section config_sections[] = {
 				.name		= "exchange",
 				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_EXCHANGE_RANGE,
 			},
+			[I_PROJID32BIT] = {
+				.name		= "projid32bit",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_PROJID32,
+				.print_fn	= print_fsgeom_only_if_missing,
+			},
 			[I_MAX_OPTS] = { },
+		},
+	},
+	{
+		.ini_section = "log",
+		.subopts = {
+			[L_LAZYSBCNTR] = {
+				.name		= "lazy-count",
+				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_LAZYSB,
+				.print_fn	= print_fsgeom_only_if_missing,
+			},
 		},
 	},
 	{
