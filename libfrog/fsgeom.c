@@ -262,6 +262,12 @@ enum {
 	M_BIGTIME,
 	M_METADIR,
 	M_AUTOFSCK,
+	M_UQUOTA,
+	M_GQUOTA,
+	M_PQUOTA,
+	M_UQNOENFORCE,
+	M_GQNOENFORCE,
+	M_PQNOENFORCE,
 	M_MAX_OPTS,
 };
 
@@ -298,6 +304,7 @@ struct mkfs_config_opt;
 struct mkfs_config_data {
 	const struct xfs_fsop_geom	*fsgeo;
 	const struct fsxattr		*fsx;
+	unsigned int			qflags;
 	enum fsprop_autofsck		autofsck;
 };
 
@@ -307,9 +314,11 @@ typedef int (*opt_print_fn)(const struct mkfs_config_opt *opt,
 
 struct mkfs_config_opt {
 	const char		*name;
+	opt_print_fn		print_fn;
 	uint64_t		fsgeom_flag;
 	uint64_t		xflags_flag;
-	opt_print_fn		print_fn;
+	unsigned int		qflags_mask;
+	unsigned int		qflags;
 };
 
 struct mkfs_config_section {
@@ -346,6 +355,26 @@ print_xflag(
 		return 0;
 
 	ret = fprintf(fp, "%s=%d\n", opt->name, 1);
+	if (ret <= 0)
+		return ret;
+	return 0;
+}
+
+static int
+print_qflags(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	int				ret;
+
+	/* quota flags are only persisted on metadir filesystems */
+	if (!(data->fsgeo->flags & XFS_FSOP_GEOM_FLAGS_METADIR))
+		return 0;
+	if ((data->qflags & opt->qflags_mask) != opt->qflags)
+		return 0;
+
+	ret = fprintf(fp, "%s=1\n", opt->name);
 	if (ret <= 0)
 		return ret;
 	return 0;
@@ -497,6 +526,42 @@ static const struct mkfs_config_section config_sections[] = {
 				.name		= "autofsck",
 				.print_fn	= print_autofsck,
 			},
+			[M_UQUOTA] = {
+				.name		= "uquota",
+				.qflags		= MAKECFG_UQUOTA_ACCT | MAKECFG_UQUOTA_ENFD,
+				.qflags_mask	= MAKECFG_UQUOTA_ACCT | MAKECFG_UQUOTA_ENFD,
+				.print_fn	= print_qflags,
+			},
+			[M_GQUOTA] = {
+				.name		= "gquota",
+				.qflags		= MAKECFG_GQUOTA_ACCT | MAKECFG_GQUOTA_ENFD,
+				.qflags_mask	= MAKECFG_GQUOTA_ACCT | MAKECFG_GQUOTA_ENFD,
+				.print_fn	= print_qflags,
+			},
+			[M_PQUOTA] = {
+				.name		= "pquota",
+				.qflags		= MAKECFG_PQUOTA_ACCT | MAKECFG_PQUOTA_ENFD,
+				.qflags_mask	= MAKECFG_PQUOTA_ACCT | MAKECFG_PQUOTA_ENFD,
+				.print_fn	= print_qflags,
+			},
+			[M_UQNOENFORCE] = {
+				.name		= "uqnoenforce",
+				.qflags		= MAKECFG_UQUOTA_ACCT,
+				.qflags_mask	= MAKECFG_UQUOTA_ACCT | MAKECFG_UQUOTA_ENFD,
+				.print_fn	= print_qflags,
+			},
+			[M_GQNOENFORCE] = {
+				.name		= "gqnoenforce",
+				.qflags		= MAKECFG_GQUOTA_ACCT,
+				.qflags_mask	= MAKECFG_GQUOTA_ACCT | MAKECFG_GQUOTA_ENFD,
+				.print_fn	= print_qflags,
+			},
+			[M_PQNOENFORCE] = {
+				.name		= "pqnoenforce",
+				.qflags		= MAKECFG_PQUOTA_ACCT,
+				.qflags_mask	= MAKECFG_PQUOTA_ACCT | MAKECFG_PQUOTA_ENFD,
+				.print_fn	= print_qflags,
+			},
 			[M_MAX_OPTS] = { },
 		},
 	},
@@ -584,6 +649,7 @@ static const struct mkfs_config_section config_sections[] = {
 int
 xfrog_write_mkfs_config(
 	const struct xfs_fsop_geom		*fsgeo,
+	unsigned int				qflags,
 	const struct fsxattr			*fsx,
 	int					autofsck,
 	FILE					*fp)
@@ -592,6 +658,7 @@ xfrog_write_mkfs_config(
 		.fsgeo				= fsgeo,
 		.fsx				= fsx,
 		.autofsck			= autofsck,
+		.qflags				= qflags,
 	};
 	const struct mkfs_config_section	*section = config_sections;
 	const struct mkfs_config_opt		*opt;

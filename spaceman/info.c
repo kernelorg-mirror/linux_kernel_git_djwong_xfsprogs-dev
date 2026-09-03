@@ -3,6 +3,7 @@
  * Copyright (C) 2018 Oracle.  All Rights Reserved.
  * Author: Darrick J. Wong <darrick.wong@oracle.com>
  */
+#include <sys/quota.h>
 #include "libxfs.h"
 #include "command.h"
 #include "init.h"
@@ -11,6 +12,7 @@
 #include "libfrog/fsproperties.h"
 #include "libfrog/fsprops.h"
 #include "space.h"
+#include "include/xqm.h"
 
 static void
 info_help(void)
@@ -88,7 +90,7 @@ get_autofsck(
 		ret = 0;
 		goto out_fph;
 	}
-	if (ret)
+	if (ret || !valuelen)
 		goto out_fph;
 
 	*autofsck = fsprop_autofsck_read(valuebuf);
@@ -96,6 +98,43 @@ get_autofsck(
 out_fph:
 	fsprops_free_handle(&fph);
 	return ret;
+}
+
+struct qflags_xlate {
+	unsigned int	qs_flag;
+	unsigned int	mkcfg_qflag;
+};
+
+static const struct qflags_xlate qsflags_xlate[] = {
+	{ .qs_flag = XFS_QUOTA_UDQ_ACCT, .mkcfg_qflag = MAKECFG_UQUOTA_ACCT },
+	{ .qs_flag = XFS_QUOTA_UDQ_ENFD, .mkcfg_qflag = MAKECFG_UQUOTA_ENFD },
+	{ .qs_flag = XFS_QUOTA_GDQ_ACCT, .mkcfg_qflag = MAKECFG_GQUOTA_ACCT },
+	{ .qs_flag = XFS_QUOTA_GDQ_ENFD, .mkcfg_qflag = MAKECFG_GQUOTA_ENFD },
+	{ .qs_flag = XFS_QUOTA_PDQ_ACCT, .mkcfg_qflag = MAKECFG_PQUOTA_ACCT },
+	{ .qs_flag = XFS_QUOTA_PDQ_ENFD, .mkcfg_qflag = MAKECFG_PQUOTA_ENFD },
+};
+
+static int
+get_qflags(
+	struct fileio		*f,
+	unsigned int		*qflags)
+{
+	struct fs_quota_stat	qstat;
+	int			i;
+	int			ret;
+
+	*qflags = 0;
+
+	ret = quotactl(QCMD(Q_XGETQSTAT, 0), f->fs_path.fs_name, 0,
+			(void *)&qstat);
+	if (ret)
+		return ret;
+
+	for (i = 0; i < ARRAY_SIZE(qsflags_xlate); i++)
+		if (qstat.qs_flags & qsflags_xlate[i].qs_flag)
+			*qflags |= qsflags_xlate[i].mkcfg_qflag;
+
+	return 0;
 }
 
 static int makecfg_usage(void);
@@ -109,6 +148,7 @@ makecfg_f(
 	FILE			*fp;
 	bool			close_fp = false;
 	enum fsprop_autofsck	autofsck;
+	unsigned int		qflags;
 	int			c;
 	int			ret;
 
@@ -145,6 +185,12 @@ makecfg_f(
 		return 1;
 	}
 
+	ret = get_qflags(file, &qflags);
+	if (ret) {
+		perror("quotactl");
+		return 1;
+	}
+
 	if (optind == argc) {
 		fp = stdout;
 	} else {
@@ -156,7 +202,8 @@ makecfg_f(
 		close_fp = true;
 	}
 
-	ret = xfrog_write_mkfs_config(&file->xfd.fsgeom, &fsx, autofsck, fp);
+	ret = xfrog_write_mkfs_config(&file->xfd.fsgeom, qflags, &fsx,
+			autofsck, fp);
 	if (ret) {
 		if (close_fp)
 			perror(argv[optind]);
