@@ -30,6 +30,10 @@ ifeq ($(HAVE_GETFSMAP),yes)
 CFILES += freesp.c
 endif
 
+ifeq ($(HAVE_QUOTACTL_FD),yes)
+CFLAGS += -DHAVE_QUOTACTL_FD
+endif
+
 default: depend $(LTCOMMAND)
 
 include $(BUILDRULES)

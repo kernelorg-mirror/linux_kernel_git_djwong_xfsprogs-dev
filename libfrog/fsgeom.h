@@ -217,7 +217,16 @@ bytes_per_rtgroup(
 		fsgeo->blocksize;
 }
 
+/* These should correspond to XFS_[UGP]UOTA_{ACCT,ENFD} */
+#define MAKECFG_UQUOTA_ACCT	0x0001 /* user quota accounting ON */
+#define MAKECFG_UQUOTA_ENFD	0x0002 /* user quota limits enforced */
+#define MAKECFG_GQUOTA_ACCT	0x0040 /* group quota accounting ON */
+#define MAKECFG_GQUOTA_ENFD	0x0080 /* group quota limits enforced */
+#define MAKECFG_PQUOTA_ACCT	0x0008 /* project quota accounting ON */
+#define MAKECFG_PQUOTA_ENFD	0x0200 /* project quota limits enforced */
+
 int xfrog_write_mkfs_config(const struct xfs_fsop_geom *fsgeo,
-		const struct fsxattr *fsx, int autofsck, FILE *fp);
+		unsigned int qflags, const struct fsxattr *fsx, int autofsck,
+		FILE *fp);
 
 #endif /* __LIBFROG_FSGEOM_H__ */
