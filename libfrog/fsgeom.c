@@ -11,6 +11,7 @@
 #include "libfrog/fsproperties.h"
 #include "xfs_arch.h"
 #include "libxfs/xfs_format.h"
+#include "xfs_multidisk.h"
 
 static inline const char *
 rtdev_name(
@@ -287,6 +288,8 @@ enum {
 	I_NREXT64,
 	I_EXCHANGE,
 	I_PROJID32BIT,
+	I_MAXPCT,
+	I_SIZE,
 	I_MAX_OPTS,
 };
 
@@ -294,6 +297,7 @@ enum {
 	N_PARENT = 0,
 	N_FTYPE,
 	N_VERSION,
+	N_SIZE,
 	N_MAX_OPTS,
 };
 
@@ -499,6 +503,90 @@ print_dirversion(
 }
 
 static int
+print_dirsize(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct xfs_fsop_geom	*fsgeo = data->fsgeo;
+	int				ret;
+
+	/* No need to emit the directory block size if it's the minimum */
+	if (fsgeo->dirblocksize > (1U << XFS_MIN_REC_DIRSIZE)) {
+		ret = fprintf(fp, "%s=%u\n", opt->name, fsgeo->dirblocksize);
+		if (ret <= 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+static inline uint64_t terablocks(unsigned int nr, unsigned int blocksize)
+{
+	return (nr * (1ULL << 40)) / blocksize;
+}
+
+static inline unsigned int default_imaxpct(const struct xfs_fsop_geom *fsgeo)
+{
+	/*
+	 * This returns the % of the disk space that is used for
+	 * inodes, it changes relatively to the FS size:
+	 *  - over  50 TB, use 1%,
+	 *  - 1TB - 50 TB, use 5%,
+	 *  - under  1 TB, use XFS_DFL_IMAXIMUM_PCT (25%).
+	 */
+
+	if (fsgeo->datablocks < terablocks(1, fsgeo->blocksize))
+		return XFS_DFL_IMAXIMUM_PCT;
+	if (fsgeo->datablocks < terablocks(50, fsgeo->blocksize))
+		return 5;
+	return 1;
+}
+
+static int
+print_imaxpct(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct xfs_fsop_geom	*fsgeo = data->fsgeo;
+	int				ret;
+
+	if (fsgeo->imaxpct != default_imaxpct(fsgeo)) {
+		ret = fprintf(fp, "%s=%u\n", opt->name, fsgeo->imaxpct);
+		if (ret <= 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+static inline unsigned int default_inodesize(const struct xfs_fsop_geom *fsgeo)
+{
+	if (fsgeo->flags & XFS_FSOP_GEOM_FLAGS_V5SB)
+		return 1U << XFS_DINODE_DFL_CRC_LOG;
+	return 1U << XFS_DINODE_DFL_LOG;
+}
+
+static int
+print_inodesize(
+	const struct mkfs_config_opt	*opt,
+	const struct mkfs_config_data	*data,
+	FILE				*fp)
+{
+	const struct xfs_fsop_geom	*fsgeo = data->fsgeo;
+	int				ret;
+
+	if (fsgeo->inodesize != default_inodesize(fsgeo)) {
+		ret = fprintf(fp, "%s=%u\n", opt->name, fsgeo->inodesize);
+		if (ret <= 0)
+			return ret;
+	}
+
+	return 0;
+}
+
+static int
 print_autofsck(
 	const struct mkfs_config_opt	*opt,
 	const struct mkfs_config_data	*data,
@@ -647,6 +735,14 @@ static const struct mkfs_config_section config_sections[] = {
 				.fsgeom_flag	= XFS_FSOP_GEOM_FLAGS_PROJID32,
 				.print_fn	= print_fsgeom_only_if_missing,
 			},
+			[I_MAXPCT] = {
+				.name		= "maxpct",
+				.print_fn	= print_imaxpct,
+			},
+			[I_SIZE] = {
+				.name		= "size",
+				.print_fn	= print_inodesize,
+			},
 			[I_MAX_OPTS] = { },
 		},
 	},
@@ -674,6 +770,10 @@ static const struct mkfs_config_section config_sections[] = {
 			[N_VERSION] = {
 				.name		= "version",
 				.print_fn	= print_dirversion,
+			},
+			[N_SIZE] = {
+				.name		= "size",
+				.print_fn	= print_dirsize,
 			},
 		},
 	},
