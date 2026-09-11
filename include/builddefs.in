@@ -126,6 +126,7 @@ HAVE_LISTMOUNT_NS_FD = @have_listmount_ns_fd@
 HAVE_STATMOUNT_SUPPORTED_MASK = @have_statmount_supported_mask@
 NEED_INTERNAL_STATMOUNT = @need_internal_statmount@
 HAVE_FANOTIFY_MOUNTINFO = @have_fanotify_mountinfo@
+HAVE_QUOTACTL_FD = @have_quotactl_fd@
 
 GCCFLAGS = -funsigned-char -fno-strict-aliasing -Wall
 #	   -Wbitwise -Wno-transparent-union -Wno-old-initializer -Wno-decl

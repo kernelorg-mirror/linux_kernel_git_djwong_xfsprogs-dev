@@ -140,6 +140,7 @@ set_limits(
 	uint32_t	id,
 	uint		type,
 	uint		mask,
+	int		mnt_fd,
 	char		*dev,
 	uint64_t	*bsoft,
 	uint64_t	*bhard,
@@ -162,7 +163,7 @@ set_limits(
 	d.d_rtb_hardlimit = *rtbhard;
 	d.d_rtb_softlimit = *rtbsoft;
 
-	if (xfsquotactl(XFS_SETQLIM, dev, type, id, (void *)&d) < 0) {
+	if (xfsquotactl(mnt_fd, dev, XFS_SETQLIM, type, id, (void *)&d) < 0) {
 		exitcode = 1;
 		fprintf(stderr, _("%s: cannot set limits: %s\n"),
 				progname, strerror(errno));
@@ -310,7 +311,7 @@ limit_f(
 	if (id == -1)
 		return 0;
 
-	set_limits(id, type, mask, fs_path->fs_name,
+	set_limits(id, type, mask, fs_path->mnt_fd, fs_path->fs_name,
 		   &bsoft, &bhard, &isoft, &ihard, &rtbsoft, &rtbhard);
 	return 0;
 }
@@ -356,7 +357,7 @@ restore_file(
 			mask = FS_DQ_ISOFT|FS_DQ_IHARD|FS_DQ_BSOFT|FS_DQ_BHARD;
 			if (cnt == 7)
 				mask |= FS_DQ_RTBSOFT|FS_DQ_RTBHARD;
-			set_limits(id, type, mask, dev, &bsoft, &bhard,
+			set_limits(id, type, mask, -1, dev, &bsoft, &bhard,
 					&isoft, &ihard, &rtbsoft, &rtbhard);
 		}
 	}

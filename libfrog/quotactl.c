@@ -56,14 +56,24 @@ xcommand_to_qcommand(
 
 int
 xfsquotactl(
-	enum xfs_quota_cmd	xcommand,
+	int			mnt_fd,
 	const char		*device,
+	enum xfs_quota_cmd	xcommand,
 	uint			xtype,
 	uint			id,
 	void			*addr)
 {
 	const int		op = QCMD(xcommand_to_qcommand(xcommand),
 					  xtype_to_qtype(xtype));
+	int			ret = -1;
+
+	errno = ENOSYS;
+#ifdef HAVE_QUOTACTL_FD
+	if (mnt_fd >= 0)
+		ret = syscall(SYS_quotactl_fd, mnt_fd, op, id, addr);
+#endif
+	if (ret != -1 || errno != ENOSYS)
+		return ret;
 
 	return quotactl(op, device, id, addr);
 }
@@ -76,5 +86,6 @@ xfrog_quotactl(
 	uint			id,
 	void			*addr)
 {
-	return xfsquotactl(xcommand, mount->fs_name, xtype, id, addr);
+	return xfsquotactl(mount->mnt_fd, mount->fs_name, xcommand, xtype, id,
+			addr);
 }

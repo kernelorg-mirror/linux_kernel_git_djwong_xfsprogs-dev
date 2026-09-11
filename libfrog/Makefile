@@ -108,6 +108,10 @@ ifeq ($(HAVE_LISTMOUNT_NS_FD),yes)
 CFLAGS+=-DHAVE_LISTMOUNT_NS_FD
 endif
 
+ifeq ($(HAVE_QUOTACTL_FD),yes)
+CFLAGS += -DHAVE_QUOTACTL_FD
+endif
+
 default: ltdepend $(LTLIBRARY) $(GETTEXT_PY)
 
 crc32table.h: gen_crc32table.c crc32defs.h

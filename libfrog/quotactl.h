@@ -20,7 +20,7 @@ enum xfs_quota_cmd {
 	XFS_GETNEXTQUOTA, /* get disk limits and usage */
 };
 
-int xfsquotactl(enum xfs_quota_cmd xcommand, const char *device,
+int xfsquotactl(int mnt_fd, const char *device, enum xfs_quota_cmd xcommand,
 		unsigned int xtype, unsigned int id, void *addr);
 
 struct fs_path;
