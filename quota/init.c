@@ -128,6 +128,19 @@ init_check_command(
 	return 0;
 }
 
+void
+open_mnt_fds(void)
+{
+	int		c;
+
+	for (c = 0; c < fs_count; c++) {
+		if (fs_table[c].mnt_fd < 0) {
+			/* if this fails, we fall back to path-based quotactl */
+			fs_table[c].mnt_fd = open(fs_table[c].fs_dir, O_RDONLY);
+		}
+	}
+}
+
 static void
 init(
 	int		argc,
@@ -189,6 +202,8 @@ init(
 		fs_path = fs_table_lookup(argv[optind], FS_MOUNT_POINT);
 	else
 		fs_path = &fs_table[0];
+
+	open_mnt_fds();
 }
 
 int

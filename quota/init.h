@@ -19,3 +19,5 @@ extern void	report_init(void);
 extern void	state_init(void);
 
 extern void init_cvtnum(unsigned int *, unsigned int *);
+
+void open_mnt_fds(void);

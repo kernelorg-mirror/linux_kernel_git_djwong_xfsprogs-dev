@@ -296,6 +296,13 @@ _("%s: cannot setup path for project dir %s: %s\n"),
 					progname, optarg, strerror(error));
 				return 0;
 			}
+
+			/*
+			 * fs_table could have been arbitrarily rearranged by
+			 * fs_table_insert, so we need to try to open any new
+			 * mounts.
+			 */
+			open_mnt_fds();
 			break;
 		case 's':
 			type = SETUP_PROJECT;
