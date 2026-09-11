@@ -3,7 +3,6 @@
  * Copyright (C) 2018 Oracle.  All Rights Reserved.
  * Author: Darrick J. Wong <darrick.wong@oracle.com>
  */
-#include <sys/quota.h>
 #include "libxfs.h"
 #include "command.h"
 #include "init.h"
@@ -11,8 +10,8 @@
 #include "libfrog/fsgeom.h"
 #include "libfrog/fsproperties.h"
 #include "libfrog/fsprops.h"
+#include "libfrog/quotactl.h"
 #include "space.h"
-#include "include/xqm.h"
 
 static void
 info_help(void)
@@ -126,8 +125,8 @@ get_qflags(
 	*qflags = 0;
 
 	/* GETQSTAT returns qflags for all quota types, not just user */
-	ret = quotactl(QCMD(Q_XGETQSTAT, USRQUOTA), f->fs_path.fs_name, 0,
-			(void *)&qstat);
+	ret = xfsquotactl(f->xfd.fd, f->fs_path.fs_name, XFS_GETQSTAT,
+			XFS_USER_QUOTA, 0, (void *)&qstat);
 	if (ret) {
 		/*
 		 * ENOSYS means quota is not enabled or compiled in; ENODEV
