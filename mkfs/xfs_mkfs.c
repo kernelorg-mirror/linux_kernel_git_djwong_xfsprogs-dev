@@ -61,6 +61,7 @@ enum {
 
 enum {
 	C_OPTFILE = 0,
+	C_MAKECFG,
 	C_MAX_OPTS,
 };
 
@@ -312,10 +313,15 @@ static struct opt_params copts = {
 	.name = 'c',
 	.subopts = {
 		[C_OPTFILE] = "options",
+		[C_MAKECFG] = "makecfg",
 		[C_MAX_OPTS] = NULL,
 	},
 	.subopt_params = {
 		{ .index = C_OPTFILE,
+		  .conflicts = { { NULL, LAST_CONFLICT } },
+		  .defaultval = SUBOPT_NEEDS_VAL,
+		},
+		{ .index = C_MAKECFG,
 		  .conflicts = { { NULL, LAST_CONFLICT } },
 		  .defaultval = SUBOPT_NEEDS_VAL,
 		},
@@ -1072,6 +1078,7 @@ struct cli_params {
 
 	char	*cfgfile;
 	char	*protofile;
+	char	*makecfg;
 
 	enum fsprop_autofsck autofsck;
 
@@ -1207,7 +1214,7 @@ usage( void )
 {
 	fprintf(stderr, _("Usage: %s\n\
 /* blocksize */		[-b size=num]\n\
-/* config file */	[-c options=xxx]\n\
+/* config file */	[-c options=path,makecfg=path\n\
 /* metadata */		[-m crc=0|1,finobt=0|1,uuid=xxx,rmapbt=0|1,reflink=0|1,\n\
 			    inobtcount=0|1,bigtime=0|1,autofsck=xxx,\n\
 			    metadir=0|1]\n\
@@ -1786,6 +1793,9 @@ cfgfile_opts_parser(
 	switch (subopt) {
 	case C_OPTFILE:
 		cli->cfgfile = getstr(value, opts, subopt);
+		break;
+	case C_MAKECFG:
+		cli->makecfg = getstr(value, opts, subopt);
 		break;
 	default:
 		return -EINVAL;
@@ -6105,6 +6115,10 @@ main(
 	 */
 	cfgfile_parse(&cli);
 
+	/* Don't create anything if we're merely generating a config file */
+	if (cli.makecfg)
+		dry_run = 1;
+
 	/*
 	 * Extract as much of the valid config as we can from the CLI input
 	 * before opening the libxfs devices.
@@ -6213,6 +6227,29 @@ main(
 	validate_cowextsize_hint(mp, &cli);
 
 	validate_supported(mp, &cli);
+
+	if (cli.makecfg) {
+		struct xfs_fsop_geom	geo;
+		FILE			*fp;
+
+		fp = fopen(cli.makecfg, "w+");
+		if (!fp) {
+			perror(cli.makecfg);
+			exit(1);
+		}
+
+		libxfs_fs_geometry(mp, &geo, XFS_FS_GEOM_MAX_STRUCT_VER);
+		error = xfrog_write_mkfs_config(&geo, cli.sb_feat.qflags,
+				&cli.fsx, cli.autofsck, fp);
+		if (!error)
+			error = fclose(fp);
+		if (error) {
+			perror(cli.makecfg);
+			exit(1);
+		}
+
+		exit(0);
+	}
 
 	/* Print the intended geometry of the fs. */
 	if (!quiet || dry_run) {
