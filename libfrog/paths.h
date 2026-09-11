@@ -29,6 +29,7 @@ typedef struct fs_path {
 	char		*fs_dir;	/* Directory / mount point	*/
 	uint		fs_flags;	/* FS_{MOUNT_POINT,PROJECT_PATH}*/
 	uint		fs_prid;	/* Project ID for tree root	*/
+	int		mnt_fd;		/* optional fd for mountpoint	*/
 } fs_path_t;
 
 extern int fs_count;		/* number of entries in fs table */

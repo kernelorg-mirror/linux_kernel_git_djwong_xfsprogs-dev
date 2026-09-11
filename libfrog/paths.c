@@ -206,6 +206,7 @@ fs_table_insert(
 	fs_path->fs_datadev = datadev;
 	fs_path->fs_logdev = logdev;
 	fs_path->fs_rtdev = rtdev;
+	fs_path->mnt_fd = -1;
 	fs_count++;
 	if (!(flags & FS_FOREIGN))
 		xfs_fs_count++;
@@ -232,6 +233,8 @@ fs_table_destroy(void)
 	struct fs_path	*fsp;
 
 	for (i = 0, fsp = fs_table; i < fs_count; i++, fsp++) {
+		if (fsp->mnt_fd >= 0)
+			close(fsp->mnt_fd);
 		free(fsp->fs_name);
 		free(fsp->fs_dir);
 		free(fsp->fs_log);
