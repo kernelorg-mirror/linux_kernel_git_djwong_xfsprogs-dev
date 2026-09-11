@@ -108,6 +108,8 @@ static inline size_t __must_check size_mul(size_t factor1, size_t factor2)
 
 #define kzalloc_obj(P, ...) \
 	__alloc_objs(kzalloc, default_gfp(__VA_ARGS__), typeof(P), 1)
+#define kzalloc_objs(P, COUNT, ...) \
+	__alloc_objs(kzalloc, default_gfp(__VA_ARGS__), typeof(P), COUNT)
 #define kmalloc_obj(VAR_OR_TYPE, ...) \
 	__alloc_objs(kmalloc, default_gfp(__VA_ARGS__), typeof(VAR_OR_TYPE), 1)
 
