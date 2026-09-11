@@ -8,7 +8,7 @@ include $(TOPDIR)/include/builddefs
 LTCOMMAND = xfs_quota
 HFILES = init.h quota.h
 CFILES = init.c util.c \
-	edit.c free.c linux.c path.c project.c quot.c quota.c report.c state.c
+	edit.c free.c path.c project.c quot.c quota.c report.c state.c
 
 LLDLIBS = $(LIBXCMD) $(LIBFROG)
 LTDEPENDENCIES = $(LIBXCMD) $(LIBFROG)

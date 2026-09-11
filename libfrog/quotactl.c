@@ -4,7 +4,7 @@
  * All Rights Reserved.
  */
 
-#include "quota.h"
+#include "libfrog/quotactl.h"
 #include <sys/quota.h>
 
 #ifndef PRJQUOTA

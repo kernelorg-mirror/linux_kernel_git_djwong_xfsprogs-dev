@@ -33,6 +33,7 @@ logging.c \
 paths.c \
 projects.c \
 ptvar.c \
+quotactl.c \
 radix-tree.c \
 randbytes.c \
 scrub.c \
@@ -67,6 +68,7 @@ logging.h \
 paths.h \
 projects.h \
 ptvar.h \
+quotactl.h \
 radix-tree.h \
 randbytes.h \
 scrub.h \

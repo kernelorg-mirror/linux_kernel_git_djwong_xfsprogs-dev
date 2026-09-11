@@ -9,6 +9,7 @@
 #include "xqm.h"
 #include "libfrog/paths.h"
 #include "libfrog/projects.h"
+#include "libfrog/quotactl.h"
 #include <stdbool.h>
 
 /*
@@ -18,23 +19,6 @@ enum {
 	XFS_BLOCK_QUOTA	=	0x1,
 	XFS_INODE_QUOTA =	0x2,
 	XFS_RTBLOCK_QUOTA =	0x4,
-};
-
-/*
- * System call definitions mapping to platform-specific quotactl
- */
-extern int xfsquotactl(int __cmd, const char *__device,
-			uint __type, uint __id, void * __addr);
-enum {
-	XFS_QUOTAON,	/* enable accounting/enforcement */
-	XFS_QUOTAOFF,	/* disable accounting/enforcement */
-	XFS_GETQUOTA,	/* get disk limits and usage */
-	XFS_SETQLIM,	/* set disk limits */
-	XFS_GETQSTAT,	/* get quota subsystem status */
-	XFS_QUOTARM,	/* free disk space used by dquots */
-	XFS_QSYNC,	/* flush delayed allocate space */
-	XFS_GETQSTATV,	/* newer version of quota stats */
-	XFS_GETNEXTQUOTA, /* get disk limits and usage */
 };
 
 /*
