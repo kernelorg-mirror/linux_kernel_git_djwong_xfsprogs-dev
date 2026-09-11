@@ -8,12 +8,7 @@
 
 #include "xqm.h"
 
-/*
- * System call definitions mapping to platform-specific quotactl
- */
-extern int xfsquotactl(int __cmd, const char *__device,
-			uint __type, uint __id, void * __addr);
-enum {
+enum xfs_quota_cmd {
 	XFS_QUOTAON,	/* enable accounting/enforcement */
 	XFS_QUOTAOFF,	/* disable accounting/enforcement */
 	XFS_GETQUOTA,	/* get disk limits and usage */
@@ -24,5 +19,8 @@ enum {
 	XFS_GETQSTATV,	/* newer version of quota stats */
 	XFS_GETNEXTQUOTA, /* get disk limits and usage */
 };
+
+int xfsquotactl(enum xfs_quota_cmd xcommand, const char *device,
+		unsigned int xtype, unsigned int id, void *addr);
 
 #endif /* LIBFROG_QUOTACTL_H_ */

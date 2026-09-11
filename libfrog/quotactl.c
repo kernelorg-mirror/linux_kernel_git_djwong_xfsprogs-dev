@@ -28,9 +28,9 @@ xtype_to_qtype(
 
 static int
 xcommand_to_qcommand(
-	uint		command)
+	enum xfs_quota_cmd	xcommand)
 {
-	switch (command) {
+	switch (xcommand) {
 	case XFS_QUOTAON:
 		return Q_XQUOTAON;
 	case XFS_QUOTAOFF:
@@ -55,16 +55,14 @@ xcommand_to_qcommand(
 
 int
 xfsquotactl(
-	int		command,
-	const char	*device,
-	uint		type,
-	uint		id,
-	void		*addr)
+	enum xfs_quota_cmd	xcommand,
+	const char		*device,
+	uint			xtype,
+	uint			id,
+	void			*addr)
 {
-	int		qcommand, qtype;
+	const int		op = QCMD(xcommand_to_qcommand(xcommand),
+					  xtype_to_qtype(xtype));
 
-	qtype = xtype_to_qtype(type);
-	qcommand = xcommand_to_qcommand(command);
-
-	return quotactl(QCMD(qcommand, qtype), device, id, addr);
+	return quotactl(op, device, id, addr);
 }
