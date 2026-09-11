@@ -202,9 +202,12 @@ state_quotafile_stat(
 	bool			accounting, enforcing;
 	struct fs_qfilestatv	*qsv;
 	char			*dev = mount->fs_name;
+	int			ret;
 
-	if (xfsquotactl(XFS_GETQSTATV, dev, type, 0, (void *)sv) < 0) {
-		if (xfsquotactl(XFS_GETQSTAT, dev, type, 0, (void *)s) < 0) {
+	ret = xfrog_quotactl(mount, XFS_GETQSTATV, type, 0, sv);
+	if (ret < 0) {
+		ret = xfrog_quotactl(mount, XFS_GETQSTAT, type, 0, sv);
+		if (ret < 0) {
 			if (flags & VERBOSE_FLAG)
 				fprintf(fp,
 					_("%s quota are not enabled on %s\n"),
@@ -351,6 +354,7 @@ enable_enforcement(
 	uint		flags)
 {
 	fs_path_t	*mount;
+	int		ret;
 
 	mount = fs_table_lookup(dir, FS_MOUNT_POINT);
 	if (!mount) {
@@ -358,8 +362,8 @@ enable_enforcement(
 		fprintf(stderr, "%s: unknown mount point %s\n", progname, dir);
 		return;
 	}
-	dir = mount->fs_name;
-	if (xfsquotactl(XFS_QUOTAON, dir, type, 0, (void *)&qflags) < 0) {
+	ret = xfrog_quotactl(mount, XFS_QUOTAON, type, 0, &qflags);
+	if (ret < 0) {
 		if (errno == EEXIST)
 			fprintf(stderr,
 				_("Quota enforcement already enabled.\n"));
@@ -381,6 +385,7 @@ disable_enforcement(
 	uint		flags)
 {
 	fs_path_t	*mount;
+	int		ret;
 
 	mount = fs_table_lookup(dir, FS_MOUNT_POINT);
 	if (!mount) {
@@ -388,8 +393,8 @@ disable_enforcement(
 		fprintf(stderr, "%s: unknown mount point %s\n", progname, dir);
 		return;
 	}
-	dir = mount->fs_name;
-	if (xfsquotactl(XFS_QUOTAOFF, dir, type, 0, (void *)&qflags) < 0) {
+	ret = xfrog_quotactl(mount, XFS_QUOTAOFF, type, 0, &qflags);
+	if (ret < 0) {
 		if (errno == EEXIST)
 			fprintf(stderr,
 				_("Quota enforcement already disabled.\n"));
@@ -411,6 +416,7 @@ quotaoff(
 	uint		flags)
 {
 	fs_path_t	*mount;
+	int		ret;
 
 	mount = fs_table_lookup(dir, FS_MOUNT_POINT);
 	if (!mount) {
@@ -418,8 +424,8 @@ quotaoff(
 		fprintf(stderr, "%s: unknown mount point %s\n", progname, dir);
 		return;
 	}
-	dir = mount->fs_name;
-	if (xfsquotactl(XFS_QUOTAOFF, dir, type, 0, (void *)&qflags) < 0) {
+	ret = xfrog_quotactl(mount, XFS_QUOTAOFF, type, 0, &qflags);
+	if (ret) {
 		if (errno == EEXIST || errno == ENOSYS)
 			fprintf(stderr, _("Quota already off.\n"));
 		else
@@ -431,12 +437,13 @@ quotaoff(
 
 static int
 remove_qtype_extents(
-	char		*dir,
-	uint		type)
+	const struct fs_path	*mount,
+	uint			type)
 {
-	int	error = 0;
+	int			error;
 
-	if ((error = xfsquotactl(XFS_QUOTARM, dir, type, 0, (void *)&type)) < 0)
+	error = xfrog_quotactl(mount, XFS_QUOTARM, type, 0, &type);
+	if (error < 0)
 		perror("XFS_QUOTARM");
 	return error;
 }
@@ -455,17 +462,16 @@ remove_extents(
 		fprintf(stderr, "%s: unknown mount point %s\n", progname, dir);
 		return;
 	}
-	dir = mount->fs_name;
 	if (type & XFS_USER_QUOTA) {
-		if (remove_qtype_extents(dir, XFS_USER_QUOTA) < 0)
+		if (remove_qtype_extents(mount, XFS_USER_QUOTA) < 0)
 			return;
 	}
 	if (type & XFS_GROUP_QUOTA) {
-		if (remove_qtype_extents(dir, XFS_GROUP_QUOTA) < 0)
+		if (remove_qtype_extents(mount, XFS_GROUP_QUOTA) < 0)
 			return;
 	}
 	if (type & XFS_PROJ_QUOTA) {
-		if (remove_qtype_extents(dir, XFS_PROJ_QUOTA) < 0)
+		if (remove_qtype_extents(mount, XFS_PROJ_QUOTA) < 0)
 			return;
 	}
 	if (flags & VERBOSE_FLAG)

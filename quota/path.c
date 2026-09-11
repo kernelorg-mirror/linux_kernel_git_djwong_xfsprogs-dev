@@ -39,8 +39,8 @@ printpath(
 		if (prj)
 			printf(_(", %s"), prj->pr_name);
 		printf(")");
-	} else if (xfsquotactl(XFS_GETQSTAT, path->fs_name, 0, 0,
-			       (void *)&qstat) == 0 && qstat.qs_flags) {
+	} else if (xfrog_quotactl(path, XFS_GETQSTAT, 0, 0, &qstat) == 0 &&
+			qstat.qs_flags) {
 		c = 0;
 		printf(" (");
 		if (qstat.qs_flags & XFS_QUOTA_UDQ_ENFD)

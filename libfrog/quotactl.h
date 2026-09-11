@@ -23,4 +23,8 @@ enum xfs_quota_cmd {
 int xfsquotactl(enum xfs_quota_cmd xcommand, const char *device,
 		unsigned int xtype, unsigned int id, void *addr);
 
+struct fs_path;
+int xfrog_quotactl(const struct fs_path *mount, enum xfs_quota_cmd xcommand,
+		uint xtype, uint id, void *addr);
+
 #endif /* LIBFROG_QUOTACTL_H_ */

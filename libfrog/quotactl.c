@@ -4,6 +4,7 @@
  * All Rights Reserved.
  */
 
+#include "libfrog/paths.h"
 #include "libfrog/quotactl.h"
 #include <sys/quota.h>
 
@@ -65,4 +66,15 @@ xfsquotactl(
 					  xtype_to_qtype(xtype));
 
 	return quotactl(op, device, id, addr);
+}
+
+int
+xfrog_quotactl(
+	const struct fs_path	*mount,
+	enum xfs_quota_cmd	xcommand,
+	uint			xtype,
+	uint			id,
+	void			*addr)
+{
+	return xfsquotactl(xcommand, mount->fs_name, xtype, id, addr);
 }

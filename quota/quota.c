@@ -53,9 +53,11 @@ quota_mount(
 	char		c[8], h[8], s[8];
 	uint		qflags;
 	int		count;
+	int		ret;
 
-	xfsquotactl(XFS_QSYNC, dev, type, 0, NULL);
-	if (xfsquotactl(XFS_GETQUOTA, dev, type, id, (void *)&d) < 0)
+	xfrog_quotactl(mount, XFS_QSYNC, type, id, NULL);
+	ret = xfrog_quotactl(mount, XFS_GETQUOTA, type, id, &d);
+	if (ret < 0)
 		return 0;
 
 	dquot_fudge_numbers(&d);

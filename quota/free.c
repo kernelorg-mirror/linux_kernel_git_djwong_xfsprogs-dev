@@ -136,11 +136,11 @@ projects_free_space_data(
 	fs_disk_quota_t		d;
 	struct fsxattr		fsx;
 	uint			type = XFS_PROJ_QUOTA;
-	char			*dev = path->fs_name;
 	int			fd;
+	int			ret;
 
-	if (xfsquotactl(XFS_GETQSTAT, dev, type, 0, &qfs) < 0 ||
-			!(qfs.qs_flags & XFS_QUOTA_PDQ_ACCT))
+	ret = xfrog_quotactl(path, XFS_GETQSTAT, type, 0, &qfs);
+	if (ret < 0 || !(qfs.qs_flags & XFS_QUOTA_PDQ_ACCT))
 		return 0;
 
 	if ((fd = open(path->fs_dir, O_RDONLY)) < 0) {
@@ -174,8 +174,9 @@ projects_free_space_data(
 		return 0;
 	}
 
-	xfsquotactl(XFS_QSYNC, dev, type, fsx.fsx_projid, NULL);
-	if (xfsquotactl(XFS_GETQUOTA, dev, type, fsx.fsx_projid, &d) < 0) {
+	xfrog_quotactl(path, XFS_QSYNC, type, fsx.fsx_projid, NULL);
+	ret = xfrog_quotactl(path, XFS_GETQUOTA, type, fsx.fsx_projid, &d);
+	if (ret < 0) {
 		perror("XFS_GETQUOTA");
 		close(fd);
 		return 0;

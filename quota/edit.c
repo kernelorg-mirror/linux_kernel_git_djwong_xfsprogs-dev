@@ -469,11 +469,12 @@ set_timer(
 	uint32_t		id,
 	uint			type,
 	uint			mask,
-	char			*dev,
+	const struct fs_path	*mount,
 	time64_t		value)
 {
 	struct fs_disk_quota	d;
 	time64_t		btimer, itimer, rtbtimer;
+	int			ret;
 
 	memset(&d, 0, sizeof(d));
 
@@ -485,7 +486,8 @@ set_timer(
 		time_t	now;
 
 		/* Get quota to find out whether user is past soft limits */
-		if (xfsquotactl(XFS_GETQUOTA, dev, type, id, (void *)&d) < 0) {
+		ret = xfrog_quotactl(mount, XFS_GETQUOTA, type, id, &d);
+		if (ret < 0) {
 			exitcode = 1;
 			fprintf(stderr, _("%s: cannot get quota: %s\n"),
 					progname, strerror(errno));
@@ -517,7 +519,8 @@ set_timer(
 	d.d_id = id;
 	encode_timers(&d, btimer, itimer, rtbtimer);
 
-	if (xfsquotactl(XFS_SETQLIM, dev, type, id, (void *)&d) < 0) {
+	ret = xfrog_quotactl(mount, XFS_SETQLIM, type, id, &d);
+	if (ret < 0) {
 		exitcode = 1;
 		fprintf(stderr, _("%s: cannot set timer: %s\n"),
 				progname, strerror(errno));
@@ -601,19 +604,20 @@ timer_f(
 	if (id == -1)
 		return 0;
 
-	set_timer(id, type, mask, fs_path->fs_name, value);
+	set_timer(id, type, mask, fs_path, value);
 	return 0;
 }
 
 static void
 set_warnings(
-	uint32_t	id,
-	uint		type,
-	uint		mask,
-	char		*dev,
-	uint		value)
+	uint32_t		id,
+	uint			type,
+	uint			mask,
+	const struct fs_path	*mount,
+	uint			value)
 {
-	fs_disk_quota_t	d;
+	struct fs_disk_quota	d;
+	int			ret;
 
 	memset(&d, 0, sizeof(d));
 	d.d_version = FS_DQUOT_VERSION;
@@ -624,7 +628,8 @@ set_warnings(
 	d.d_bwarns = value;
 	d.d_rtbwarns = value;
 
-	if (xfsquotactl(XFS_SETQLIM, dev, type, id, (void *)&d) < 0) {
+	ret = xfrog_quotactl(mount, XFS_SETQLIM, type, id, &d);
+	if (ret < 0) {
 		exitcode = 1;
 		fprintf(stderr, _("%s: cannot set warnings: %s\n"),
 				progname, strerror(errno));
@@ -699,7 +704,7 @@ warn_f(
 	if (id == -1)
 		return 0;
 
-	set_warnings(id, type, mask, fs_path->fs_name, value);
+	set_warnings(id, type, mask, fs_path, value);
 	return 0;
 }
 
