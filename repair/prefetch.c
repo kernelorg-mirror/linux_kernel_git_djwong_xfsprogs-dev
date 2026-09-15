@@ -447,8 +447,8 @@ pf_read_inode_dirs(
 		if (be64_to_cpu(dino->di_size) <= XFS_DFORK_DSIZE(dino, mp))
 			continue;
 
-		if ((dino->di_forkoff != 0) &&
-		    (dino->di_forkoff >= XFS_LITINO(mp) >> 3))
+		if (dino->di_forkoff != 0 &&
+		    dino->di_forkoff >= XFS_B_TO_FORKOFFT(XFS_LITINO(mp)))
 			continue;
 
 		switch (dino->di_format) {
