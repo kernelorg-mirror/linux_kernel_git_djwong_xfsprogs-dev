@@ -184,6 +184,9 @@ typedef struct xfs_mount {
 	uint64_t		m_metafile_resv_target;
 	uint64_t		m_metafile_resv_used;
 	uint64_t		m_metafile_resv_avail;
+
+	/* Always NULL, do not call xfs_sync_sb_buf! */
+	struct xfs_buf		*m_sb_bp, *m_rtsb_bp;
 } xfs_mount_t;
 
 #define M_IGEO(mp)		(&(mp)->m_ino_geo)
