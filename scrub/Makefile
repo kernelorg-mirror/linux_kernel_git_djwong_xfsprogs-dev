@@ -31,6 +31,8 @@ SYSTEMD_SERVICES=\
 	xfs_scrub_all_fail.service \
 	xfs_scrub_all.timer \
 	system-xfs_scrub.slice
+SYSTEMD_PRESETS=\
+	50-xfs_scrub.preset
 OPTIONAL_TARGETS += $(SYSTEMD_SERVICES)
 endif
 ifeq ($(HAVE_CROND),yes)
@@ -116,7 +118,7 @@ XFS_SCRUB_ALL_AUTO_MEDIA_SCAN_INTERVAL=1mo
 
 LDIRT = $(XFS_SCRUB_ALL_PROG) $(XFS_SCRUB_FAIL_PROG) *.service *.cron xfs_scrub_all.timer
 
-default: depend $(LTCOMMAND) $(XFS_SCRUB_ALL_PROG) $(XFS_SCRUB_FAIL_PROG) $(OPTIONAL_TARGETS)
+default: depend $(LTCOMMAND) $(XFS_SCRUB_ALL_PROG) $(XFS_SCRUB_FAIL_PROG) $(OPTIONAL_TARGETS) $(SYSTEMD_PRESETS)
 
 xfs_scrub_all.timer: xfs_scrub_all.timer.in $(builddefs)
 	@echo "    [SED]    $@"
@@ -169,6 +171,8 @@ install-systemd: default $(SYSTEMD_SERVICES)
 	$(INSTALL) -m 644 $(SYSTEMD_SERVICES) $(SYSTEMD_SYSTEM_UNIT_DIR)
 	$(INSTALL) -m 755 -d $(PKG_LIBEXEC_DIR)
 	$(INSTALL) -m 755 $(XFS_SCRUB_FAIL_PROG) $(PKG_LIBEXEC_DIR)
+	$(INSTALL) -m 755 -d $(SYSTEMD_SYSTEM_PRESET_DIR)
+	$(INSTALL) -m 644 $(SYSTEMD_PRESETS) $(SYSTEMD_SYSTEM_PRESET_DIR)
 
 install-crond: default $(CRONTABS)
 	$(INSTALL) -m 755 -d $(CROND_DIR)
