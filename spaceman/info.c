@@ -115,7 +115,7 @@ static const struct qflags_xlate qsflags_xlate[] = {
 
 static int
 get_qflags(
-	struct fileio		*f,
+	const struct fs_path	*mount,
 	unsigned int		*qflags)
 {
 	struct fs_quota_stat	qstat;
@@ -125,8 +125,7 @@ get_qflags(
 	*qflags = 0;
 
 	/* GETQSTAT returns qflags for all quota types, not just user */
-	ret = xfsquotactl(f->xfd.fd, f->fs_path.fs_name, XFS_GETQSTAT,
-			XFS_USER_QUOTA, 0, (void *)&qstat);
+	ret = xfrog_quotactl(mount, XFS_GETQSTAT, XFS_USER_QUOTA, 0, &qstat);
 	if (ret) {
 		/*
 		 * ENOSYS means quota is not enabled or compiled in; ENODEV
@@ -153,10 +152,12 @@ makecfg_f(
 	char			**argv)
 {
 	struct fsxattr		fsx = { };
+	struct fs_path		*mount;
 	FILE			*fp;
 	bool			close_fp = false;
 	enum fsprop_autofsck	autofsck;
 	unsigned int		qflags;
+	int			old_mnt_fd;
 	int			c;
 	int			ret;
 
@@ -173,7 +174,8 @@ makecfg_f(
 		return makecfg_usage();
 	}
 
-	if (fs_table_lookup_mount(file->name) == NULL) {
+	mount = fs_table_lookup_mount(file->name);
+	if (!mount) {
 		fprintf(stderr, _("%s: Not a XFS mount point.\n"), file->name);
 		return 1;
 	}
@@ -193,7 +195,10 @@ makecfg_f(
 		return 1;
 	}
 
-	ret = get_qflags(file, &qflags);
+	old_mnt_fd = mount->mnt_fd;
+	mount->mnt_fd = file->xfd.fd;
+	ret = get_qflags(mount, &qflags);
+	mount->mnt_fd = old_mnt_fd;
 	if (ret) {
 		perror("quotactl");
 		return 1;

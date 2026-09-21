@@ -135,41 +135,6 @@ id_from_string(
 	return id;
 }
 
-static void
-set_limits(
-	uint32_t	id,
-	uint		type,
-	uint		mask,
-	int		mnt_fd,
-	char		*dev,
-	uint64_t	*bsoft,
-	uint64_t	*bhard,
-	uint64_t	*isoft,
-	uint64_t	*ihard,
-	uint64_t	*rtbsoft,
-	uint64_t	*rtbhard)
-{
-	fs_disk_quota_t	d;
-
-	memset(&d, 0, sizeof(d));
-	d.d_version = FS_DQUOT_VERSION;
-	d.d_id = id;
-	d.d_flags = type;
-	d.d_fieldmask = mask;
-	d.d_blk_hardlimit = *bhard;
-	d.d_blk_softlimit = *bsoft;
-	d.d_ino_hardlimit = *ihard;
-	d.d_ino_softlimit = *isoft;
-	d.d_rtb_hardlimit = *rtbhard;
-	d.d_rtb_softlimit = *rtbsoft;
-
-	if (xfsquotactl(mnt_fd, dev, XFS_SETQLIM, type, id, (void *)&d) < 0) {
-		exitcode = 1;
-		fprintf(stderr, _("%s: cannot set limits: %s\n"),
-				progname, strerror(errno));
-	}
-}
-
 /* extract number of blocks from an ascii string */
 static int
 extractb(
@@ -311,8 +276,25 @@ limit_f(
 	if (id == -1)
 		return 0;
 
-	set_limits(id, type, mask, fs_path->mnt_fd, fs_path->fs_name,
-		   &bsoft, &bhard, &isoft, &ihard, &rtbsoft, &rtbhard);
+	struct fs_disk_quota		d = {
+		.d_version		= FS_DQUOT_VERSION,
+		.d_id			= id,
+		.d_flags		= type,
+		.d_fieldmask		= mask,
+		.d_blk_hardlimit	= bhard,
+		.d_blk_softlimit	= bsoft,
+		.d_ino_hardlimit	= ihard,
+		.d_ino_softlimit	= isoft,
+		.d_rtb_hardlimit	= rtbhard,
+		.d_rtb_softlimit	= rtbsoft,
+	};
+
+	c = xfrog_quotactl(fs_path, XFS_SETQLIM, type, id, &d);
+	if (c < 0) {
+		exitcode = 1;
+		fprintf(stderr, _("%s: cannot set limits: %s\n"),
+				progname, strerror(errno));
+	}
 	return 0;
 }
 
@@ -357,8 +339,26 @@ restore_file(
 			mask = FS_DQ_ISOFT|FS_DQ_IHARD|FS_DQ_BSOFT|FS_DQ_BHARD;
 			if (cnt == 7)
 				mask |= FS_DQ_RTBSOFT|FS_DQ_RTBHARD;
-			set_limits(id, type, mask, -1, dev, &bsoft, &bhard,
-					&isoft, &ihard, &rtbsoft, &rtbhard);
+
+			struct fs_disk_quota		d = {
+				.d_version		= FS_DQUOT_VERSION,
+				.d_id			= id,
+				.d_flags		= type,
+				.d_fieldmask		= mask,
+				.d_blk_hardlimit	= bhard,
+				.d_blk_softlimit	= bsoft,
+				.d_ino_hardlimit	= ihard,
+				.d_ino_softlimit	= isoft,
+				.d_rtb_hardlimit	= rtbhard,
+				.d_rtb_softlimit	= rtbsoft,
+			};
+			int ret = xfsquotactl(-1, dev, XFS_SETQLIM, type, id, &d);
+
+			if (ret < 0) {
+				exitcode = 1;
+				fprintf(stderr, _("%s: cannot set limits: %s\n"),
+						progname, strerror(errno));
+			}
 		}
 	}
 }
