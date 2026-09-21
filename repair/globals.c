@@ -54,6 +54,7 @@ bool	add_bigtime;		/* add support for timestamps up to 2486 */
 bool	add_nrext64;
 bool	add_exchrange;		/* add file content exchange support */
 bool	add_finobt;		/* add free inode btrees */
+bool	add_reflink;		/* add reference count btrees */
 
 /* misc status variables */
 
