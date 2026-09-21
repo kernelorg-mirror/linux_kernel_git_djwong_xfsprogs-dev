@@ -233,12 +233,9 @@
 #define xfs_metafile_resv_free		libxfs_metafile_resv_free
 #define xfs_metafile_resv_init		libxfs_metafile_resv_init
 #define xfs_metafile_set_iflag		libxfs_metafile_set_iflag
-#define xfs_metadir_cancel		libxfs_metadir_cancel
-#define xfs_metadir_commit		libxfs_metadir_commit
 #define xfs_metadir_link		libxfs_metadir_link
 #define xfs_metadir_lookup		libxfs_metadir_lookup
 #define xfs_metadir_start_create	libxfs_metadir_start_create
-#define xfs_metadir_start_link		libxfs_metadir_start_link
 
 #define xfs_mode_to_ftype		libxfs_mode_to_ftype
 #define xfs_mkdir_space_res		libxfs_mkdir_space_res
