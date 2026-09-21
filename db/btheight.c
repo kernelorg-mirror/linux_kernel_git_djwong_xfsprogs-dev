@@ -204,10 +204,6 @@ construct_records_per_block(
 		perror(p);
 		goto out;
 	}
-	if (ptr_size == 0) {
-		fprintf(stderr, _("%s: pointer size cannot be zero.\n"), tag);
-		goto out;
-	}
 
 	p = strtok(NULL, ":");
 	if (!p) {
@@ -222,8 +218,10 @@ construct_records_per_block(
 		blocksize -= XFS_BTREE_LBLOCK_LEN;
 	else if (!strcmp(p, "longcrc"))
 		blocksize -= XFS_BTREE_LBLOCK_CRC_LEN;
+	else if (!strcmp(p, "merkle"))
+		; /* no header */
 	else {
-		fprintf(stderr, _("%s: unrecognized btree header type."),
+		fprintf(stderr, _("%s: unrecognized btree header type.\n"),
 				p);
 		goto out;
 	}
