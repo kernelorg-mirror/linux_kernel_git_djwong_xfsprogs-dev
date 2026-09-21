@@ -39,7 +39,7 @@ printpath(
 		if (prj)
 			printf(_(", %s"), prj->pr_name);
 		printf(")");
-	} else if (xfrog_quotactl(path, XFS_GETQSTAT, 0, 0, &qstat) == 0 &&
+	} else if (xfrog_getqstat(path, 0, 0, &qstat) == 0 &&
 			qstat.qs_flags) {
 		c = 0;
 		printf(" (");

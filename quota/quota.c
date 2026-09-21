@@ -55,8 +55,8 @@ quota_mount(
 	int		count;
 	int		ret;
 
-	xfrog_quotactl(mount, XFS_QSYNC, type, id, NULL);
-	ret = xfrog_quotactl(mount, XFS_GETQUOTA, type, id, &d);
+	xfrog_qsync(mount, type, id);
+	ret = xfrog_getquota(mount, type, id, &d);
 	if (ret < 0)
 		return 0;
 

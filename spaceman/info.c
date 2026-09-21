@@ -125,7 +125,7 @@ get_qflags(
 	*qflags = 0;
 
 	/* GETQSTAT returns qflags for all quota types, not just user */
-	ret = xfrog_quotactl(mount, XFS_GETQSTAT, XFS_USER_QUOTA, 0, &qstat);
+	ret = xfrog_getqstat(mount, XFS_USER_QUOTA, 0, &qstat);
 	if (ret) {
 		/*
 		 * ENOSYS means quota is not enabled or compiled in; ENODEV
