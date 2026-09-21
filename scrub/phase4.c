@@ -174,12 +174,20 @@ repair_list_schedule(
 	return 0;
 }
 
+/*
+ * Allow the repair work thread pool a second chance to run through the repair
+ * items without making forward progress on repairs before switching to serial
+ * repair mode.
+ */
+#define NOPROGRESS_CHANCES	(3)
+
 /* Process both repair lists. */
 static int
 repair_everything(
 	struct scrub_ctx		*ctx)
 {
 	struct workqueue		wq;
+	int				noprogress_retries = NOPROGRESS_CHANCES;
 	int				fixed_anything;
 	int				ret, ret2;
 
@@ -196,6 +204,13 @@ repair_everything(
 	 * be threaded, if the user desires.
 	 */
 	do {
+		if (noprogress_retries != NOPROGRESS_CHANCES) {
+			str_info(ctx, ctx->mntpoint,
+					_("Phase 4 NOPROGRESS runs %d < %d"),
+					noprogress_retries,
+					NOPROGRESS_CHANCES);
+		}
+
 		fixed_anything = 0;
 
 		ret = repair_list_schedule(ctx, &wq, ctx->fs_repair_list);
@@ -209,7 +224,9 @@ repair_everything(
 			break;
 		if (ret == 1)
 			fixed_anything++;
-	} while (fixed_anything > 0);
+		if (fixed_anything)
+			noprogress_retries = NOPROGRESS_CHANCES;
+	} while (fixed_anything > 0 || (wq.thread_count > 0 && --noprogress_retries));
 
 	ret2 = -workqueue_terminate(&wq);
 	if (ret2) {
@@ -227,6 +244,8 @@ repair_everything(
 	 * the last chance to fix things.
 	 */
 	action_list_merge(ctx->fs_repair_list, ctx->file_repair_list);
+	if (!action_list_empty(ctx->fs_repair_list))
+		str_info(ctx, ctx->mntpoint, _("Phase 4 FINAL_WARNING run"));
 	return action_list_process(ctx, ctx->fs_repair_list, XRM_FINAL_WARNING);
 }
 
