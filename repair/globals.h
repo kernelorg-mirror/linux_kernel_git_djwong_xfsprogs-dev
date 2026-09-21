@@ -94,6 +94,7 @@ extern bool	add_inobtcount;		/* add inode btree counts to AGI */
 extern bool	add_bigtime;		/* add support for timestamps up to 2486 */
 extern bool	add_nrext64;
 extern bool	add_exchrange;		/* add file content exchange support */
+extern bool	add_finobt;		/* add free inode btrees */
 
 /* misc status variables */
 
