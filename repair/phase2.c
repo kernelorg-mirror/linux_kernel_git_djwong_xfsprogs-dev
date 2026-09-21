@@ -283,9 +283,8 @@ set_rmapbt(
 		exit(0);
 	}
 
-	if (xfs_has_realtime(mp)) {
-		printf(
-	_("Reverse mapping btree feature not supported with realtime.\n"));
+	if (xfs_has_realtime(mp) && !xfs_has_rtgroups(mp)) {
+		printf(_("Reverse mapping btree requires realtime groups.\n"));
 		exit(0);
 	}
 
@@ -298,6 +297,7 @@ set_rmapbt(
 	printf(_("Adding reverse mapping btrees to filesystem.\n"));
 	new_sb->sb_features_ro_compat |= XFS_SB_FEAT_RO_COMPAT_RMAPBT;
 	new_sb->sb_features_incompat |= XFS_SB_FEAT_INCOMPAT_NEEDSREPAIR;
+
 	return true;
 }
 
@@ -487,6 +487,27 @@ check_free_space(
 	return avail > GIGABYTES(10, mp->m_sb.sb_blocklog);
 }
 
+/*
+ * Compute the amount of extra space needed for further rtrmap btree expansion.
+ * If we're adding rtrmap to a filesystem then there won't be an rtrmap inode
+ * and we'll return the full reservation charge.  If there's already an rtrmap
+ * inode, then subtract the ondisk space usage because that's not reserved.
+ */
+static xfs_rfsblock_t
+compute_rtrmap_reservation(
+	struct xfs_rtgroup	*rtg)
+{
+	struct xfs_mount	*mp = rtg_mount(rtg);
+	xfs_rfsblock_t		ret = libxfs_rtrmapbt_calc_reserves(mp);
+
+	if (!xfs_has_rtrmapbt(mp))
+		return 0;
+
+	if (rtg_rmap(rtg))
+		ret -= min(ret, rtg_rmap(rtg)->i_nblocks);
+	return ret;
+}
+
 static void
 check_fs_free_space(
 	struct xfs_mount		*mp,
@@ -494,6 +515,8 @@ check_fs_free_space(
 	struct xfs_sb			*new_sb)
 {
 	struct xfs_perag		*pag = NULL;
+	struct xfs_rtgroup		*rtg = NULL;
+	xfs_rfsblock_t			new_resv = 0;
 	int				error;
 
 	/* Make sure we have enough space for per-AG reservations. */
@@ -565,6 +588,18 @@ check_fs_free_space(
 		libxfs_trans_cancel(tp);
 	}
 
+	/* Realtime metadata btree inodes */
+	while ((rtg = xfs_rtgroup_next(mp, rtg))) {
+		new_resv += compute_rtrmap_reservation(rtg);
+	}
+
+	if (new_resv > mp->m_sb.sb_fdblocks) {
+		printf(
+ _("Not enough free space to add realtime metadata files.\n"));
+		exit(1);
+	}
+	mp->m_sb.sb_fdblocks -= new_resv;
+
 	/*
 	 * If we're adding parent pointers, we need at least 25% free since
 	 * scanning the entire filesystem to guesstimate the overhead is
@@ -580,12 +615,16 @@ check_fs_free_space(
 
 	/*
 	 * Would the post-upgrade filesystem have enough free space on the data
-	 * device after making per-AG reservations?
+	 * device after making per-AG reservations and reserving rt metadata
+	 * inode blocks?
 	 */
-	if (!check_free_space(mp, mp->m_sb.sb_fdblocks, mp->m_sb.sb_dblocks)) {
+	if (new_resv > mp->m_sb.sb_fdblocks ||
+	    !check_free_space(mp, mp->m_sb.sb_fdblocks, mp->m_sb.sb_dblocks)) {
 		printf(_("Filesystem will be low on space after upgrade.\n"));
 		exit(1);
 	}
+
+	mp->m_sb.sb_fdblocks += new_resv;
 
 	/*
 	 * Release the per-AG reservations and mark the per-AG structure as
