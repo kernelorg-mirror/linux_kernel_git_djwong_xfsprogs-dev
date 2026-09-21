@@ -41,6 +41,44 @@ AC_DEFUN([AC_CONFIG_SYSTEMD_SYSTEM_UNIT_DIR],
 ])
 
 #
+# Figure out where to install systemd preset files
+#
+AC_DEFUN([AC_CONFIG_SYSTEMD_SYSTEM_PRESET_DIR],
+[
+	AC_REQUIRE([PKG_PROG_PKG_CONFIG])
+	AC_ARG_WITH([systemd_preset_dir],
+	  [AS_HELP_STRING([--with-systemd-preset-dir@<:@=DIR@:>@],
+		[Install systemd system presets into DIR.])],
+	  [],
+	  [with_systemd_preset_dir=yes])
+	AS_IF([test "x${with_systemd_preset_dir}" != "xno"],
+	  [
+		AS_IF([test "x${with_systemd_preset_dir}" = "xyes"],
+		  [
+			PKG_CHECK_MODULES([systemd], [systemd],
+			  [
+				with_systemd_preset_dir="$($PKG_CONFIG --variable=systemd_system_preset_dir systemd)"
+			  ], [
+				with_systemd_preset_dir=""
+			  ])
+			m4_pattern_allow([^PKG_(MAJOR|MINOR|BUILD|REVISION)$])
+		  ])
+		AC_MSG_CHECKING([for systemd system preset dir])
+		systemd_system_preset_dir="${with_systemd_preset_dir}"
+		AS_IF([test -n "${systemd_system_preset_dir}"],
+		  [
+			AC_MSG_RESULT(${systemd_system_preset_dir})
+		  ],
+		  [
+			AC_MSG_RESULT(no)
+		  ])
+	  ],
+	  [
+	  ])
+	AC_SUBST(systemd_system_preset_dir)
+])
+
+#
 # Figure out where to install crontabs
 #
 AC_DEFUN([AC_CONFIG_CROND_DIR],
