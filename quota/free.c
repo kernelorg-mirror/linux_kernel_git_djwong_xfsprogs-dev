@@ -139,7 +139,7 @@ projects_free_space_data(
 	int			fd;
 	int			ret;
 
-	ret = xfrog_quotactl(path, XFS_GETQSTAT, type, 0, &qfs);
+	ret = xfrog_getqstat(path, type, 0, &qfs);
 	if (ret < 0 || !(qfs.qs_flags & XFS_QUOTA_PDQ_ACCT))
 		return 0;
 
@@ -174,8 +174,8 @@ projects_free_space_data(
 		return 0;
 	}
 
-	xfrog_quotactl(path, XFS_QSYNC, type, fsx.fsx_projid, NULL);
-	ret = xfrog_quotactl(path, XFS_GETQUOTA, type, fsx.fsx_projid, &d);
+	xfrog_qsync(path, type, fsx.fsx_projid);
+	ret = xfrog_getquota(path, type, fsx.fsx_projid, &d);
 	if (ret < 0) {
 		perror("XFS_GETQUOTA");
 		close(fd);

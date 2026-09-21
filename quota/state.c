@@ -204,9 +204,9 @@ state_quotafile_stat(
 	char			*dev = mount->fs_name;
 	int			ret;
 
-	ret = xfrog_quotactl(mount, XFS_GETQSTATV, type, 0, sv);
+	ret = xfrog_getqstatv(mount, type, 0, sv);
 	if (ret < 0) {
-		ret = xfrog_quotactl(mount, XFS_GETQSTAT, type, 0, s);
+		ret = xfrog_getqstat(mount, type, 0, s);
 		if (ret < 0) {
 			if (flags & VERBOSE_FLAG)
 				fprintf(fp,
@@ -362,7 +362,7 @@ enable_enforcement(
 		fprintf(stderr, "%s: unknown mount point %s\n", progname, dir);
 		return;
 	}
-	ret = xfrog_quotactl(mount, XFS_QUOTAON, type, 0, &qflags);
+	ret = xfrog_quotaon(mount, type, 0, &qflags);
 	if (ret < 0) {
 		if (errno == EEXIST)
 			fprintf(stderr,
@@ -393,7 +393,7 @@ disable_enforcement(
 		fprintf(stderr, "%s: unknown mount point %s\n", progname, dir);
 		return;
 	}
-	ret = xfrog_quotactl(mount, XFS_QUOTAOFF, type, 0, &qflags);
+	ret = xfrog_quotaoff(mount, type, 0, &qflags);
 	if (ret < 0) {
 		if (errno == EEXIST)
 			fprintf(stderr,
@@ -424,7 +424,7 @@ quotaoff(
 		fprintf(stderr, "%s: unknown mount point %s\n", progname, dir);
 		return;
 	}
-	ret = xfrog_quotactl(mount, XFS_QUOTAOFF, type, 0, &qflags);
+	ret = xfrog_quotaoff(mount, type, 0, &qflags);
 	if (ret) {
 		if (errno == EEXIST || errno == ENOSYS)
 			fprintf(stderr, _("Quota already off.\n"));
@@ -442,7 +442,7 @@ remove_qtype_extents(
 {
 	int			error;
 
-	error = xfrog_quotactl(mount, XFS_QUOTARM, type, 0, &type);
+	error = xfrog_quotarm(mount, type, 0, &type);
 	if (error < 0)
 		perror("XFS_QUOTARM");
 	return error;
