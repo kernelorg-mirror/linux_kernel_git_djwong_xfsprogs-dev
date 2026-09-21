@@ -314,6 +314,11 @@ xfs_buf_incore(
 void __xfs_buf_mark_corrupt(struct xfs_buf *bp, xfs_failaddr_t fa);
 #define xfs_buf_mark_corrupt(bp) __xfs_buf_mark_corrupt((bp), __this_address)
 
+static inline void xfs_buf_set_uptodate(struct xfs_buf *bp)
+{
+	/* does nothing, XBF_DONE is not LIBXFS_B_UPTODATE */
+}
+
 static inline void
 xfs_buf_readahead(
 	struct xfs_buftarg	*target,
