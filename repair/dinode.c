@@ -2276,11 +2276,11 @@ process_check_inode_forkoff(
 
 	switch (dino->di_format)  {
 	case XFS_DINODE_FMT_DEV:
-		if (dino->di_forkoff != (roundup(sizeof(xfs_dev_t), 8) >> 3)) {
+		if (dino->di_forkoff != XFS_B_TO_FORKOFF(sizeof(xfs_dev_t))) {
 			do_warn(
 _("bad attr fork offset %d in dev inode %" PRIu64 ", should be %d\n"),
 				dino->di_forkoff, lino,
-				(int)(roundup(sizeof(xfs_dev_t), 8) >> 3));
+				(int)XFS_B_TO_FORKOFF(sizeof(xfs_dev_t)));
 			return 1;
 		}
 		break;
@@ -2295,10 +2295,11 @@ _("metadata inode %" PRIu64 " type %d cannot have attr fork\n"),
 	case XFS_DINODE_FMT_LOCAL:
 	case XFS_DINODE_FMT_EXTENTS:
 	case XFS_DINODE_FMT_BTREE:
-		if (dino->di_forkoff >= (XFS_LITINO(mp) >> 3)) {
+		if (dino->di_forkoff >= XFS_B_TO_FORKOFFT(XFS_LITINO(mp))) {
 			do_warn(
 _("bad attr fork offset %d in inode %" PRIu64 ", max=%zu\n"),
-				dino->di_forkoff, lino, XFS_LITINO(mp) >> 3);
+				dino->di_forkoff, lino,
+				XFS_B_TO_FORKOFFT(XFS_LITINO(mp)));
 			return 1;
 		}
 		break;
