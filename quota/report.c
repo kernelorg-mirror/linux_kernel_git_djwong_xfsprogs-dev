@@ -67,19 +67,16 @@ get_dquot(
 	const struct fs_path	*mount,
 	int			flags)
 {
-	int			cmd;
 	int			ret;
 
-	if (flags & GETNEXTQUOTA_FLAG)
-		cmd = XFS_GETNEXTQUOTA;
-	else
-		cmd = XFS_GETQUOTA;
-
 	/* Fall back silently if XFS_GETNEXTQUOTA fails, warn on XFS_GETQUOTA */
-	ret = xfrog_quotactl(mount, cmd, type, id, d);
+	if (flags & GETNEXTQUOTA_FLAG)
+		ret = xfrog_getnextquota(mount, type, id, d);
+	else
+		ret = xfrog_getquota(mount, type, id, d);
 	if (ret < 0) {
 		if (errno != ENOENT && errno != ENOSYS && errno != ESRCH &&
-		    cmd == XFS_GETQUOTA)
+		    !(flags & GETNEXTQUOTA_FLAG))
 			perror("XFS_GETQUOTA");
 		return 0;
 	}
@@ -610,8 +607,7 @@ report_any_type(
 		while ((mount = fs_cursor_next_entry(&cursor))) {
 			if (!foreign_allowed && (mount->fs_flags & FS_FOREIGN))
 				continue;
-			ret = xfrog_quotactl(mount, XFS_QSYNC, XFS_USER_QUOTA,
-					0, NULL);
+			ret = xfrog_qsync(mount, XFS_USER_QUOTA, 0);
 			if (ret < 0 && errno != ENOENT && errno != ENOSYS)
 				perror("XFS_QSYNC user quota");
 			report_user_mount(fp, form, mount,
@@ -623,8 +619,7 @@ report_any_type(
 		while ((mount = fs_cursor_next_entry(&cursor))) {
 			if (!foreign_allowed && (mount->fs_flags & FS_FOREIGN))
 				continue;
-			ret = xfrog_quotactl(mount, XFS_QSYNC, XFS_GROUP_QUOTA,
-					0, NULL);
+			ret = xfrog_qsync(mount, XFS_GROUP_QUOTA, 0);
 			if (ret < 0 && errno != ENOENT && errno != ENOSYS)
 				perror("XFS_QSYNC group quota");
 			report_group_mount(fp, form, mount,
@@ -636,8 +631,7 @@ report_any_type(
 		while ((mount = fs_cursor_next_entry(&cursor))) {
 			if (!foreign_allowed && (mount->fs_flags & FS_FOREIGN))
 				continue;
-			ret = xfrog_quotactl(mount, XFS_QSYNC, XFS_PROJ_QUOTA,
-					0, NULL);
+			ret = xfrog_qsync(mount, XFS_PROJ_QUOTA, 0);
 			if (ret < 0 && errno != ENOENT && errno != ENOSYS)
 				perror("XFS_QSYNC proj quota");
 			report_project_mount(fp, form, mount,

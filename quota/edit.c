@@ -289,7 +289,7 @@ limit_f(
 		.d_rtb_softlimit	= rtbsoft,
 	};
 
-	c = xfrog_quotactl(fs_path, XFS_SETQLIM, type, id, &d);
+	c = xfrog_setqlim(fs_path, type, id, &d);
 	if (c < 0) {
 		exitcode = 1;
 		fprintf(stderr, _("%s: cannot set limits: %s\n"),
@@ -352,7 +352,7 @@ restore_file(
 				.d_rtb_hardlimit	= rtbhard,
 				.d_rtb_softlimit	= rtbsoft,
 			};
-			int ret = xfsquotactl(-1, dev, XFS_SETQLIM, type, id, &d);
+			int ret = xfssetqlim(dev, type, id, &d);
 
 			if (ret < 0) {
 				exitcode = 1;
@@ -487,7 +487,7 @@ set_timer(
 		time_t	now;
 
 		/* Get quota to find out whether user is past soft limits */
-		ret = xfrog_quotactl(mount, XFS_GETQUOTA, type, id, &d);
+		ret = xfrog_getquota(mount, type, id, &d);
 		if (ret < 0) {
 			exitcode = 1;
 			fprintf(stderr, _("%s: cannot get quota: %s\n"),
@@ -520,7 +520,7 @@ set_timer(
 	d.d_id = id;
 	encode_timers(&d, btimer, itimer, rtbtimer);
 
-	ret = xfrog_quotactl(mount, XFS_SETQLIM, type, id, &d);
+	ret = xfrog_setqlim(fs_path, type, id, &d);
 	if (ret < 0) {
 		exitcode = 1;
 		fprintf(stderr, _("%s: cannot set timer: %s\n"),
@@ -629,7 +629,7 @@ set_warnings(
 	d.d_bwarns = value;
 	d.d_rtbwarns = value;
 
-	ret = xfrog_quotactl(mount, XFS_SETQLIM, type, id, &d);
+	ret = xfrog_setqlim(mount, type, id, &d);
 	if (ret < 0) {
 		exitcode = 1;
 		fprintf(stderr, _("%s: cannot set warnings: %s\n"),
