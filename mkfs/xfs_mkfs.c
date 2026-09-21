@@ -2055,6 +2055,21 @@ log_opts_parser(
 	return 0;
 }
 
+static void
+toggle_qflag(
+	struct opt_params	*opts,
+	int			subopt,
+	const char		*value,
+	struct cli_params	*cli,
+	uint16_t		flag,
+	uint16_t		mask)
+{
+	cli->sb_feat.qflags &= ~mask;
+
+	if (getnum(value, opts, subopt))
+		cli->sb_feat.qflags |= flag;
+}
+
 static int
 meta_opts_parser(
 	struct opt_params	*opts,
@@ -2107,28 +2122,31 @@ meta_opts_parser(
 		cli->sb_feat.metadir = getnum(value, opts, subopt);
 		break;
 	case M_UQUOTA:
-		if (getnum(value, opts, subopt))
-			cli->sb_feat.qflags |= XFS_UQUOTA_ACCT | XFS_UQUOTA_ENFD;
+		toggle_qflag(opts, subopt, value, cli,
+				XFS_UQUOTA_ACCT | XFS_UQUOTA_ENFD,
+				XFS_UQUOTA_ACCT | XFS_UQUOTA_ENFD);
 		break;
 	case M_GQUOTA:
-		if (getnum(value, opts, subopt))
-			cli->sb_feat.qflags |= XFS_GQUOTA_ACCT | XFS_GQUOTA_ENFD;
+		toggle_qflag(opts, subopt, value, cli,
+				XFS_GQUOTA_ACCT | XFS_GQUOTA_ENFD,
+				XFS_GQUOTA_ACCT | XFS_GQUOTA_ENFD);
 		break;
 	case M_PQUOTA:
-		if (getnum(value, opts, subopt))
-			cli->sb_feat.qflags |= XFS_PQUOTA_ACCT | XFS_PQUOTA_ENFD;
+		toggle_qflag(opts, subopt, value, cli,
+				XFS_PQUOTA_ACCT | XFS_PQUOTA_ENFD,
+				XFS_PQUOTA_ACCT | XFS_PQUOTA_ENFD);
 		break;
 	case M_UQNOENFORCE:
-		if (getnum(value, opts, subopt))
-			cli->sb_feat.qflags |= XFS_UQUOTA_ACCT;
+		toggle_qflag(opts, subopt, value, cli, XFS_UQUOTA_ACCT,
+				XFS_UQUOTA_ACCT | XFS_UQUOTA_ENFD);
 		break;
 	case M_GQNOENFORCE:
-		if (getnum(value, opts, subopt))
-			cli->sb_feat.qflags |= XFS_GQUOTA_ACCT;
+		toggle_qflag(opts, subopt, value, cli, XFS_GQUOTA_ACCT,
+				XFS_GQUOTA_ACCT | XFS_GQUOTA_ENFD);
 		break;
 	case M_PQNOENFORCE:
-		if (getnum(value, opts, subopt))
-			cli->sb_feat.qflags |= XFS_PQUOTA_ACCT;
+		toggle_qflag(opts, subopt, value, cli, XFS_PQUOTA_ACCT,
+				XFS_PQUOTA_ACCT | XFS_PQUOTA_ENFD);
 		break;
 	default:
 		return -EINVAL;
