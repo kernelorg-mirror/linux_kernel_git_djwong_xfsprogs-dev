@@ -206,7 +206,7 @@ state_quotafile_stat(
 
 	ret = xfrog_quotactl(mount, XFS_GETQSTATV, type, 0, sv);
 	if (ret < 0) {
-		ret = xfrog_quotactl(mount, XFS_GETQSTAT, type, 0, sv);
+		ret = xfrog_quotactl(mount, XFS_GETQSTAT, type, 0, s);
 		if (ret < 0) {
 			if (flags & VERBOSE_FLAG)
 				fprintf(fp,
