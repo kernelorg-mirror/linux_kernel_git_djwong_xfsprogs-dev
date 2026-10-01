@@ -317,6 +317,16 @@ setup_monitor(
 
 	ret = -xfd_open(&ctx->mnt, ctx->mntpoint, O_RDONLY);
 	if (ret) {
+		if (ret == ENOTTY) {
+			/*
+			 * If the fsgeometry call returns ENOTTY, this isn't
+			 * even an XFS filesystem.
+			 */
+			fprintf(stderr, "%s: %s\n", ctx->mntpoint,
+ _("XFS health monitoring not supported."));
+			return MON_UNSUPPORTED;
+		}
+
 		fprintf(stderr, "%s: %s\n", ctx->mntpoint, strerror(ret));
 		return outcome;
 	}
