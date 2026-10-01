@@ -315,9 +315,9 @@ setup_monitor(
 	int			mon_fd;
 	int			ret;
 
-	ret = xfd_open(&ctx->mnt, ctx->mntpoint, O_RDONLY);
+	ret = -xfd_open(&ctx->mnt, ctx->mntpoint, O_RDONLY);
 	if (ret) {
-		perror(ctx->mntpoint);
+		fprintf(stderr, "%s: %s\n", ctx->mntpoint, strerror(ret));
 		return outcome;
 	}
 
