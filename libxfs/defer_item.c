@@ -30,6 +30,12 @@
 #include "xfs_group.h"
 #include "xfs_rtgroup.h"
 #include "xfs_attr_item.h"
+#include "xfs_extfree_item.h"
+#include "xfs_bmap_item.h"
+#include "xfs_rmap_item.h"
+#include "xfs_refcount_item.h"
+#include "xfs_exchmaps_item.h"
+#include "xfs_icreate_item.h"
 
 /* Dummy defer item ops, since we don't do logging. */
 

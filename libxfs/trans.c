@@ -22,6 +22,7 @@
 #include "xfs_defer.h"
 #include "xfs_trace.h"
 #include "xfs_rtbitmap.h"
+#include "xfs_icreate_item.h"
 
 static void xfs_trans_free_items(struct xfs_trans *tp);
 STATIC struct xfs_trans *xfs_trans_dup(struct xfs_trans *tp);
